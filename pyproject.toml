@@ -1,0 +1,29 @@
+[build-system]
+requires = [
+    "setuptools>=42",
+    "wheel",
+    "setuptools_scm[toml]>=3.4"
+]
+
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+write_to = "src/dask_awkward/_version.py"
+
+[tool.pytest.ini_options]
+addopts = "-v"
+testpaths = ["tests"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+src_paths = ["src", "tests"]
+
+[tool.mypy]
+python_version = 3.7
+warn_unused_configs = true
+files = ["src", "tests"]
+
+[[tool.mypy.overrides]]
+module = ["dask.*"]
+ignore_missing_imports = true
