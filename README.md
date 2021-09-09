@@ -1,4 +1,4 @@
-dask-awkward-sandbox
-====================
+dask-awkward
+============
 
-Early ideas for dask-awkward.
+Early ideas for Awkward Dask arrays.
