@@ -46,30 +46,26 @@ class DaskNode:
     def id(self):
         return (self._id_name(""), id(self))
 
-    @property
-    def raw_id(self):
-        return (self._id_name(":raw"), id(self))
+    @staticmethod
+    def _graph_item(nplike, graph, item):
+        if isinstance(item, DaskNode):
+            item._graph_node(nplike, graph)
+            return item.raw_id
+        else:
+            return item
 
     @staticmethod
     def _graph_args(nplike, graph, args, kwargs):
         out = []
         for arg in args:
-            if isinstance(arg, DaskNode):
-                arg._graph_node(nplike, graph)
-                out.append(arg.raw_id)
-            else:
-                out.append(arg)
+            out.append(DaskNode._graph_item(nplike, graph, arg))
 
         num = len(out)
         kws = []
         if kwargs is not None:
             for kw, arg in kwargs.items():
                 kws.append(kw)
-                if isinstance(arg, DaskNode):
-                    arg._graph_node(nplike, graph)
-                    out.append(arg.raw_id)
-                else:
-                    out.append(arg)
+                out.append(DaskNode._graph_item(nplike, graph, arg))
 
         return out, num, kws
 
@@ -83,6 +79,13 @@ class DaskNodeKernelCall(DaskNode):
         for argdir, arg in zip(ak._cpu_kernels.kernel[name_and_types].dir, args):
             if argdir != "in":
                 arg.mutations.append(self)
+
+    @property
+    def raw_id(self):
+        if self.error_handler is None:
+            return (self._id_name(""), id(self))
+        else:
+            return (self._id_name(":raw"), id(self))
 
     def handle_error(self, error_handler):
         self.error_handler = error_handler
@@ -125,19 +128,36 @@ class DaskNodeCall(DaskNode):
 
         name = self._id_name("")
         if name == ".__getitem__":
-            if isinstance(self.node._type, tuple) and isinstance(self.args[0], numbers.Integral):
+            if (
+                isinstance(self.node._ndim, tuple)
+                and isinstance(self.node._type, tuple)
+                and isinstance(self.args[0], numbers.Integral)
+            ):
+                self._ndim = self.node._ndim[self.args[0]]
                 self._type = self.node._type[self.args[0]]
+            elif self.node._ndim is not None and self.node._type is not None:
+                # We only ever do internal __getitem__ with int or slice
+                if isinstance(self.args[0], numbers.Integral):
+                    self._ndim = self.node._ndim - 1
+                else:
+                    self._ndim = self.node._ndim
+                self._type = self.node._type
+                assert self._ndim >= 0
             else:
-                self._type = None
-        elif name in propagate_type:
-            self._type = propagate_type[name](*args, **kwargs)
-        else:
-            self._type = None
+                self._ndim, self._type = None, None
 
-        if isinstance(self._type, np.dtype):
-            self._ndim = len(self._type.shape) + 1
+        elif name in propagate_type:
+            self._ndim, self._type = propagate_type[name](*args, **kwargs)
+
         else:
-            self._ndim = None
+            self._ndim, self._type = None, None
+
+    @property
+    def raw_id(self):
+        if len(self.mutations) == 0:
+            return (self._id_name(""), id(self))
+        else:
+            return (self._id_name(":raw"), id(self))
 
     @property
     def nplike(self):
@@ -165,6 +185,9 @@ class DaskNodeCall(DaskNode):
 
     def __getitem__(self, where):
         return DaskNodeMethodCall((where,), {}, self, "__getitem__")
+
+    def __add__(self, other):
+        return DaskNodeMethodCall((other,), {}, self, "__add__")
 
 
 class DaskNodeModuleCall(DaskNodeCall):
@@ -195,7 +218,7 @@ class DaskNodeModuleCall(DaskNodeCall):
             if len(kws) == 0:
                 function = direct_function
             else:
-                function = lambda *a: direct_function(*a[:num], **dict(kws, a[num:]))
+                function = lambda *a: direct_function(*a[:num], **dict(zip(kws, a[num:])))
 
             if len(self.mutations) == 0:
                 graph[self_id] = (function,) + tuple(args)
@@ -232,7 +255,7 @@ class DaskNodeMethodCall(DaskNodeCall):
             if len(kws) == 0:
                 function = lambda s, *a: getattr(s, name)(*a)
             else:
-                function = lambda s, *a: getattr(s, name)(*a[:num], **dict(kws, a[num:]))
+                function = lambda s, *a: getattr(s, name)(*a[:num], **dict(zip(kws, a[num:])))
 
             if len(self.mutations) == 0:
                 graph[self_id] = (function, self_arg[0]) + tuple(args)
@@ -282,12 +305,24 @@ class DaskTrace(ak.nplike.NumpyLike):
         return DaskTraceKernelCall(name_and_types)
 
     @staticmethod
-    def prohibit(predicate, consequence, *args):
+    def prohibit(*args):
         out = DaskNodeModuleCall(args, {}, "prohibit", ())
         for arg in args:
             if isinstance(arg, DaskNodeCall):
                 arg.mutations.append(out)
         return out
+
+    @staticmethod
+    def postpone(*args):
+        out = DaskNodeModuleCall(args, {}, "postpone", ())
+        for arg in args:
+            if isinstance(arg, DaskNodeCall):
+                arg.mutations.append(out)
+        return out
+
+    @staticmethod
+    def slice(*args):
+        return DaskNodeModuleCall(args, {}, "slice", ())
 
     _dict = {
         "array_str": lambda array, *args, **kwargs: "[delayed]",
@@ -306,6 +341,7 @@ class DaskTrace(ak.nplike.NumpyLike):
 
 DaskTrace._dict["instance"] = DaskTrace.instance
 DaskTrace._dict["prohibit"] = DaskTrace.prohibit
+DaskTrace._dict["slice"] = DaskTrace.slice
 
 
 class DaskTraceSubmodule:
@@ -320,22 +356,28 @@ propagate_type = {}
 
 
 def propagate_type_array(data, dtype=None, copy=None):
+    ndim = getattr(data, "ndim", None)
+    if ndim is None:
+        raise TypeError("delayed array ndim must be known")
     if dtype is None:
         dtype = getattr(data, "dtype", None)
         if dtype is None:
             raise TypeError("delayed array dtype must be specified")
-    return np.dtype(dtype)
+    return ndim, np.dtype(dtype)
 
 
 propagate_type["array"] = propagate_type_array
 
 
 def propagate_type_asarray(data, dtype=None, order=None):
+    ndim = getattr(data, "ndim", None)
+    if ndim is None:
+        raise TypeError("delayed array ndim must be known")
     if dtype is None:
         dtype = getattr(data, "dtype", None)
         if dtype is None:
             raise TypeError("delayed array dtype must be specified")
-    return np.dtype(dtype)
+    return ndim, np.dtype(dtype)
 
 
 propagate_type["asarray"] = propagate_type_asarray
@@ -343,14 +385,16 @@ propagate_type["ascontiguousarray"] = propagate_type_asarray
 
 
 def propagate_type_frombuffer(data, dtype=np.float64):
-    return np.dtype(dtype)
+    return 1, np.dtype(dtype)
 
 
 propagate_type["frombuffer"] = propagate_type_frombuffer
 
 
 def propagate_type_zeros(shape, dtype=np.float64):
-    return np.dtype(dtype)
+    if isinstance(shape, numbers.Integral):
+        shape = (shape,)
+    return len(shape), np.dtype(dtype)
 
 
 propagate_type["zeros"] = propagate_type_zeros
@@ -359,16 +403,18 @@ propagate_type["empty"] = propagate_type_zeros
 
 
 def propagate_type_full(shape, value, dtype=None):
+    if isinstance(shape, numbers.Integral):
+        shape = (shape,)
     if dtype is None:
         dtype = numpy.array(value).dtype
-    return np.dtype(dtype)
+    return len(shape), np.dtype(dtype)
 
 
 propagate_type["full"] = propagate_type_full
 
 
 def propagate_type_zeros_like(array, *args, **kwargs):
-    return array.dtype
+    return array.ndim, array.dtype
 
 
 propagate_type["zeros_like"] = propagate_type_zeros_like
@@ -377,52 +423,47 @@ propagate_type["full_like"] = propagate_type_zeros_like
 
 
 def propagate_type_arange(*args, dtype=np.int64):
-    return np.dtype(dtype)
-
-
-propagate_type["arange"] = propagate_type_arange
-
-
-def propagate_type_arange(*args, dtype=np.int64):
-    return np.dtype(dtype)
+    return 1, np.dtype(dtype)
 
 
 propagate_type["arange"] = propagate_type_arange
 
 
 def propagate_type_meshgrid(*arrays, indexing="ij"):
-    return tuple([x.dtype for x in arrays])
+    return tuple([(x.ndim, x.dtype) for x in arrays])
 
 
 propagate_type["meshgrid"] = propagate_type_meshgrid
 
 
 def propagate_type_searchsorted(haystack, needle, side=None):
-    return np.dtype(np.int64)
+    return needle.ndim, np.dtype(np.int64)
 
 
 propagate_type["searchsorted"] = propagate_type_searchsorted
 
 
 def propagate_type_argsort(array):
-    return np.dtype(np.int64)
+    return array.ndim, np.dtype(np.int64)
 
 
 propagate_type["argsort"] = propagate_type_argsort
 
 
 def propagate_type_broadcast_arrays(*arrays):
-    return tuple([x.dtype for x in arrays])
+    ndim = max(x.ndim for x in arrays)
+    return (ndim,) * len(arrays), tuple([(x.dtype) for x in arrays])
 
 
 propagate_type["broadcast_arrays"] = propagate_type_broadcast_arrays
 
 
 def propagate_type_add(array1, array2, out=None):
+    ndim = max(array1.ndim, array2.ndim)
     if out is None:
-        return (np.array([], array1.dtype) + np.array([], array2.dtype)).dtype
+        return ndim, (np.array([], array1.dtype) + np.array([], array2.dtype)).dtype
     else:
-        return out.dtype
+        return ndim, out.dtype
 
 
 propagate_type["add"] = propagate_type_add
@@ -430,9 +471,9 @@ propagate_type["add"] = propagate_type_add
 
 def propagate_type_cumsum(array, out=None):
     if out is None:
-        return array.dtype
+        return 1, array.dtype
     else:
-        return out.dtype
+        return out.ndim, out.dtype
 
 
 propagate_type["cumsum"] = propagate_type_cumsum
@@ -441,24 +482,10 @@ propagate_type["cumprod"] = propagate_type_cumsum
 
 def propagate_type_nonzero(array):
     # Awkward only ever uses this function on 1D arrays
-    return np.dtype(np.int64)
+    return 1, np.dtype(np.int64)
 
 
 propagate_type["nonzero"] = propagate_type_nonzero
 
 
-def propagate_type_unique(array):
-    return array.dtype
-
-
-propagate_type["unique"] = propagate_type_unique
-
-
-def propagate_type_concatenate(arrays):
-    return numpy.concatenate([numpy.array([], x.dtype) for x in arrays]).dtype
-
-
-propagate_type["concatenate"] = propagate_type_concatenate
-
-
-# FIXME: next is repeat
+# FIXME: next is unique
