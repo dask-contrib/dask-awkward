@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, List, Tuple
-import functools
 
-import awkward as ak
 from dask.base import DaskMethodsMixin
 from dask.highlevelgraph import HighLevelGraph
 from dask.threaded import get as threaded_get
@@ -56,4 +54,8 @@ class AwkwardDaskArray(DaskMethodsMixin):
         return _finalize_daskawkwardarray, ()
 
     def __str__(self) -> str:
-        return f"AwkwardDaskArray<{key_split(self.name)}>"
+        return (
+            f"AwkwardDaskArray<{key_split(self.name)}, npartitions={self.npartitions}>"
+        )
+
+    __repr__ = __str__
