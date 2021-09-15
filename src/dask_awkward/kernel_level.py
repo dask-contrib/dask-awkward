@@ -112,6 +112,11 @@ def mutations(target, *steps):
     return target
 
 
+def prohibit(predicate, consequence):
+    if predicate:
+        consequence()
+
+
 class DaskNodeCall(DaskNode):
     def __init__(self, args, kwargs):
         self.args = args
@@ -119,23 +124,47 @@ class DaskNodeCall(DaskNode):
         self.mutations = []
 
         name = self._id_name("")
-        if name in propagate_shape_dtype:
-            self.shape, self.dtype = propagate_shape_dtype[name](*args, **kwargs)
-            if self.dtype is not None:
-                self.dtype = np.dtype(self.dtype)
+        if name == ".__getitem__":
+            if isinstance(self.node._type, tuple) and isinstance(self.args[0], numbers.Integral):
+                self._type = self.node._type[self.args[0]]
+            else:
+                self._type = None
+        elif name in propagate_type:
+            self._type = propagate_type[name](*args, **kwargs)
         else:
-            self.shape, self.dtype = None, None
+            self._type = None
+
+        if isinstance(self._type, np.dtype):
+            self._ndim = len(self._type.shape) + 1
+        else:
+            self._ndim = None
 
     @property
     def nplike(self):
         return DaskTrace.instance()
 
     def __len__(self):
-        if self.shape is None:
-            raise TypeError("delayed object is not known to be an array")
+        return DaskNodeModuleCall((self,), {}, "shape", ())[0]
 
     def __getattr__(self, name):
-        return DaskTraceMethodCall(self, name)
+        if name == "ndim":
+            if self._ndim is None:
+                raise TypeError("delayed computation is not known to be an array")
+            return self._ndim
+
+        elif name == "shape":
+            return DaskNodeModuleCall((self,), {}, "shape", ())
+
+        elif name == "dtype":
+            if not isinstance(self._type, np.dtype):
+                raise TypeError("delayed computation is not known to be an array")
+            return self._type
+
+        else:
+            return DaskTraceMethodCall(self, name)
+
+    def __getitem__(self, where):
+        return DaskNodeMethodCall((where,), {}, self, "__getitem__")
 
 
 class DaskNodeModuleCall(DaskNodeCall):
@@ -144,7 +173,7 @@ class DaskNodeModuleCall(DaskNodeCall):
         self.submodule = submodule
         super().__init__(args, kwargs)
 
-        out = kwargs.get("out", None)
+        out = kwargs.get("out", None)   # all functions we use are consistent about this
         if out is not None:
             out.mutations.append(self)
 
@@ -189,7 +218,7 @@ class DaskNodeMethodCall(DaskNodeCall):
         super().__init__(args, kwargs)
 
     def _id_name(self, suffix):
-        return "ndarray." + self.name + suffix
+        return "." + self.name + suffix
 
     def _graph_node(self, nplike, graph):
         self_id = self.id
@@ -252,16 +281,31 @@ class DaskTrace(ak.nplike.NumpyLike):
     def __getitem__(self, name_and_types):
         return DaskTraceKernelCall(name_and_types)
 
-    def asarray(self, data):
-        raise NotImplementedError
+    @staticmethod
+    def prohibit(predicate, consequence, *args):
+        out = DaskNodeModuleCall(args, {}, "prohibit", ())
+        for arg in args:
+            if isinstance(arg, DaskNodeCall):
+                arg.mutations.append(out)
+        return out
+
+    _dict = {
+        "array_str": lambda array, *args, **kwargs: "[delayed]",
+    }
 
     def __getattribute__(self, name):
-        if name == "ma":
+        if name in DaskTrace._dict:
+            return DaskTrace._dict[name]
+        elif name == "ma":
             return DaskTraceSubmodule(("ma",))
         elif name == "char":
             return DaskTraceSubmodule(("char",))
         else:
             return DaskTraceModuleCall(name, ())
+
+
+DaskTrace._dict["instance"] = DaskTrace.instance
+DaskTrace._dict["prohibit"] = DaskTrace.prohibit
 
 
 class DaskTraceSubmodule:
@@ -272,186 +316,149 @@ class DaskTraceSubmodule:
         return DaskTraceModuleCall(name, self.submodule)
 
 
-propagate_shape_dtype = {}
-
-UNSPECIFIED = object()
+propagate_type = {}
 
 
-def propagate_array(data, dtype=UNSPECIFIED, copy=UNSPECIFIED):
-    shape = getattr(data, "shape", UNSPECIFIED)
-    if shape is UNSPECIFIED:
-        shape = (len(data),)
-    if dtype is UNSPECIFIED:
-        dtype = getattr(data, "dtype", UNSPECIFIED)
-        if dtype is UNSPECIFIED:
+def propagate_type_array(data, dtype=None, copy=None):
+    if dtype is None:
+        dtype = getattr(data, "dtype", None)
+        if dtype is None:
             raise TypeError("delayed array dtype must be specified")
-    return shape, dtype
+    return np.dtype(dtype)
 
 
-propagate_shape_dtype["array"] = propagate_array
+propagate_type["array"] = propagate_type_array
 
 
-def propagate_asarray(data, dtype=UNSPECIFIED, order="C"):
-    shape = getattr(data, "shape", UNSPECIFIED)
-    if shape is UNSPECIFIED:
-        shape = (len(data),)
-    if dtype is UNSPECIFIED:
-        dtype = getattr(data, "dtype", UNSPECIFIED)
-        if dtype is UNSPECIFIED:
+def propagate_type_asarray(data, dtype=None, order=None):
+    if dtype is None:
+        dtype = getattr(data, "dtype", None)
+        if dtype is None:
             raise TypeError("delayed array dtype must be specified")
-    return shape, dtype
+    return np.dtype(dtype)
 
 
-propagate_shape_dtype["asarray"] = propagate_asarray
+propagate_type["asarray"] = propagate_type_asarray
+propagate_type["ascontiguousarray"] = propagate_type_asarray
 
 
-def propagate_ascontiguousarray(data, dtype=UNSPECIFIED):
-    shape = getattr(data, "shape", UNSPECIFIED)
-    if shape is UNSPECIFIED:
-        shape = (len(data),)
-    if dtype is UNSPECIFIED:
-        dtype = getattr(data, "dtype", UNSPECIFIED)
-        if dtype is UNSPECIFIED:
-            raise TypeError("delayed array dtype must be specified")
-    return shape, dtype
+def propagate_type_frombuffer(data, dtype=np.float64):
+    return np.dtype(dtype)
 
 
-propagate_shape_dtype["ascontiguousarray"] = propagate_ascontiguousarray
+propagate_type["frombuffer"] = propagate_type_frombuffer
 
 
-def propagate_frombuffer(data, dtype=np.float64):
-    shape = (len(data) // dtype.itemsize,)
-    return shape, dtype
+def propagate_type_zeros(shape, dtype=np.float64):
+    return np.dtype(dtype)
 
 
-propagate_shape_dtype["frombuffer"] = propagate_frombuffer
+propagate_type["zeros"] = propagate_type_zeros
+propagate_type["ones"] = propagate_type_zeros
+propagate_type["empty"] = propagate_type_zeros
 
 
-def propagate_zeros(shape, dtype=np.float64):
-    if isinstance(shape, numbers.Integral):
-        shape = (shape,)
-    return shape, dtype
-
-
-propagate_shape_dtype["zeros"] = propagate_zeros
-
-
-def propagate_ones(shape, dtype=np.float64):
-    if isinstance(shape, numbers.Integral):
-        shape = (shape,)
-    return shape, dtype
-
-
-propagate_shape_dtype["ones"] = propagate_ones
-
-
-def propagate_empty(shape, dtype=np.float64):
-    if isinstance(shape, numbers.Integral):
-        shape = (shape,)
-    return shape, dtype
-
-
-propagate_shape_dtype["empty"] = propagate_empty
-
-
-def propagate_full(shape, value, dtype=UNSPECIFIED):
-    if isinstance(shape, numbers.Integral):
-        shape = (shape,)
-    if dtype is UNSPECIFIED:
+def propagate_type_full(shape, value, dtype=None):
+    if dtype is None:
         dtype = numpy.array(value).dtype
-    return shape, dtype
+    return np.dtype(dtype)
 
 
-propagate_shape_dtype["full"] = propagate_full
+propagate_type["full"] = propagate_type_full
 
 
-def propagate_zeros_like(array):
-    return array.shape, array.dtype
+def propagate_type_zeros_like(array, *args, **kwargs):
+    return array.dtype
 
 
-propagate_shape_dtype["zeros_like"] = propagate_zeros_like
+propagate_type["zeros_like"] = propagate_type_zeros_like
+propagate_type["ones_like"] = propagate_type_zeros_like
+propagate_type["full_like"] = propagate_type_zeros_like
 
 
-def propagate_ones_like(array):
-    return array.shape, array.dtype
+def propagate_type_arange(*args, dtype=np.int64):
+    return np.dtype(dtype)
 
 
-propagate_shape_dtype["ones_like"] = propagate_ones_like
+propagate_type["arange"] = propagate_type_arange
 
 
-def propagate_full_like(array):
-    return array.shape, array.dtype
+def propagate_type_arange(*args, dtype=np.int64):
+    return np.dtype(dtype)
 
 
-propagate_shape_dtype["full_like"] = propagate_full_like
+propagate_type["arange"] = propagate_type_arange
 
 
-def propagate_arange(arg1, arg2=UNSPECIFIED, arg3=UNSPECIFIED, dtype=np.int64):
-    if (
-        isinstance(arg1, numbers.Integral)
-        and arg2 is UNSPECIFIED
-        and arg3 is UNSPECIFIED
-    ):
-        shape = (arg1,)
-    elif (
-        isinstance(arg1, numbers.Integral)
-        and isinstance(arg2, numbers.Integral)
-        and arg3 is UNSPECIFIED
-    ):
-        shape = (arg2 - arg1,)
-    elif (
-        isinstance(arg1, numbers.Integral)
-        and isinstance(arg2, numbers.Integral)
-        and isinstance(arg3, numbers.Integral)
-    ):
-        shape = ((arg2 - arg1) // arg3,)
-    return shape, dtype
+def propagate_type_meshgrid(*arrays, indexing="ij"):
+    return tuple([x.dtype for x in arrays])
 
 
-propagate_shape_dtype["arange"] = propagate_arange
+propagate_type["meshgrid"] = propagate_type_meshgrid
 
 
-# FIXME: meshgrid returns a tuple
+def propagate_type_searchsorted(haystack, needle, side=None):
+    return np.dtype(np.int64)
 
 
-def propagate_searchsorted(haystack, needle, side="left"):
-    return needle.shape, np.int64
+propagate_type["searchsorted"] = propagate_type_searchsorted
 
 
-propagate_shape_dtype["searchsorted"] = propagate_searchsorted
+def propagate_type_argsort(array):
+    return np.dtype(np.int64)
 
 
-def propagate_argsort(array):
-    return array.shape, np.int64
+propagate_type["argsort"] = propagate_type_argsort
 
 
-propagate_shape_dtype["argsort"] = propagate_argsort
+def propagate_type_broadcast_arrays(*arrays):
+    return tuple([x.dtype for x in arrays])
 
 
-# FIXME: broadcast_arrays returns a tuple
+propagate_type["broadcast_arrays"] = propagate_type_broadcast_arrays
 
 
-def propagate_add(array1, array2, out=None):
-    shape = getattr(array1, "shape", None)
-    if shape is None or all(x is None for x in shape):
-        if getattr(array2, "shape", None) is not None:
-            shape = array2
-    dtype = (numpy.array([], array1.dtype) + numpy.array([], array2.dtype)).dtype
-    return shape, dtype
+def propagate_type_add(array1, array2, out=None):
+    if out is None:
+        return (np.array([], array1.dtype) + np.array([], array2.dtype)).dtype
+    else:
+        return out.dtype
 
 
-propagate_shape_dtype["add"] = propagate_add
+propagate_type["add"] = propagate_type_add
 
 
-def propagate_cumsum(array, out=None):
-    return array.shape, array.dtype
+def propagate_type_cumsum(array, out=None):
+    if out is None:
+        return array.dtype
+    else:
+        return out.dtype
 
 
-propagate_shape_dtype["cumsum"] = propagate_cumsum
+propagate_type["cumsum"] = propagate_type_cumsum
+propagate_type["cumprod"] = propagate_type_cumsum
 
 
-def propagate_cumprod(array, out=None):
-    return array.shape, array.dtype
+def propagate_type_nonzero(array):
+    # Awkward only ever uses this function on 1D arrays
+    return np.dtype(np.int64)
 
 
-propagate_shape_dtype["cumprod"] = propagate_cumprod
+propagate_type["nonzero"] = propagate_type_nonzero
+
+
+def propagate_type_unique(array):
+    return array.dtype
+
+
+propagate_type["unique"] = propagate_type_unique
+
+
+def propagate_type_concatenate(arrays):
+    return numpy.concatenate([numpy.array([], x.dtype) for x in arrays]).dtype
+
+
+propagate_type["concatenate"] = propagate_type_concatenate
+
+
+# FIXME: next is repeat
