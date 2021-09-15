@@ -4,9 +4,12 @@ This module implements Dask task graphs at Awkward Array's kernel level.
 Graph nodes are 1D array and kernel calls, rather than user-level functions (ak.*).
 """
 
+import numbers
+
 import awkward as ak
 
 np = ak.nplike.NumpyMetadata.instance()
+numpy = ak.nplike.Numpy.instance()
 
 
 def _run(symbols, graph, which):
@@ -115,9 +118,21 @@ class DaskNodeCall(DaskNode):
         self.kwargs = kwargs
         self.mutations = []
 
+        name = self._id_name("")
+        if name in propagate_shape_dtype:
+            self.shape, self.dtype = propagate_shape_dtype[name](*args, **kwargs)
+            if self.dtype is not None:
+                self.dtype = np.dtype(self.dtype)
+        else:
+            self.shape, self.dtype = None, None
+
     @property
     def nplike(self):
         return DaskTrace.instance()
+
+    def __len__(self):
+        if self.shape is None:
+            raise TypeError("delayed object is not known to be an array")
 
     def __getattr__(self, name):
         return DaskTraceMethodCall(self, name)
@@ -125,12 +140,16 @@ class DaskNodeCall(DaskNode):
 
 class DaskNodeModuleCall(DaskNodeCall):
     def __init__(self, args, kwargs, name, submodule):
-        super().__init__(args, kwargs)
         self.name = name
         self.submodule = submodule
+        super().__init__(args, kwargs)
+
+        out = kwargs.get("out", None)
+        if out is not None:
+            out.mutations.append(self)
 
     def _id_name(self, suffix):
-        return self.name + suffix
+        return "".join(x + "." for x in self.submodule) + self.name + suffix
 
     def _graph_node(self, nplike, graph):
         self_id = self.id
@@ -165,11 +184,11 @@ class DaskNodeModuleCall(DaskNodeCall):
 
 class DaskNodeMethodCall(DaskNodeCall):
     def __init__(self, args, kwargs, node, name):
-        super().__init__(args, kwargs)
         self.node = node
         self.name = name
+        super().__init__(args, kwargs)
 
-    def _id_name(self):
+    def _id_name(self, suffix):
         return "ndarray." + self.name + suffix
 
     def _graph_node(self, nplike, graph):
@@ -251,3 +270,188 @@ class DaskTraceSubmodule:
 
     def __getattr__(self, name):
         return DaskTraceModuleCall(name, self.submodule)
+
+
+propagate_shape_dtype = {}
+
+UNSPECIFIED = object()
+
+
+def propagate_array(data, dtype=UNSPECIFIED, copy=UNSPECIFIED):
+    shape = getattr(data, "shape", UNSPECIFIED)
+    if shape is UNSPECIFIED:
+        shape = (len(data),)
+    if dtype is UNSPECIFIED:
+        dtype = getattr(data, "dtype", UNSPECIFIED)
+        if dtype is UNSPECIFIED:
+            raise TypeError("delayed array dtype must be specified")
+    return shape, dtype
+
+
+propagate_shape_dtype["array"] = propagate_array
+
+
+def propagate_asarray(data, dtype=UNSPECIFIED, order="C"):
+    shape = getattr(data, "shape", UNSPECIFIED)
+    if shape is UNSPECIFIED:
+        shape = (len(data),)
+    if dtype is UNSPECIFIED:
+        dtype = getattr(data, "dtype", UNSPECIFIED)
+        if dtype is UNSPECIFIED:
+            raise TypeError("delayed array dtype must be specified")
+    return shape, dtype
+
+
+propagate_shape_dtype["asarray"] = propagate_asarray
+
+
+def propagate_ascontiguousarray(data, dtype=UNSPECIFIED):
+    shape = getattr(data, "shape", UNSPECIFIED)
+    if shape is UNSPECIFIED:
+        shape = (len(data),)
+    if dtype is UNSPECIFIED:
+        dtype = getattr(data, "dtype", UNSPECIFIED)
+        if dtype is UNSPECIFIED:
+            raise TypeError("delayed array dtype must be specified")
+    return shape, dtype
+
+
+propagate_shape_dtype["ascontiguousarray"] = propagate_ascontiguousarray
+
+
+def propagate_frombuffer(data, dtype=np.float64):
+    shape = (len(data) // dtype.itemsize,)
+    return shape, dtype
+
+
+propagate_shape_dtype["frombuffer"] = propagate_frombuffer
+
+
+def propagate_zeros(shape, dtype=np.float64):
+    if isinstance(shape, numbers.Integral):
+        shape = (shape,)
+    return shape, dtype
+
+
+propagate_shape_dtype["zeros"] = propagate_zeros
+
+
+def propagate_ones(shape, dtype=np.float64):
+    if isinstance(shape, numbers.Integral):
+        shape = (shape,)
+    return shape, dtype
+
+
+propagate_shape_dtype["ones"] = propagate_ones
+
+
+def propagate_empty(shape, dtype=np.float64):
+    if isinstance(shape, numbers.Integral):
+        shape = (shape,)
+    return shape, dtype
+
+
+propagate_shape_dtype["empty"] = propagate_empty
+
+
+def propagate_full(shape, value, dtype=UNSPECIFIED):
+    if isinstance(shape, numbers.Integral):
+        shape = (shape,)
+    if dtype is UNSPECIFIED:
+        dtype = numpy.array(value).dtype
+    return shape, dtype
+
+
+propagate_shape_dtype["full"] = propagate_full
+
+
+def propagate_zeros_like(array):
+    return array.shape, array.dtype
+
+
+propagate_shape_dtype["zeros_like"] = propagate_zeros_like
+
+
+def propagate_ones_like(array):
+    return array.shape, array.dtype
+
+
+propagate_shape_dtype["ones_like"] = propagate_ones_like
+
+
+def propagate_full_like(array):
+    return array.shape, array.dtype
+
+
+propagate_shape_dtype["full_like"] = propagate_full_like
+
+
+def propagate_arange(arg1, arg2=UNSPECIFIED, arg3=UNSPECIFIED, dtype=np.int64):
+    if (
+        isinstance(arg1, numbers.Integral)
+        and arg2 is UNSPECIFIED
+        and arg3 is UNSPECIFIED
+    ):
+        shape = (arg1,)
+    elif (
+        isinstance(arg1, numbers.Integral)
+        and isinstance(arg2, numbers.Integral)
+        and arg3 is UNSPECIFIED
+    ):
+        shape = (arg2 - arg1,)
+    elif (
+        isinstance(arg1, numbers.Integral)
+        and isinstance(arg2, numbers.Integral)
+        and isinstance(arg3, numbers.Integral)
+    ):
+        shape = ((arg2 - arg1) // arg3,)
+    return shape, dtype
+
+
+propagate_shape_dtype["arange"] = propagate_arange
+
+
+# FIXME: meshgrid returns a tuple
+
+
+def propagate_searchsorted(haystack, needle, side="left"):
+    return needle.shape, np.int64
+
+
+propagate_shape_dtype["searchsorted"] = propagate_searchsorted
+
+
+def propagate_argsort(array):
+    return array.shape, np.int64
+
+
+propagate_shape_dtype["argsort"] = propagate_argsort
+
+
+# FIXME: broadcast_arrays returns a tuple
+
+
+def propagate_add(array1, array2, out=None):
+    shape = getattr(array1, "shape", None)
+    if shape is None or all(x is None for x in shape):
+        if getattr(array2, "shape", None) is not None:
+            shape = array2
+    dtype = (numpy.array([], array1.dtype) + numpy.array([], array2.dtype)).dtype
+    return shape, dtype
+
+
+propagate_shape_dtype["add"] = propagate_add
+
+
+def propagate_cumsum(array, out=None):
+    return array.shape, array.dtype
+
+
+propagate_shape_dtype["cumsum"] = propagate_cumsum
+
+
+def propagate_cumprod(array, out=None):
+    return array.shape, array.dtype
+
+
+propagate_shape_dtype["cumprod"] = propagate_cumprod
