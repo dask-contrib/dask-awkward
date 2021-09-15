@@ -9,7 +9,7 @@ import awkward as ak
 np = ak.nplike.NumpyMetadata.instance()
 
 
-def run(graph, which):
+def _run(symbols, graph, which):
     function, *delayed_args = graph[which]
     args = []
     for x in delayed_args:
@@ -19,10 +19,18 @@ def run(graph, which):
             and isinstance(x[0], str)
             and isinstance(x[1], int)
         ):
-            args.append(run(graph, x))
+            if x not in symbols:
+                symbols[x] = _run(symbols, graph, x)
+            args.append(symbols[x])
         else:
             args.append(x)
+
     return function(*args)
+
+
+def run(graph, which):
+    symbols = {}
+    return _run(symbols, graph, which)
 
 
 class DaskNode:
@@ -35,13 +43,17 @@ class DaskNode:
     def id(self):
         return (self._id_name(""), id(self))
 
+    @property
+    def raw_id(self):
+        return (self._id_name(":raw"), id(self))
+
     @staticmethod
     def _graph_args(nplike, graph, args, kwargs):
         out = []
         for arg in args:
             if isinstance(arg, DaskNode):
                 arg._graph_node(nplike, graph)
-                out.append(arg.id)
+                out.append(arg.raw_id)
             else:
                 out.append(arg)
 
@@ -52,7 +64,7 @@ class DaskNode:
                 kws.append(kw)
                 if isinstance(arg, DaskNode):
                     arg._graph_node(nplike, graph)
-                    out.append(arg.id)
+                    out.append(arg.raw_id)
                 else:
                     out.append(arg)
 
@@ -65,6 +77,10 @@ class DaskNodeKernelCall(DaskNode):
         self.args = args
         self.error_handler = None
 
+        for argdir, arg in zip(ak._cpu_kernels.kernel[name_and_types].dir, args):
+            if argdir != "in":
+                arg.mutations.append(self)
+
     def handle_error(self, error_handler):
         self.error_handler = error_handler
 
@@ -76,22 +92,28 @@ class DaskNodeKernelCall(DaskNode):
     def _graph_node(self, nplike, graph):
         self_id = self.id
         if self_id not in graph:
+            graph[self_id] = None   # prevent infinite recursion
+
             args, _, _ = self._graph_args(nplike, graph, self.args, None)
             kernel = nplike[self.name_and_types]
 
             if self.error_handler is None:
                 graph[self_id] = (kernel,) + tuple(args)
             else:
-                raw_id = (self._id_name(":raw"), id(self))
+                raw_id = self.raw_id
                 graph[raw_id] = (kernel,) + tuple(args)
                 graph[self_id] = (self.error_handler, raw_id)
+
+
+def mutations(target, *steps):
+    return target
 
 
 class DaskNodeCall(DaskNode):
     def __init__(self, args, kwargs):
         self.args = args
         self.kwargs = kwargs
-        self.mutations = []  # FIXME: any kernel for which this is an "out" is a dependency
+        self.mutations = []
 
     @property
     def nplike(self):
@@ -113,6 +135,8 @@ class DaskNodeModuleCall(DaskNodeCall):
     def _graph_node(self, nplike, graph):
         self_id = self.id
         if self_id not in graph:
+            graph[self_id] = None   # prevent infinite recursion
+
             args, num, kws = self._graph_args(nplike, graph, self.args, self.kwargs)
 
             module = nplike
@@ -125,7 +149,18 @@ class DaskNodeModuleCall(DaskNodeCall):
             else:
                 function = lambda *a: direct_function(*a[:num], **dict(kws, a[num:]))
 
-            graph[self_id] = (function,) + tuple(args)
+            if len(self.mutations) == 0:
+                graph[self_id] = (function,) + tuple(args)
+
+            else:
+                raw_id = self.raw_id
+                graph[raw_id] = (function,) + tuple(args)
+
+                mutargs = []
+                for mut in self.mutations:
+                    mut._graph_node(nplike, graph)
+                    mutargs.append(mut.id)
+                graph[self_id] = (mutations, raw_id) + tuple(mutargs)
 
 
 class DaskNodeMethodCall(DaskNodeCall):
@@ -140,6 +175,8 @@ class DaskNodeMethodCall(DaskNodeCall):
     def _graph_node(self, nplike, graph):
         self_id = self.id
         if self_id not in graph:
+            graph[self_id] = None   # prevent infinite recursion
+
             name = self.name
             self_arg, _, _ = self._graph_args(nplike, graph, (self.node,), None)
             args, num, kws = self._graph_args(nplike, graph, self.args, self.kwargs)
@@ -149,7 +186,18 @@ class DaskNodeMethodCall(DaskNodeCall):
             else:
                 function = lambda s, *a: getattr(s, name)(*a[:num], **dict(kws, a[num:]))
 
-            graph[self_id] = (function, self_arg[0]) + tuple(args)
+            if len(self.mutations) == 0:
+                graph[self_id] = (function, self_arg[0]) + tuple(args)
+
+            else:
+                raw_id = self.raw_id
+                graph[raw_id] = (function, self_arg[0]) + tuple(args)
+
+                mutargs = []
+                for mut in self.mutations:
+                    mut._graph_node(nplike, graph)
+                    mutargs.append(mut.id)
+                graph[self_id] = (mutations, raw_id) + tuple(mutargs)
 
 
 class DaskTraceKernelCall:
