@@ -38,12 +38,11 @@ class AwkwardDaskArray(DaskMethodsMixin):
     def __dask_optimize__(dsk, keys, **kwargs):
         return dsk
 
-    @staticmethod
-    def _rebuild(dsk: Any, *, rename: Any = None) -> Any:
+    def _rebuild(self, dsk: Any, *, rename: Any = None) -> Any:
         name = self.name
         if rename:
             name = rename.get(name, name)
-        return AwkwardDaskArray(dsk, name, self.npartitions)
+        return type(self)(dsk, name, self.npartitions)
 
     def __str__(self) -> str:
         return (
