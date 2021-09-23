@@ -1,0 +1,9 @@
+name: test-environment
+channels:
+  - conda-forge
+dependencies:
+  # required dependencies
+  - python=3.8
+  - dask
+  - awkward
+  - pytest
