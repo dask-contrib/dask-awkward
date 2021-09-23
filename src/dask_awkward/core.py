@@ -15,7 +15,7 @@ def _finalize_daskawkwardarray(results: Any) -> Any:
     return ak.concatenate(results)
 
 
-class AwkwardDaskArray(DaskMethodsMixin):
+class DaskAwkwardArray(DaskMethodsMixin):
     def __init__(self, dsk: HighLevelGraph, key: str, npartitions: int) -> None:
         self._dsk: HighLevelGraph = dsk
         self._key: str = key
@@ -49,7 +49,7 @@ class AwkwardDaskArray(DaskMethodsMixin):
 
     def __str__(self) -> str:
         return (
-            f"AwkwardDaskArray<{key_split(self.name)}, npartitions={self.npartitions}>"
+            f"DaskAwkwardArray<{key_split(self.name)}, npartitions={self.npartitions}>"
         )
 
     __repr__ = __str__
@@ -84,7 +84,7 @@ class AwkwardDaskArray(DaskMethodsMixin):
         name = f"getitem-{token}"
         graphlayer = partitionwise(_getitem, name, self, gikey=key)
         hlg = HighLevelGraph.from_collections(name, graphlayer, dependencies=[self])
-        return AwkwardDaskArray(hlg, name, self.npartitions)
+        return DaskAwkwardArray(hlg, name, self.npartitions)
 
     def __getattr__(self, attr) -> Any:
         return self.__getitem__(attr)
@@ -98,7 +98,7 @@ def partitionwise(func, name, *args, **kwargs):
     pairs: List[Any] = []
     numblocks: Dict[Any, int] = {}
     for arg in args:
-        if isinstance(arg, AwkwardDaskArray):
+        if isinstance(arg, DaskAwkwardArray):
             pairs.extend([arg.name, "i"])
             numblocks[arg.name] = (arg.npartitions,)
     return core_blockwise(
@@ -123,7 +123,7 @@ class PartitionwiseOp:
         name = f"{self.__name__}-{token}"
         layer = partitionwise(self._func, name, collection, **kwargs)
         hlg = HighLevelGraph.from_collections(name, layer, dependencies=[collection])
-        return AwkwardDaskArray(hlg, name, collection.npartitions)
+        return DaskAwkwardArray(hlg, name, collection.npartitions)
 
 
 flatten = PartitionwiseOp(ak.flatten)
