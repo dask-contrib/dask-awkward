@@ -35,7 +35,9 @@ jobs:
         auto-activate-base: false
     - name: Install package
       run: |
+        conda activate test-environment
         python -m pip install --ignore-installed -U -q --no-cache-dir -e .
     - name: Run tests
       run: |
+        conda activate test-environment
         py.test tests
