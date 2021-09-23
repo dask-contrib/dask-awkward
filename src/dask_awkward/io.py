@@ -2,19 +2,19 @@ import awkward as ak
 from dask.base import tokenize
 from dask.highlevelgraph import HighLevelGraph
 
-from .core import AwkwardDaskArray
+from .core import DaskAwkwardArray
 
 
 def _from_json(source, kwargs):
     return ak.from_json(source, **kwargs)
 
 
-def from_json(source, **kwargs) -> AwkwardDaskArray:
+def from_json(source, **kwargs) -> DaskAwkwardArray:
     token = tokenize(source)
     name = f"from-json-{token}"
     dsk = {(name, i): (_from_json, f, kwargs) for i, f in enumerate(source)}
     hlg = HighLevelGraph.from_collections(name, dsk)
-    return AwkwardDaskArray(hlg, name, len(source))
+    return DaskAwkwardArray(hlg, name, len(source))
 
 
 def _from_parquet_single(source, kwargs):
@@ -25,7 +25,7 @@ def _from_parquet_rowgroups(source, row_groups, kwargs):
     return ak.from_parquet(source, row_groups=row_groups, **kwargs)
 
 
-def from_parquet(source, **kwargs) -> AwkwardDaskArray:
+def from_parquet(source, **kwargs) -> DaskAwkwardArray:
     token = tokenize(source)
     name = f"from-parquet-{token}"
 
@@ -43,4 +43,4 @@ def from_parquet(source, **kwargs) -> AwkwardDaskArray:
         N = len(row_groups)
 
     hlg = HighLevelGraph.from_collections(name, dsk)
-    return AwkwardDaskArray(hlg, name, N)
+    return DaskAwkwardArray(hlg, name, N)
