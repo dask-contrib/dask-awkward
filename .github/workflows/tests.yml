@@ -35,7 +35,7 @@ jobs:
         auto-activate-base: false
     - name: Install package
       run: |
-        python3 -m pip install --ignore-installed -U -q --no-cache-dir -e .
+        python -m pip install --ignore-installed -U -q --no-cache-dir -e .
     - name: Run tests
       run: |
-        python3 -m pytest
+        py.test tests
