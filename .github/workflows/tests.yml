@@ -22,11 +22,24 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
+    - name: Setup Conda Environment
+      uses: conda-incubator/setup-miniconda@v2
+      with:
+        miniforge-variant: Mambaforge
+        miniforge-version: latest
+        use-mamba: true
+        channel-priority: strict
+        python-version: ${{ matrix.python-version }}
+        environment-file: tests/environment-${{ matrix.python-version }}.yml
+        activate-environment: test-environment
+        auto-activate-base: false
     - name: Install package
+      shell: bash -l {0}
       run: |
-        python3 -m pip install pip setuptools wheel
-        python3 -m pip install --ignore-installed -U -q --no-cache-dir -e .[complete]
-        python3 -m pip list
+        conda activate test-environment
+        python -m pip install --ignore-installed -U -q --no-cache-dir -e .
     - name: Run tests
+      shell: bash -l {0}
       run: |
-        python3 -m pytest
+        conda activate test-environment
+        py.test tests
