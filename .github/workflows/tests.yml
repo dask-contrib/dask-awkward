@@ -25,7 +25,8 @@ jobs:
     - name: Install package
       run: |
         python3 -m pip install pip setuptools wheel
-        python3 -m pip install --ignore-installed -U -q --no-cache-dir -e .[complete]
+        python3 -m pip install pytest
+        python3 -m pip install --ignore-installed -U -q --no-cache-dir -e .
         python3 -m pip list
     - name: Run tests
       run: |
