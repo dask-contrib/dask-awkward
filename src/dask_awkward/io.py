@@ -2,19 +2,11 @@ import awkward as ak
 from dask.base import tokenize
 from dask.highlevelgraph import HighLevelGraph
 
-from .collection import AwkwardDaskArray
+from .core import AwkwardDaskArray
 
 
 def _from_json(source, kwargs):
     return ak.from_json(source, **kwargs)
-
-
-def _from_parquet_single(source, kwargs):
-    return ak.from_parquet(source, **kwargs)
-
-
-def _from_parquet_rowgroups(source, row_groups, kwargs):
-    return ak.from_parquet(source, row_groups=row_groups, **kwargs)
 
 
 def from_json(source, **kwargs) -> AwkwardDaskArray:
@@ -25,12 +17,22 @@ def from_json(source, **kwargs) -> AwkwardDaskArray:
     return AwkwardDaskArray(hlg, name, len(source))
 
 
+def _from_parquet_single(source, kwargs):
+    return ak.from_parquet(source, **kwargs)
+
+
+def _from_parquet_rowgroups(source, row_groups, kwargs):
+    return ak.from_parquet(source, row_groups=row_groups, **kwargs)
+
+
 def from_parquet(source, **kwargs) -> AwkwardDaskArray:
     token = tokenize(source)
     name = f"from-parquet-{token}"
 
     if isinstance(source, list):
-        dsk = {(name, i): (_from_parquet_single, f, kwargs) for i, f in enumerate(source)}
+        dsk = {
+            (name, i): (_from_parquet_single, f, kwargs) for i, f in enumerate(source)
+        }
         N = len(source)
     elif "row_groups" in kwargs:
         row_groups = kwargs.pop("row_groups")

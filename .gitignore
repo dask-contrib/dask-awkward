@@ -3,6 +3,10 @@
 
 # default dask visualize() output
 mydask.png
+dask-hlg.svg
+
+# distributed
+dask-worker-space
 
 # scratch files
 scratch/*.parquet
