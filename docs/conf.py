@@ -20,7 +20,7 @@ import dask_awkward
 
 project = "dask-awkward"
 copyright = "2021, Dask contributors"
-author = "Doug Davis"
+author = "Dask contributors"
 
 
 version = dask_awkward.__version__
