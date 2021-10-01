@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools
 import operator
+from numbers import Number
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 import awkward as ak
@@ -10,7 +11,7 @@ from dask.base import DaskMethodsMixin, replace_name_in_key, tokenize
 from dask.blockwise import blockwise as core_blockwise
 from dask.highlevelgraph import HighLevelGraph
 from dask.threaded import get as threaded_get
-from dask.utils import key_split
+from dask.utils import key_split, IndexCallable
 
 
 def _finalize_daskawkwardarray(results: Any) -> Any:
@@ -28,18 +29,18 @@ def _finalize_scalar(results: Any) -> Any:
 
 class Scalar(DaskMethodsMixin):
     def __init__(self, dsk: HighLevelGraph, key: str) -> None:
-        self._dsk: HighLevelGraph = dsk
+        self._dask: HighLevelGraph = dsk
         self._key: str = key
 
     def __dask_graph__(self):
-        return self._dsk
+        return self._dask
 
     def __dask_keys__(self):
         return [self._key]
 
     def __dask_layers__(self):
-        if isinstance(self._dsk, HighLevelGraph) and len(self._dsk.layers) == 1:
-            return tuple(self._dsk.layers)
+        if isinstance(self._dask, HighLevelGraph) and len(self._dask.layers) == 1:
+            return tuple(self._dask.layers)
         return (self.key,)
 
     def __dask_tokenize__(self):
@@ -93,10 +94,21 @@ class DaskAwkwardArray(DaskMethodsMixin):
 
     """
 
-    def __init__(self, dsk: HighLevelGraph, key: str, npartitions: int) -> None:
-        self._dsk: HighLevelGraph = dsk
+    def __init__(
+        self,
+        dsk: HighLevelGraph,
+        key: str,
+        divisions: Tuple[Any, ...] = None,
+        npartitions: int = None,
+    ) -> None:
+        self._dask: HighLevelGraph = dsk
         self._key: str = key
-        self._npartitions: int = npartitions
+        if divisions is None and npartitions is not None:
+            self._npartitions: int = npartitions
+            self._divisions: Tuple[Any, ...] = (None,) * (npartitions + 1)
+        elif divisions is not None and npartitions is None:
+            self._divisions = divisions
+            self._npartitions = len(divisions) - 1
         self._fields: List[str] = None
 
     def __dask_graph__(self) -> HighLevelGraph:
@@ -134,7 +146,7 @@ class DaskAwkwardArray(DaskMethodsMixin):
 
     @property
     def dask(self) -> HighLevelGraph:
-        return self._dsk
+        return self._dask
 
     @property
     def fields(self) -> Iterable[str]:
@@ -149,8 +161,40 @@ class DaskAwkwardArray(DaskMethodsMixin):
         return self.key
 
     @property
+    def divisions(self) -> Tuple[Any, ...]:
+        return self._divisions
+
+    @property
+    def known_divisions(self) -> bool:
+        return len(self.divisions) > 0 and self.divisions[0] is not None
+
+    @property
     def npartitions(self) -> int:
         return self._npartitions
+
+    def _partitions(self, index):
+        if not isinstance(index, tuple):
+            index = (index,)
+        token = tokenize(self, index)
+        from dask.array.slicing import normalize_index
+
+        index = normalize_index(index, (self.npartitions,))
+        index = tuple(slice(k, k + 1) if isinstance(k, Number) else k for k in index)
+        name = f"partitions-{token}"
+        new_keys = np.array(self.__dask_keys__(), dtype=object)[index].tolist()
+        print(f"{new_keys=}")
+        divisions = [self.divisions[i] for _, i in new_keys] + [
+            self.divisions[new_keys[-1][1] + 1]
+        ]
+        print(f"{self.divisions=}")
+        print(f"{divisions=}")
+        dsk = {(name, i): tuple(key) for i, key in enumerate(new_keys)}
+        graph = HighLevelGraph.from_collections(name, dsk, dependencies=[self])
+        return new_array_object(graph, name, None, divisions=tuple(divisions))
+
+    @property
+    def partitions(self) -> IndexCallable:
+        return IndexCallable(self._partitions)
 
     def __getitem__(self, key) -> Any:
         if not isinstance(key, (int, str)):
@@ -169,8 +213,14 @@ class DaskAwkwardArray(DaskMethodsMixin):
         return self.__getitem__(attr)
 
 
-def new_array_object(dsk: HighLevelGraph, name: str, meta: Any, npartitions: int):
-    return DaskAwkwardArray(dsk, name, npartitions)
+def new_array_object(
+    dsk: HighLevelGraph,
+    name: str,
+    meta: Any,
+    npartitions: int = None,
+    divisions: Tuple[Any, ...] = None,
+):
+    return DaskAwkwardArray(dsk, name, npartitions=npartitions, divisions=divisions)
 
 
 def pw_layer(func, name, *args, **kwargs):
