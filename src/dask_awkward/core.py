@@ -18,7 +18,7 @@ def _finalize_daskawkwardarray(results: Any) -> Any:
     if all(isinstance(r, ak.Array) for r in results):
         return ak.concatenate(results)
     if all(isinstance(r, ak.Record) for r in results):
-        return ak.concatenate(results)
+        raise NotImplementedError("Records not supported yet.")
     else:
         return results
 
@@ -293,16 +293,33 @@ def count(a, axis: Optional[int] = None, **kwargs):
 
 
 def flatten(a: DaskAwkwardArray, axis: int = 1, **kwargs):
-    if axis == 1:
+    if axis > 0:
         return _flatten_trivial(a, axis=axis, **kwargs)
+    raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
 
 
 def max(a: DaskAwkwardArray, axis: Optional[int] = None, **kwargs):
-    pass
+    if axis == 1:
+        return _max_trivial(a, axis=axis, **kwargs)
+    elif axis is None:
+        trivial_result = _max_trivial(a, axis=1, **kwargs)
+        return pw_reduction_with_agg(trivial_result, ak.max, ak.max, **kwargs)
+    elif axis == 0 or axis == -1 * a.ndim:
+        raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
+    else:
+        raise ValueError("axis must be None or an integer.")
 
 
 def min(a: DaskAwkwardArray, axis: Optional[int] = None, **kwargs):
-    pass
+    if axis == 1:
+        return _min_trivial(a, axis=axis, **kwargs)
+    elif axis is None:
+        trivial_result = _min_trivial(a, axis=1, **kwargs)
+        return pw_reduction_with_agg(trivial_result, ak.min, ak.min, **kwargs)
+    elif axis == 0 or axis == -1 * a.ndim:
+        raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
+    else:
+        raise ValueError("axis must be None or an integer.")
 
 
 def num(a: DaskAwkwardArray, axis: int = 1, **kwargs):
