@@ -161,6 +161,10 @@ class DaskAwkwardArray(DaskMethodsMixin):
         return self.key
 
     @property
+    def ndim(self) -> int:
+        raise NotImplementedError("Not known without metadata")
+
+    @property
     def divisions(self) -> Tuple[Any, ...]:
         return self._divisions
 
@@ -182,12 +186,9 @@ class DaskAwkwardArray(DaskMethodsMixin):
         index = tuple(slice(k, k + 1) if isinstance(k, Number) else k for k in index)
         name = f"partitions-{token}"
         new_keys = np.array(self.__dask_keys__(), dtype=object)[index].tolist()
-        print(f"{new_keys=}")
         divisions = [self.divisions[i] for _, i in new_keys] + [
             self.divisions[new_keys[-1][1] + 1]
         ]
-        print(f"{self.divisions=}")
-        print(f"{divisions=}")
         dsk = {(name, i): tuple(key) for i, key in enumerate(new_keys)}
         graph = HighLevelGraph.from_collections(name, dsk, dependencies=[self])
         return new_array_object(graph, name, None, divisions=tuple(divisions))
@@ -197,13 +198,11 @@ class DaskAwkwardArray(DaskMethodsMixin):
         return IndexCallable(self._partitions)
 
     def __getitem__(self, key) -> Any:
-        if not isinstance(key, (int, str)):
-            raise NotImplementedError(
-                "getitem supports only string and integer for now."
-            )
+        if not isinstance(key, str):
+            raise NotImplementedError("__getitem__ supports only string (for now).")
         token = tokenize(self, key)
         name = f"getitem-{token}"
-        graphlayer = pw_layer(
+        graphlayer = partitionwise_layer(
             lambda x, gikey: operator.getitem(x, gikey), name, self, gikey=key
         )
         hlg = HighLevelGraph.from_collections(name, graphlayer, dependencies=[self])
@@ -223,7 +222,7 @@ def new_array_object(
     return DaskAwkwardArray(dsk, name, npartitions=npartitions, divisions=divisions)
 
 
-def pw_layer(func, name, *args, **kwargs):
+def partitionwise_layer(func, name, *args, **kwargs):
     pairs: List[Any] = []
     numblocks: Dict[Any, int] = {}
     for arg in args:
@@ -241,7 +240,7 @@ def pw_layer(func, name, *args, **kwargs):
     )
 
 
-def pw_reduction_with_agg(
+def pw_reduction_with_agg_to_scalar(
     a: DaskAwkwardArray,
     func: Callable,
     agg: Callable,
@@ -267,7 +266,7 @@ class TrivialPartitionwiseOp:
     def __call__(self, collection, **kwargs):
         token = tokenize(collection)
         name = f"{self.__name__}-{token}"
-        layer = pw_layer(self._func, name, collection, **kwargs)
+        layer = partitionwise_layer(self._func, name, collection, **kwargs)
         hlg = HighLevelGraph.from_collections(name, layer, dependencies=[collection])
         return new_array_object(hlg, name, None, collection.npartitions)
 
@@ -281,11 +280,11 @@ _sum_trivial = TrivialPartitionwiseOp(ak.sum)
 
 
 def count(a, axis: Optional[int] = None, **kwargs):
-    if axis is not None and axis > 0:
+    if axis is not None and axis == 1:
         return _count_trivial(a, axis=axis, **kwargs)
     elif axis is None:
         trivial_result = _count_trivial(a, axis=1, **kwargs)
-        return pw_reduction_with_agg(trivial_result, ak.sum, ak.sum)
+        return pw_reduction_with_agg_to_scalar(trivial_result, ak.sum, ak.sum)
     elif axis == 0 or axis == -1 * a.ndim:
         raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
     else:
@@ -293,33 +292,33 @@ def count(a, axis: Optional[int] = None, **kwargs):
 
 
 def flatten(a: DaskAwkwardArray, axis: int = 1, **kwargs):
-    if axis > 0:
-        return _flatten_trivial(a, axis=axis, **kwargs)
-    raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
+    return _flatten_trivial(a, axis=axis, **kwargs)
+
+
+def _min_max(f, a, axis, **kwargs):
+    if axis is not None and axis < 0:
+        axis = a.ndim + axis + 1
+    if f == ak.min:
+        trivf = _min_trivial
+    else:
+        trivf = _max_trivial
+    if axis == 1:
+        return trivf(a, axis=axis, **kwargs)
+    elif axis is None:
+        trivial_result = trivf(a, axis=1, **kwargs)
+        return pw_reduction_with_agg_to_scalar(trivial_result, f, f, **kwargs)
+    elif axis == 0 or axis == -1 * a.ndim:
+        raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
+    else:
+        raise ValueError("axis must be None or an integer.")
 
 
 def max(a: DaskAwkwardArray, axis: Optional[int] = None, **kwargs):
-    if axis == 1:
-        return _max_trivial(a, axis=axis, **kwargs)
-    elif axis is None:
-        trivial_result = _max_trivial(a, axis=1, **kwargs)
-        return pw_reduction_with_agg(trivial_result, ak.max, ak.max, **kwargs)
-    elif axis == 0 or axis == -1 * a.ndim:
-        raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
-    else:
-        raise ValueError("axis must be None or an integer.")
+    return _min_max(ak.max, a, axis, **kwargs)
 
 
 def min(a: DaskAwkwardArray, axis: Optional[int] = None, **kwargs):
-    if axis == 1:
-        return _min_trivial(a, axis=axis, **kwargs)
-    elif axis is None:
-        trivial_result = _min_trivial(a, axis=1, **kwargs)
-        return pw_reduction_with_agg(trivial_result, ak.min, ak.min, **kwargs)
-    elif axis == 0 or axis == -1 * a.ndim:
-        raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
-    else:
-        raise ValueError("axis must be None or an integer.")
+    return _min_max(ak.min, a, axis, **kwargs)
 
 
 def num(a: DaskAwkwardArray, axis: int = 1, **kwargs):
