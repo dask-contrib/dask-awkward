@@ -1,10 +1,10 @@
 from ..io import from_json
 
 
-def json_data(type="numbers"):
-    if type == "numbers":
+def json_data(kind="numbers"):
+    if kind == "numbers":
         return from_json(_numbers())
-    elif type == "records":
+    elif kind == "records":
         return from_json(_records())
 
 

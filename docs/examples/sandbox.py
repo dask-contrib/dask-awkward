@@ -1,10 +1,11 @@
 import awkward as ak  # noqa
 import dask_awkward.core as dakc  # noqa
-import dask_awkward as dak
+import dask_awkward as dak  # noqa
+import dask_awkward.data as dakd
 
 
-daa = dak.from_json(["data/arr1.json", "data/arr2.json", "data/arr3.json"])
+daa = dakd.json_data(type="numbers")
 aa = daa.compute()
-a1 = ak.from_json("data/arr1.json")
-a2 = ak.from_json("data/arr2.json")
-a3 = ak.from_json("data/arr3.json")
+a0 = daa.partitions[0].compute()
+a1 = daa.partitions[1].compute()
+a2 = daa.partitions[2].compute()
