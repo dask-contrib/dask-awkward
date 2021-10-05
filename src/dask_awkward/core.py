@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import functools
 import operator
+from functools import partial
 from numbers import Number
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
@@ -11,7 +11,7 @@ from dask.base import DaskMethodsMixin, replace_name_in_key, tokenize
 from dask.blockwise import blockwise as core_blockwise
 from dask.highlevelgraph import HighLevelGraph
 from dask.threaded import get as threaded_get
-from dask.utils import key_split, IndexCallable
+from dask.utils import IndexCallable, key_split, cached_property
 
 
 def _finalize_daskawkwardarray(results: Any) -> Any:
@@ -176,6 +176,10 @@ class DaskAwkwardArray(DaskMethodsMixin):
     def npartitions(self) -> int:
         return self._npartitions
 
+    @cached_property
+    def keys_array(self) -> np.ndarray:
+        return np.array(self.__dask_keys__(), dtype=object)
+
     def _partitions(self, index):
         if not isinstance(index, tuple):
             index = (index,)
@@ -185,7 +189,7 @@ class DaskAwkwardArray(DaskMethodsMixin):
         index = normalize_index(index, (self.npartitions,))
         index = tuple(slice(k, k + 1) if isinstance(k, Number) else k for k in index)
         name = f"partitions-{token}"
-        new_keys = np.array(self.__dask_keys__(), dtype=object)[index].tolist()
+        new_keys = self.keys_array[index].tolist()
         divisions = [self.divisions[i] for _, i in new_keys] + [
             self.divisions[new_keys[-1][1] + 1]
         ]
@@ -251,7 +255,7 @@ def pw_reduction_with_agg_to_scalar(
     token = tokenize(a)
     name = func.__name__ if name is None else name
     name = f"{name}-{token}"
-    func = functools.partial(func, **kwargs)
+    func = partial(func, **kwargs)
     dsk = {(name, i): (func, k) for i, k in enumerate(a.__dask_keys__())}
     dsk[name] = (agg, list(dsk.keys()))
     hlg = HighLevelGraph.from_collections(name, dsk, dependencies=[a])
@@ -296,16 +300,16 @@ def flatten(a: DaskAwkwardArray, axis: int = 1, **kwargs):
 
 
 def _min_max(f, a, axis, **kwargs):
+    # translate negative axis
     if axis is not None and axis < 0:
         axis = a.ndim + axis + 1
-    if f == ak.min:
-        trivf = _min_trivial
-    else:
-        trivf = _max_trivial
+    # get the correct callable
+    tf = _min_trivial if f == ak.min else _max_trivial
+    # generate collection based on axis
     if axis == 1:
-        return trivf(a, axis=axis, **kwargs)
+        return tf(a, axis=axis, **kwargs)
     elif axis is None:
-        trivial_result = trivf(a, axis=1, **kwargs)
+        trivial_result = tf(a, axis=1, **kwargs)
         return pw_reduction_with_agg_to_scalar(trivial_result, f, f, **kwargs)
     elif axis == 0 or axis == -1 * a.ndim:
         raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
