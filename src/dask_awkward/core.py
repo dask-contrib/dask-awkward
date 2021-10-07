@@ -7,11 +7,18 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 import awkward as ak
 import numpy as np
-from dask.base import DaskMethodsMixin, replace_name_in_key, tokenize
+from dask.array.core import normalize_arg
+from dask.base import (
+    DaskMethodsMixin,
+    is_dask_collection,
+    replace_name_in_key,
+    tokenize,
+)
 from dask.blockwise import blockwise as core_blockwise
+from dask.delayed import unpack_collections
 from dask.highlevelgraph import HighLevelGraph
 from dask.threaded import get as threaded_get
-from dask.utils import IndexCallable, key_split, cached_property
+from dask.utils import IndexCallable, cached_property, funcname, key_split
 
 
 def _finalize_daskawkwardarray(results: Any) -> Any:
@@ -98,8 +105,8 @@ class DaskAwkwardArray(DaskMethodsMixin):
         self,
         dsk: HighLevelGraph,
         key: str,
-        divisions: Tuple[Any, ...] = None,
-        npartitions: int = None,
+        divisions: Optional[Tuple[Any, ...]] = None,
+        npartitions: Optional[int] = None,
     ) -> None:
         self._dask: HighLevelGraph = dsk
         self._key: str = key
@@ -109,7 +116,7 @@ class DaskAwkwardArray(DaskMethodsMixin):
         elif divisions is not None and npartitions is None:
             self._divisions = divisions
             self._npartitions = len(divisions) - 1
-        self._fields: List[str] = None
+        self._fields: Optional[List[str]] = None
 
     def __dask_graph__(self) -> HighLevelGraph:
         return self.dask
@@ -130,7 +137,7 @@ class DaskAwkwardArray(DaskMethodsMixin):
     def __dask_optimize__(dsk, keys, **kwargs):
         return dsk
 
-    def _rebuild(self, dsk: Any, *, rename: Any = None) -> Any:
+    def _rebuild(self, dsk: Any, *, rename: Optional[Any] = None) -> Any:
         name = self.name
         if rename:
             name = rename.get(name, name)
@@ -215,13 +222,16 @@ class DaskAwkwardArray(DaskMethodsMixin):
     def __getattr__(self, attr) -> Any:
         return self.__getitem__(attr)
 
+    def map_partitions(self, func, *args, **kwargs):
+        return map_partitions(func, self, *args, **kwargs)
+
 
 def new_array_object(
     dsk: HighLevelGraph,
     name: str,
     meta: Any,
-    npartitions: int = None,
-    divisions: Tuple[Any, ...] = None,
+    npartitions: Optional[int] = None,
+    divisions: Optional[Tuple[Any, ...]] = None,
 ):
     return DaskAwkwardArray(dsk, name, npartitions=npartitions, divisions=divisions)
 
@@ -244,12 +254,30 @@ def partitionwise_layer(func, name, *args, **kwargs):
     )
 
 
+def map_partitions(
+    func: Callable,
+    *args: Any,
+    name: Optional[str] = None,
+    **kwargs: Any,
+) -> DaskAwkwardArray:
+    token = tokenize(func, *args, **kwargs)
+    name = name or funcname(func)
+    name = f"{name}-{token}"
+    lay = partitionwise_layer(func, name, *args, **kwargs)
+    deps = []
+    for a in args:
+        if is_dask_collection(a):
+            deps.append(a)
+    hlg = HighLevelGraph.from_collections(name, lay, dependencies=deps)
+    return new_array_object(hlg, name, None, npartitions=args[0].npartitions)
+
+
 def pw_reduction_with_agg_to_scalar(
     a: DaskAwkwardArray,
     func: Callable,
     agg: Callable,
     *,
-    name: str = None,
+    name: Optional[str] = None,
     **kwargs,
 ):
     token = tokenize(a)
@@ -263,7 +291,7 @@ def pw_reduction_with_agg_to_scalar(
 
 
 class TrivialPartitionwiseOp:
-    def __init__(self, func: Callable, name: str = None) -> None:
+    def __init__(self, func: Callable, name: Optional[str] = None) -> None:
         self._func = func
         self.__name__ = func.__name__ if name is None else name
 
@@ -309,6 +337,7 @@ def _min_max(f, a, axis, **kwargs):
     if axis == 1:
         return tf(a, axis=axis, **kwargs)
     elif axis is None:
+        # TODO: remove this call of tf
         trivial_result = tf(a, axis=1, **kwargs)
         return pw_reduction_with_agg_to_scalar(trivial_result, f, f, **kwargs)
     elif axis == 0 or axis == -1 * a.ndim:
