@@ -65,9 +65,9 @@ def min(a: DaskAwkwardArray, axis: Optional[int] = None, **kwargs):
 
 @derived_from(ak)
 def num(a: DaskAwkwardArray, axis: int = 1, **kwargs):
-    pass
+    raise NotImplementedError("function is still TODO")
 
 
 @derived_from(ak)
 def sum(a: DaskAwkwardArray, axis: Optional[int] = None, **kwargs):
-    pass
+    raise NotImplementedError("function is still TODO")
