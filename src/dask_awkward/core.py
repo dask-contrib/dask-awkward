@@ -169,7 +169,7 @@ class DaskAwkwardArray(DaskMethodsMixin):
 
     @property
     def ndim(self) -> int:
-        raise NotImplementedError("Not known without metadata")
+        raise NotImplementedError("Not known without metadata; a current TODO")
 
     @property
     def divisions(self) -> Tuple[Any, ...]:
@@ -206,6 +206,21 @@ class DaskAwkwardArray(DaskMethodsMixin):
 
     @property
     def partitions(self) -> IndexCallable:
+        """Get a specific partition or slice of partitions.
+
+        Examples
+        --------
+        >>> import dask_awkward as dak
+        >>> import dask_awkward.data as dakd
+        >>> a = dak.from_json(dakd.json_data())
+        >>> a
+        DaskAwkwardArray<from-json, npartitions=3>
+        >>> a.partitions[0]
+        DaskAwkwardArray<partitions, npartitions=1>
+        >>> a.partitions[0:2]
+        DaskAwkwardArray<partitions, npartitions=2>
+
+        """
         return IndexCallable(self._partitions)
 
     def __getitem__(self, key) -> Any:
@@ -260,6 +275,28 @@ def map_partitions(
     name: Optional[str] = None,
     **kwargs: Any,
 ) -> DaskAwkwardArray:
+    """Map a callable across all partitions of a collection.
+
+    Parameters
+    ----------
+    func : Callable
+        Function to call on all partitions.
+    *args : Collections and function arguments
+        Arguments passed to the function, if arguments are
+        DaskAwkwardArray collections they must be compatibly
+        partitioned.
+    name : str, optional
+        Name for the Dask graph layer; if left to ``None`` (default),
+        the name of the function will be used.
+    **kwargs : Any
+        Additional keyword arguments passed to the `func`.
+
+    Returns
+    -------
+    DaskAwkwardArray
+        The new collection.
+
+    """
     token = tokenize(func, *args, **kwargs)
     name = name or funcname(func)
     name = f"{name}-{token}"
