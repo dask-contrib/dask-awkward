@@ -1,5 +1,6 @@
 from ._version import version  # noqa
-from .core import count, flatten, map_partitions, max, min, num, sum
+from .core import map_partitions
+from .routines import count, flatten, max, min, num, sum
 from .io import from_json, from_parquet
 
 __version__ = version  # noqa

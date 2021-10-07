@@ -7,7 +7,6 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 import awkward as ak
 import numpy as np
-from dask.array.core import normalize_arg
 from dask.base import (
     DaskMethodsMixin,
     is_dask_collection,
@@ -15,7 +14,6 @@ from dask.base import (
     tokenize,
 )
 from dask.blockwise import blockwise as core_blockwise
-from dask.delayed import unpack_collections
 from dask.highlevelgraph import HighLevelGraph
 from dask.threaded import get as threaded_get
 from dask.utils import IndexCallable, cached_property, funcname, key_split
@@ -356,70 +354,23 @@ def pw_reduction_with_agg_to_scalar(
 
 
 class TrivialPartitionwiseOp:
-    def __init__(self, func: Callable, name: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        func: Callable,
+        *,
+        name: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
         self._func = func
         self.__name__ = func.__name__ if name is None else name
+        self._kwargs = kwargs
 
     def __call__(self, collection, **kwargs):
-        token = tokenize(collection)
+        # overwrite any saved kwargs in self._kwargs
+        for k, v in kwargs.items():
+            self._kwargs[k] = v
+        token = tokenize(collection, kwargs)
         name = f"{self.__name__}-{token}"
-        layer = partitionwise_layer(self._func, name, collection, **kwargs)
+        layer = partitionwise_layer(self._func, name, collection, **self._kwargs)
         hlg = HighLevelGraph.from_collections(name, layer, dependencies=[collection])
         return new_array_object(hlg, name, None, collection.npartitions)
-
-
-_count_trivial = TrivialPartitionwiseOp(ak.count)
-_flatten_trivial = TrivialPartitionwiseOp(ak.flatten)
-_max_trivial = TrivialPartitionwiseOp(ak.max)
-_min_trivial = TrivialPartitionwiseOp(ak.min)
-_num_trivial = TrivialPartitionwiseOp(ak.num)
-_sum_trivial = TrivialPartitionwiseOp(ak.sum)
-
-
-def count(a, axis: Optional[int] = None, **kwargs):
-    if axis is not None and axis == 1:
-        return _count_trivial(a, axis=axis, **kwargs)
-    elif axis is None:
-        trivial_result = _count_trivial(a, axis=1, **kwargs)
-        return pw_reduction_with_agg_to_scalar(trivial_result, ak.sum, ak.sum)
-    elif axis == 0 or axis == -1 * a.ndim:
-        raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
-    else:
-        raise ValueError("axis must be None or an integer.")
-
-
-def flatten(a: DaskAwkwardArray, axis: int = 1, **kwargs):
-    return _flatten_trivial(a, axis=axis, **kwargs)
-
-
-def _min_max(f, a, axis, **kwargs):
-    # translate negative axis (a.ndim currently raises)
-    if axis is not None and axis < 0:
-        axis = a.ndim + axis + 1
-    # get the correct trivial callable
-    tf = _min_trivial if f == ak.min else _max_trivial
-    # generate collection based on axis
-    if axis == 1:
-        return tf(a, axis=axis, **kwargs)
-    elif axis is None:
-        return pw_reduction_with_agg_to_scalar(a, f, f, **kwargs)
-    elif axis == 0 or axis == -1 * a.ndim:
-        raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
-    else:
-        raise ValueError("axis must be None or an integer.")
-
-
-def max(a: DaskAwkwardArray, axis: Optional[int] = None, **kwargs):
-    return _min_max(ak.max, a, axis, **kwargs)
-
-
-def min(a: DaskAwkwardArray, axis: Optional[int] = None, **kwargs):
-    return _min_max(ak.min, a, axis, **kwargs)
-
-
-def num(a: DaskAwkwardArray, axis: int = 1, **kwargs):
-    pass
-
-
-def sum(a: DaskAwkwardArray, axis: Optional[int] = None, **kwargs):
-    pass
