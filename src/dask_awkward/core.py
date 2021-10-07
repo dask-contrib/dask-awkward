@@ -208,6 +208,10 @@ class DaskAwkwardArray(DaskMethodsMixin):
     def partitions(self) -> IndexCallable:
         """Get a specific partition or slice of partitions.
 
+        Returns
+        -------
+        dask.utils.IndexCallable
+
         Examples
         --------
         >>> import dask_awkward as dak
@@ -238,6 +242,30 @@ class DaskAwkwardArray(DaskMethodsMixin):
         return self.__getitem__(attr)
 
     def map_partitions(self, func, *args, **kwargs):
+        """Map a function across all partitions of the collection.
+
+        Parameters
+        ----------
+        func : Callable
+            Function to call on all partitions.
+        *args : Collections and function arguments
+            Additional arguments passed to `func` after the
+            collection, if arguments are DaskAwkwardArray collections
+            they must be compatibly partitioned with the object this
+            method is being called from.
+        **kwargs : Any
+            Additional keyword arguments passed to the `func`.
+
+        Returns
+        -------
+        DaskAwkwardArray
+            The new collection.
+
+        See Also
+        --------
+        dask_awkward.map_partitions
+
+        """
         return map_partitions(func, self, *args, **kwargs)
 
 
