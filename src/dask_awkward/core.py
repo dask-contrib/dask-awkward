@@ -139,7 +139,7 @@ class DaskAwkwardArray(DaskMethodsMixin):
         name = self.name
         if rename:
             name = rename.get(name, name)
-        return type(self)(dsk, name, self.npartitions)
+        return type(self)(dsk, name, divisions=self.divisions)
 
     def __str__(self) -> str:
         return (
@@ -154,7 +154,7 @@ class DaskAwkwardArray(DaskMethodsMixin):
         return self._dask
 
     @property
-    def fields(self) -> Iterable[str]:
+    def fields(self) -> Optional[List[str]]:
         return self._fields
 
     @property
@@ -348,7 +348,7 @@ def pw_reduction_with_agg_to_scalar(
     name = f"{name}-{token}"
     func = partial(func, **kwargs)
     dsk = {(name, i): (func, k) for i, k in enumerate(a.__dask_keys__())}
-    dsk[name] = (agg, list(dsk.keys()))
+    dsk[name] = (agg, list(dsk.keys()))  # type: ignore
     hlg = HighLevelGraph.from_collections(name, dsk, dependencies=[a])
     return new_scalar_object(hlg, name, None)
 

@@ -40,14 +40,14 @@ def from_parquet(source, **kwargs) -> DaskAwkwardArray:
         dsk = {
             (name, i): (_from_parquet_single, f, kwargs) for i, f in enumerate(source)
         }
-        N = len(source)
+        npartitions = len(source)
     elif "row_groups" in kwargs:
         row_groups = kwargs.pop("row_groups")
         dsk = {
-            (name, i): (_from_parquet_rowgroups, source, rg, kwargs)
+            (name, i): (_from_parquet_rowgroups, source, rg, kwargs)  # type: ignore
             for i, rg in enumerate(row_groups)
         }
-        N = len(row_groups)
+        npartitions = len(row_groups)
 
     hlg = HighLevelGraph.from_collections(name, dsk)
-    return new_array_object(hlg, name, None, npartitions=N)
+    return new_array_object(hlg, name, None, npartitions=npartitions)
