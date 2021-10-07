@@ -365,18 +365,16 @@ def flatten(a: DaskAwkwardArray, axis: int = 1, **kwargs):
 
 
 def _min_max(f, a, axis, **kwargs):
-    # translate negative axis
+    # translate negative axis (a.ndim currently raises)
     if axis is not None and axis < 0:
         axis = a.ndim + axis + 1
-    # get the correct callable
+    # get the correct trivial callable
     tf = _min_trivial if f == ak.min else _max_trivial
     # generate collection based on axis
     if axis == 1:
         return tf(a, axis=axis, **kwargs)
     elif axis is None:
-        # TODO: remove this call of tf
-        trivial_result = tf(a, axis=1, **kwargs)
-        return pw_reduction_with_agg_to_scalar(trivial_result, f, f, **kwargs)
+        return pw_reduction_with_agg_to_scalar(a, f, f, **kwargs)
     elif axis == 0 or axis == -1 * a.ndim:
         raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
     else:
