@@ -9,7 +9,7 @@ dask-hlg.svg
 dask-worker-space
 
 # scratch files
-scratch/**/*.parquet
+*/**/million*.parquet
 
 # setuptools_scm generated
 src/dask_awkward/_version.py
