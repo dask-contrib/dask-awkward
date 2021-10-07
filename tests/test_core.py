@@ -13,16 +13,16 @@ if TYPE_CHECKING:
 
 
 def load_nested() -> DaskAwkwardArray:
-    return dakd.json_data(kind="records")
+    return dak.from_json(dakd.json_data(kind="records"))
 
 
 def load_array() -> DaskAwkwardArray:
-    return dakd.json_data(kind="numbers")
+    return dak.from_json(dakd.json_data(kind="numbers"))
 
 
 @pytest.mark.parametrize("axis", [None, 1, pytest.param(-1, marks=pytest.mark.xfail)])
 def test_min(axis):
-    daa = load_nested().analysis.x
+    daa = load_nested().analysis.x1
     aa = daa.compute()
     ar = ak.min(aa, axis=axis)
     dr = dak.min(daa, axis=axis).compute()
@@ -33,7 +33,7 @@ def test_min(axis):
 
 
 @pytest.mark.parametrize("axis", [None, 1, pytest.param(-1, marks=pytest.mark.xfail)])
-@pytest.mark.parametrize("attr", ["x"])
+@pytest.mark.parametrize("attr", ["x1", "z2"])
 def test_max(axis, attr):
     daa = load_nested().analysis[attr]
     aa = daa.compute()
