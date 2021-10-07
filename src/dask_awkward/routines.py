@@ -18,23 +18,6 @@ _num_trivial = TrivialPartitionwiseOp(ak.num, axis=1)
 _sum_trivial = TrivialPartitionwiseOp(ak.sum, axis=1)
 
 
-def _min_or_max(f, a, axis, **kwargs):
-    # translate negative axis (a.ndim currently raises)
-    if axis is not None and axis < 0:
-        axis = a.ndim + axis + 1
-    # get the correct trivial callable
-    tf = _min_trivial if f == ak.min else _max_trivial
-    # generate collection based on axis
-    if axis == 1:
-        return tf(a, axis=axis, **kwargs)
-    elif axis is None:
-        return pw_reduction_with_agg_to_scalar(a, f, f, **kwargs)
-    elif axis == 0 or axis == -1 * a.ndim:
-        raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
-    else:
-        raise ValueError("axis must be None or an integer.")
-
-
 @derived_from(ak)
 def count(a, axis: Optional[int] = None, **kwargs):
     if axis is not None and axis == 1:
@@ -51,6 +34,23 @@ def count(a, axis: Optional[int] = None, **kwargs):
 @derived_from(ak)
 def flatten(a: DaskAwkwardArray, axis: int = 1, **kwargs):
     return _flatten_trivial(a, axis=axis, **kwargs)
+
+
+def _min_or_max(f, a, axis, **kwargs):
+    # translate negative axis (a.ndim currently raises)
+    if axis is not None and axis < 0:
+        axis = a.ndim + axis + 1
+    # get the correct trivial callable
+    tf = _min_trivial if f == ak.min else _max_trivial
+    # generate collection based on axis
+    if axis == 1:
+        return tf(a, axis=axis, **kwargs)
+    elif axis is None:
+        return pw_reduction_with_agg_to_scalar(a, f, f, **kwargs)
+    elif axis == 0 or axis == -1 * a.ndim:
+        raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
+    else:
+        raise ValueError("axis must be None or an integer.")
 
 
 @derived_from(ak)
