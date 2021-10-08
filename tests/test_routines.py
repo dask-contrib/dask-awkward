@@ -45,6 +45,19 @@ def test_max(axis, attr):
         assert ar == dr
 
 
+@pytest.mark.parametrize("axis", [None, 1, pytest.param(-1, marks=pytest.mark.xfail)])
+@pytest.mark.parametrize("attr", ["x1", "z2"])
+def test_sum(axis, attr):
+    daa = load_nested().analysis[attr]
+    aa = daa.compute()
+    ar = ak.sum(aa, axis=axis)
+    dr = dak.sum(daa, axis=axis).compute()
+    if isinstance(ar, ak.Array):
+        assert ar.to_list() == dr.to_list()
+    else:
+        assert ar == dr
+
+
 @pytest.mark.parametrize(
     "axis", [None, 0, 1, 2, -1, -2, pytest.param(3, marks=pytest.mark.xfail)]
 )
@@ -53,6 +66,29 @@ def test_flatten(axis):
     aa = daa.compute()
     ar = ak.flatten(aa, axis=axis)
     dr = dak.flatten(daa, axis=axis).compute()
+    if isinstance(ar, ak.Array):
+        assert ar.to_list() == dr.to_list()
+    else:
+        assert ar == dr
+
+
+@pytest.mark.parametrize(
+    "axis",
+    [
+        pytest.param(None, marks=pytest.mark.xfail),
+        pytest.param(0, marks=pytest.mark.xfail),
+        1,
+        2,
+        -1,
+        -2,
+        pytest.param(3, marks=pytest.mark.xfail),
+    ],
+)
+def test_num(axis):
+    daa = load_array()
+    aa = daa.compute()
+    ar = ak.num(aa, axis=axis)
+    dr = dak.num(daa, axis=axis).compute()
     if isinstance(ar, ak.Array):
         assert ar.to_list() == dr.to_list()
     else:
