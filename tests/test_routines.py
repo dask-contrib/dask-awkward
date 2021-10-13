@@ -93,3 +93,29 @@ def test_num(axis):
         assert ar.to_list() == dr.to_list()
     else:
         assert ar == dr
+
+
+@pytest.mark.parametrize("axis", [None, 1, pytest.param(-1, marks=pytest.mark.xfail)])
+@pytest.mark.parametrize("attr", ["x1", "z2"])
+def test_count(axis, attr):
+    daa = load_nested().analysis[attr]
+    aa = daa.compute()
+    ar = ak.count(aa, axis=axis)
+    dr = dak.count(daa, axis=axis).compute()
+    if isinstance(ar, ak.Array):
+        assert ar.to_list() == dr.to_list()
+    else:
+        assert ar == dr
+
+
+@pytest.mark.parametrize("axis", [None, 1, pytest.param(-1, marks=pytest.mark.xfail)])
+@pytest.mark.parametrize("attr", ["x1", "z2"])
+def test_count_nonzero(axis, attr):
+    daa = load_nested().analysis[attr]
+    aa = daa.compute()
+    ar = ak.count_nonzero(aa, axis=axis)
+    dr = dak.count_nonzero(daa, axis=axis).compute()
+    if isinstance(ar, ak.Array):
+        assert ar.to_list() == dr.to_list()
+    else:
+        assert ar == dr
