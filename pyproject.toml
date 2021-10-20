@@ -29,5 +29,5 @@ module = ["dask.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["awkward"]
+module = ["awkward.*"]
 ignore_missing_imports = true

@@ -7,6 +7,7 @@ from typing import Any, Callable
 
 import awkward as ak
 import numpy as np
+from awkward._v2.tmp_for_testing import v1_to_v2
 from dask.base import (
     DaskMethodsMixin,
     is_dask_collection,
@@ -115,6 +116,7 @@ class DaskAwkwardArray(DaskMethodsMixin):
             self._divisions = divisions
             self._npartitions = len(divisions) - 1
         self._fields: list[str] | None = None
+        self._typetracer = None
 
     def __dask_graph__(self) -> HighLevelGraph:
         return self.dask
@@ -181,6 +183,10 @@ class DaskAwkwardArray(DaskMethodsMixin):
     def npartitions(self) -> int:
         return self._npartitions
 
+    @property
+    def typetracer(self) -> Any:
+        return self._typetracer
+
     @cached_property
     def keys_array(self) -> np.ndarray:
         return np.array(self.__dask_keys__(), dtype=object)
@@ -234,7 +240,13 @@ class DaskAwkwardArray(DaskMethodsMixin):
             lambda x, gikey: operator.getitem(x, gikey), name, self, gikey=key
         )
         hlg = HighLevelGraph.from_collections(name, graphlayer, dependencies=[self])
-        return new_array_object(hlg, name, None, self.npartitions)
+        new_typetracer = self._typetracer[key]
+        return new_array_object(
+            hlg,
+            name,
+            meta=new_typetracer,
+            npartitions=self.npartitions,
+        )
 
     def __getattr__(self, attr) -> Any:
         return self.__getitem__(attr)
@@ -267,14 +279,24 @@ class DaskAwkwardArray(DaskMethodsMixin):
         return map_partitions(func, self, *args, **kwargs)
 
 
+def _first_partition_layout(arr: DaskAwkwardArray):
+    return arr.__dask_scheduler__(arr.__dask_graph__(), arr.__dask_keys__()[0]).layout
+
+
 def new_array_object(
     dsk: HighLevelGraph,
     name: str,
-    meta: Any,
+    meta: Any | None = None,
     npartitions: int | None = None,
     divisions: tuple[Any, ...] | None = None,
 ):
-    return DaskAwkwardArray(dsk, name, npartitions=npartitions, divisions=divisions)
+    arr = DaskAwkwardArray(dsk, name, npartitions=npartitions, divisions=divisions)
+    if meta is None:
+        layout = v1_to_v2(_first_partition_layout(arr))
+        arr._typetracer = layout.typetracer
+    else:
+        arr._typetracer = meta
+    return arr
 
 
 def partitionwise_layer(func, name, *args, **kwargs):
