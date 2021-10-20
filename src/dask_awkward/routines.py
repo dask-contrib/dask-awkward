@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import awkward as ak
 from dask.utils import derived_from
@@ -13,14 +13,9 @@ if TYPE_CHECKING:
 ####################################
 # all awkward.operations.reducers.py
 ####################################
-# def count(array, axis=None, keepdims=False, mask_identity=False):
-# def count_nonzero(array, axis=None, keepdims=False, mask_identity=False):
-# def sum(array, axis=None, keepdims=False, mask_identity=False):
 # def prod(array, axis=None, keepdims=False, mask_identity=False):
 # def any(array, axis=None, keepdims=False, mask_identity=False):
 # def all(array, axis=None, keepdims=False, mask_identity=False):
-# def min(array, axis=None, keepdims=False, initial=None, mask_identity=True):
-# def max(array, axis=None, keepdims=False, initial=None, mask_identity=True):
 # def ptp(arr, axis=None, keepdims=False, mask_identity=True):
 # def argmin(array, axis=None, keepdims=False, mask_identity=True):
 # def argmax(array, axis=None, keepdims=False, mask_identity=True):
@@ -35,17 +30,31 @@ if TYPE_CHECKING:
 ####################################
 
 _count_trivial = TrivialPartitionwiseOp(ak.count, axis=1)
+_count_nonzero_trivial = TrivialPartitionwiseOp(ak.count_nonzero, axis=1)
 _max_trivial = TrivialPartitionwiseOp(ak.max, axis=1)
 _min_trivial = TrivialPartitionwiseOp(ak.min, axis=1)
 _sum_trivial = TrivialPartitionwiseOp(ak.sum, axis=1)
 
 
 @derived_from(ak)
-def count(array, axis: Optional[int] = None, **kwargs):
-    if axis is not None and axis == 1:
+def count(array, axis: int | None = None, **kwargs):
+    if axis == 1:
         return _count_trivial(array, axis=axis, **kwargs)
     elif axis is None:
         trivial_result = _count_trivial(array, axis=1, **kwargs)
+        return pw_reduction_with_agg_to_scalar(trivial_result, ak.sum, ak.sum)
+    elif axis == 0 or axis == -1 * array.ndim:
+        raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
+    else:
+        raise ValueError("axis must be None or an integer.")
+
+
+@derived_from(ak)
+def count_nonzero(array, axis: int | None = None, **kwargs):
+    if axis is not None and axis == 1:
+        return _count_nonzero_trivial(array, axis=1, **kwargs)
+    elif axis is None:
+        trivial_result = _count_nonzero_trivial(array, axis=1, **kwargs)
         return pw_reduction_with_agg_to_scalar(trivial_result, ak.sum, ak.sum)
     elif axis == 0 or axis == -1 * array.ndim:
         raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
@@ -71,17 +80,17 @@ def _min_or_max(f, array, axis, **kwargs):
 
 
 @derived_from(ak)
-def max(array: DaskAwkwardArray, axis: Optional[int] = None, **kwargs):
+def max(array: DaskAwkwardArray, axis: int | None = None, **kwargs):
     return _min_or_max(ak.max, array, axis, **kwargs)
 
 
 @derived_from(ak)
-def min(array: DaskAwkwardArray, axis: Optional[int] = None, **kwargs):
+def min(array: DaskAwkwardArray, axis: int | None = None, **kwargs):
     return _min_or_max(ak.min, array, axis, **kwargs)
 
 
 @derived_from(ak)
-def sum(array: DaskAwkwardArray, axis: Optional[int] = None, **kwargs):
+def sum(array: DaskAwkwardArray, axis: int | None = None, **kwargs):
     if axis is not None and axis < 0:
         axis = array.ndim + axis + 1
     if axis == 1:
@@ -94,7 +103,58 @@ def sum(array: DaskAwkwardArray, axis: Optional[int] = None, **kwargs):
         raise ValueError("axis must be none or an integer")
 
 
-# Non reduction routines
+#####################################
+# all awkward.operations.structure.py
+#####################################
+# def copy(array):
+# def mask(array, mask, valid_when=True, highlevel=True, behavior=None):
+# def num(array, axis=1, highlevel=True, behavior=None):
+# def run_lengths(array, highlevel=True, behavior=None):
+# def zip(
+# def unzip(array):
+# def to_regular(array, axis=1, highlevel=True, behavior=None):
+# def from_regular(array, axis=1, highlevel=True, behavior=None):
+# def with_name(array, name, highlevel=True, behavior=None):
+# def with_field(base, what, where=None, highlevel=True, behavior=None):
+# def with_parameter(array, parameter, value, highlevel=True, behavior=None):
+# def without_parameters(array, highlevel=True, behavior=None):
+# def zeros_like(array, highlevel=True, behavior=None, dtype=None):
+# def ones_like(array, highlevel=True, behavior=None, dtype=None):
+# def full_like(array, fill_value, highlevel=True, behavior=None, dtype=None):
+# def broadcast_arrays(*arrays, **kwargs):
+# def concatenate(
+# def where(condition, *args, **kwargs):
+# def flatten(array, axis=1, highlevel=True, behavior=None):
+# def unflatten(array, counts, axis=0, highlevel=True, behavior=None):
+# def ravel(array, highlevel=True, behavior=None):
+# def _pack_layout(layout):
+# def packed(array, highlevel=True, behavior=None):
+# def local_index(array, axis=-1, highlevel=True, behavior=None):
+# def sort(array, axis=-1, ascending=True, stable=True, highlevel=True, behavior=None):
+# def argsort(array, axis=-1, ascending=True, stable=True, highlevel=True, behavior=None):
+# def pad_none(array, target, axis=1, clip=False, highlevel=True, behavior=None):
+# def _fill_none_deprecated(array, value, highlevel=True, behavior=None):
+# def fill_none(array, value, axis=ak._util.MISSING, highlevel=True, behavior=None):
+# def is_none(array, axis=0, highlevel=True, behavior=None):
+# def singletons(array, highlevel=True, behavior=None):
+# def firsts(array, axis=1, highlevel=True, behavior=None):
+# def cartesian(
+# def argcartesian(
+# def combinations(
+# def argcombinations(
+# def partitions(array):
+# def partitioned(arrays, highlevel=True, behavior=None):
+# def repartition(array, lengths, highlevel=True, behavior=None):
+# def virtual(
+# def materialized(array, highlevel=True, behavior=None):
+# def with_cache(array, cache, highlevel=True, behavior=None):
+# def size(array, axis=None):
+# def atleast_1d(*arrays):
+# def nan_to_num(
+# def isclose(
+# def values_astype(array, to, highlevel=True, behavior=None):
+# def strings_astype(array, to, highlevel=True, behavior=None):
+####################################
 
 
 _flatten_trivial = TrivialPartitionwiseOp(ak.flatten, axis=1)
@@ -109,3 +169,57 @@ def num(array: DaskAwkwardArray, axis: int = 1, **kwargs):
 @derived_from(ak)
 def flatten(array: DaskAwkwardArray, axis: int = 1, **kwargs):
     return _flatten_trivial(array, axis=axis, **kwargs)
+
+
+###################################
+# all awkward.operations.convert.py
+###################################
+# def from_numpy(
+# def to_numpy(array, allow_missing=True):
+# def from_cupy(array, regulararray=False, highlevel=True, behavior=None):
+# def to_cupy(array):
+# def from_jax(array, regulararray=False, highlevel=True, behavior=None):
+# def to_jax(array):
+# def kernels(*arrays):
+# def to_kernels(array, kernels, highlevel=True, behavior=None):
+# def from_iter(
+# def to_list(array):
+# def from_json(
+# def to_json(
+# def from_awkward0(
+# def to_awkward0(array, keep_layout=False):
+# def to_layout(
+# def regularize_numpyarray(array, allow_empty=True, highlevel=True, behavior=None):
+# def to_arrow(
+# def to_arrow_table(
+# def from_arrow(array, highlevel=True, behavior=None):
+# def to_parquet(
+# def from_parquet(
+# def to_buffers(
+# def from_buffers(
+# def to_pandas(
+# def from_numpy(
+# def to_numpy(array, allow_missing=True):
+# def from_cupy(array, regulararray=False, highlevel=True, behavior=None):
+# def to_cupy(array):
+# def from_jax(array, regulararray=False, highlevel=True, behavior=None):
+# def to_jax(array):
+# def kernels(*arrays):
+# def to_kernels(array, kernels, highlevel=True, behavior=None):
+# def from_iter(
+# def to_list(array):
+# def from_json(
+# def to_json(
+# def from_awkward0(
+# def to_awkward0(array, keep_layout=False):
+# def to_layout(
+# def regularize_numpyarray(array, allow_empty=True, highlevel=True, behavior=None):
+# def to_arrow(
+# def to_arrow_table(
+# def from_arrow(array, highlevel=True, behavior=None):
+# def to_parquet(
+# def from_parquet(
+# def to_buffers(
+# def from_buffers(
+# def to_pandas(
+###################################
