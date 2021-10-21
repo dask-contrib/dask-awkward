@@ -405,12 +405,10 @@ def map_partitions(
     name = name or funcname(func)
     name = f"{name}-{token}"
     lay = partitionwise_layer(func, name, *args, **kwargs)
-    deps = []
-    for a in args:
-        if is_dask_collection(a):
-            deps.append(a)
+    deps = [a for a in args if is_dask_collection(a)] + [
+        v for k, v in kwargs.items() if is_dask_collection(v)
+    ]
     hlg = HighLevelGraph.from_collections(name, lay, dependencies=deps)
-
     return new_array_object(hlg, name, None, npartitions=args[0].npartitions)
 
 
