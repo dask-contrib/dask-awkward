@@ -1,11 +1,15 @@
-def json_data(kind="numbers"):
+from __future__ import annotations
+
+
+def json_data(kind: str = "numbers") -> list[str]:
     if kind == "numbers":
         return _numbers()
     elif kind == "records":
         return _records()
+    raise ValueError(f"kind ({kind}) must be 'numbers' or 'records'")
 
 
-def _records():
+def _records() -> list[str]:
     a1 = """
     [
         {
@@ -131,7 +135,7 @@ def _records():
     return [a1, a2, a3]
 
 
-def _numbers():
+def _numbers() -> list[str]:
     a1 = """
     [
       [

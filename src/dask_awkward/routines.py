@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import awkward as ak
 from dask.utils import derived_from
@@ -8,7 +8,11 @@ from dask.utils import derived_from
 from .core import TrivialPartitionwiseOp, pw_reduction_with_agg_to_scalar
 
 if TYPE_CHECKING:
-    from .core import DaskAwkwardArray
+    from typing import Union
+
+    from .core import DaskAwkwardArray, Scalar
+
+    LazyResult = Union[DaskAwkwardArray, Scalar]
 
 ####################################
 # all awkward.operations.reducers.py
@@ -37,7 +41,11 @@ _sum_trivial = TrivialPartitionwiseOp(ak.sum, axis=1)
 
 
 @derived_from(ak)
-def count(array, axis: int | None = None, **kwargs):
+def count(
+    array: DaskAwkwardArray,
+    axis: int | None = None,
+    **kwargs: Any,
+) -> LazyResult:
     if axis == 1:
         return _count_trivial(array, axis=axis, **kwargs)
     elif axis is None:
@@ -50,7 +58,11 @@ def count(array, axis: int | None = None, **kwargs):
 
 
 @derived_from(ak)
-def count_nonzero(array, axis: int | None = None, **kwargs):
+def count_nonzero(
+    array: DaskAwkwardArray,
+    axis: int | None = None,
+    **kwargs: Any,
+) -> LazyResult:
     if axis is not None and axis == 1:
         return _count_nonzero_trivial(array, axis=1, **kwargs)
     elif axis is None:
@@ -62,7 +74,12 @@ def count_nonzero(array, axis: int | None = None, **kwargs):
         raise ValueError("axis must be None or an integer.")
 
 
-def _min_or_max(f, array, axis, **kwargs):
+def _min_or_max(
+    f,
+    array: DaskAwkwardArray,
+    axis: int | None = None,
+    **kwargs: Any,
+) -> LazyResult:
     # translate negative axis (array.ndim currently raises)
     if axis is not None and axis < 0:
         axis = array.ndim + axis + 1
@@ -80,17 +97,17 @@ def _min_or_max(f, array, axis, **kwargs):
 
 
 @derived_from(ak)
-def max(array: DaskAwkwardArray, axis: int | None = None, **kwargs):
+def max(array: DaskAwkwardArray, axis: int | None = None, **kwargs: Any) -> LazyResult:
     return _min_or_max(ak.max, array, axis, **kwargs)
 
 
 @derived_from(ak)
-def min(array: DaskAwkwardArray, axis: int | None = None, **kwargs):
+def min(array: DaskAwkwardArray, axis: int | None = None, **kwargs: Any) -> LazyResult:
     return _min_or_max(ak.min, array, axis, **kwargs)
 
 
 @derived_from(ak)
-def sum(array: DaskAwkwardArray, axis: int | None = None, **kwargs):
+def sum(array: DaskAwkwardArray, axis: int | None = None, **kwargs: Any) -> LazyResult:
     if axis is not None and axis < 0:
         axis = array.ndim + axis + 1
     if axis == 1:
@@ -162,12 +179,12 @@ _num_trivial = TrivialPartitionwiseOp(ak.num, axis=1)
 
 
 @derived_from(ak)
-def num(array: DaskAwkwardArray, axis: int = 1, **kwargs):
+def num(array: DaskAwkwardArray, axis: int = 1, **kwargs: Any) -> LazyResult:
     return _num_trivial(array, axis=axis, **kwargs)
 
 
 @derived_from(ak)
-def flatten(array: DaskAwkwardArray, axis: int = 1, **kwargs):
+def flatten(array: DaskAwkwardArray, axis: int = 1, **kwargs: Any) -> LazyResult:
     return _flatten_trivial(array, axis=axis, **kwargs)
 
 

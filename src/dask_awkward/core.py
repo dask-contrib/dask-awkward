@@ -3,7 +3,7 @@ from __future__ import annotations
 import operator
 from functools import partial
 from numbers import Number
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 import awkward as ak
 import numpy as np
@@ -18,6 +18,10 @@ from dask.blockwise import blockwise as core_blockwise
 from dask.highlevelgraph import HighLevelGraph
 from dask.threaded import get as threaded_get
 from dask.utils import IndexCallable, cached_property, funcname, key_split
+
+if TYPE_CHECKING:
+    from awkward.layout import Content
+    from dask.blockwise import Blockwise
 
 
 def _finalize_daskawkwardarray(results: Any) -> Any:
@@ -84,7 +88,7 @@ class Scalar(DaskMethodsMixin):
         return new_scalar_object(g, name, None)
 
 
-def new_scalar_object(dsk: HighLevelGraph, name: str, meta: Any):
+def new_scalar_object(dsk: HighLevelGraph, name: str, meta: Any) -> Scalar:
     return Scalar(dsk, name)
 
 
@@ -172,7 +176,7 @@ class DaskAwkwardArray(DaskMethodsMixin):
         raise NotImplementedError("Not known without metadata; a current TODO")
 
     @property
-    def divisions(self) -> tuple[Any, ...]:
+    def divisions(self) -> tuple[int | None, ...]:
         return self._divisions
 
     @property
@@ -184,21 +188,21 @@ class DaskAwkwardArray(DaskMethodsMixin):
         return self._npartitions
 
     @property
-    def typetracer(self) -> Any:
+    def typetracer(self) -> Any | None:
         return self._typetracer
 
     @cached_property
     def keys_array(self) -> np.ndarray:
         return np.array(self.__dask_keys__(), dtype=object)
 
-    def _partitions(self, index):
+    def _partitions(self, index: Any) -> DaskAwkwardArray:
         if not isinstance(index, tuple):
             index = (index,)
         token = tokenize(self, index)
         from dask.array.slicing import normalize_index
 
         index = normalize_index(index, (self.npartitions,))
-        index = tuple(slice(k, k + 1) if isinstance(k, Number) else k for k in index)
+        index = tuple(slice(k, k + 1) if isinstance(k, Number) else k for k in index)  # type: ignore
         name = f"partitions-{token}"
         new_keys = self.keys_array[index].tolist()
         divisions = [self.divisions[i] for _, i in new_keys] + [
@@ -231,7 +235,7 @@ class DaskAwkwardArray(DaskMethodsMixin):
         """
         return IndexCallable(self._partitions)
 
-    def __getitem__(self, key) -> Any:
+    def __getitem__(self, key: Any) -> DaskAwkwardArray:
         if not isinstance(key, str):
             raise NotImplementedError("__getitem__ supports only string (for now).")
         token = tokenize(self, key)
@@ -240,18 +244,23 @@ class DaskAwkwardArray(DaskMethodsMixin):
             lambda x, gikey: operator.getitem(x, gikey), name, self, gikey=key
         )
         hlg = HighLevelGraph.from_collections(name, graphlayer, dependencies=[self])
-        new_typetracer = self._typetracer[key]
+        typetracer = self.typetracer[key] if self.typetracer is not None else None
         return new_array_object(
             hlg,
             name,
-            meta=new_typetracer,
+            meta=typetracer,
             npartitions=self.npartitions,
         )
 
-    def __getattr__(self, attr) -> Any:
+    def __getattr__(self, attr) -> DaskAwkwardArray:
         return self.__getitem__(attr)
 
-    def map_partitions(self, func, *args, **kwargs):
+    def map_partitions(
+        self,
+        func: Callable,
+        *args: Any,
+        **kwargs: Any,
+    ) -> DaskAwkwardArray:
         """Map a function across all partitions of the collection.
 
         Parameters
@@ -279,7 +288,7 @@ class DaskAwkwardArray(DaskMethodsMixin):
         return map_partitions(func, self, *args, **kwargs)
 
 
-def _first_partition_layout(arr: DaskAwkwardArray):
+def _first_partition_layout(arr: DaskAwkwardArray) -> Content:
     return arr.__dask_scheduler__(arr.__dask_graph__(), arr.__dask_keys__()[0]).layout
 
 
@@ -289,7 +298,7 @@ def new_array_object(
     meta: Any | None = None,
     npartitions: int | None = None,
     divisions: tuple[Any, ...] | None = None,
-):
+) -> DaskAwkwardArray:
     arr = DaskAwkwardArray(dsk, name, npartitions=npartitions, divisions=divisions)
     if meta is None:
         layout = v1_to_v2(_first_partition_layout(arr))
@@ -299,9 +308,14 @@ def new_array_object(
     return arr
 
 
-def partitionwise_layer(func, name, *args, **kwargs):
+def partitionwise_layer(
+    func: Callable,
+    name: str,
+    *args: Any,
+    **kwargs: Any,
+) -> Blockwise:
     pairs: list[Any] = []
-    numblocks: dict[Any, int] = {}
+    numblocks: dict[Any, int | tuple[int, ...]] = {}
     for arg in args:
         if isinstance(arg, DaskAwkwardArray):
             pairs.extend([arg.name, "i"])
@@ -363,8 +377,8 @@ def pw_reduction_with_agg_to_scalar(
     agg: Callable,
     *,
     name: str | None = None,
-    **kwargs,
-):
+    **kwargs: Any,
+) -> Scalar:
     token = tokenize(a)
     name = func.__name__ if name is None else name
     name = f"{name}-{token}"
@@ -387,7 +401,7 @@ class TrivialPartitionwiseOp:
         self.__name__ = func.__name__ if name is None else name
         self._kwargs = kwargs
 
-    def __call__(self, collection, **kwargs):
+    def __call__(self, collection: DaskAwkwardArray, **kwargs: Any) -> DaskAwkwardArray:
         # overwrite any saved kwargs in self._kwargs
         for k, v in kwargs.items():
             self._kwargs[k] = v

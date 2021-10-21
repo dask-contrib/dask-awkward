@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import awkward as ak
 from dask.base import tokenize
@@ -12,11 +12,11 @@ if TYPE_CHECKING:
     from .core import DaskAwkwardArray
 
 
-def _from_json(source, kwargs):
+def _from_json(source: Any, kwargs: dict[str, Any]) -> Any:
     return ak.from_json(source, **kwargs)
 
 
-def from_json(source, **kwargs) -> DaskAwkwardArray:
+def from_json(source: Any, **kwargs: Any) -> DaskAwkwardArray:
     token = tokenize(source)
     name = f"from-json-{token}"
     dsk = {(name, i): (_from_json, f, kwargs) for i, f in enumerate(source)}
@@ -24,15 +24,19 @@ def from_json(source, **kwargs) -> DaskAwkwardArray:
     return new_array_object(hlg, name, None, npartitions=len(source))
 
 
-def _from_parquet_single(source, kwargs):
+def _from_parquet_single(source: Any, kwargs: dict[Any, Any]) -> Any:
     return ak.from_parquet(source, **kwargs)
 
 
-def _from_parquet_rowgroups(source, row_groups, kwargs):
+def _from_parquet_rowgroups(
+    source: Any,
+    row_groups: int | list[int],
+    kwargs: dict[str, Any],
+) -> Any:
     return ak.from_parquet(source, row_groups=row_groups, **kwargs)
 
 
-def from_parquet(source, **kwargs) -> DaskAwkwardArray:
+def from_parquet(source: Any, **kwargs: Any) -> DaskAwkwardArray:
     token = tokenize(source)
     name = f"from-parquet-{token}"
 
