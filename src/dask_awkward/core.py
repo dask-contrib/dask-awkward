@@ -299,6 +299,29 @@ def new_array_object(
     npartitions: int | None = None,
     divisions: tuple[Any, ...] | None = None,
 ) -> DaskAwkwardArray:
+    """Instantiate a new DaskAwkwardArray collection object.
+
+    Parameters
+    ----------
+    dsk : HighLevelGraph
+        Graph backing the collection.
+    name : str
+        Unique name for the collection.
+    meta : awkward-array type tracing information, optional
+        Object metadata; this is awkward-array TypeTracer.
+    npartitions : int, optional
+        Total number of partitions; if used `divisions` will be a
+        tuple of length `npartitions` + 1 with all elements``None``.
+    divisions : tuple[int or None, ...], optional
+        Tuple identifying the locations of the divisions between the
+        partitions.
+
+    Returns
+    -------
+    DaskAwkwardArray
+        Resulting collection.
+
+    """
     arr = DaskAwkwardArray(dsk, name, npartitions=npartitions, divisions=divisions)
     if meta is None:
         layout = v1_to_v2(_first_partition_layout(arr))
@@ -314,6 +337,25 @@ def partitionwise_layer(
     *args: Any,
     **kwargs: Any,
 ) -> Blockwise:
+    """Create a partitionwise graph layer.
+
+    Parameters
+    ----------
+    func : Callable
+        Function to operate on all partitions.
+    name : str
+        Name for the layer.
+    *args : Any
+        Arguments that will be passed to `func`.
+    **kwargs : Any
+        Keyword arguments that will be passed to `func`.
+
+    Returns
+    -------
+    Blockwise
+        The resulting graph layer.
+
+    """
     pairs: list[Any] = []
     numblocks: dict[Any, int | tuple[int, ...]] = {}
     for arg in args:
@@ -368,6 +410,7 @@ def map_partitions(
         if is_dask_collection(a):
             deps.append(a)
     hlg = HighLevelGraph.from_collections(name, lay, dependencies=deps)
+
     return new_array_object(hlg, name, None, npartitions=args[0].npartitions)
 
 
@@ -389,7 +432,7 @@ def pw_reduction_with_agg_to_scalar(
     return new_scalar_object(hlg, name, None)
 
 
-class TrivialPartitionwiseOp:
+class _TrivialPartitionwiseOp:
     def __init__(
         self,
         func: Callable,
@@ -398,15 +441,11 @@ class TrivialPartitionwiseOp:
         **kwargs: Any,
     ) -> None:
         self._func = func
-        self.__name__ = func.__name__ if name is None else name
+        self.name = func.__name__ if name is None else name
         self._kwargs = kwargs
 
     def __call__(self, collection: DaskAwkwardArray, **kwargs: Any) -> DaskAwkwardArray:
         # overwrite any saved kwargs in self._kwargs
         for k, v in kwargs.items():
             self._kwargs[k] = v
-        token = tokenize(collection, kwargs)
-        name = f"{self.__name__}-{token}"
-        layer = partitionwise_layer(self._func, name, collection, **self._kwargs)
-        hlg = HighLevelGraph.from_collections(name, layer, dependencies=[collection])
-        return new_array_object(hlg, name, None, collection.npartitions)
+        return map_partitions(self._func, collection, name=self.name, **self._kwargs)

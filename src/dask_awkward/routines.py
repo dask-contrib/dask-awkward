@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 import awkward as ak
 from dask.utils import derived_from
 
-from .core import TrivialPartitionwiseOp, pw_reduction_with_agg_to_scalar
+from .core import _TrivialPartitionwiseOp, pw_reduction_with_agg_to_scalar
 
 if TYPE_CHECKING:
     from typing import Union
@@ -33,11 +33,11 @@ if TYPE_CHECKING:
 # def softmax(x, axis=None, keepdims=False, mask_identity=False):
 ####################################
 
-_count_trivial = TrivialPartitionwiseOp(ak.count, axis=1)
-_count_nonzero_trivial = TrivialPartitionwiseOp(ak.count_nonzero, axis=1)
-_max_trivial = TrivialPartitionwiseOp(ak.max, axis=1)
-_min_trivial = TrivialPartitionwiseOp(ak.min, axis=1)
-_sum_trivial = TrivialPartitionwiseOp(ak.sum, axis=1)
+_count_trivial = _TrivialPartitionwiseOp(ak.count, axis=1)
+_count_nonzero_trivial = _TrivialPartitionwiseOp(ak.count_nonzero, axis=1)
+_max_trivial = _TrivialPartitionwiseOp(ak.max, axis=1)
+_min_trivial = _TrivialPartitionwiseOp(ak.min, axis=1)
+_sum_trivial = _TrivialPartitionwiseOp(ak.sum, axis=1)
 
 
 @derived_from(ak)
@@ -174,8 +174,8 @@ def sum(array: DaskAwkwardArray, axis: int | None = None, **kwargs: Any) -> Lazy
 ####################################
 
 
-_flatten_trivial = TrivialPartitionwiseOp(ak.flatten, axis=1)
-_num_trivial = TrivialPartitionwiseOp(ak.num, axis=1)
+_flatten_trivial = _TrivialPartitionwiseOp(ak.flatten, axis=1)
+_num_trivial = _TrivialPartitionwiseOp(ak.num, axis=1)
 
 
 @derived_from(ak)
