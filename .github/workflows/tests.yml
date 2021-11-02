@@ -42,4 +42,6 @@ jobs:
       shell: bash -l {0}
       run: |
         conda activate test-environment
+        conda list
+        pip list
         py.test tests
