@@ -1,23 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import awkward as ak
 import pytest
 
 import dask_awkward as dak
-import dask_awkward.data as dakd
-
-if TYPE_CHECKING:
-    from dask_awkward.core import DaskAwkwardArray
-
-
-def load_nested() -> DaskAwkwardArray:
-    return dak.from_json(dakd.json_data(kind="records"))
-
-
-def load_array() -> DaskAwkwardArray:
-    return dak.from_json(dakd.json_data(kind="numbers"))
+from dask_awkward.utils import load_array, load_nested
 
 
 @pytest.mark.parametrize("axis", [None, 1, pytest.param(-1, marks=pytest.mark.xfail)])

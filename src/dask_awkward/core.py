@@ -20,7 +20,7 @@ from dask.threaded import get as threaded_get
 from dask.utils import IndexCallable, cached_property, funcname, key_split
 
 if TYPE_CHECKING:
-    from awkward.layout import Content
+    from awkward._v2.contents import Content
     from dask.blockwise import Blockwise
 
 
@@ -108,19 +108,19 @@ class DaskAwkwardArray(DaskMethodsMixin):
         self,
         dsk: HighLevelGraph,
         key: str,
-        divisions: tuple[Any, ...] | None = None,
+        meta: Any,
+        divisions: tuple[int | None, ...] | None = None,
         npartitions: int | None = None,
     ) -> None:
         self._dask: HighLevelGraph = dsk
         self._key: str = key
         if divisions is None and npartitions is not None:
             self._npartitions: int = npartitions
-            self._divisions: tuple[Any, ...] = (None,) * (npartitions + 1)
+            self._divisions: tuple[int | None, ...] = (None,) * (npartitions + 1)
         elif divisions is not None and npartitions is None:
             self._divisions = divisions
             self._npartitions = len(divisions) - 1
-        self._fields: list[str] | None = None
-        self._typetracer = None
+        self._meta = meta
 
     def __dask_graph__(self) -> HighLevelGraph:
         return self.dask
@@ -145,7 +145,7 @@ class DaskAwkwardArray(DaskMethodsMixin):
         name = self.name
         if rename:
             name = rename.get(name, name)
-        return type(self)(dsk, name, divisions=self.divisions)
+        return type(self)(dsk, name, self.meta, divisions=self.divisions)
 
     def __str__(self) -> str:
         return (
@@ -158,10 +158,6 @@ class DaskAwkwardArray(DaskMethodsMixin):
     @property
     def dask(self) -> HighLevelGraph:
         return self._dask
-
-    @property
-    def fields(self) -> list[str] | None:
-        return self._fields
 
     @property
     def key(self) -> str:
@@ -188,8 +184,18 @@ class DaskAwkwardArray(DaskMethodsMixin):
         return self._npartitions
 
     @property
+    def meta(self) -> Any | None:
+        return self._meta
+
+    @property
     def typetracer(self) -> Any | None:
-        return self._typetracer
+        return self.meta
+
+    @property
+    def fields(self) -> list[str] | None:
+        if self.meta is not None:
+            return self.meta.fields
+        return None
 
     @cached_property
     def keys_array(self) -> np.ndarray:
@@ -288,8 +294,15 @@ class DaskAwkwardArray(DaskMethodsMixin):
         return map_partitions(func, self, *args, **kwargs)
 
 
-def _first_partition_layout(arr: DaskAwkwardArray) -> Content:
-    return arr.__dask_scheduler__(arr.__dask_graph__(), arr.__dask_keys__()[0]).layout
+def _first_partition(array: DaskAwkwardArray) -> ak.Array:
+    computed = array.__dask_scheduler__(
+        array.__dask_graph__(), array.__dask_keys__()[0]
+    )
+    return computed
+
+
+def _typetracer_via_v1_to_v2(array: DaskAwkwardArray) -> Content:
+    return v1_to_v2(_first_partition(array).layout).typetracer
 
 
 def new_array_object(
@@ -322,13 +335,16 @@ def new_array_object(
         Resulting collection.
 
     """
-    arr = DaskAwkwardArray(dsk, name, npartitions=npartitions, divisions=divisions)
+    array = DaskAwkwardArray(
+        dsk,
+        name,
+        meta,
+        npartitions=npartitions,
+        divisions=divisions,
+    )
     if meta is None:
-        layout = v1_to_v2(_first_partition_layout(arr))
-        arr._typetracer = layout.typetracer
-    else:
-        arr._typetracer = meta
-    return arr
+        array._meta = _typetracer_via_v1_to_v2(array)
+    return array
 
 
 def partitionwise_layer(
@@ -406,7 +422,7 @@ def map_partitions(
     name = f"{name}-{token}"
     lay = partitionwise_layer(func, name, *args, **kwargs)
     deps = [a for a in args if is_dask_collection(a)] + [
-        v for k, v in kwargs.items() if is_dask_collection(v)
+        v for _, v in kwargs.items() if is_dask_collection(v)
     ]
     hlg = HighLevelGraph.from_collections(name, lay, dependencies=deps)
     return new_array_object(hlg, name, None, npartitions=args[0].npartitions)
