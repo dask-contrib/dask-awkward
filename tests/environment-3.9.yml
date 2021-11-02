@@ -5,5 +5,7 @@ dependencies:
   # required dependencies
   - python=3.9
   - dask
-  - awkward
   - pytest
+  - pip
+  - pip:
+    - git+https://github.com/scikit-hep/awkward-1.0
