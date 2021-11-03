@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import awkward as ak
+
+import dask_awkward as dak
 from dask_awkward.utils import load_nested
 
 
@@ -11,5 +14,5 @@ def test_meta_exists() -> None:
 
 def test_fields() -> None:
     daa = load_nested()
-    assert daa.fields == daa.compute().fields
-    assert daa["analysis"].fields == daa["analysis"].compute().fields
+    assert dak.fields(daa) == ak.fields(daa.compute())
+    assert dak.fields(daa["analysis"]) == ak.fields(daa["analysis"].compute())

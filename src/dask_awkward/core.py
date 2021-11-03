@@ -111,17 +111,11 @@ class DaskAwkwardArray(DaskMethodsMixin):
         dsk: HighLevelGraph,
         key: str,
         meta: Any,
-        divisions: tuple[int | None, ...] | None = None,
-        npartitions: int | None = None,
+        divisions: tuple[int | None, ...],
     ) -> None:
         self._dask: HighLevelGraph = dsk
         self._key: str = key
-        if divisions is None and npartitions is not None:
-            self._npartitions: int = npartitions
-            self._divisions: tuple[int | None, ...] = (None,) * (npartitions + 1)
-        elif divisions is not None and npartitions is None:
-            self._divisions = divisions
-            self._npartitions = len(divisions) - 1
+        self._divisions = divisions
         self._meta = meta
 
     def __dask_graph__(self) -> HighLevelGraph:
@@ -171,7 +165,7 @@ class DaskAwkwardArray(DaskMethodsMixin):
 
     @property
     def ndim(self) -> int:
-        raise NotImplementedError("Not known without metadata; a current TODO")
+        raise NotImplementedError("TODO")
 
     @property
     def divisions(self) -> tuple[int | None, ...]:
@@ -183,7 +177,7 @@ class DaskAwkwardArray(DaskMethodsMixin):
 
     @property
     def npartitions(self) -> int:
-        return self._npartitions
+        return len(self.divisions) - 1
 
     @property
     def meta(self) -> Any | None:
@@ -341,13 +335,13 @@ def new_array_object(
         Resulting collection.
 
     """
-    array = DaskAwkwardArray(
-        dsk,
-        name,
-        meta,
-        npartitions=npartitions,
-        divisions=divisions,
-    )
+    if divisions is None and npartitions is not None:
+        divisions = (None,) * (npartitions + 1)
+    elif divisions is not None and npartitions is not None:
+        raise ValueError("Only one of either divisions or npartitions must be defined.")
+    elif divisions is None and npartitions is None:
+        raise ValueError("One of either divisions or npartitions must be defined.")
+    array = DaskAwkwardArray(dsk, name, meta, divisions)
     if meta is None:
         array._meta = _typetracer_via_v1_to_v2(array)
     return array
@@ -471,8 +465,11 @@ class _TrivialPartitionwiseOp:
         return map_partitions(self._func, collection, name=self.name, **self._kwargs)
 
 
-def fields(array: DaskAwkwardArray) -> list[str]:
-    return array.fields
+def fields(array: DaskAwkwardArray) -> list[str] | None:
+    if array.meta is not None:
+        return array.meta.fields
+    else:
+        None
 
 
 def form(array: DaskAwkwardArray) -> Form:
