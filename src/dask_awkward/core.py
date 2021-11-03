@@ -21,6 +21,8 @@ from dask.utils import IndexCallable, cached_property, funcname, key_split
 
 if TYPE_CHECKING:
     from awkward._v2.contents import Content
+    from awkward._v2.forms.form import Form
+    from awkward._v2.types.type import Type
     from dask.blockwise import Blockwise
 
 
@@ -467,3 +469,15 @@ class _TrivialPartitionwiseOp:
         for k, v in kwargs.items():
             self._kwargs[k] = v
         return map_partitions(self._func, collection, name=self.name, **self._kwargs)
+
+
+def fields(array: DaskAwkwardArray) -> list[str]:
+    return array.fields
+
+
+def form(array: DaskAwkwardArray) -> Form:
+    return array.meta.form
+
+
+def type(array: DaskAwkwardArray) -> Type:
+    return form(array).type
