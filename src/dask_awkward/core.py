@@ -144,9 +144,20 @@ class DaskAwkwardArray(DaskMethodsMixin):
         return type(self)(dsk, name, self.meta, divisions=self.divisions)
 
     def __str__(self) -> str:
+        tstr = typestr(self)
+        if len(tstr) > 22:
+            tstr = f"{tstr[0:22]} ... }}"
+        length = "var" if self.divisions[-1] is None else self.divisions[-1]
+        tstr = f"{length} * {tstr}"
         return (
-            f"DaskAwkwardArray<{key_split(self.name)}, npartitions={self.npartitions}>"
+            f"DaskAwkwardArray<{key_split(self.name)}, "
+            f"npartitions={self.npartitions}, "
+            f"type='{tstr}'"
+            ">"
         )
+
+    def _shorttypestr(self, max=10) -> str:
+        return typestr(self)[0:max]
 
     __repr__ = __str__
     __dask_scheduler__ = staticmethod(threaded_get)
@@ -465,6 +476,10 @@ class _TrivialPartitionwiseOp:
         return map_partitions(self._func, collection, name=self.name, **self._kwargs)
 
 
+def _type(array: DaskAwkwardArray) -> Type:
+    return form(array).type
+
+
 def fields(array: DaskAwkwardArray) -> list[str] | None:
     if array.meta is not None:
         return array.meta.fields
@@ -476,5 +491,5 @@ def form(array: DaskAwkwardArray) -> Form:
     return array.meta.form
 
 
-def type(array: DaskAwkwardArray) -> Type:
-    return form(array).type
+def typestr(array: DaskAwkwardArray) -> str:
+    return str(_type(array))
