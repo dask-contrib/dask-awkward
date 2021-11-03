@@ -1,23 +1,6 @@
 from ._version import version  # noqa
-from .core import map_partitions
-from .io import from_json, from_parquet
-from .routines import count, count_nonzero, flatten, max, min, num, sum
+from .core import fields, form, map_partitions, type  # noqa
+from .io import from_json, from_parquet  # noqa
+from .routines import count, count_nonzero, flatten, max, min, num, sum  # noqa
 
 __version__ = version  # noqa
-
-
-__all__ = (
-    # top level methods
-    "count",
-    "count_nonzero",
-    "flatten",
-    "max",
-    "min",
-    "num",
-    "sum",
-    # collection specific
-    "map_partitions",
-    # io
-    "from_json",
-    "from_parquet",
-)

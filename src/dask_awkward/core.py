@@ -197,6 +197,12 @@ class DaskAwkwardArray(DaskMethodsMixin):
             return self.meta.fields
         return None
 
+    @property
+    def form(self) -> Any | None:
+        if self.meta is not None:
+            return self.meta.form
+        return None
+
     @cached_property
     def keys_array(self) -> np.ndarray:
         return np.array(self.__dask_keys__(), dtype=object)
@@ -241,22 +247,20 @@ class DaskAwkwardArray(DaskMethodsMixin):
         """
         return IndexCallable(self._partitions)
 
-    def __getitem__(self, key: Any) -> DaskAwkwardArray:
-        if not isinstance(key, str):
-            raise NotImplementedError("__getitem__ supports only string (for now).")
+    def _getitem_str(self, key: str) -> DaskAwkwardArray:
         token = tokenize(self, key)
         name = f"getitem-{token}"
         graphlayer = partitionwise_layer(
             lambda x, gikey: operator.getitem(x, gikey), name, self, gikey=key
         )
         hlg = HighLevelGraph.from_collections(name, graphlayer, dependencies=[self])
-        typetracer = self.typetracer[key] if self.typetracer is not None else None
-        return new_array_object(
-            hlg,
-            name,
-            meta=typetracer,
-            npartitions=self.npartitions,
-        )
+        meta = self.meta[key] if self.meta is not None else None
+        return new_array_object(hlg, name, meta=meta, divisions=self.divisions)
+
+    def __getitem__(self, key: Any) -> DaskAwkwardArray:
+        if not isinstance(key, str):
+            raise NotImplementedError("__getitem__ supports only string (for now).")
+        return self._getitem_str(key=key)
 
     def __getattr__(self, attr) -> DaskAwkwardArray:
         return self.__getitem__(attr)
