@@ -30,7 +30,7 @@ def _finalize_daskawkwardarray(results: Any) -> Any:
     if all(isinstance(r, ak.Array) for r in results):
         return ak.concatenate(results)
     if all(isinstance(r, ak.Record) for r in results):
-        raise NotImplementedError("Records not supported yet.")
+        return ak.from_iter(results)
     else:
         return results
 
@@ -143,16 +143,18 @@ class DaskAwkwardArray(DaskMethodsMixin):
             name = rename.get(name, name)
         return type(self)(dsk, name, self.meta, divisions=self.divisions)
 
-    def __str__(self) -> str:
+    def _tstr(self, max: int = 0) -> str:
         tstr = typestr(self)
-        if len(tstr) > 22:
-            tstr = f"{tstr[0:22]} ... }}"
+        if max and len(tstr) > max:
+            tstr = f"{tstr[0:max]} ... }}"
         length = "var" if self.divisions[-1] is None else self.divisions[-1]
-        tstr = f"{length} * {tstr}"
+        return f"{length} * {tstr}"
+
+    def __str__(self) -> str:
         return (
-            f"DaskAwkwardArray<{key_split(self.name)}, "
+            f"dask.awkward<{key_split(self.name)}, "
             f"npartitions={self.npartitions}, "
-            f"type='{tstr}'"
+            f"type='{self._tstr(max=30)}'"
             ">"
         )
 
@@ -160,6 +162,26 @@ class DaskAwkwardArray(DaskMethodsMixin):
         return typestr(self)[0:max]
 
     __repr__ = __str__
+
+    def _ipython_display_(self):
+        import uuid
+
+        from IPython.display import display_html, display_javascript
+
+        u = uuid.uuid4()
+        display_html(
+            f'<div id="{u}" style="height: 600px; width:100%;"></div>', raw=True
+        )
+        display_javascript(
+            """
+        require(["https://rawgit.com/caldwell/renderjson/master/renderjson.js"], function() {
+        document.getElementById('%s').appendChild(renderjson(%s))
+        });
+        """
+            % (u, self.meta.form.to_json()),
+            raw=True,
+        )
+
     __dask_scheduler__ = staticmethod(threaded_get)
 
     @property
@@ -205,7 +227,7 @@ class DaskAwkwardArray(DaskMethodsMixin):
         return None
 
     @property
-    def form(self) -> Any | None:
+    def form(self) -> Form | None:
         if self.meta is not None:
             return self.meta.form
         return None
@@ -254,7 +276,12 @@ class DaskAwkwardArray(DaskMethodsMixin):
         """
         return IndexCallable(self._partitions)
 
-    def _getitem_str(self, key: str) -> DaskAwkwardArray:
+    def _calculate_known_divisions(self) -> tuple[int, ...]:
+        # force computation of ak.num with axis=0 on all partitions
+        # (if we don't know it yet!)
+        pass
+
+    def _getitem_inner(self, key: str) -> DaskAwkwardArray:
         token = tokenize(self, key)
         name = f"getitem-{token}"
         graphlayer = partitionwise_layer(
@@ -265,12 +292,28 @@ class DaskAwkwardArray(DaskMethodsMixin):
         return new_array_object(hlg, name, meta=meta, divisions=self.divisions)
 
     def __getitem__(self, key: Any) -> DaskAwkwardArray:
-        if not isinstance(key, str):
-            raise NotImplementedError("__getitem__ supports only string (for now).")
-        return self._getitem_str(key=key)
+        if not isinstance(key, tuple):
+            key = (key,)
+        if isinstance(key[0], list):
+            if any(isinstance(k, int) for k in key[0]):
+                raise NotImplementedError("Lists containing integers not supported.")
+        if (
+            isinstance(key[0], (str, list))
+            or key[0] is Ellipsis
+            or key[0] == slice(None, None, None)
+        ):
+            return self._getitem_inner(key=key)
+        if isinstance(key[0], slice):
+            return key
+        if isinstance(key[0], int):
+            return key
+        return key
 
-    def __getattr__(self, attr) -> DaskAwkwardArray:
-        return self.__getitem__(attr)
+    def __getattr__(self, attr: str) -> DaskAwkwardArray:
+        try:
+            return self.__getitem__(attr)
+        except (IndexError, KeyError):
+            raise AttributeError(f"{attr} not in fields.")
 
     def map_partitions(
         self,
@@ -352,7 +395,7 @@ def new_array_object(
         raise ValueError("Only one of either divisions or npartitions must be defined.")
     elif divisions is None and npartitions is None:
         raise ValueError("One of either divisions or npartitions must be defined.")
-    array = DaskAwkwardArray(dsk, name, meta, divisions)
+    array = DaskAwkwardArray(dsk, name, meta, divisions)  # type: ignore
     if meta is None:
         array._meta = _typetracer_via_v1_to_v2(array)
     return array
@@ -476,19 +519,16 @@ class _TrivialPartitionwiseOp:
         return map_partitions(self._func, collection, name=self.name, **self._kwargs)
 
 
-def _type(array: DaskAwkwardArray) -> Type:
-    return form(array).type
+def _type(array: DaskAwkwardArray) -> Type | None:
+    f = array.form
+    return f.type if f is not None else None
 
 
 def fields(array: DaskAwkwardArray) -> list[str] | None:
     if array.meta is not None:
         return array.meta.fields
     else:
-        None
-
-
-def form(array: DaskAwkwardArray) -> Form:
-    return array.meta.form
+        return None
 
 
 def typestr(array: DaskAwkwardArray) -> str:

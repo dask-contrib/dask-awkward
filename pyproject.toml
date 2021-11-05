@@ -31,3 +31,7 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = ["awkward.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["IPython.*"]
+ignore_missing_imports = true
