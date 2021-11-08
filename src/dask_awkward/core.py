@@ -32,7 +32,7 @@ def _finalize_daskawkwardarray(results: Any) -> Any:
     if all(isinstance(r, ak.Record) for r in results):
         return ak.from_iter(results)
     else:
-        return results
+        return ak.from_iter(results)
 
 
 def _finalize_scalar(results: Any) -> Any:
@@ -276,11 +276,6 @@ class DaskAwkwardArray(DaskMethodsMixin):
         """
         return IndexCallable(self._partitions)
 
-    def _calculate_known_divisions(self) -> tuple[int, ...]:
-        # force computation of ak.num with axis=0 on all partitions
-        # (if we don't know it yet!)
-        pass
-
     def _getitem_inner(self, key: str) -> DaskAwkwardArray:
         token = tokenize(self, key)
         name = f"getitem-{token}"
@@ -397,7 +392,10 @@ def new_array_object(
         raise ValueError("One of either divisions or npartitions must be defined.")
     array = DaskAwkwardArray(dsk, name, meta, divisions)  # type: ignore
     if meta is None:
-        array._meta = _typetracer_via_v1_to_v2(array)
+        try:
+            array._meta = _typetracer_via_v1_to_v2(array)
+        except (AttributeError, AssertionError):
+            array._meta = None
     return array
 
 
@@ -412,7 +410,7 @@ def partitionwise_layer(
     Parameters
     ----------
     func : Callable
-        Function to operate on all partitions.
+        Function to apply on all partitions.
     name : str
         Name for the layer.
     *args : Any
@@ -454,7 +452,7 @@ def map_partitions(
     Parameters
     ----------
     func : Callable
-        Function to call on all partitions.
+        Function to apply on all partitions.
     *args : Collections and function arguments
         Arguments passed to the function, if arguments are
         DaskAwkwardArray collections they must be compatibly
@@ -483,21 +481,68 @@ def map_partitions(
 
 
 def pw_reduction_with_agg_to_scalar(
-    a: DaskAwkwardArray,
+    array: DaskAwkwardArray,
     func: Callable,
     agg: Callable,
     *,
     name: str | None = None,
     **kwargs: Any,
 ) -> Scalar:
-    token = tokenize(a)
+    """Partitionwise operation with aggregation to scalar.
+
+    Parameters
+    ----------
+    array : DaskAwkwardArray
+        Array collection.
+    func : Callable
+        Function to apply on all partitions.
+    agg : Callable
+        Function to aggregate the result on each partition.
+    name : str | None
+        Name for the computation, if ``None`` we use the name of
+        `func`.
+    **kwargs : Any
+        Keyword arguments passed to `func`.
+
+    Returns
+    -------
+    Scalar
+        Resulting scalar Dask collection.
+
+    """
+    token = tokenize(array)
     name = func.__name__ if name is None else name
     name = f"{name}-{token}"
     func = partial(func, **kwargs)
-    dsk = {(name, i): (func, k) for i, k in enumerate(a.__dask_keys__())}
+    dsk = {(name, i): (func, k) for i, k in enumerate(array.__dask_keys__())}
     dsk[name] = (agg, list(dsk.keys()))  # type: ignore
-    hlg = HighLevelGraph.from_collections(name, dsk, dependencies=[a])
+    hlg = HighLevelGraph.from_collections(name, dsk, dependencies=[array])
     return new_scalar_object(hlg, name, None)
+
+
+def calculate_known_divisions(array: DaskAwkwardArray) -> tuple[int, ...]:
+    """Determine the divisions of a collection.
+
+    This function triggers a computation.
+
+    Parameters
+    ----------
+    array : DaskAwkwardArray
+        Array collection
+
+    Returns
+    -------
+    tuple[int, ...]
+        Location (index) of each division
+
+    """
+    if array.known_divisions:
+        return array.divisions  # type: ignore
+    nums = array.map_partitions(ak.num, axis=0).compute()
+    try:
+        return tuple(np.cumsum(nums))
+    except TypeError:
+        return tuple(np.cumsum(nums.slot0))
 
 
 class _TrivialPartitionwiseOp:
