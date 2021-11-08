@@ -23,6 +23,7 @@ jobs:
       run: |
         python -m pip install pip setuptools -U
         python -m pip install wheel -U
+        python -m pip install pytest -U
         pip install --ignore-installed -U -q --no-cache-dir -e .
         pip list
     - name: test
