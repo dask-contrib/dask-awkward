@@ -10,6 +10,7 @@ dask-worker-space
 
 # scratch files
 */**/million*.parquet
+*/**/Untitled.ipynb
 
 # setuptools_scm generated
 src/dask_awkward/_version.py
