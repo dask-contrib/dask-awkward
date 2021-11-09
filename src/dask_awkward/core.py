@@ -143,6 +143,11 @@ class DaskAwkwardArray(DaskMethodsMixin):
             name = rename.get(name, name)
         return type(self)(dsk, name, self.meta, divisions=self.divisions)
 
+    def __len__(self) -> int:
+        if not self.known_divisions:
+            self._divisions = calculate_known_divisions(self)
+        return self.divisions[-1] + 1
+
     def _tstr(self, max: int = 0) -> str:
         tstr = typestr(self)
         if max and len(tstr) > max:
@@ -496,7 +501,7 @@ def pw_reduction_with_agg_to_scalar(
     Parameters
     ----------
     array : DaskAwkwardArray
-        Array collection.
+        Awkward array collection.
     func : Callable
         Function to apply on all partitions.
     agg : Callable
@@ -531,12 +536,12 @@ def calculate_known_divisions(array: DaskAwkwardArray) -> tuple[int, ...]:
     Parameters
     ----------
     array : DaskAwkwardArray
-        Array collection
+        Awkard array collection.
 
     Returns
     -------
     tuple[int, ...]
-        Location (index) of each division
+        Locations (indices) of division boundaries.
 
     """
     if array.known_divisions:

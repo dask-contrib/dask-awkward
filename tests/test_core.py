@@ -5,7 +5,7 @@ import pytest
 
 import dask_awkward as dak
 import dask_awkward.core as dakc
-from dask_awkward.utils import load_nested
+from dask_awkward.utils import load_array, load_nested
 
 
 def test_meta_exists() -> None:
@@ -28,3 +28,12 @@ def test_calculate_known_divisions() -> None:
     assert dakc.calculate_known_divisions(daa.analysis) == target
     assert dakc.calculate_known_divisions(daa.analysis.x1) == target
     assert dakc.calculate_known_divisions(daa["analysis"][["x1", "x2"]]) == target
+    daa = load_array()
+    assert dakc.calculate_known_divisions(daa) == target
+
+
+def test_len() -> None:
+    daa = load_nested()
+    assert len(daa) == 9
+    daa = load_array()
+    assert len(daa) == 9
