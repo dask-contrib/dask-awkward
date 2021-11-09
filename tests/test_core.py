@@ -23,7 +23,7 @@ def test_fields() -> None:
 
 def test_calculate_known_divisions() -> None:
     daa = load_nested()
-    target = (3, 6, 9)
+    target = (0, 3, 6, 8)
     assert dakc.calculate_known_divisions(daa) == target
     assert dakc.calculate_known_divisions(daa.analysis) == target
     assert dakc.calculate_known_divisions(daa.analysis.x1) == target

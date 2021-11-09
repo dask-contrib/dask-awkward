@@ -1,4 +1,8 @@
 import awkward as ak  # noqa
+import dask.array as da  # noqa
+import dask.dataframe as dd  # noqa
+import numpy as np  # noqa
+import pandas as pd  # noqa
 
 import dask_awkward as dak  # noqa
 import dask_awkward.core as dakc  # noqa

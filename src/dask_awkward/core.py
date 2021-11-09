@@ -543,9 +543,11 @@ def calculate_known_divisions(array: DaskAwkwardArray) -> tuple[int, ...]:
         return array.divisions  # type: ignore
     nums = array.map_partitions(ak.num, axis=0).compute()
     try:
-        return tuple(np.cumsum(nums))
+        cs = list(np.cumsum(nums))
     except TypeError:
-        return tuple(np.cumsum(nums.slot0))
+        cs = list(np.cumsum(nums.slot0))
+    cs[-1] -= 1
+    return tuple([0, *cs])
 
 
 class _TrivialPartitionwiseOp:
