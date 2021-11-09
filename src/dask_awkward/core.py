@@ -137,6 +137,8 @@ class DaskAwkwardArray(DaskMethodsMixin):
     def __dask_optimize__(dsk: Any, keys: Any, **kwargs: Any) -> HighLevelGraph:
         return dsk
 
+    __dask_scheduler__ = staticmethod(threaded_get)
+
     def _rebuild(self, dsk: Any, *, rename: Any | None = None) -> Any:
         name = self.name
         if rename:
@@ -172,25 +174,11 @@ class DaskAwkwardArray(DaskMethodsMixin):
         if self.meta is None:
             return None
 
-        import uuid
+        import json
 
-        from IPython.display import display_html, display_javascript
+        from IPython.display import display_json
 
-        u = uuid.uuid4()
-        display_html(
-            f'<div id="{u}" style="height: 600px; width:100%;"></div>', raw=True
-        )
-        display_javascript(
-            """
-        require(["https://rawgit.com/caldwell/renderjson/master/renderjson.js"], function() {
-        document.getElementById('%s').appendChild(renderjson(%s))
-        });
-        """
-            % (u, self.meta.form.to_json()),
-            raw=True,
-        )
-
-    __dask_scheduler__ = staticmethod(threaded_get)
+        display_json(json.loads(self.meta.form.to_json()), raw=True)
 
     @property
     def dask(self) -> HighLevelGraph:
