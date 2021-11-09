@@ -44,33 +44,33 @@ class Scalar(DaskMethodsMixin):
         self._dask: HighLevelGraph = dsk
         self._key: str = key
 
-    def __dask_graph__(self):
+    def __dask_graph__(self) -> HighLevelGraph:
         return self._dask
 
-    def __dask_keys__(self):
+    def __dask_keys__(self) -> list[str]:
         return [self._key]
 
-    def __dask_layers__(self):
+    def __dask_layers__(self) -> tuple[str, ...]:
         if isinstance(self._dask, HighLevelGraph) and len(self._dask.layers) == 1:
             return tuple(self._dask.layers)
         return (self.key,)
 
-    def __dask_tokenize__(self):
+    def __dask_tokenize__(self) -> str:
         return self.key
 
     @staticmethod
-    def __dask_optimize__(dsk, keys, **kwargs):
+    def __dask_optimize__(dsk: Any, keys: Any, **kwargs: Any) -> HighLevelGraph:
         return dsk
 
     __dask_scheduler__ = staticmethod(threaded_get)
 
-    def __dask_postcompute__(self):
+    def __dask_postcompute__(self) -> Any:
         return _finalize_scalar, ()
 
-    def __dask_postpersist__(self):
+    def __dask_postpersist__(self) -> Any:
         return self._rebuild, ()
 
-    def _rebuild(self, dsk, *, rename=None):
+    def _rebuild(self, dsk: Any, *, rename: Any | None = None) -> Any:
         key = replace_name_in_key(self.key, rename) if rename else self.key
         return Scalar(dsk, key)
 
@@ -134,7 +134,7 @@ class DaskAwkwardArray(DaskMethodsMixin):
         return _finalize_daskawkwardarray, ()
 
     @staticmethod
-    def __dask_optimize__(dsk, keys, **kwargs):
+    def __dask_optimize__(dsk: Any, keys: Any, **kwargs: Any) -> HighLevelGraph:
         return dsk
 
     def _rebuild(self, dsk: Any, *, rename: Any | None = None) -> Any:
@@ -158,12 +158,15 @@ class DaskAwkwardArray(DaskMethodsMixin):
             ">"
         )
 
-    def _shorttypestr(self, max=10) -> str:
+    def _shorttypestr(self, max: int = 10) -> str:
         return typestr(self)[0:max]
 
     __repr__ = __str__
 
-    def _ipython_display_(self):
+    def _ipython_display_(self) -> None:
+        if self.meta is None:
+            return None
+
         import uuid
 
         from IPython.display import display_html, display_javascript

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import awkward as ak
 from dask.utils import derived_from
@@ -8,7 +8,7 @@ from dask.utils import derived_from
 from .core import _TrivialPartitionwiseOp, pw_reduction_with_agg_to_scalar
 
 if TYPE_CHECKING:
-    from typing import Union
+    from typing import Any, Callable, Union
 
     from .core import DaskAwkwardArray, Scalar
 
@@ -75,7 +75,7 @@ def count_nonzero(
 
 
 def _min_or_max(
-    f,
+    f: Callable,
     array: DaskAwkwardArray,
     axis: int | None = None,
     **kwargs: Any,
