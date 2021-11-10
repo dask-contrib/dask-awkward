@@ -4,7 +4,7 @@ import awkward as ak
 import pytest
 
 import dask_awkward as dak
-from dask_awkward.utils import load_array, load_nested
+from dask_awkward.data import load_array, load_nested
 
 
 @pytest.mark.parametrize("axis", [None, 1, pytest.param(-1, marks=pytest.mark.xfail)])

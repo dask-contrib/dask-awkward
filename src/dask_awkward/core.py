@@ -19,6 +19,8 @@ from dask.highlevelgraph import HighLevelGraph
 from dask.threaded import get as threaded_get
 from dask.utils import IndexCallable, cached_property, funcname, key_split
 
+from .utils import normalize_single_outer_inner_index
+
 if TYPE_CHECKING:
     from awkward._v2.contents import Content
     from awkward._v2.forms.form import Form
@@ -263,16 +265,16 @@ class DaskAwkwardArray(DaskMethodsMixin):
         >>> import dask_awkward.data as dakd
         >>> a = dak.from_json(dakd.json_data())
         >>> a
-        DaskAwkwardArray<from-json, npartitions=3>
+        dask.awkward<from-json, npartitions=3, type='var * var * var * int64'>
         >>> a.partitions[0]
-        DaskAwkwardArray<partitions, npartitions=1>
+        dask.awkward<partitions, npartitions=1, type='var * var * var * int64'>
         >>> a.partitions[0:2]
-        DaskAwkwardArray<partitions, npartitions=2>
+        dask.awkward<partitions, npartitions=2, type='var * var * var * int64'>
 
         """
         return IndexCallable(self._partitions)
 
-    def _getitem_inner(self, key: str) -> DaskAwkwardArray:
+    def _getitem_inner(self, key: Any) -> DaskAwkwardArray:
         token = tokenize(self, key)
         name = f"getitem-{token}"
         graphlayer = partitionwise_layer(
@@ -281,6 +283,17 @@ class DaskAwkwardArray(DaskMethodsMixin):
         hlg = HighLevelGraph.from_collections(name, graphlayer, dependencies=[self])
         meta = self.meta[key] if self.meta is not None else None
         return new_array_object(hlg, name, meta=meta, divisions=self.divisions)
+
+    def _getitem_singleint(self, key: int) -> DaskAwkwardArray:
+        # get divisions
+        self._divisions = calculate_known_divisions(self)
+
+        # if only 1 division
+        if len(self.divisions) == 2:
+            return self._getitem_inner(key=key)
+
+        p, k = normalize_single_outer_inner_index(self.divisions, key)
+        return self.partitions[p][k]
 
     def __getitem__(self, key: Any) -> DaskAwkwardArray:
         if not isinstance(key, tuple):
@@ -295,9 +308,11 @@ class DaskAwkwardArray(DaskMethodsMixin):
         ):
             return self._getitem_inner(key=key)
         if isinstance(key[0], slice):
-            return key
-        if isinstance(key[0], int):
-            return key
+            pass
+        if isinstance(key[0], int) and len(key) == 1:
+            return self._getitem_singleint(key=key[0])
+        if isinstance(key[0], int) and len(key) > 1:
+            pass
         return key
 
     def __getattr__(self, attr: str) -> DaskAwkwardArray:
@@ -337,6 +352,9 @@ class DaskAwkwardArray(DaskMethodsMixin):
 
         """
         return map_partitions(func, self, *args, **kwargs)
+
+    def _compute_divisions(self) -> None:
+        self._divisions = calculate_known_divisions(self)
 
 
 def _first_partition(array: DaskAwkwardArray) -> ak.Array:
