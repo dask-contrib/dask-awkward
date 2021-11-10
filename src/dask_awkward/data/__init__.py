@@ -1,5 +1,20 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+from dask_awkward.io import from_json
+
+if TYPE_CHECKING:
+    from ..core import DaskAwkwardArray
+
+
+def load_nested() -> DaskAwkwardArray:
+    return from_json(json_data(kind="records"))
+
+
+def load_array() -> DaskAwkwardArray:
+    return from_json(json_data(kind="numbers"))
+
 
 def json_data(kind: str = "numbers") -> list[str]:
     if kind == "numbers":

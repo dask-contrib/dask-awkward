@@ -5,7 +5,7 @@ import pytest
 
 import dask_awkward as dak
 import dask_awkward.core as dakc
-from dask_awkward.utils import load_array, load_nested
+from dask_awkward.data import load_array, load_nested
 
 
 def test_meta_exists() -> None:

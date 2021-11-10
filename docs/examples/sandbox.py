@@ -6,12 +6,14 @@ import pandas as pd  # noqa
 
 import dask_awkward as dak  # noqa
 import dask_awkward.core as dakc  # noqa
-import dask_awkward.data as dakd
+import dask_awkward.data as dakd  # noqa
+import dask_awkward.utils as daku  # noqa
 
 
 class Recs:
     def __init__(self):
         self.daa = dak.from_json(dakd.json_data(kind="records"))
+        self.daa._compute_divisions()
         self.aa = self.daa.compute()
         self.a0 = self.daa.partitions[0].compute()
         self.a1 = self.daa.partitions[1].compute()
@@ -21,6 +23,7 @@ class Recs:
 class Nums:
     def __init__(self):
         self.daa = dak.from_json(dakd.json_data(kind="numbers"))
+        self.daa._compute_divisions()
         self.aa = self.daa.compute()
         self.a0 = self.daa.partitions[0].compute()
         self.a1 = self.daa.partitions[1].compute()
