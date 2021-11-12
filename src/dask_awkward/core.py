@@ -14,7 +14,7 @@ from dask.base import (
     replace_name_in_key,
     tokenize,
 )
-from dask.blockwise import blockwise as core_blockwise
+from dask.blockwise import blockwise as upstream_blockwise
 from dask.highlevelgraph import HighLevelGraph
 from dask.threaded import get as threaded_get
 from dask.utils import IndexCallable, cached_property, funcname, key_split
@@ -152,8 +152,11 @@ class DaskAwkwardArray(DaskMethodsMixin):
             self._divisions = calculate_known_divisions(self)
         return self.divisions[-1] + 1
 
-    def _tstr(self, max: int = 0) -> str:
-        tstr = typestr(self)
+    def _shorttypestr(self, max: int = 10) -> str:
+        return str(_type(self))[0:max]
+
+    def _typestr(self, max: int = 0) -> str:
+        tstr = str(_type(self))
         if max and len(tstr) > max:
             tstr = f"{tstr[0:max]} ... }}"
         length = "var" if self.divisions[-1] is None else self.divisions[-1]
@@ -163,12 +166,9 @@ class DaskAwkwardArray(DaskMethodsMixin):
         return (
             f"dask.awkward<{key_split(self.name)}, "
             f"npartitions={self.npartitions}, "
-            f"type='{self._tstr(max=30)}'"
+            f"type='{self._typestr(max=30)}'"
             ">"
         )
-
-    def _shorttypestr(self, max: int = 10) -> str:
-        return typestr(self)[0:max]
 
     __repr__ = __str__
 
@@ -356,8 +356,26 @@ class DaskAwkwardArray(DaskMethodsMixin):
     def _compute_divisions(self) -> None:
         self._divisions = calculate_known_divisions(self)
 
+    def __add__(self, other: Any) -> DaskAwkwardArray:
+        return map_partitions(operator.add, self, other, name="add")
+
 
 def _first_partition(array: DaskAwkwardArray) -> ak.Array:
+    """Compute the first partition of a DaskAwkwardArray collection.
+
+    Parameters
+    ----------
+    array : DaskAwkwardArray
+        Awkward collection.
+
+    Returns
+    -------
+    ak.Array
+        Concrete awkward array for the first partition of the Dask
+        awkward array.
+
+    """
+
     computed = array.__dask_scheduler__(
         array.__dask_graph__(), array.__dask_keys__()[0]
     )
@@ -365,6 +383,22 @@ def _first_partition(array: DaskAwkwardArray) -> ak.Array:
 
 
 def _typetracer_via_v1_to_v2(array: DaskAwkwardArray) -> Content:
+    """Obtain the awkward type tracker using the v1 to v2 conversion
+
+    This will compute the first partition of the array collection if
+    necessary.
+
+    Parameters
+    ----------
+    array : DaskAwkwardArray
+        The collection.
+
+    Returns
+    -------
+    Content
+        Awkward Content object representing the typetracer (metadata).
+
+    """
     return v1_to_v2(_first_partition(array).layout).typetracer
 
 
@@ -444,7 +478,14 @@ def partitionwise_layer(
         if isinstance(arg, DaskAwkwardArray):
             pairs.extend([arg.name, "i"])
             numblocks[arg.name] = (arg.npartitions,)
-    return core_blockwise(
+        elif is_dask_collection(arg):
+            raise NotImplementedError(
+                "Use of DaskAwkwardArray with other Dask "
+                "collections is currently unsupported."
+            )
+        else:
+            pairs.extend([arg, None])
+    return upstream_blockwise(
         func,
         name,
         "i",
@@ -581,16 +622,40 @@ class _TrivialPartitionwiseOp:
 
 
 def _type(array: DaskAwkwardArray) -> Type | None:
+    """Get the type object associated with an array.
+
+    Parameters
+    ----------
+    array : DaskAwkwardArray
+        The collection.
+
+    Returns
+    -------
+    Type
+        The awkward type object of the array; if the array does not
+        contain metadata ``None`` is returned.
+
+    """
     f = array.form
     return f.type if f is not None else None
 
 
 def fields(array: DaskAwkwardArray) -> list[str] | None:
+    """Get the fields of a DaskAwkwardArray collection.
+
+    Parameters
+    ----------
+    array : DaskAwkwardArray
+        The collection.
+
+    Returns
+    -------
+    list[str] or None
+        The fields of the array; if the array does not contain
+        metadata ``None`` is returned.
+
+    """
     if array.meta is not None:
         return array.meta.fields
     else:
         return None
-
-
-def typestr(array: DaskAwkwardArray) -> str:
-    return str(_type(array))
