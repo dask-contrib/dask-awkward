@@ -10,6 +10,7 @@ Welcome to dask-awkward's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   api.rst
 
 
 Indices and tables

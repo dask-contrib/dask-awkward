@@ -101,7 +101,7 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
     """Partitioned, lazy, and parallel Awkward Array Dask collection.
 
     The class constructor is not intended for users. Instead use
-    factory functions like :py:func:`dask_awkward.from_parquet,
+    factory functions like :py:func:`dask_awkward.from_parquet`,
     :py:func:`dask_awkward.from_json`, etc.
 
     Within dask-awkward the ``new_array_object`` factory function is
@@ -413,7 +413,7 @@ def new_array_object(
 
     Parameters
     ----------
-    dsk : HighLevelGraph
+    dsk : dask.highlevelgraph.HighLevelGraph
         Graph backing the collection.
     name : str
         Unique name for the collection.
