@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Callable
 
 import awkward as ak
 import numpy as np
+from awkward._v2._connect.numpy import NDArrayOperatorsMixin
 from awkward._v2.tmp_for_testing import v1_to_v2
 from dask.base import (
     DaskMethodsMixin,
@@ -96,7 +97,7 @@ def new_scalar_object(dsk: HighLevelGraph, name: str, meta: Any) -> Scalar:
     return Scalar(dsk, name)
 
 
-class DaskAwkwardArray(DaskMethodsMixin):
+class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
     """Partitioned, lazy, and parallel Awkward Array Dask collection.
 
     The class constructor is not intended for users. Instead use
@@ -148,9 +149,8 @@ class DaskAwkwardArray(DaskMethodsMixin):
         return type(self)(dsk, name, self.meta, divisions=self.divisions)
 
     def __len__(self) -> int:
-        if not self.known_divisions:
-            self._divisions = calculate_known_divisions(self)
-        return self.divisions[-1] + 1
+        self._divisions = calculate_known_divisions(self)
+        return self._divisions[-1] + 1
 
     def _shorttypestr(self, max: int = 10) -> str:
         return str(_type(self))[0:max]
@@ -292,7 +292,7 @@ class DaskAwkwardArray(DaskMethodsMixin):
         if len(self.divisions) == 2:
             return self._getitem_inner(key=key)
 
-        p, k = normalize_single_outer_inner_index(self.divisions, key)
+        p, k = normalize_single_outer_inner_index(self._divisions, key)
         return self.partitions[p][k]
 
     def __getitem__(self, key: Any) -> DaskAwkwardArray:
@@ -356,8 +356,8 @@ class DaskAwkwardArray(DaskMethodsMixin):
     def _compute_divisions(self) -> None:
         self._divisions = calculate_known_divisions(self)
 
-    def __add__(self, other: Any) -> DaskAwkwardArray:
-        return map_partitions(operator.add, self, other, name="add")
+    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+        return map_partitions(ufunc, *inputs, **kwargs)
 
 
 def _first_partition(array: DaskAwkwardArray) -> ak.Array:
@@ -578,7 +578,7 @@ def pw_reduction_with_agg_to_scalar(
 def calculate_known_divisions(array: DaskAwkwardArray) -> tuple[int, ...]:
     """Determine the divisions of a collection.
 
-    This function triggers a computation.
+    This function triggers an immediate computation.
 
     Parameters
     ----------
