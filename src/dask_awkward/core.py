@@ -468,8 +468,8 @@ def partitionwise_layer(
 
     Returns
     -------
-    Blockwise
-        The resulting graph layer.
+    dask.blockwise.Blockwise
+        The Dask HighLevelGraph Blockwise layer.
 
     """
     pairs: list[Any] = []
