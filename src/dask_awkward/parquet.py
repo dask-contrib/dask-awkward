@@ -1,39 +1,37 @@
 # BSD 3-Clause License; see https://github.com/scikit-hep/awkward-1.0/blob/main/LICENSE
 
+import pyarrow as pa
+import toolz
+from awkward._v2.operations.convert import from_arrow
+from dask.base import tokenize
 from dask.dataframe.io.parquet.arrow import ArrowDatasetEngine
-from dask.dataframe.io.parquet.utils import natural_sort_key
 from dask.dataframe.io.parquet.core import (
     DataFrameIOLayer,
     HighLevelGraph,
-    ParquetFunctionWrapper
+    ParquetFunctionWrapper,
 )
-from dask.base import tokenize
-import pyarrow as pa
+from dask.dataframe.io.parquet.utils import natural_sort_key
 from fsspec import get_fs_token_paths
-from .core import DaskAwkwardArray, new_array_object
-import awkward  # implicitly v1
-from awkward._v2.operations.convert import from_arrow
-import awkward as ak
-import toolz
+
+from .core import new_array_object
 
 
 class AkParquetEngine(ArrowDatasetEngine):
-
     @classmethod
     def read_metadata(
-            cls,
-            fs,
-            paths,
-            categories=None,
-            index=None,
-            gather_statistics=None,
-            filters=None,
-            split_row_groups=None,
-            chunksize=None,
-            aggregate_files=None,
-            ignore_metadata_file=False,
-            metadata_task_size=0,
-            **kwargs,
+        cls,
+        fs,
+        paths,
+        categories=None,
+        index=None,
+        gather_statistics=None,
+        filters=None,
+        split_row_groups=None,
+        chunksize=None,
+        aggregate_files=None,
+        ignore_metadata_file=False,
+        metadata_task_size=0,
+        **kwargs,
     ):
 
         # Stage 1: Collect general dataset information
@@ -53,7 +51,7 @@ class AkParquetEngine(ArrowDatasetEngine):
         )
 
         # Stage 2: Generate output `meta`
-        meta = dataset_info['physical_schema']
+        meta = dataset_info["physical_schema"]
 
         # Stage 3: Generate parts and stats
         dataset_info["index_cols"] = []
@@ -137,7 +135,6 @@ class AkParquetEngine(ArrowDatasetEngine):
 
 
 class MyParquetFunctionWrapper(ParquetFunctionWrapper):
-
     def __call__(self, part):
 
         if not isinstance(part, list):
@@ -154,38 +151,33 @@ class MyParquetFunctionWrapper(ParquetFunctionWrapper):
         )
 
 
-
-def ak_read_parquet(path,
-                    columns=None,
-                    filters=None,
-                    categories=None,
-                    index=None,
-                    storage_options=None,
-                    gather_statistics=None,
-                    ignore_metadata_file=False,
-                    metadata_task_size=None,
-                    split_row_groups=None,
-                    chunksize=None,
-                    aggregate_files=None,
-                    **kwargs,):
+def ak_read_parquet(
+    path,
+    columns=None,
+    filters=None,
+    categories=None,
+    index=None,
+    storage_options=None,
+    gather_statistics=None,
+    ignore_metadata_file=False,
+    metadata_task_size=None,
+    split_row_groups=None,
+    chunksize=None,
+    aggregate_files=None,
+    **kwargs,
+):
     if columns is not None:
         columns = list(columns)
 
     label = "read-parquet-"
-    output_name = label + tokenize(
-        path,
-        columns,
-        kwargs
-    )
-    fs, _, paths = get_fs_token_paths(
-        path, mode="rb", storage_options=storage_options
-    )
+    output_name = label + tokenize(path, columns, kwargs)
+    fs, _, paths = get_fs_token_paths(path, mode="rb", storage_options=storage_options)
 
     engine = AkParquetEngine
     paths = sorted(paths, key=natural_sort_key)  # numeric rather than glob ordering
 
     if chunksize or (
-            split_row_groups and int(split_row_groups) > 1 and aggregate_files
+        split_row_groups and int(split_row_groups) > 1 and aggregate_files
     ):
         # Require `gather_statistics=True` if `chunksize` is used,
         # or if `split_row_groups>1` and we are aggregating files.
@@ -244,7 +236,7 @@ def read_parquet_part(fs, engine, meta, part, columns, index, kwargs):
 
     This function is used by `read_parquet`."""
     if isinstance(part, list):
-        if len(part) == 1 or part[0][1] or not check_multi_support(engine):
+        if len(part) == 1 or part[0][1]:
             # Part kwargs expected
             func = engine.read_partition
             tables = [
@@ -259,10 +251,5 @@ def read_parquet_part(fs, engine, meta, part, columns, index, kwargs):
                 fs, [p[0] for p in part], columns.copy(), index, **kwargs
             )
     else:
-        # NOTE: `kwargs` are the same for all parts, while `part_kwargs` may
-        #       be different for each part.
-        table, part_kwargs = part
-        df = engine.read_partition(
-            fs, rg, columns, index, **toolz.merge(kwargs, part_kwargs)
-        )
+        raise NotImplementedError
     return from_arrow(table)
