@@ -30,7 +30,8 @@ if TYPE_CHECKING:
 
 
 def _finalize_daskawkwardarray(results: Any) -> Any:
-    if all(isinstance(r, ak.Array) for r in results):
+    if all(isinstance(r, (ak.Array, ak._v2.highlevel.Array)) for r in results):
+        # need v2 concatenate
         return ak.concatenate(results)
     if all(isinstance(r, ak.Record) for r in results):
         return ak.from_iter(results)
