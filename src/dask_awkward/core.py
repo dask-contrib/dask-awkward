@@ -159,7 +159,7 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
         tstr = str(_type(self))
         if max and len(tstr) > max:
             tstr = f"{tstr[0:max]} ... }}"
-        length = "var" if self.divisions[-1] is None else self.divisions[-1]
+        length = "var" if self.divisions[-1] is None else (self.divisions[-1] + 1)
         return f"{length} * {tstr}"
 
     def __str__(self) -> str:
