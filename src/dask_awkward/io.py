@@ -4,7 +4,11 @@ from functools import partial
 from typing import TYPE_CHECKING, Any, Callable
 
 import awkward as ak
-import ujson as json
+
+try:
+    import ujson as json
+except ImportError:
+    import json
 from awkward import from_iter as from_iter_v1
 from awkward._v2.operations.convert.ak_from_iter import from_iter as from_iter_v2
 from dask.base import flatten, tokenize
