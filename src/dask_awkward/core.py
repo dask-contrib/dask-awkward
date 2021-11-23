@@ -33,16 +33,16 @@ if TYPE_CHECKING:
 
 
 def _finalize_daskawkwardarray(results: Any) -> Any:
-    if len(results) == 1:
-        return results[0]
-    elif all(isinstance(r, Array_v1) for r in results):
-        return ak.concatenate(results)
-    elif all(isinstance(r, Array_v2) for r in results):
+    if any(isinstance(r, Array_v2) for r in results):
         warnings.warn(
             "v2 Record Arrays cannot be concatenated (yet); "
             "returning the list of results on each node."
         )
         return results
+    elif len(results) == 1:
+        return results[0]
+    elif all(isinstance(r, Array_v1) for r in results):
+        return ak.concatenate(results)
     else:
         return ak.from_iter(results)
 

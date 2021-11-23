@@ -8,7 +8,7 @@ import awkward as ak
 try:
     import ujson as json
 except ImportError:
-    import json
+    import json  # type: ignore
 from awkward import from_iter as from_iter_v1
 from awkward._v2.operations.convert.ak_from_iter import from_iter as from_iter_v2
 from dask.base import flatten, tokenize
