@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import operator
+import warnings
 from functools import partial
 from numbers import Number
 from typing import TYPE_CHECKING, Any, Callable
@@ -8,7 +9,9 @@ from typing import TYPE_CHECKING, Any, Callable
 import awkward as ak
 import numpy as np
 from awkward._v2._connect.numpy import NDArrayOperatorsMixin
+from awkward._v2.highlevel import Array as Array_v2
 from awkward._v2.tmp_for_testing import v1_to_v2
+from awkward.highlevel import Array as Array_v1
 from dask.base import (
     DaskMethodsMixin,
     is_dask_collection,
@@ -30,10 +33,16 @@ if TYPE_CHECKING:
 
 
 def _finalize_daskawkwardarray(results: Any) -> Any:
-    if all(isinstance(r, ak.Array) for r in results):
+    if len(results) == 1:
+        return results[0]
+    elif all(isinstance(r, Array_v1) for r in results):
         return ak.concatenate(results)
-    if all(isinstance(r, ak.Record) for r in results):
-        return ak.from_iter(results)
+    elif all(isinstance(r, Array_v2) for r in results):
+        warnings.warn(
+            "v2 Record Arrays cannot be concatenated (yet); "
+            "returning the list of results on each node."
+        )
+        return results
     else:
         return ak.from_iter(results)
 
@@ -76,6 +85,10 @@ class Scalar(DaskMethodsMixin):
     def _rebuild(self, dsk: Any, *, rename: Any | None = None) -> Any:
         key = replace_name_in_key(self.key, rename) if rename else self.key
         return Scalar(dsk, key)
+
+    @property
+    def dask(self) -> HighLevelGraph:
+        return self._dask
 
     @property
     def key(self) -> str:
@@ -399,7 +412,13 @@ def _typetracer_via_v1_to_v2(array: DaskAwkwardArray) -> Content:
         Awkward Content object representing the typetracer (metadata).
 
     """
-    return v1_to_v2(_first_partition(array).layout).typetracer
+    first_part = _first_partition(array)
+    if isinstance(first_part, Array_v1):
+        return v1_to_v2(_first_partition(array).layout).typetracer
+    elif isinstance(first_part, Array_v2):
+        return first_part.layout
+    else:
+        raise TypeError(f"Should have an Array type, got {type(first_part)}")
 
 
 def new_array_object(
@@ -442,7 +461,7 @@ def new_array_object(
     if meta is None:
         try:
             array._meta = _typetracer_via_v1_to_v2(array)
-        except (AttributeError, AssertionError):
+        except (AttributeError, AssertionError, TypeError):
             array._meta = None
     return array
 
@@ -591,8 +610,16 @@ def calculate_known_divisions(array: DaskAwkwardArray) -> tuple[int, ...]:
         Locations (indices) of division boundaries.
 
     """
+    # if divisions are known, quick return
     if array.known_divisions:
         return array.divisions  # type: ignore
+    # handle the case where we have 1 partition
+    if array.npartitions == 1:
+        num = array.map_partitions(ak.num, axis=0).compute()
+        if isinstance(num, int):
+            return (0, num - 1)
+        return (0, num.slot0 - 1)
+    # finally handle the more common > 1 partition case
     nums = array.map_partitions(ak.num, axis=0).compute()
     try:
         cs = list(np.cumsum(nums))

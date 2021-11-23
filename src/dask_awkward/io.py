@@ -1,27 +1,20 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from functools import partial
+from typing import TYPE_CHECKING, Any, Callable
 
 import awkward as ak
-from dask.base import tokenize
+import ujson as json
+from awkward import from_iter as from_iter_v1
+from awkward._v2.operations.convert.ak_from_iter import from_iter as from_iter_v2
+from dask.base import flatten, tokenize
+from dask.bytes import read_bytes
 from dask.highlevelgraph import HighLevelGraph
 
 from .core import new_array_object
 
 if TYPE_CHECKING:
     from .core import DaskAwkwardArray
-
-
-def _from_json(source: Any, kwargs: dict[str, Any]) -> Any:
-    return ak.from_json(source, **kwargs)
-
-
-def from_json(source: Any, **kwargs: Any) -> DaskAwkwardArray:
-    token = tokenize(source)
-    name = f"from-json-{token}"
-    dsk = {(name, i): (_from_json, f, kwargs) for i, f in enumerate(source)}
-    hlg = HighLevelGraph.from_collections(name, dsk)
-    return new_array_object(hlg, name, None, npartitions=len(source))
 
 
 def _from_parquet_single(source: Any, kwargs: dict[Any, Any]) -> Any:
@@ -55,3 +48,36 @@ def from_parquet(source: Any, **kwargs: Any) -> DaskAwkwardArray:
 
     hlg = HighLevelGraph.from_collections(name, dsk)
     return new_array_object(hlg, name, None, npartitions=npartitions)
+
+
+def _chunked_to_json_v2(chunks):
+    return from_iter_v2(json.loads(ch) for ch in chunks.split(b"\n") if ch)
+
+
+def _chunked_to_json_v1(chunks):
+    return from_iter_v1(json.loads(ch) for ch in chunks.split(b"\n") if ch)
+
+
+def _from_json(
+    source: str | list[str],
+    concrete: Callable,
+    delimiter: bytes = b"\n",
+    blocksize: int | str = "128 MiB",
+) -> DaskAwkwardArray:
+    token = tokenize(source, delimiter, blocksize)
+    name = f"from-json-{token}"
+    _, chunks = read_bytes(
+        source,
+        delimiter=delimiter,
+        blocksize=blocksize,
+        sample=None,
+    )
+    chunks = list(flatten(chunks))
+    dsk = {(name, i): (concrete, d.key) for i, d in enumerate(chunks)}
+    hlg = HighLevelGraph.from_collections(name, dsk, dependencies=chunks)
+    return new_array_object(hlg, name, None, npartitions=len(chunks))
+
+
+from_json_v1 = partial(_from_json, concrete=_chunked_to_json_v1)
+from_json_v2 = partial(_from_json, concrete=_chunked_to_json_v2)
+from_json = from_json_v1
