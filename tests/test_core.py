@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 import dask_awkward.core as dakc
 from helpers import load_records_lazy
 
@@ -12,12 +10,9 @@ def test_meta_exists() -> None:
     assert daa["analysis"]["x1"].meta is not None
 
 
-@pytest.mark.xfail
 def test_calculate_known_divisions() -> None:
-    # marking xfail because load_records_lazy loads by number of bytes
-    # and therefore partitions can vary on different platforms.
-    daa = load_records_lazy()
-    target = (0, 20, 40, 60, 62)
+    daa = load_records_lazy(by_file=True)
+    target = (0, 63, 126, 189)
     assert dakc.calculate_known_divisions(daa) == target
     assert dakc.calculate_known_divisions(daa.analysis) == target
     assert dakc.calculate_known_divisions(daa.analysis.x1) == target

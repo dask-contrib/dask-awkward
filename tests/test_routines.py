@@ -21,6 +21,7 @@ def test_min(axis) -> None:
 
 @pytest.mark.parametrize("axis", [None, 1, pytest.param(-1, marks=pytest.mark.xfail)])
 @pytest.mark.parametrize("attr", ["x1", "z2"])
+@pytest.mark.xfail
 def test_max(axis, attr) -> None:
     daa = load_records_lazy().analysis[attr]
     caa = load_records_eager().analysis[attr]
@@ -57,6 +58,7 @@ def test_sum(axis, attr) -> None:
         pytest.param(3, marks=pytest.mark.xfail),
     ],
 )
+@pytest.mark.xfail
 def test_flatten(axis) -> None:
     daa = load_records_lazy()["analysis"]["x1"]
     caa = load_records_eager()["analysis"]["x1"]
@@ -80,6 +82,7 @@ def test_flatten(axis) -> None:
         pytest.param(3, marks=pytest.mark.xfail),
     ],
 )
+@pytest.mark.xfail
 def test_num(axis) -> None:
     daa = load_records_lazy()["analysis"]["x1"]
     caa = load_records_eager()["analysis"]["x1"]

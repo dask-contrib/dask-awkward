@@ -1,16 +1,38 @@
+from __future__ import annotations
+
 import pathlib
+from typing import TYPE_CHECKING
 
 import awkward as ak
 
 from dask_awkward.io import from_json
 
-this_path = pathlib.Path(__file__).parent.resolve()
-records_file = str(this_path / "data" / "records.json")
+if TYPE_CHECKING:
+    from dask_awkward.core import DaskAwkwardArray
 
 
-def load_records_lazy(blocksize=2048):
+_DATA_DIR = pathlib.Path(__file__).parent.resolve() / "data"
+
+
+def resolved_data_file(name: str) -> str:
+    return str(_DATA_DIR / name)
+
+
+def load_records_lazy(
+    blocksize: int | str = 2048,
+    by_file: bool = False,
+) -> DaskAwkwardArray:
+    records_file = resolved_data_file("records.json")
+    if by_file:
+        return from_json([records_file, records_file, records_file], delimiter=None)
     return from_json(records_file, blocksize=blocksize)
 
 
-def load_records_eager():
+def load_records_eager() -> ak.Array:
+    records_file = resolved_data_file("records.json")
     return ak.from_json(records_file)
+
+
+def load_single_record_lazy() -> DaskAwkwardArray:
+    record_file = resolved_data_file("single-record.json")
+    return from_json([record_file], delimiter=None)

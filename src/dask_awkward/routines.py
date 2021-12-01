@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import awkward as ak
-from dask.utils import derived_from
+from awkward._v2.operations.reducers import count, count_nonzero
+from awkward._v2.operations.reducers import min as _max
+from awkward._v2.operations.reducers import min as _min
+from awkward._v2.operations.reducers import sum as _sum
+from awkward._v2.operations.structure import flatten, num
 
 from .core import _TrivialPartitionwiseOp, pw_reduction_with_agg_to_scalar
 
@@ -33,14 +36,13 @@ if TYPE_CHECKING:
 # def softmax(x, axis=None, keepdims=False, mask_identity=False):
 ####################################
 
-_count_trivial = _TrivialPartitionwiseOp(ak.count, axis=1)
-_count_nonzero_trivial = _TrivialPartitionwiseOp(ak.count_nonzero, axis=1)
-_max_trivial = _TrivialPartitionwiseOp(ak.max, axis=1)
-_min_trivial = _TrivialPartitionwiseOp(ak.min, axis=1)
-_sum_trivial = _TrivialPartitionwiseOp(ak.sum, axis=1)
+_count_trivial = _TrivialPartitionwiseOp(count, axis=1)
+_count_nonzero_trivial = _TrivialPartitionwiseOp(count_nonzero, axis=1)
+_max_trivial = _TrivialPartitionwiseOp(_max, axis=1)
+_min_trivial = _TrivialPartitionwiseOp(_min, axis=1)
+_sum_trivial = _TrivialPartitionwiseOp(_sum, axis=1)
 
 
-@derived_from(ak)
 def count(
     array: DaskAwkwardArray,
     axis: int | None = None,
@@ -50,14 +52,13 @@ def count(
         return _count_trivial(array, axis=axis, **kwargs)
     elif axis is None:
         trivial_result = _count_trivial(array, axis=1, **kwargs)
-        return pw_reduction_with_agg_to_scalar(trivial_result, ak.sum, ak.sum)
+        return pw_reduction_with_agg_to_scalar(trivial_result, _sum, _sum)
     elif axis == 0 or axis == -1 * array.ndim:
         raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
     else:
         raise ValueError("axis must be None or an integer.")
 
 
-@derived_from(ak)
 def count_nonzero(
     array: DaskAwkwardArray,
     axis: int | None = None,
@@ -67,7 +68,7 @@ def count_nonzero(
         return _count_nonzero_trivial(array, axis=1, **kwargs)
     elif axis is None:
         trivial_result = _count_nonzero_trivial(array, axis=1, **kwargs)
-        return pw_reduction_with_agg_to_scalar(trivial_result, ak.sum, ak.sum)
+        return pw_reduction_with_agg_to_scalar(trivial_result, _sum, _sum)
     elif axis == 0 or axis == -1 * array.ndim:
         raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
     else:
@@ -84,7 +85,7 @@ def _min_or_max(
     if axis is not None and axis < 0:
         axis = array.ndim + axis + 1
     # get the correct trivial callable
-    tf = _min_trivial if f == ak.min else _max_trivial
+    tf = _min_trivial if f == _min else _max_trivial
     # generate collection based on axis
     if axis == 1:
         return tf(array, axis=axis, **kwargs)
@@ -96,24 +97,21 @@ def _min_or_max(
         raise ValueError("axis must be None or an integer.")
 
 
-@derived_from(ak)
 def max(array: DaskAwkwardArray, axis: int | None = None, **kwargs: Any) -> LazyResult:
-    return _min_or_max(ak.max, array, axis, **kwargs)
+    return _min_or_max(_max, array, axis, **kwargs)
 
 
-@derived_from(ak)
 def min(array: DaskAwkwardArray, axis: int | None = None, **kwargs: Any) -> LazyResult:
-    return _min_or_max(ak.min, array, axis, **kwargs)
+    return _min_or_max(_min, array, axis, **kwargs)
 
 
-@derived_from(ak)
 def sum(array: DaskAwkwardArray, axis: int | None = None, **kwargs: Any) -> LazyResult:
     if axis is not None and axis < 0:
         axis = array.ndim + axis + 1
     if axis == 1:
         return _sum_trivial(array, **kwargs)
     elif axis is None:
-        return pw_reduction_with_agg_to_scalar(array, ak.sum, ak.sum, **kwargs)
+        return pw_reduction_with_agg_to_scalar(array, _sum, _sum, **kwargs)
     elif axis == 0:
         raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
     else:
@@ -174,16 +172,14 @@ def sum(array: DaskAwkwardArray, axis: int | None = None, **kwargs: Any) -> Lazy
 ####################################
 
 
-_flatten_trivial = _TrivialPartitionwiseOp(ak.flatten, axis=1)
-_num_trivial = _TrivialPartitionwiseOp(ak.num, axis=1)
+_flatten_trivial = _TrivialPartitionwiseOp(flatten, axis=1)
+_num_trivial = _TrivialPartitionwiseOp(num, axis=1)
 
 
-@derived_from(ak)
 def num(array: DaskAwkwardArray, axis: int = 1, **kwargs: Any) -> LazyResult:
     return _num_trivial(array, axis=axis, **kwargs)
 
 
-@derived_from(ak)
 def flatten(array: DaskAwkwardArray, axis: int = 1, **kwargs: Any) -> LazyResult:
     return _flatten_trivial(array, axis=axis, **kwargs)
 
