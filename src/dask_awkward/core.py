@@ -682,7 +682,6 @@ def from_awkward(source: Array, npartitions: int) -> DaskAwkwardArray:
     nrows = len(source)
     chunksize = int(ceil(nrows / npartitions))
     locs = list(range(0, nrows, chunksize)) + [nrows]
-    print(f"{nrows=}\n{chunksize=}\n{locs=}")
     llg = {
         (name, i): source[start:stop]
         for i, (start, stop) in enumerate(zip(locs[:-1], locs[1:]))
