@@ -252,9 +252,6 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
         index = tuple(slice(k, k + 1) if isinstance(k, Number) else k for k in index)  # type: ignore
         name = f"partitions-{token}"
         new_keys = self.keys_array[index].tolist()
-        # divisions = [self.divisions[i] for _, i in new_keys] + [
-        #     self.divisions[new_keys[-1][1] + 1]
-        # ]
         divisions = (None,) * (len(new_keys) + 1)
         dsk = {(name, i): tuple(key) for i, key in enumerate(new_keys)}
         graph = HighLevelGraph.from_collections(name, dsk, dependencies=[self])
@@ -677,11 +674,3 @@ def fields(array: DaskAwkwardArray) -> list[str] | None:
         return array.meta.fields
     else:
         return None
-
-
-# def from_awkward(source: Array, npartitions: int) -> DaskAwkwardArray:
-#     token = tokenize(source, npartitions)
-#     total = len(source)
-#     perpart = total / npartitions
-#     name = f"from-awkward-{token}"
-#     g = {(name, i): set() for i in range(npartitions)}

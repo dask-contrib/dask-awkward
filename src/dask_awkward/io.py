@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from math import ceil
 from typing import TYPE_CHECKING, Any
 
 try:
@@ -86,3 +87,17 @@ def from_json(
 
     hlg = HighLevelGraph.from_collections(name, dsk, dependencies=deps)
     return new_array_object(hlg, name, None, npartitions=n)
+
+
+def from_awkward(source: Array, npartitions: int) -> DaskAwkwardArray:
+    name = tokenize(source, npartitions)
+    nrows = len(source)
+    chunksize = int(ceil(nrows / npartitions))
+    locs = list(range(0, nrows, chunksize)) + [nrows]
+    print(f"{nrows=}\n{chunksize=}\n{locs=}")
+    llg = {
+        (name, i): source[start:stop]
+        for i, (start, stop) in enumerate(zip(locs[:-1], locs[1:]))
+    }
+    hlg = HighLevelGraph.from_collections(name, llg, dependencies=set())
+    return new_array_object(hlg, name, divisions=locs, meta=source.layout.typetracer)
