@@ -11,7 +11,7 @@ def test_meta_exists() -> None:
 
 
 def test_calculate_known_divisions() -> None:
-    daa = load_records_lazy(by_file=True)
+    daa = load_records_lazy(by_file=True, ntimes=3)
     target = (0, 20, 40, 60)
     assert dakc.calculate_known_divisions(daa) == target
     assert dakc.calculate_known_divisions(daa.analysis) == target

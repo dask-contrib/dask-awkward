@@ -1,9 +1,16 @@
 from __future__ import annotations
 
+try:
+    import ujson as json
+except ImportError:
+    import json
+
 import pathlib
 from typing import TYPE_CHECKING
 
-import awkward as ak
+import fsspec
+from awkward._v2.highlevel import Array
+from awkward._v2.operations.convert import from_iter
 
 from dask_awkward.io import from_json
 
@@ -21,16 +28,18 @@ def resolved_data_file(name: str) -> str:
 def load_records_lazy(
     blocksize: int | str = 1024,
     by_file: bool = False,
+    ntimes: int = 1,
 ) -> DaskAwkwardArray:
     records_file = resolved_data_file("records.json")
     if by_file:
-        return from_json([records_file, records_file, records_file])
+        return from_json([records_file] * ntimes)
     return from_json(records_file, blocksize=blocksize)
 
 
-def load_records_eager() -> ak.Array:
+def load_records_eager(ntimes: int = 1) -> Array:
     records_file = resolved_data_file("records.json")
-    return ak.from_json(records_file)
+    with fsspec.open(records_file) as f:
+        return from_iter(json.loads(line) for line in f)
 
 
 def load_single_record_lazy() -> DaskAwkwardArray:
