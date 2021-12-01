@@ -19,12 +19,12 @@ def resolved_data_file(name: str) -> str:
 
 
 def load_records_lazy(
-    blocksize: int | str = 2048,
+    blocksize: int | str = 1024,
     by_file: bool = False,
 ) -> DaskAwkwardArray:
     records_file = resolved_data_file("records.json")
     if by_file:
-        return from_json([records_file, records_file, records_file], delimiter=None)
+        return from_json([records_file, records_file, records_file])
     return from_json(records_file, blocksize=blocksize)
 
 
@@ -35,4 +35,9 @@ def load_records_eager() -> ak.Array:
 
 def load_single_record_lazy() -> DaskAwkwardArray:
     record_file = resolved_data_file("single-record.json")
-    return from_json([record_file], delimiter=None)
+    return from_json(
+        record_file,
+        delimiter=None,
+        blocksize=None,
+        one_obj_per_file=True,
+    )
