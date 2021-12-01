@@ -1,29 +1,30 @@
-from dask_awkward.data import load_array, load_nested
 from dask_awkward.utils import assert_eq
+from helpers import load_records_eager, load_records_lazy
 
 
 def test_single_string() -> None:
-    a = load_nested()
-    b = a.compute()
-    assert_eq(a["analysis"], b["analysis"])
+    daa = load_records_lazy()
+    caa = load_records_eager()
+    assert_eq(daa["analysis"], caa["analysis"])
 
 
 def test_multi_string() -> None:
-    a = load_nested()
-    b = a.compute()
+    daa = load_records_lazy()
+    caa = load_records_eager()
     assert_eq(
-        a["analysis"][["x1", "y2"]],
-        b["analysis"][["x1", "y2"]],
+        daa["analysis"][["x1", "y2"]],
+        caa["analysis"][["x1", "y2"]],
     )
 
 
 def test_single_int() -> None:
-    a = load_array()
-    for i in range(len(a)):
-        assert_eq(a[i], a.compute()[i])
+    daa = load_records_lazy()["analysis"]["y1"]
+    caa = load_records_eager()["analysis"]["y1"]
+    for i in range(len(daa)):
+        assert_eq(daa[i], caa[i])
 
 
 def test_test() -> None:
-    a = load_nested()
-    b = a.compute()
-    assert_eq(a["analysis", "x1"][:, ::2], b["analysis", "x1"][:, ::2])
+    daa = load_records_lazy()
+    caa = load_records_eager()
+    assert_eq(daa["analysis", "x1"][:, ::2], caa["analysis", "x1"][:, ::2])
