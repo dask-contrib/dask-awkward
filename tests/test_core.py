@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import dask_awkward.core as dakc
-from helpers import load_records_lazy
+from dask_awkward.utils import assert_eq
+from helpers import load_records_eager, load_records_lazy
 
 
 def test_meta_exists() -> None:
@@ -22,3 +23,9 @@ def test_calculate_known_divisions() -> None:
 def test_len() -> None:
     daa = load_records_lazy()
     assert len(daa) == 20
+
+
+def test_from_awkward() -> None:
+    aa = load_records_eager()
+    daa = dakc.from_awkward(aa, npartitions=3)
+    assert_eq(daa, aa)

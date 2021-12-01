@@ -3,6 +3,7 @@ from __future__ import annotations
 import operator
 import warnings
 from functools import partial
+from math import ceil
 from numbers import Number
 from typing import TYPE_CHECKING, Any, Callable
 
@@ -674,3 +675,17 @@ def fields(array: DaskAwkwardArray) -> list[str] | None:
         return array.meta.fields
     else:
         return None
+
+
+def from_awkward(source: Array, npartitions: int) -> DaskAwkwardArray:
+    name = tokenize(source, npartitions)
+    nrows = len(source)
+    chunksize = int(ceil(nrows / npartitions))
+    locs = list(range(0, nrows, chunksize)) + [nrows]
+    print(f"{nrows=}\n{chunksize=}\n{locs=}")
+    llg = {
+        (name, i): source[start:stop]
+        for i, (start, stop) in enumerate(zip(locs[:-1], locs[1:]))
+    }
+    hlg = HighLevelGraph.from_collections(name, llg, dependencies=set())
+    return new_array_object(hlg, name, divisions=locs, meta=source.layout.typetracer)
