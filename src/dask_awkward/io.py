@@ -30,7 +30,7 @@ def is_file_path(source: Any) -> bool:
 
 def _from_json_single_object_in_file(source):
     with open(source) as f:
-        return Array(json.load(f))
+        return Array([json.load(f)])
 
 
 def _from_json_line_by_line(source):
