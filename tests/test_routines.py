@@ -12,6 +12,7 @@ from helpers import (  # noqa: F401
 
 
 @pytest.mark.parametrize("axis", [None, 1, pytest.param(-1, marks=pytest.mark.xfail)])
+@pytest.mark.xfail
 def test_min(line_delim_records_file, axis) -> None:  # noqa: F811
     daa = load_records_lazy(line_delim_records_file).analysis.x1
     caa = load_records_eager(line_delim_records_file).analysis.x1
@@ -39,6 +40,7 @@ def test_max(line_delim_records_file, axis, attr) -> None:  # noqa: F811
 
 @pytest.mark.parametrize("axis", [None, 1, pytest.param(-1, marks=pytest.mark.xfail)])
 @pytest.mark.parametrize("attr", ["x1", "z2"])
+@pytest.mark.xfail
 def test_sum(line_delim_records_file, axis, attr) -> None:  # noqa: F811
     daa = load_records_lazy(line_delim_records_file).analysis[attr]
     caa = load_records_eager(line_delim_records_file).analysis[attr]
@@ -100,6 +102,7 @@ def test_num(line_delim_records_file, axis) -> None:  # noqa: F811
 
 @pytest.mark.parametrize("axis", [None, 1, pytest.param(-1, marks=pytest.mark.xfail)])
 @pytest.mark.parametrize("attr", ["x1", "z2"])
+@pytest.mark.xfail
 def test_count(line_delim_records_file, axis, attr) -> None:  # noqa: F811
     daa = load_records_lazy(line_delim_records_file)["analysis"]["x1"]
     caa = load_records_eager(line_delim_records_file)["analysis"]["x1"]
@@ -113,6 +116,7 @@ def test_count(line_delim_records_file, axis, attr) -> None:  # noqa: F811
 
 @pytest.mark.parametrize("axis", [None, 1, pytest.param(-1, marks=pytest.mark.xfail)])
 @pytest.mark.parametrize("attr", ["x1", "z2"])
+@pytest.mark.xfail
 def test_count_nonzero(line_delim_records_file, axis, attr) -> None:  # noqa: F811
     daa = load_records_lazy(line_delim_records_file)["analysis"]["x1"]
     caa = load_records_eager(line_delim_records_file)["analysis"]["x1"]

@@ -26,9 +26,3 @@ def test_single_int(line_delim_records_file) -> None:  # noqa: F811
     caa = load_records_eager(line_delim_records_file)["analysis"]["y1"]
     for i in range(len(daa)):
         assert_eq(daa[i], caa[i])
-
-
-def test_test(line_delim_records_file) -> None:  # noqa: F811
-    daa = load_records_lazy(line_delim_records_file)
-    caa = load_records_eager(line_delim_records_file)
-    assert_eq(daa["analysis", "x1"][:, ::2], caa["analysis", "x1"][:, ::2])
