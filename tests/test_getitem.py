@@ -1,30 +1,34 @@
 from dask_awkward.utils import assert_eq
-from helpers import load_records_eager, load_records_lazy
+from helpers import (  # noqa: F401
+    line_delim_records_file,
+    load_records_eager,
+    load_records_lazy,
+)
 
 
-def test_single_string() -> None:
-    daa = load_records_lazy()
-    caa = load_records_eager()
+def test_single_string(line_delim_records_file) -> None:  # noqa: F811
+    daa = load_records_lazy(line_delim_records_file)
+    caa = load_records_eager(line_delim_records_file)
     assert_eq(daa["analysis"], caa["analysis"])
 
 
-def test_multi_string() -> None:
-    daa = load_records_lazy()
-    caa = load_records_eager()
+def test_multi_string(line_delim_records_file) -> None:  # noqa: F811
+    daa = load_records_lazy(line_delim_records_file)
+    caa = load_records_eager(line_delim_records_file)
     assert_eq(
         daa["analysis"][["x1", "y2"]],
         caa["analysis"][["x1", "y2"]],
     )
 
 
-def test_single_int() -> None:
-    daa = load_records_lazy()["analysis"]["y1"]
-    caa = load_records_eager()["analysis"]["y1"]
+def test_single_int(line_delim_records_file) -> None:  # noqa: F811
+    daa = load_records_lazy(line_delim_records_file)["analysis"]["y1"]
+    caa = load_records_eager(line_delim_records_file)["analysis"]["y1"]
     for i in range(len(daa)):
         assert_eq(daa[i], caa[i])
 
 
-def test_test() -> None:
-    daa = load_records_lazy()
-    caa = load_records_eager()
+def test_test(line_delim_records_file) -> None:  # noqa: F811
+    daa = load_records_lazy(line_delim_records_file)
+    caa = load_records_eager(line_delim_records_file)
     assert_eq(daa["analysis", "x1"][:, ::2], caa["analysis", "x1"][:, ::2])

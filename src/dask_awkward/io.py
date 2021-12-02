@@ -61,7 +61,7 @@ def from_json(
     # read a single file or a list of files.
     if delimiter is None and blocksize is None:
         if is_file_path(source):
-            source = [source]
+            source = [source]  # type: ignore
         concrete = (
             _from_json_single_object_in_file
             if one_obj_per_file

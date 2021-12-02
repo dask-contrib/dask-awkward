@@ -160,6 +160,7 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     def __len__(self) -> int:
         self._compute_divisions()
+        assert self.divisions[-1] is not None
         return self.divisions[-1]
 
     def _shorttypestr(self, max: int = 10) -> str:
@@ -687,4 +688,9 @@ def from_awkward(source: Array, npartitions: int) -> DaskAwkwardArray:
         for i, (start, stop) in enumerate(zip(locs[:-1], locs[1:]))
     }
     hlg = HighLevelGraph.from_collections(name, llg, dependencies=set())
-    return new_array_object(hlg, name, divisions=locs, meta=source.layout.typetracer)
+    return new_array_object(
+        hlg,
+        name,
+        divisions=tuple(locs),
+        meta=source.layout.typetracer,
+    )

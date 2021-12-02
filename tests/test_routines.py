@@ -4,13 +4,17 @@ import awkward as ak
 import pytest
 
 import dask_awkward as dak
-from helpers import load_records_eager, load_records_lazy
+from helpers import (  # noqa: F401
+    line_delim_records_file,
+    load_records_eager,
+    load_records_lazy,
+)
 
 
 @pytest.mark.parametrize("axis", [None, 1, pytest.param(-1, marks=pytest.mark.xfail)])
-def test_min(axis) -> None:
-    daa = load_records_lazy().analysis.x1
-    caa = load_records_eager().analysis.x1
+def test_min(line_delim_records_file, axis) -> None:  # noqa: F811
+    daa = load_records_lazy(line_delim_records_file).analysis.x1
+    caa = load_records_eager(line_delim_records_file).analysis.x1
     ar = ak.min(caa, axis=axis)
     dr = dak.min(daa, axis=axis).compute()
     if isinstance(ar, ak.Array):
@@ -22,9 +26,9 @@ def test_min(axis) -> None:
 @pytest.mark.parametrize("axis", [None, 1, pytest.param(-1, marks=pytest.mark.xfail)])
 @pytest.mark.parametrize("attr", ["x1", "z2"])
 @pytest.mark.xfail
-def test_max(axis, attr) -> None:
-    daa = load_records_lazy().analysis[attr]
-    caa = load_records_eager().analysis[attr]
+def test_max(line_delim_records_file, axis, attr) -> None:  # noqa: F811
+    daa = load_records_lazy(line_delim_records_file).analysis[attr]
+    caa = load_records_eager(line_delim_records_file).analysis[attr]
     ar = ak.max(caa, axis=axis)
     dr = dak.max(daa, axis=axis).compute()
     if isinstance(ar, ak.Array):
@@ -35,9 +39,9 @@ def test_max(axis, attr) -> None:
 
 @pytest.mark.parametrize("axis", [None, 1, pytest.param(-1, marks=pytest.mark.xfail)])
 @pytest.mark.parametrize("attr", ["x1", "z2"])
-def test_sum(axis, attr) -> None:
-    daa = load_records_lazy().analysis[attr]
-    caa = load_records_eager().analysis[attr]
+def test_sum(line_delim_records_file, axis, attr) -> None:  # noqa: F811
+    daa = load_records_lazy(line_delim_records_file).analysis[attr]
+    caa = load_records_eager(line_delim_records_file).analysis[attr]
     ar = ak.sum(caa, axis=axis)
     dr = dak.sum(daa, axis=axis).compute()
     if isinstance(ar, ak.Array):
@@ -59,9 +63,9 @@ def test_sum(axis, attr) -> None:
     ],
 )
 @pytest.mark.xfail
-def test_flatten(axis) -> None:
-    daa = load_records_lazy()["analysis"]["x1"]
-    caa = load_records_eager()["analysis"]["x1"]
+def test_flatten(line_delim_records_file, axis) -> None:  # noqa: F811
+    daa = load_records_lazy(line_delim_records_file)["analysis"]["x1"]
+    caa = load_records_eager(line_delim_records_file)["analysis"]["x1"]
     ar = ak.flatten(caa, axis=axis)
     dr = dak.flatten(daa, axis=axis).compute()
     if isinstance(ar, ak.Array):
@@ -83,9 +87,9 @@ def test_flatten(axis) -> None:
     ],
 )
 @pytest.mark.xfail
-def test_num(axis) -> None:
-    daa = load_records_lazy()["analysis"]["x1"]
-    caa = load_records_eager()["analysis"]["x1"]
+def test_num(line_delim_records_file, axis) -> None:  # noqa: F811
+    daa = load_records_lazy(line_delim_records_file)["analysis"]["x1"]
+    caa = load_records_eager(line_delim_records_file)["analysis"]["x1"]
     ar = ak.num(caa, axis=axis)
     dr = dak.num(daa, axis=axis).compute()
     if isinstance(ar, ak.Array):
@@ -96,9 +100,9 @@ def test_num(axis) -> None:
 
 @pytest.mark.parametrize("axis", [None, 1, pytest.param(-1, marks=pytest.mark.xfail)])
 @pytest.mark.parametrize("attr", ["x1", "z2"])
-def test_count(axis, attr) -> None:
-    daa = load_records_lazy()["analysis"]["x1"]
-    caa = load_records_eager()["analysis"]["x1"]
+def test_count(line_delim_records_file, axis, attr) -> None:  # noqa: F811
+    daa = load_records_lazy(line_delim_records_file)["analysis"]["x1"]
+    caa = load_records_eager(line_delim_records_file)["analysis"]["x1"]
     ar = ak.count(caa, axis=axis)
     dr = dak.count(daa, axis=axis).compute()
     if isinstance(ar, ak.Array):
@@ -109,9 +113,9 @@ def test_count(axis, attr) -> None:
 
 @pytest.mark.parametrize("axis", [None, 1, pytest.param(-1, marks=pytest.mark.xfail)])
 @pytest.mark.parametrize("attr", ["x1", "z2"])
-def test_count_nonzero(axis, attr) -> None:
-    daa = load_records_lazy()["analysis"]["x1"]
-    caa = load_records_eager()["analysis"]["x1"]
+def test_count_nonzero(line_delim_records_file, axis, attr) -> None:  # noqa: F811
+    daa = load_records_lazy(line_delim_records_file)["analysis"]["x1"]
+    caa = load_records_eager(line_delim_records_file)["analysis"]["x1"]
     ar = ak.count_nonzero(caa, axis=axis)
     dr = dak.count_nonzero(daa, axis=axis).compute()
     if isinstance(ar, ak.Array):
