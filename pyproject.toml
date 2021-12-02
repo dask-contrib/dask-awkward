@@ -12,7 +12,6 @@ write_to = "src/dask_awkward/_version.py"
 
 [tool.pytest.ini_options]
 addopts = "-v"
-testpaths = ["tests"]
 
 [tool.isort]
 profile = "black"

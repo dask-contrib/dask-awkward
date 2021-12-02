@@ -69,7 +69,7 @@ def single_record_file(tmpdir_factory):
 
 def load_records_lazy(
     fn,
-    blocksize: int | str = 1024,
+    blocksize: int | str = 700,
     by_file: bool = False,
     ntimes: int = 1,
 ) -> DaskAwkwardArray:

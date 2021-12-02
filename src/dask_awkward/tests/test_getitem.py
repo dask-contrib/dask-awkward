@@ -1,5 +1,5 @@
 from dask_awkward.utils import assert_eq
-from helpers import (  # noqa: F401
+from dask_awkward.tests.helpers import (  # noqa: F401
     line_delim_records_file,
     load_records_eager,
     load_records_lazy,
