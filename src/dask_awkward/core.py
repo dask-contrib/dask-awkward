@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 import operator
+import warnings
 from functools import partial
+from math import ceil
 from numbers import Number
 from typing import TYPE_CHECKING, Any, Callable
 
-import awkward as ak
 import numpy as np
+from awkward import concatenate as concatenate_v1
 from awkward._v2._connect.numpy import NDArrayOperatorsMixin
+from awkward._v2.highlevel import Array
+from awkward._v2.operations.structure import concatenate
 from awkward._v2.tmp_for_testing import v1_to_v2
+from awkward.highlevel import Array as Array_v1
 from dask.base import (
     DaskMethodsMixin,
     is_dask_collection,
@@ -30,12 +35,13 @@ if TYPE_CHECKING:
 
 
 def _finalize_daskawkwardarray(results: Any) -> Any:
-    if all(isinstance(r, ak.Array) for r in results):
-        return ak.concatenate(results)
-    if all(isinstance(r, ak.Record) for r in results):
-        return ak.from_iter(results)
+    if any(isinstance(r, Array) for r in results):
+        return concatenate(results)
+    elif all(isinstance(r, Array_v1) for r in results):
+        warnings.warn("Encountered an Awkward v1 array! " "We do not want to do this.")
+        return concatenate_v1(results)
     else:
-        return ak.from_iter(results)
+        return concatenate_v1(list(map(lambda x: [x], results)))
 
 
 def _finalize_scalar(results: Any) -> Any:
@@ -76,6 +82,10 @@ class Scalar(DaskMethodsMixin):
     def _rebuild(self, dsk: Any, *, rename: Any | None = None) -> Any:
         key = replace_name_in_key(self.key, rename) if rename else self.key
         return Scalar(dsk, key)
+
+    @property
+    def dask(self) -> HighLevelGraph:
+        return self._dask
 
     @property
     def key(self) -> str:
@@ -149,8 +159,9 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
         return type(self)(dsk, name, self.meta, divisions=self.divisions)
 
     def __len__(self) -> int:
-        self._divisions = calculate_known_divisions(self)
-        return self._divisions[-1] + 1
+        self._compute_divisions()
+        assert self.divisions[-1] is not None
+        return self.divisions[-1]
 
     def _shorttypestr(self, max: int = 10) -> str:
         return str(_type(self))[0:max]
@@ -159,8 +170,7 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
         tstr = str(_type(self))
         if max and len(tstr) > max:
             tstr = f"{tstr[0:max]} ... }}"
-        length = "var" if self.divisions[-1] is None else (self.divisions[-1] + 1)
-        return f"{length} * {tstr}"
+        return f"var * {tstr}"
 
     def __str__(self) -> str:
         return (
@@ -244,9 +254,7 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
         index = tuple(slice(k, k + 1) if isinstance(k, Number) else k for k in index)  # type: ignore
         name = f"partitions-{token}"
         new_keys = self.keys_array[index].tolist()
-        divisions = [self.divisions[i] for _, i in new_keys] + [
-            self.divisions[new_keys[-1][1] + 1]
-        ]
+        divisions = (None,) * (len(new_keys) + 1)
         dsk = {(name, i): tuple(key) for i, key in enumerate(new_keys)}
         graph = HighLevelGraph.from_collections(name, dsk, dependencies=[self])
         return new_array_object(graph, name, None, divisions=tuple(divisions))
@@ -360,7 +368,7 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
         return map_partitions(ufunc, *inputs, **kwargs)
 
 
-def _first_partition(array: DaskAwkwardArray) -> ak.Array:
+def _first_partition(array: DaskAwkwardArray) -> Array_v1 | Array:
     """Compute the first partition of a DaskAwkwardArray collection.
 
     Parameters
@@ -375,14 +383,13 @@ def _first_partition(array: DaskAwkwardArray) -> ak.Array:
         awkward array.
 
     """
-
     computed = array.__dask_scheduler__(
         array.__dask_graph__(), array.__dask_keys__()[0]
     )
     return computed
 
 
-def _typetracer_via_v1_to_v2(array: DaskAwkwardArray) -> Content:
+def _get_typetracer(array: DaskAwkwardArray) -> Content:
     """Obtain the awkward type tracker using the v1 to v2 conversion
 
     This will compute the first partition of the array collection if
@@ -399,7 +406,16 @@ def _typetracer_via_v1_to_v2(array: DaskAwkwardArray) -> Content:
         Awkward Content object representing the typetracer (metadata).
 
     """
-    return v1_to_v2(_first_partition(array).layout).typetracer
+    if array.meta is not None:
+        return array.meta
+
+    first_part = _first_partition(array)
+    if isinstance(first_part, Array_v1):
+        return v1_to_v2(first_part.layout).typetracer
+    elif isinstance(first_part, Array):
+        return first_part.layout.typetracer
+    else:
+        raise TypeError(f"Should have an Array type, got {type(first_part)}")
 
 
 def new_array_object(
@@ -441,8 +457,8 @@ def new_array_object(
     array = DaskAwkwardArray(dsk, name, meta, divisions)  # type: ignore
     if meta is None:
         try:
-            array._meta = _typetracer_via_v1_to_v2(array)
-        except (AttributeError, AssertionError):
+            array._meta = _get_typetracer(array)
+        except (AttributeError, AssertionError, TypeError):
             array._meta = None
     return array
 
@@ -591,15 +607,16 @@ def calculate_known_divisions(array: DaskAwkwardArray) -> tuple[int, ...]:
         Locations (indices) of division boundaries.
 
     """
+    # if divisions are known, quick return
     if array.known_divisions:
         return array.divisions  # type: ignore
-    nums = array.map_partitions(ak.num, axis=0).compute()
+    nums = array.map_partitions(len).compute()
     try:
         cs = list(np.cumsum(nums))
     except TypeError:
         cs = list(np.cumsum(nums.slot0))
-    cs[-1] -= 1
-    return tuple([0, *cs])
+    divs = tuple([0, *cs])
+    return divs
 
 
 class _TrivialPartitionwiseOp:
@@ -659,3 +676,21 @@ def fields(array: DaskAwkwardArray) -> list[str] | None:
         return array.meta.fields
     else:
         return None
+
+
+def from_awkward(source: Array, npartitions: int) -> DaskAwkwardArray:
+    name = tokenize(source, npartitions)
+    nrows = len(source)
+    chunksize = int(ceil(nrows / npartitions))
+    locs = list(range(0, nrows, chunksize)) + [nrows]
+    llg = {
+        (name, i): source[start:stop]
+        for i, (start, stop) in enumerate(zip(locs[:-1], locs[1:]))
+    }
+    hlg = HighLevelGraph.from_collections(name, llg, dependencies=set())
+    return new_array_object(
+        hlg,
+        name,
+        divisions=tuple(locs),
+        meta=source.layout.typetracer,
+    )

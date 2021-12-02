@@ -35,3 +35,7 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = ["IPython.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["fsspec.*"]
+ignore_missing_imports = true

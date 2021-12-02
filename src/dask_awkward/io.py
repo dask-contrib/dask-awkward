@@ -1,9 +1,18 @@
 from __future__ import annotations
 
+import io
+import os
 from typing import TYPE_CHECKING, Any
 
-import awkward as ak
-from dask.base import tokenize
+try:
+    import ujson as json
+except ImportError:
+    import json  # type: ignore
+
+from awkward._v2.highlevel import Array
+from awkward._v2.operations.convert.ak_from_iter import from_iter
+from dask.base import flatten, tokenize
+from dask.bytes import read_bytes
 from dask.highlevelgraph import HighLevelGraph
 
 from .core import new_array_object
@@ -12,46 +21,72 @@ if TYPE_CHECKING:
     from .core import DaskAwkwardArray
 
 
-def _from_json(source: Any, kwargs: dict[str, Any]) -> Any:
-    return ak.from_json(source, **kwargs)
+def is_file_path(source: Any) -> bool:
+    try:
+        return os.path.isfile(source)
+    except (ValueError, TypeError):
+        return False
 
 
-def from_json(source: Any, **kwargs: Any) -> DaskAwkwardArray:
-    token = tokenize(source)
+def _from_json_single_object_in_file(source):
+    with open(source) as f:
+        return Array([json.load(f)])
+
+
+def _from_json_line_by_line(source):
+    with open(source) as f:
+        return from_iter(json.loads(line) for line in f)
+
+
+def _from_json_bytes(source):
+    # return from_iter(json.loads(ch) for ch in source.split(b"\n") if ch)
+    return from_iter(
+        json.loads(ch) for ch in io.TextIOWrapper(io.BytesIO(source)) if ch
+    )
+
+
+def from_json(
+    source: str | list[str],
+    blocksize: int | str | None = None,
+    delimiter: bytes | None = None,
+    one_obj_per_file: bool = False,
+) -> DaskAwkwardArray:
+    token = tokenize(source, delimiter, blocksize, one_obj_per_file)
     name = f"from-json-{token}"
-    dsk = {(name, i): (_from_json, f, kwargs) for i, f in enumerate(source)}
-    hlg = HighLevelGraph.from_collections(name, dsk)
-    return new_array_object(hlg, name, None, npartitions=len(source))
 
+    # allow either blocksize or delimieter being not-None to trigger
+    # line deliminated JSON reading.
+    if blocksize is not None and delimiter is None:
+        delimiter = b"\n"
+    elif blocksize is None and delimiter == b"\n":
+        blocksize = "128 MiB"
 
-def _from_parquet_single(source: Any, kwargs: dict[Any, Any]) -> Any:
-    return ak.from_parquet(source, **kwargs)
+    # if delimiter is None and blocksize is None we are expecting to
+    # read a single file or a list of files.
+    if delimiter is None and blocksize is None:
+        if is_file_path(source):
+            source = [source]  # type: ignore
+        concrete = (
+            _from_json_single_object_in_file
+            if one_obj_per_file
+            else _from_json_line_by_line
+        )
+        dsk = {(name, i): (concrete, s) for i, s in enumerate(source)}
+        deps = set()
+        n = len(dsk)
+    elif delimiter is not None and blocksize is not None:
+        _, chunks = read_bytes(
+            source,
+            delimiter=delimiter,
+            blocksize=blocksize,
+            sample=None,
+        )
+        chunks = list(flatten(chunks))
+        dsk = {(name, i): (_from_json_bytes, d.key) for i, d in enumerate(chunks)}
+        deps = chunks
+        n = len(deps)
+    else:
+        raise TypeError("Incompatible combination of arguments.")
 
-
-def _from_parquet_rowgroups(
-    source: Any,
-    row_groups: int | list[int],
-    kwargs: dict[str, Any],
-) -> Any:
-    return ak.from_parquet(source, row_groups=row_groups, **kwargs)
-
-
-def from_parquet(source: Any, **kwargs: Any) -> DaskAwkwardArray:
-    token = tokenize(source)
-    name = f"from-parquet-{token}"
-
-    if isinstance(source, list):
-        dsk = {
-            (name, i): (_from_parquet_single, f, kwargs) for i, f in enumerate(source)
-        }
-        npartitions = len(source)
-    elif "row_groups" in kwargs:
-        row_groups = kwargs.pop("row_groups")
-        dsk = {
-            (name, i): (_from_parquet_rowgroups, source, rg, kwargs)  # type: ignore
-            for i, rg in enumerate(row_groups)
-        }
-        npartitions = len(row_groups)
-
-    hlg = HighLevelGraph.from_collections(name, dsk)
-    return new_array_object(hlg, name, None, npartitions=npartitions)
+    hlg = HighLevelGraph.from_collections(name, dsk, dependencies=deps)
+    return new_array_object(hlg, name, None, npartitions=n)
