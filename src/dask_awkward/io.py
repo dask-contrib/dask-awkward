@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import os
 from typing import TYPE_CHECKING, Any
 
@@ -38,7 +39,10 @@ def _from_json_line_by_line(source):
 
 
 def _from_json_bytes(source):
-    return from_iter(json.loads(ch) for ch in source.split(b"\n") if ch)
+    # return from_iter(json.loads(ch) for ch in source.split(b"\n") if ch)
+    return from_iter(
+        json.loads(ch) for ch in io.TextIOWrapper(io.BytesIO(source)) if ch
+    )
 
 
 def from_json(
