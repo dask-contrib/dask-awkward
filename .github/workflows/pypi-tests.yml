@@ -30,8 +30,8 @@ jobs:
         pip install wheel -U
         pip install pytest -U
         pip install pyarrow
-        pip install --ignore-installed -q --no-cache-dir git+https://github.com/scikit-hep/awkward-1.0@main -v
         pip install dask[complete]
+        pip install --ignore-installed -q --no-cache-dir git+https://github.com/scikit-hep/awkward-1.0@main -v
         pip install --ignore-installed --no-deps -q --no-cache-dir -e .
         pip list
     - name: test
