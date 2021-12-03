@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-import dask_awkward.core as dakc
-from dask_awkward.io import from_json
-from dask_awkward.utils import assert_eq
 from helpers import (  # noqa: F401
     line_delim_records_file,
     load_records_eager,
     load_records_lazy,
     single_record_file,
 )
+
+import dask_awkward.core as dakc
+from dask_awkward.io import from_json
+from dask_awkward.utils import assert_eq
 
 
 def test_meta_exists(line_delim_records_file) -> None:  # noqa: F811

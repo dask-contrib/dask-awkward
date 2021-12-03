@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import awkward as ak
 import pytest
-
-import dask_awkward as dak
 from helpers import (  # noqa: F401
     line_delim_records_file,
     load_records_eager,
     load_records_lazy,
 )
+
+import dask_awkward as dak
 
 
 @pytest.mark.parametrize("axis", [None, 1, pytest.param(-1, marks=pytest.mark.xfail)])
