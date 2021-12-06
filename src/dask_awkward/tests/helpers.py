@@ -12,10 +12,10 @@ import fsspec
 from awkward._v2.highlevel import Array
 from awkward._v2.operations.convert import from_iter
 
-from dask_awkward.io import from_json
+from ..io import from_json
 
 if TYPE_CHECKING:
-    from dask_awkward.core import DaskAwkwardArray
+    from ..core import DaskAwkwardArray
 
 import pytest
 

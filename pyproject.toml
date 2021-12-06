@@ -20,7 +20,7 @@ src_paths = ["src", "tests"]
 
 [tool.mypy]
 python_version = "3.7"
-files = ["src", "tests"]
+files = ["src"]
 warn_unused_configs = true
 
 [[tool.mypy.overrides]]

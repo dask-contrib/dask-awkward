@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import awkward as ak
 import pytest
-from helpers import (  # noqa: F401
+
+import dask_awkward.routines as dakr
+
+from .helpers import (  # noqa: F401
     line_delim_records_file,
     load_records_eager,
     load_records_lazy,
 )
-
-import dask_awkward as dak
 
 
 @pytest.mark.parametrize("axis", [None, 1, pytest.param(-1, marks=pytest.mark.xfail)])
@@ -17,7 +18,7 @@ def test_min(line_delim_records_file, axis) -> None:  # noqa: F811
     daa = load_records_lazy(line_delim_records_file).analysis.x1
     caa = load_records_eager(line_delim_records_file).analysis.x1
     ar = ak.min(caa, axis=axis)
-    dr = dak.min(daa, axis=axis).compute()
+    dr = dakr.min(daa, axis=axis).compute()
     if isinstance(ar, ak.Array):
         assert list(ar) == list(dr)
     else:
@@ -31,7 +32,7 @@ def test_max(line_delim_records_file, axis, attr) -> None:  # noqa: F811
     daa = load_records_lazy(line_delim_records_file).analysis[attr]
     caa = load_records_eager(line_delim_records_file).analysis[attr]
     ar = ak.max(caa, axis=axis)
-    dr = dak.max(daa, axis=axis).compute()
+    dr = dakr.max(daa, axis=axis).compute()
     if isinstance(ar, ak.Array):
         assert ar.to_list() == dr.to_list()
     else:
@@ -45,7 +46,7 @@ def test_sum(line_delim_records_file, axis, attr) -> None:  # noqa: F811
     daa = load_records_lazy(line_delim_records_file).analysis[attr]
     caa = load_records_eager(line_delim_records_file).analysis[attr]
     ar = ak.sum(caa, axis=axis)
-    dr = dak.sum(daa, axis=axis).compute()
+    dr = dakr.sum(daa, axis=axis).compute()
     if isinstance(ar, ak.Array):
         assert ar.to_list() == dr.to_list()
     else:
@@ -69,7 +70,7 @@ def test_flatten(line_delim_records_file, axis) -> None:  # noqa: F811
     daa = load_records_lazy(line_delim_records_file)["analysis"]["x1"]
     caa = load_records_eager(line_delim_records_file)["analysis"]["x1"]
     ar = ak.flatten(caa, axis=axis)
-    dr = dak.flatten(daa, axis=axis).compute()
+    dr = dakr.flatten(daa, axis=axis).compute()
     if isinstance(ar, ak.Array):
         assert ar.to_list() == dr.to_list()
     else:
@@ -93,7 +94,7 @@ def test_num(line_delim_records_file, axis) -> None:  # noqa: F811
     daa = load_records_lazy(line_delim_records_file)["analysis"]["x1"]
     caa = load_records_eager(line_delim_records_file)["analysis"]["x1"]
     ar = ak.num(caa, axis=axis)
-    dr = dak.num(daa, axis=axis).compute()
+    dr = dakr.num(daa, axis=axis).compute()
     if isinstance(ar, ak.Array):
         assert ar.to_list() == dr.to_list()
     else:
@@ -107,7 +108,7 @@ def test_count(line_delim_records_file, axis, attr) -> None:  # noqa: F811
     daa = load_records_lazy(line_delim_records_file)["analysis"]["x1"]
     caa = load_records_eager(line_delim_records_file)["analysis"]["x1"]
     ar = ak.count(caa, axis=axis)
-    dr = dak.count(daa, axis=axis).compute()
+    dr = dakr.count(daa, axis=axis).compute()
     if isinstance(ar, ak.Array):
         assert ar.to_list() == dr.to_list()
     else:
@@ -121,7 +122,7 @@ def test_count_nonzero(line_delim_records_file, axis, attr) -> None:  # noqa: F8
     daa = load_records_lazy(line_delim_records_file)["analysis"]["x1"]
     caa = load_records_eager(line_delim_records_file)["analysis"]["x1"]
     ar = ak.count_nonzero(caa, axis=axis)
-    dr = dak.count_nonzero(daa, axis=axis).compute()
+    dr = dakr.count_nonzero(daa, axis=axis).compute()
     if isinstance(ar, ak.Array):
         assert ar.to_list() == dr.to_list()
     else:
