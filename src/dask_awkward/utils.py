@@ -37,7 +37,7 @@ def normalize_single_outer_inner_index(
     Examples
     --------
     >>> from dask_awkward.utils import normalize_single_outer_inner_index
-    >>> divisions = (0, 3, 6, 8)
+    >>> divisions = (0, 3, 6, 9)
     >>> normalize_single_outer_inner_index(divisions, 0)
     (0, 0)
     >>> normalize_single_outer_inner_index(divisions, 5)
@@ -50,7 +50,4 @@ def normalize_single_outer_inner_index(
         return (0, index)
     partition_index = int(np.digitize(index, divisions)) - 1
     new_index = index - divisions[partition_index]
-    # if last
-    if partition_index == (len(divisions) - 1) and new_index == 0:
-        return (partition_index - 1, -1)
     return (partition_index, new_index)

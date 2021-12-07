@@ -1,19 +1,16 @@
 from __future__ import annotations
 
 import operator
-import warnings
 from functools import partial
 from math import ceil
 from numbers import Number
 from typing import TYPE_CHECKING, Any, Callable
 
 import numpy as np
-from awkward import concatenate as concatenate_v1
 from awkward._v2._connect.numpy import NDArrayOperatorsMixin
+from awkward._v2.contents import Content
 from awkward._v2.highlevel import Array
 from awkward._v2.operations.structure import concatenate
-from awkward._v2.tmp_for_testing import v1_to_v2
-from awkward.highlevel import Array as Array_v1
 from dask.base import (
     DaskMethodsMixin,
     is_dask_collection,
@@ -25,10 +22,7 @@ from dask.highlevelgraph import HighLevelGraph
 from dask.threaded import get as threaded_get
 from dask.utils import IndexCallable, cached_property, funcname, key_split
 
-from .utils import normalize_single_outer_inner_index
-
 if TYPE_CHECKING:
-    from awkward._v2.contents import Content
     from awkward._v2.forms.form import Form
     from awkward._v2.types.type import Type
     from dask.blockwise import Blockwise
@@ -37,11 +31,17 @@ if TYPE_CHECKING:
 def _finalize_daskawkwardarray(results: Any) -> Any:
     if any(isinstance(r, Array) for r in results):
         return concatenate(results)
-    elif all(isinstance(r, Array_v1) for r in results):
-        warnings.warn("Encountered an Awkward v1 array! " "We do not want to do this.")
-        return concatenate_v1(results)
+    elif len(results) == 1 and isinstance(results[0], int):
+        return results[0]
+    elif all(isinstance(r, int) for r in results):
+        return Array(results)
     else:
-        return concatenate_v1(list(map(lambda x: [x], results)))
+        msg = (
+            "Unexpected  results of a computation.\n "
+            f"results: {results}"
+            f"type of first result: {type(results[0])}"
+        )
+        raise RuntimeError(msg)
 
 
 def _finalize_scalar(results: Any) -> Any:
@@ -129,7 +129,7 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
         self._dask: HighLevelGraph = dsk
         self._key: str = key
         self._divisions = divisions
-        self._meta = meta
+        self.meta = meta
 
     def __dask_graph__(self) -> HighLevelGraph:
         return self.dask
@@ -224,6 +224,10 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
     def meta(self) -> Any | None:
         return self._meta
 
+    @meta.setter
+    def meta(self, m: Any | None) -> None:
+        self._meta = m
+
     @property
     def typetracer(self) -> Any | None:
         return self.meta
@@ -292,35 +296,49 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
         meta = self.meta[key] if self.meta is not None else None
         return new_array_object(hlg, name, meta=meta, divisions=self.divisions)
 
-    def _getitem_singleint(self, key: int) -> DaskAwkwardArray:
-        # get divisions
-        self._divisions = calculate_known_divisions(self)
-
-        # if only 1 division
-        if len(self.divisions) == 2:
-            return self._getitem_inner(key=key)
-
-        p, k = normalize_single_outer_inner_index(self._divisions, key)
-        return self.partitions[p][k]
-
     def __getitem__(self, key: Any) -> DaskAwkwardArray:
-        if not isinstance(key, tuple):
-            key = (key,)
-        if isinstance(key[0], list):
-            if any(isinstance(k, int) for k in key[0]):
+        """Select items from the collection.
+
+        Heavily under construction.
+
+        Arguments
+        ---------
+        key : many types supported
+            Selection criteria.
+
+        Returns
+        -------
+        DaskAwkwardArray
+            Resulting collection.
+
+        """
+
+        # don't accept lists containing integers.
+        if isinstance(key, list):
+            if any(isinstance(k, int) for k in key):
                 raise NotImplementedError("Lists containing integers not supported.")
-        if (
-            isinstance(key[0], (str, list))
-            or key[0] is Ellipsis
-            or key[0] == slice(None, None, None)
-        ):
+
+        # a single string or a list.
+        if isinstance(key, (str, list)):
             return self._getitem_inner(key=key)
-        if isinstance(key[0], slice):
-            pass
-        if isinstance(key[0], int) and len(key) == 1:
-            return self._getitem_singleint(key=key[0])
-        if isinstance(key[0], int) and len(key) > 1:
-            pass
+
+        # an empty slice
+        elif key == slice(None, None, None):
+            return self._getitem_inner(key=key)
+
+        # a single ellipsis
+        elif key is Ellipsis:
+            return self._getitem_inner(key=key)
+
+        # unimplemented
+
+        elif isinstance(key, int):
+            raise NotImplementedError("__getitem__ int to be implemented.")
+        elif isinstance(key, slice):
+            raise NotImplementedError("__getitem__ single slice to be implemented.")
+        elif isinstance(key, tuple):
+            raise NotImplementedError("__getitem__ tuple to be implemented.")
+
         return key
 
     def __getattr__(self, attr: str) -> DaskAwkwardArray:
@@ -368,7 +386,7 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
         return map_partitions(ufunc, *inputs, **kwargs)
 
 
-def _first_partition(array: DaskAwkwardArray) -> Array_v1 | Array:
+def _first_partition(array: DaskAwkwardArray) -> Array:
     """Compute the first partition of a DaskAwkwardArray collection.
 
     Parameters
@@ -390,7 +408,7 @@ def _first_partition(array: DaskAwkwardArray) -> Array_v1 | Array:
 
 
 def _get_typetracer(array: DaskAwkwardArray) -> Content:
-    """Obtain the awkward type tracker using the v1 to v2 conversion
+    """Obtain the awkward type tracer associated with an array.
 
     This will compute the first partition of the array collection if
     necessary.
@@ -408,20 +426,16 @@ def _get_typetracer(array: DaskAwkwardArray) -> Content:
     """
     if array.meta is not None:
         return array.meta
-
     first_part = _first_partition(array)
-    if isinstance(first_part, Array_v1):
-        return v1_to_v2(first_part.layout).typetracer
-    elif isinstance(first_part, Array):
-        return first_part.layout.typetracer
-    else:
+    if not isinstance(first_part, Array):
         raise TypeError(f"Should have an Array type, got {type(first_part)}")
+    return first_part.layout.typetracer
 
 
 def new_array_object(
     dsk: HighLevelGraph,
     name: str,
-    meta: Any | None = None,
+    meta: Content | None = None,
     npartitions: int | None = None,
     divisions: tuple[Any, ...] | None = None,
 ) -> DaskAwkwardArray:
@@ -433,8 +447,8 @@ def new_array_object(
         Graph backing the collection.
     name : str
         Unique name for the collection.
-    meta : awkward-array type tracing information, optional
-        Object metadata; this is awkward-array TypeTracer.
+    meta : Content, the awkward-array type tracing information, optional
+        Object metadata; this is an awkward-array type tracer.
     npartitions : int, optional
         Total number of partitions; if used `divisions` will be a
         tuple of length `npartitions` + 1 with all elements``None``.
@@ -454,12 +468,15 @@ def new_array_object(
         raise ValueError("Only one of either divisions or npartitions must be defined.")
     elif divisions is None and npartitions is None:
         raise ValueError("One of either divisions or npartitions must be defined.")
+
     array = DaskAwkwardArray(dsk, name, meta, divisions)  # type: ignore
+
     if meta is None:
         try:
-            array._meta = _get_typetracer(array)
+            array.meta = _get_typetracer(array)
         except (AttributeError, AssertionError, TypeError):
-            array._meta = None
+            array.meta = None
+
     return array
 
 
@@ -610,13 +627,18 @@ def calculate_known_divisions(array: DaskAwkwardArray) -> tuple[int, ...]:
     # if divisions are known, quick return
     if array.known_divisions:
         return array.divisions  # type: ignore
-    nums = array.map_partitions(len).compute()
-    try:
-        cs = list(np.cumsum(nums))
-    except TypeError:
-        cs = list(np.cumsum(nums.slot0))
-    divs = tuple([0, *cs])
-    return divs
+
+    if array.npartitions > 1:
+        nums = array.map_partitions(len).compute()
+        try:
+            cs = list(np.cumsum(nums))
+        except TypeError:
+            cs = list(np.cumsum(nums.slot0))
+        divs = tuple([0, *cs])
+        return divs
+
+    n = array.map_partitions(len).compute()
+    return (0, n)
 
 
 class _TrivialPartitionwiseOp:
