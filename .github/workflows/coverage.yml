@@ -28,7 +28,7 @@ jobs:
       run: |
         pip install pip setuptools -U
         pip install wheel -U
-        pip install pytest -U
+        pip install pytest pytest-cov -U
         pip install pyarrow
         pip install dask[complete]
         pip install --ignore-installed -q --no-cache-dir git+https://github.com/scikit-hep/awkward-1.0@main -v
