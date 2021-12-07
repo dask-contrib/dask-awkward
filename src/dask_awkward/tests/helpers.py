@@ -5,22 +5,21 @@ try:
 except ImportError:
     import json  # type: ignore
 
-import pathlib
+import os
+import tempfile
 from typing import TYPE_CHECKING
 
 import fsspec
 from awkward._v2.highlevel import Array
 from awkward._v2.operations.convert import from_iter
 
+from ..core import from_awkward
 from ..io import from_json
 
 if TYPE_CHECKING:
     from ..core import DaskAwkwardArray
 
 import pytest
-
-_DATA_DIR = pathlib.Path(__file__).parent.resolve() / "data"
-
 
 # fmt: off
 MANY_RECORDS = \
@@ -47,7 +46,6 @@ MANY_RECORDS = \
 
 
 SINGLE_RECORD = """{"a":[1,2,3]}"""
-
 # fmt: on
 
 
@@ -67,8 +65,17 @@ def single_record_file(tmpdir_factory):
     return str(fn)
 
 
+def records_from_temp_file(ntimes: int = 1) -> Array:
+    with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
+        f.write(MANY_RECORDS)
+        name = f.name
+    x = load_records_eager(name, ntimes=ntimes)
+    os.remove(name)
+    return x
+
+
 def load_records_lazy(
-    fn,
+    fn: str,
     blocksize: int | str = 700,
     by_file: bool = False,
     ntimes: int = 1,
@@ -78,15 +85,27 @@ def load_records_lazy(
     return from_json(fn, blocksize=blocksize)
 
 
-def load_records_eager(fn, ntimes: int = 1) -> Array:
-    with fsspec.open(fn) as f:
-        return from_iter(json.loads(line) for line in f)
+def load_records_eager(fn: str, ntimes: int = 1) -> Array:
+    files = [fn] * ntimes
+    loaded = []
+    for ff in files:
+        with fsspec.open(ff) as f:
+            loaded += list(json.loads(line) for line in f)
+    return from_iter(loaded)
 
 
-def load_single_record_lazy(fn) -> DaskAwkwardArray:
+def load_single_record_lazy(fn: str) -> DaskAwkwardArray:
     return from_json(
         fn,
         delimiter=None,
         blocksize=None,
         one_obj_per_file=True,
     )
+
+
+def wipe_divisions(a: DaskAwkwardArray) -> None:
+    a._divisions = (None,) * (a.npartitions + 1)
+
+
+def lazy_from_awkward(ntimes: int = 1, npartitions: int = 5):
+    return from_awkward(records_from_temp_file(ntimes), npartitions=npartitions)

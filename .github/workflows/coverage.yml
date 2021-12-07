@@ -1,0 +1,39 @@
+name: Coverage
+
+on:
+  push:
+    paths-ignore:
+    - '**.md'
+  pull_request:
+    paths-ignore:
+    - '**.md'
+  workflow_dispatch:
+
+jobs:
+  pytest:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ubuntu-latest]
+        python-version: ["3.8"]
+    runs-on: ${{matrix.platform}}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: setup Python ${{matrix.python-version}}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{matrix.python-version}}
+    - name: install
+      run: |
+        pip install pip setuptools -U
+        pip install wheel -U
+        pip install pytest pytest-cov -U
+        pip install pyarrow
+        pip install dask[complete]
+        pip install --ignore-installed -q --no-cache-dir git+https://github.com/scikit-hep/awkward-1.0@main -v
+        pip install --ignore-installed --no-deps -q --no-cache-dir -e .
+        pip list
+    - name: test
+      run: |
+        pytest --cov=dask_awkward src/dask_awkward/tests
