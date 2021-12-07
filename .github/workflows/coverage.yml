@@ -36,4 +36,4 @@ jobs:
         pip list
     - name: test
       run: |
-        pytest --cov=dask_awkward
+        pytest --cov=dask_awkward src/dask_awkward/tests
