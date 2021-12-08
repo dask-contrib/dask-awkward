@@ -10,7 +10,7 @@ from awkward._v2.operations.reducers import sum as _sum
 from awkward._v2.operations.structure import flatten as _flatten
 from awkward._v2.operations.structure import num as _num
 
-from .core import _TrivialPartitionwiseOp, pw_reduction_with_agg_to_scalar
+from .core import TrivialPartitionwiseOp, pw_reduction_with_agg_to_scalar
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Union
@@ -38,11 +38,11 @@ if TYPE_CHECKING:
 # def softmax(x, axis=None, keepdims=False, mask_identity=False):
 ####################################
 
-_count_trivial = _TrivialPartitionwiseOp(_count, axis=1)
-_count_nonzero_trivial = _TrivialPartitionwiseOp(_count_nonzero, axis=1)
-_max_trivial = _TrivialPartitionwiseOp(_max, axis=1)
-_min_trivial = _TrivialPartitionwiseOp(_min, axis=1)
-_sum_trivial = _TrivialPartitionwiseOp(_sum, axis=1)
+_count_trivial = TrivialPartitionwiseOp(_count, axis=1)
+_count_nonzero_trivial = TrivialPartitionwiseOp(_count_nonzero, axis=1)
+_max_trivial = TrivialPartitionwiseOp(_max, axis=1)
+_min_trivial = TrivialPartitionwiseOp(_min, axis=1)
+_sum_trivial = TrivialPartitionwiseOp(_sum, axis=1)
 
 
 def count(
@@ -174,8 +174,8 @@ def sum(array: DaskAwkwardArray, axis: int | None = None, **kwargs: Any) -> Lazy
 ####################################
 
 
-_flatten_trivial = _TrivialPartitionwiseOp(_flatten, axis=1)
-_num_trivial = _TrivialPartitionwiseOp(_num, axis=1)
+_flatten_trivial = TrivialPartitionwiseOp(_flatten, axis=1)
+_num_trivial = TrivialPartitionwiseOp(_num, axis=1)
 
 
 def num(array: DaskAwkwardArray, axis: int = 1, **kwargs: Any) -> LazyResult:

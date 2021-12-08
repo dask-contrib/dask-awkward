@@ -13,6 +13,7 @@ from awkward._v2.highlevel import Array
 from awkward._v2.operations.structure import concatenate
 from dask.base import (
     DaskMethodsMixin,
+    dont_optimize,
     is_dask_collection,
     replace_name_in_key,
     tokenize,
@@ -49,9 +50,10 @@ def _finalize_scalar(results: Any) -> Any:
 
 
 class Scalar(DaskMethodsMixin):
-    def __init__(self, dsk: HighLevelGraph, key: str) -> None:
+    def __init__(self, dsk: HighLevelGraph, key: str, meta: Any | None = None) -> None:
         self._dask: HighLevelGraph = dsk
         self._key: str = key
+        self._meta: Any | None = meta
 
     def __dask_graph__(self) -> HighLevelGraph:
         return self._dask
@@ -69,7 +71,7 @@ class Scalar(DaskMethodsMixin):
 
     @staticmethod
     def __dask_optimize__(dsk: Any, keys: Any, **kwargs: Any) -> HighLevelGraph:
-        return dsk
+        return dont_optimize(dsk, keys, **kwargs)
 
     __dask_scheduler__ = staticmethod(threaded_get)
 
@@ -95,16 +97,13 @@ class Scalar(DaskMethodsMixin):
     def name(self) -> str:
         return self.key
 
-    def __add__(self, other: Scalar) -> Scalar:
-        name = f"add-{tokenize(self, other)}"
-        deps = [self, other]
-        llg = {name: (operator.add, self.key, other.key)}
-        g = HighLevelGraph.from_collections(name, llg, dependencies=deps)
-        return new_scalar_object(g, name, None)
+    @property
+    def meta(self) -> Any | None:
+        return self._meta
 
 
 def new_scalar_object(dsk: HighLevelGraph, name: str, meta: Any) -> Scalar:
-    return Scalar(dsk, name)
+    return Scalar(dsk, name, meta)
 
 
 class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
@@ -148,7 +147,7 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     @staticmethod
     def __dask_optimize__(dsk: Any, keys: Any, **kwargs: Any) -> HighLevelGraph:
-        return dsk
+        return dont_optimize(dsk, keys, **kwargs)
 
     __dask_scheduler__ = staticmethod(threaded_get)
 
@@ -383,6 +382,8 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
         self._divisions = calculate_known_divisions(self)
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+        if method != "__call__":
+            raise NotImplementedError("Array ufunc supports only method == '__call__'")
         return map_partitions(ufunc, *inputs, **kwargs)
 
 
@@ -628,20 +629,17 @@ def calculate_known_divisions(array: DaskAwkwardArray) -> tuple[int, ...]:
     if array.known_divisions:
         return array.divisions  # type: ignore
 
+    # if more than 1 partition use cumulative sum
     if array.npartitions > 1:
         nums = array.map_partitions(len).compute()
-        try:
-            cs = list(np.cumsum(nums))
-        except TypeError:
-            cs = list(np.cumsum(nums.slot0))
-        divs = tuple([0, *cs])
-        return divs
+        cs = list(np.cumsum(nums))
+        return tuple([0, *cs])
 
-    n = array.map_partitions(len).compute()
-    return (0, n)
+    # if only 1 partition just get it's length
+    return (0, array.map_partitions(len).compute())
 
 
-class _TrivialPartitionwiseOp:
+class TrivialPartitionwiseOp:
     def __init__(
         self,
         func: Callable,
@@ -700,8 +698,11 @@ def fields(array: DaskAwkwardArray) -> list[str] | None:
         return None
 
 
-def from_awkward(source: Array, npartitions: int) -> DaskAwkwardArray:
-    name = tokenize(source, npartitions)
+def from_awkward(
+    source: Array, npartitions: int, name: str | None = None
+) -> DaskAwkwardArray:
+    if name is None:
+        name = tokenize(source, npartitions)
     nrows = len(source)
     chunksize = int(ceil(nrows / npartitions))
     locs = list(range(0, nrows, chunksize)) + [nrows]
