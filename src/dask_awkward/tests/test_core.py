@@ -7,6 +7,18 @@ from dask_awkward.utils import assert_eq
 from .helpers import line_delim_records_file, load_records_eager  # noqa: F401
 
 
+def test_from_awkward(line_delim_records_file) -> None:  # noqa: F811
+    aa = load_records_eager(line_delim_records_file)
+    daa = dak.from_awkward(aa, npartitions=4)
+    assert_eq(daa, aa)
+
+
+def test_dunder_str(line_delim_records_file):  # noqa: F811
+    aa = load_records_eager(line_delim_records_file)
+    daa = dak.from_awkward(aa, npartitions=6)
+    assert str(daa) == "dask.awkward<from-awkward, npartitions=5>"
+
+
 def test_meta_exists(line_delim_records_file) -> None:  # noqa: F811
     daa = dak.from_json(line_delim_records_file, blocksize=700)
     assert daa.meta is not None
@@ -25,9 +37,3 @@ def test_calculate_known_divisions(line_delim_records_file) -> None:  # noqa: F8
 def test_len(line_delim_records_file) -> None:  # noqa: F811
     daa = dak.from_json(line_delim_records_file)
     assert len(daa) == 20
-
-
-def test_from_awkward(line_delim_records_file) -> None:  # noqa: F811
-    aa = load_records_eager(line_delim_records_file)
-    daa = dak.from_awkward(aa, npartitions=3)
-    assert_eq(daa, aa)

@@ -174,8 +174,7 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
     def __str__(self) -> str:
         return (
             f"dask.awkward<{key_split(self.name)}, "
-            f"npartitions={self.npartitions}, "
-            f"type='{self._typestr(max=30)}'"
+            f"npartitions={self.npartitions}"
             ">"
         )
 
@@ -273,14 +272,17 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
         Examples
         --------
         >>> import dask_awkward as dak
-        >>> import dask_awkward.data as dakd
-        >>> a = dak.from_json(dakd.json_data())
+        >>> from awkward._v2.highlevel import Array
+        >>> aa = Array([[1,2,3],[],[2]])
+        >>> a = dak.from_awkward(aa, npartitions=3)
         >>> a
-        dask.awkward<from-json, npartitions=3, type='var * var * var * int64'>
+        dask.awkward<from-awkward, npartitions=3>
         >>> a.partitions[0]
-        dask.awkward<partitions, npartitions=1, type='var * var * var * int64'>
+        dask.awkward<partitions, npartitions=1>
         >>> a.partitions[0:2]
-        dask.awkward<partitions, npartitions=2, type='var * var * var * int64'>
+        dask.awkward<partitions, npartitions=2>
+        >>> a.partitions[2].compute()
+        <Array [[2]] type='1 * var * int64'>
 
         """
         return IndexCallable(self._partitions)
@@ -702,7 +704,7 @@ def from_awkward(
     source: Array, npartitions: int, name: str | None = None
 ) -> DaskAwkwardArray:
     if name is None:
-        name = tokenize(source, npartitions)
+        name = f"from-awkward-{tokenize(source, npartitions)}"
     nrows = len(source)
     chunksize = int(ceil(nrows / npartitions))
     locs = list(range(0, nrows, chunksize)) + [nrows]

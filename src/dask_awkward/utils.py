@@ -43,7 +43,7 @@ def normalize_single_outer_inner_index(
     >>> normalize_single_outer_inner_index(divisions, 5)
     (1, 2)
     >>> normalize_single_outer_inner_index(divisions, 8)
-    (2, -1)
+    (2, 2)
 
     """
     if len(divisions) == 2:
