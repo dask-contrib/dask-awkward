@@ -13,6 +13,7 @@ import fsspec
 from awkward._v2.highlevel import Array
 from awkward._v2.operations.convert import from_iter
 
+from ..core import from_awkward
 from ..io import from_json
 
 if TYPE_CHECKING:
@@ -166,21 +167,12 @@ def load_single_record_eager(fn: str) -> Array:
     return Array([d])
 
 
-def clear_divisions(array: DaskAwkwardArray) -> None:
-    """Clear the divisions of a Dask Awkward Collection.
-
-    Parameters
-    ----------
-    array : DaskAwkwardArray
-        Array collection.
-
-    """
-    array._divisions = (None,) * (array.npartitions + 1)
-
-
 # def lazy_records_from_awkward(n_times: int = 1, npartitions: int = 5):
 #     return from_awkward(records_from_temp_file(n_times), npartitions=npartitions)
 
 
 # def lazy_record_from_awkward():
 #     return from_awkward(single_record_from_temp_file(), npartitions=1)
+
+LAZY_RECORDS = from_awkward(records_from_temp_file(), npartitions=5)
+LAZY_RECORD = from_awkward(single_record_from_temp_file(), npartitions=1)

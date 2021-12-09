@@ -180,15 +180,15 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     __repr__ = __str__
 
-    def _ipython_display_(self) -> None:
-        if self.meta is None:
-            return None
-
-        import json
-
-        from IPython.display import display_json
-
-        display_json(json.loads(self.meta.form.to_json()), raw=True)
+    # def _ipython_display_(self) -> None:
+    #     if self.meta is None:
+    #         return None
+    #
+    #     import json
+    #
+    #     from IPython.display import display_json
+    #
+    #     display_json(json.loads(self.meta.form.to_json()), raw=True)
 
     @property
     def dask(self) -> HighLevelGraph:
@@ -382,6 +382,10 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     def _compute_divisions(self) -> None:
         self._divisions = calculate_known_divisions(self)
+
+    def clear_divisions(self) -> None:
+        """Clear the divisions of a Dask Awkward Collection."""
+        self._divisions = (None,) * (self.npartitions + 1)
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         if method != "__call__":

@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 from ..utils import normalize_single_outer_inner_index
 
 
-def test_normalize_single_outer_inner_index():
+def test_normalize_single_outer_inner_index() -> None:
     divisions = (0, 12, 14, 20, 23, 24)
     indices = [0, 1, 2, 8, 12, 13, 14, 15, 17, 20, 21, 22]
     results = [
