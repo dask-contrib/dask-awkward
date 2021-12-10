@@ -6,3 +6,9 @@ omit =
      src/dask_awkward/_version.py
 source =
      src/dask_awkward
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if TYPE_CHECKING:
+    except ImportError:

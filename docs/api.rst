@@ -1,18 +1,15 @@
 API
 ---
 
-.. currentmodule:: dask_awkward.core
+.. currentmodule:: dask_awkward
 
 .. autosummary::
 
-   DaskAwkwardArray
+   Array
    map_partitions
-   new_array_object
 
 
-.. autoclass:: DaskAwkwardArray
+.. autoclass:: Array
    :members:
-   :undoc-members:
 
 .. autofunction:: map_partitions
-.. autofunction:: new_array_object

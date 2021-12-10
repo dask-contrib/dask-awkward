@@ -9,15 +9,15 @@ import os
 import tempfile
 from typing import TYPE_CHECKING
 
+import awkward._v2.highlevel as ak
 import fsspec
-from awkward._v2.highlevel import Array
 from awkward._v2.operations.convert import from_iter
 
 from ..core import from_awkward
 from ..io import from_json
 
 if TYPE_CHECKING:
-    from ..core import DaskAwkwardArray
+    from ..core import Array
 
 import pytest
 
@@ -67,7 +67,7 @@ def single_record_file(tmpdir_factory):
     return str(fn)
 
 
-def records_from_temp_file(n_times: int = 1) -> Array:
+def records_from_temp_file(n_times: int = 1) -> ak.Array:
     """Get a concrete Array of records from a temporary file.
 
     Parameters
@@ -89,7 +89,7 @@ def records_from_temp_file(n_times: int = 1) -> Array:
     return x
 
 
-def single_record_from_temp_file() -> Array:
+def single_record_from_temp_file() -> ak.Array:
     with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
         f.write(SINGLE_RECORD)
         name = f.name
@@ -103,7 +103,7 @@ def load_records_lazy(
     blocksize: int | str = 700,
     by_file: bool = False,
     n_times: int = 1,
-) -> DaskAwkwardArray:
+) -> Array:
     """Load a record array Dask Awkward Array collection.
 
     Parameters
@@ -119,7 +119,7 @@ def load_records_lazy(
 
     Returns
     -------
-    DaskAwkwardArray
+    Array
         Resulting Dask Awkward Array collection.
 
     """
@@ -128,7 +128,7 @@ def load_records_lazy(
     return from_json(fn, blocksize=blocksize)
 
 
-def load_records_eager(fn: str, n_times: int = 1) -> Array:
+def load_records_eager(fn: str, n_times: int = 1) -> ak.Array:
     """Load a concrete Awkward record array.
 
     Parameters
@@ -152,7 +152,7 @@ def load_records_eager(fn: str, n_times: int = 1) -> Array:
     return from_iter(loaded)
 
 
-def load_single_record_lazy(fn: str) -> DaskAwkwardArray:
+def load_single_record_lazy(fn: str) -> Array:
     return from_json(
         fn,
         delimiter=None,
@@ -161,10 +161,10 @@ def load_single_record_lazy(fn: str) -> DaskAwkwardArray:
     )
 
 
-def load_single_record_eager(fn: str) -> Array:
+def load_single_record_eager(fn: str) -> ak.Array:
     with fsspec.open(fn) as f:
         d = json.load(f)
-    return Array([d])
+    return ak.Array([d])
 
 
 # def lazy_records_from_awkward(n_times: int = 1, npartitions: int = 5):

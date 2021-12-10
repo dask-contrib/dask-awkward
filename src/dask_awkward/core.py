@@ -6,9 +6,9 @@ from math import ceil
 from numbers import Number
 from typing import TYPE_CHECKING, Any, Callable
 
+import awkward._v2.highlevel as ak
 import numpy as np
 from awkward._v2._connect.numpy import NDArrayOperatorsMixin
-from awkward._v2.highlevel import Array
 from awkward._v2.operations.structure import concatenate
 from dask.base import (
     DaskMethodsMixin,
@@ -28,16 +28,16 @@ if TYPE_CHECKING:
     from dask.blockwise import Blockwise
 
 
-def _finalize_daskawkwardarray(results: Any) -> Any:
-    if any(isinstance(r, Array) for r in results):
+def _finalize_array(results: Any) -> Any:
+    if any(isinstance(r, ak.Array) for r in results):
         return concatenate(results)
     elif len(results) == 1 and isinstance(results[0], int):
         return results[0]
     elif all(isinstance(r, int) for r in results):
-        return Array(results)
+        return ak.Array(results)
     else:
         msg = (
-            "Unexpected  results of a computation.\n "
+            "Unexpected results of a computation.\n "
             f"results: {results}"
             f"type of first result: {type(results[0])}"
         )
@@ -105,7 +105,7 @@ def new_scalar_object(dsk: HighLevelGraph, name: str, meta: Any) -> Scalar:
     return Scalar(dsk, name, meta)
 
 
-class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
+class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     """Partitioned, lazy, and parallel Awkward Array Dask collection.
 
     The class constructor is not intended for users. Instead use
@@ -121,7 +121,7 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
         self,
         dsk: HighLevelGraph,
         key: str,
-        meta: Array | None,
+        meta: ak.Array | None,
         divisions: tuple[int | None, ...],
     ) -> None:
         self._dask: HighLevelGraph = dsk
@@ -142,7 +142,7 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
         return self.name
 
     def __dask_postcompute__(self) -> Any:
-        return _finalize_daskawkwardarray, ()
+        return _finalize_array, ()
 
     @staticmethod
     def __dask_optimize__(dsk: Any, keys: Any, **kwargs: Any) -> HighLevelGraph:
@@ -218,12 +218,12 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
         return len(self.divisions) - 1
 
     @property
-    def meta(self) -> Array | None:
+    def meta(self) -> ak.Array | None:
         return self._meta
 
     @meta.setter
-    def meta(self, m: Array | None) -> None:
-        if m is not None and not isinstance(m, Array):
+    def meta(self, m: ak.Array | None) -> None:
+        if m is not None and not isinstance(m, ak.Array):
             raise TypeError("meta must be an instance of an Awkward Array.")
         self._meta = m
 
@@ -240,14 +240,14 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
     @property
     def form(self) -> Form | None:
         if self.meta is not None:
-            return self.meta.form
+            return self.meta.layout.form
         return None
 
     @cached_property
     def keys_array(self) -> np.ndarray:
         return np.array(self.__dask_keys__(), dtype=object)
 
-    def _partitions(self, index: Any) -> DaskAwkwardArray:
+    def _partitions(self, index: Any) -> Array:
         if not isinstance(index, tuple):
             index = (index,)
         token = tokenize(self, index)
@@ -288,7 +288,7 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
         """
         return IndexCallable(self._partitions)
 
-    def _getitem_inner(self, key: Any) -> DaskAwkwardArray:
+    def _getitem_inner(self, key: Any) -> Array:
         token = tokenize(self, key)
         name = f"getitem-{token}"
         graphlayer = partitionwise_layer(
@@ -298,7 +298,7 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
         meta = self.meta[key] if self.meta is not None else None
         return new_array_object(hlg, name, meta=meta, divisions=self.divisions)
 
-    def __getitem__(self, key: Any) -> DaskAwkwardArray:
+    def __getitem__(self, key: Any) -> Array:
         """Select items from the collection.
 
         Heavily under construction.
@@ -310,7 +310,7 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         Returns
         -------
-        DaskAwkwardArray
+        Array
             Resulting collection.
 
         """
@@ -343,7 +343,7 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         return key
 
-    def __getattr__(self, attr: str) -> DaskAwkwardArray:
+    def __getattr__(self, attr: str) -> Array:
         try:
             return self.__getitem__(attr)
         except (IndexError, KeyError):
@@ -354,7 +354,7 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
         func: Callable,
         *args: Any,
         **kwargs: Any,
-    ) -> DaskAwkwardArray:
+    ) -> Array:
         """Map a function across all partitions of the collection.
 
         Parameters
@@ -363,7 +363,7 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
             Function to call on all partitions.
         *args : Collections and function arguments
             Additional arguments passed to `func` after the
-            collection, if arguments are DaskAwkwardArray collections
+            collection, if arguments are Array collections
             they must be compatibly partitioned with the object this
             method is being called from.
         **kwargs : Any
@@ -371,7 +371,7 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         Returns
         -------
-        DaskAwkwardArray
+        Array
             The new collection.
 
         See Also
@@ -399,10 +399,10 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
         inputs_meta = []
         for inp in inputs:
             # if input is a Dask Awkward Array collection, grab it's meta
-            if isinstance(inp, DaskAwkwardArray):
+            if isinstance(inp, Array):
                 inputs_meta.append(inp.meta)
             # if input is a concrete Awkward Array, grab it's typetracer
-            elif isinstance(inp, Array):
+            elif isinstance(inp, ak.Array):
                 inputs_meta.append(inp.layout.typetracer)
             # otherwise pass along
             else:
@@ -414,12 +414,12 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
         return map_partitions(ufunc, *inputs, meta=new_meta)
 
 
-def _first_partition(array: DaskAwkwardArray) -> Array:
-    """Compute the first partition of a DaskAwkwardArray collection.
+def _first_partition(array: Array) -> ak.Array:
+    """Compute the first partition of a Array collection.
 
     Parameters
     ----------
-    array : DaskAwkwardArray
+    array : Array
         Awkward collection.
 
     Returns
@@ -435,7 +435,7 @@ def _first_partition(array: DaskAwkwardArray) -> Array:
     return computed
 
 
-def _get_typetracer(array: DaskAwkwardArray) -> Array:
+def _get_typetracer(array: Array) -> ak.Array:
     """Obtain the awkward type tracer associated with an array.
 
     This will compute the first partition of the array collection if
@@ -443,7 +443,7 @@ def _get_typetracer(array: DaskAwkwardArray) -> Array:
 
     Parameters
     ----------
-    array : DaskAwkwardArray
+    array : Array
         The collection.
 
     Returns
@@ -455,19 +455,19 @@ def _get_typetracer(array: DaskAwkwardArray) -> Array:
     if array.meta is not None:
         return array.meta
     first_part = _first_partition(array)
-    if not isinstance(first_part, Array):
-        raise TypeError(f"Should have an Array type, got {type(first_part)}")
-    return Array(first_part.layout.typetracer)
+    if not isinstance(first_part, ak.Array):
+        raise TypeError(f"Should have an ak.Array type, got {type(first_part)}")
+    return ak.Array(first_part.layout.typetracer)
 
 
 def new_array_object(
     dsk: HighLevelGraph,
     name: str,
-    meta: Array | None = None,
+    meta: ak.Array | None = None,
     npartitions: int | None = None,
     divisions: tuple[Any, ...] | None = None,
-) -> DaskAwkwardArray:
-    """Instantiate a new DaskAwkwardArray collection object.
+) -> Array:
+    """Instantiate a new Array collection object.
 
     Parameters
     ----------
@@ -486,7 +486,7 @@ def new_array_object(
 
     Returns
     -------
-    DaskAwkwardArray
+    Array
         Resulting collection.
 
     """
@@ -497,7 +497,7 @@ def new_array_object(
     elif divisions is None and npartitions is None:
         raise ValueError("One of either divisions or npartitions must be defined.")
 
-    array = DaskAwkwardArray(dsk, name, meta, divisions)  # type: ignore
+    array = Array(dsk, name, meta, divisions)  # type: ignore
 
     if meta is None:
         try:
@@ -536,13 +536,12 @@ def partitionwise_layer(
     pairs: list[Any] = []
     numblocks: dict[Any, int | tuple[int, ...]] = {}
     for arg in args:
-        if isinstance(arg, DaskAwkwardArray):
+        if isinstance(arg, Array):
             pairs.extend([arg.name, "i"])
             numblocks[arg.name] = (arg.npartitions,)
         elif is_dask_collection(arg):
             raise NotImplementedError(
-                "Use of DaskAwkwardArray with other Dask "
-                "collections is currently unsupported."
+                "Use of Array with other Dask " "collections is currently unsupported."
             )
         else:
             pairs.extend([arg, None])
@@ -561,9 +560,9 @@ def map_partitions(
     func: Callable,
     *args: Any,
     name: str | None = None,
-    meta: Array | None = None,
+    meta: ak.Array | None = None,
     **kwargs: Any,
-) -> DaskAwkwardArray:
+) -> Array:
     """Map a callable across all partitions of a collection.
 
     Parameters
@@ -572,7 +571,7 @@ def map_partitions(
         Function to apply on all partitions.
     *args : Collections and function arguments
         Arguments passed to the function, if arguments are
-        DaskAwkwardArray collections they must be compatibly
+        Array collections they must be compatibly
         partitioned.
     name : str, optional
         Name for the Dask graph layer; if left to ``None`` (default),
@@ -582,7 +581,7 @@ def map_partitions(
 
     Returns
     -------
-    DaskAwkwardArray
+    Array
         The new collection.
 
     """
@@ -598,7 +597,7 @@ def map_partitions(
 
 
 def pw_reduction_with_agg_to_scalar(
-    array: DaskAwkwardArray,
+    array: Array,
     func: Callable,
     agg: Callable,
     *,
@@ -609,7 +608,7 @@ def pw_reduction_with_agg_to_scalar(
 
     Parameters
     ----------
-    array : DaskAwkwardArray
+    array : Array
         Awkward array collection.
     func : Callable
         Function to apply on all partitions.
@@ -637,14 +636,14 @@ def pw_reduction_with_agg_to_scalar(
     return new_scalar_object(hlg, name, None)
 
 
-def calculate_known_divisions(array: DaskAwkwardArray) -> tuple[int, ...]:
+def calculate_known_divisions(array: Array) -> tuple[int, ...]:
     """Determine the divisions of a collection.
 
     This function triggers an immediate computation.
 
     Parameters
     ----------
-    array : DaskAwkwardArray
+    array : Array
         Awkard array collection.
 
     Returns
@@ -679,19 +678,19 @@ class TrivialPartitionwiseOp:
         self.name = func.__name__ if name is None else name
         self._kwargs = kwargs
 
-    def __call__(self, collection: DaskAwkwardArray, **kwargs: Any) -> DaskAwkwardArray:
+    def __call__(self, collection: Array, **kwargs: Any) -> Array:
         # overwrite any saved kwargs in self._kwargs
         for k, v in kwargs.items():
             self._kwargs[k] = v
         return map_partitions(self._func, collection, name=self.name, **self._kwargs)
 
 
-def _type(array: DaskAwkwardArray) -> Type | None:
+def _type(array: Array) -> Type | None:
     """Get the type object associated with an array.
 
     Parameters
     ----------
-    array : DaskAwkwardArray
+    array : Array
         The collection.
 
     Returns
@@ -705,12 +704,12 @@ def _type(array: DaskAwkwardArray) -> Type | None:
     return f.type if f is not None else None
 
 
-def fields(array: DaskAwkwardArray) -> list[str] | None:
-    """Get the fields of a DaskAwkwardArray collection.
+def fields(array: Array) -> list[str] | None:
+    """Get the fields of a Array collection.
 
     Parameters
     ----------
-    array : DaskAwkwardArray
+    array : Array
         The collection.
 
     Returns
@@ -726,9 +725,7 @@ def fields(array: DaskAwkwardArray) -> list[str] | None:
         return None
 
 
-def from_awkward(
-    source: Array, npartitions: int, name: str | None = None
-) -> DaskAwkwardArray:
+def from_awkward(source: ak.Array, npartitions: int, name: str | None = None) -> Array:
     if name is None:
         name = f"from-awkward-{tokenize(source, npartitions)}"
     nrows = len(source)
@@ -743,5 +740,5 @@ def from_awkward(
         hlg,
         name,
         divisions=tuple(locs),
-        meta=Array(source.layout.typetracer),
+        meta=ak.Array(source.layout.typetracer),
     )

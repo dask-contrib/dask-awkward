@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 import dask_awkward as dak
 import dask_awkward.core as dakc
 from dask_awkward.utils import assert_eq
@@ -33,6 +35,10 @@ def test_calculate_known_divisions(line_delim_records_file) -> None:  # noqa: F8
     assert dakc.calculate_known_divisions(daa.analysis) == target
     assert dakc.calculate_known_divisions(daa.analysis.x1) == target
     assert dakc.calculate_known_divisions(daa["analysis"][["x1", "x2"]]) == target
+    daa = dak.from_json([line_delim_records_file] * 3)
+    daa._compute_divisions()
+    assert daa.known_divisions
+    assert dakc.calculate_known_divisions(daa) == target
 
 
 def test_fields(line_delim_records_file) -> None:  # noqa: F811
@@ -40,12 +46,32 @@ def test_fields(line_delim_records_file) -> None:  # noqa: F811
     aa = daa.compute()
     assert daa.fields == aa.fields
     assert dak.fields(daa) == aa.fields
+    daa.meta = None
+    assert daa.fields is None
+    assert dak.fields(daa) is None
+
+
+def test_form(line_delim_records_file) -> None:  # noqa: F811
+    daa = dak.from_json(line_delim_records_file)
+    assert daa.form
+    daa.meta = None
+    assert daa.form is None
+
+
+@pytest.mark.xfail
+def test_form_equality(line_delim_records_file) -> None:  # noqa: F811
+    # NOTE: forms come from meta which currently depends on partitioning
+    daa = dak.from_json(line_delim_records_file)
+    assert daa.form == daa.compute().layout.form
+    daa = LAZY_RECORDS
+    assert daa.form == daa.compute().layout.form
 
 
 def test_from_awkward(line_delim_records_file) -> None:  # noqa: F811
     aa = load_records_eager(line_delim_records_file)
     daa = dak.from_awkward(aa, npartitions=4)
-    assert_eq(daa, aa)
+    assert_eq(aa, daa)
+    assert_eq(daa, daa)
 
 
 def test_len(line_delim_records_file) -> None:  # noqa: F811
@@ -60,12 +86,27 @@ def test_meta_and_typetracer_exist(line_delim_records_file) -> None:  # noqa: F8
     assert daa.typetracer is daa.meta
 
 
-def test_partitions() -> None:  # noqa: F811
+def test_meta_raise(line_delim_records_file) -> None:  # noqa: F811
+    daa = dak.from_json(line_delim_records_file)
+    with pytest.raises(
+        TypeError, match="meta must be an instance of an Awkward Array."
+    ):
+        daa.meta = "hello"
+
+
+def test_partitions() -> None:
     daa = LAZY_RECORDS
     lop = list(daa.partitions)
     for part in lop:
         assert part.npartitions == 1
     assert len(lop) == daa.npartitions
+
+
+def test_raise_in_finalize() -> None:
+    daa = LAZY_RECORDS
+    res = daa.map_partitions(str)
+    with pytest.raises(RuntimeError, match="type of first result: <class 'str'>"):
+        res.compute()
 
 
 def test_short_typestr() -> None:
