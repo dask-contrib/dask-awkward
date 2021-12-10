@@ -82,7 +82,7 @@ class Scalar(DaskMethodsMixin):
 
     def _rebuild(self, dsk: Any, *, rename: Any | None = None) -> Any:
         key = replace_name_in_key(self.key, rename) if rename else self.key
-        return Scalar(dsk, key)
+        return Scalar(dsk, key)  # type: ignore
 
     @property
     def dask(self) -> HighLevelGraph:
@@ -158,8 +158,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     def __len__(self) -> int:
         self._compute_divisions()
-        assert self.divisions[-1] is not None
-        return self.divisions[-1]
+        return self.divisions[-1]  # type: ignore
 
     def _shorttypestr(self, max: int = 10) -> str:
         return str(_type(self))[0:max]
@@ -177,7 +176,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             ">"
         )
 
-    __repr__ = __str__
+    def __repr__(self) -> str:
+        return self.__str__()
 
     # def _ipython_display_(self) -> None:
     #     if self.meta is None:
@@ -411,7 +411,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         # compute new meta from inputs
         new_meta = ufunc(*inputs_meta)
 
-        return map_partitions(ufunc, *inputs, meta=new_meta)
+        return map_partitions(ufunc, *inputs, meta=new_meta, **kwargs)
 
 
 def _first_partition(array: Array) -> ak.Array:
@@ -541,7 +541,7 @@ def partitionwise_layer(
             numblocks[arg.name] = (arg.npartitions,)
         elif is_dask_collection(arg):
             raise NotImplementedError(
-                "Use of Array with other Dask " "collections is currently unsupported."
+                "Use of Array with other Dask collections is currently unsupported."
             )
         else:
             pairs.extend([arg, None])
@@ -700,8 +700,9 @@ def _type(array: Array) -> Type | None:
         contain metadata ``None`` is returned.
 
     """
-    f = array.meta.layout.form
-    return f.type if f is not None else None
+    if array.meta is not None:
+        return array.meta.layout.form.type
+    return None
 
 
 def fields(array: Array) -> list[str] | None:
@@ -721,8 +722,7 @@ def fields(array: Array) -> list[str] | None:
     """
     if array.meta is not None:
         return array.meta.fields
-    else:
-        return None
+    return None
 
 
 def from_awkward(source: ak.Array, npartitions: int, name: str | None = None) -> Array:

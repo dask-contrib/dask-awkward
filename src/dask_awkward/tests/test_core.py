@@ -94,6 +94,22 @@ def test_meta_raise(line_delim_records_file) -> None:  # noqa: F811
         daa.meta = "hello"
 
 
+def test_new_array_object_raises(line_delim_records_file) -> None:  # noqa: F811
+    daa = dak.from_json(line_delim_records_file)
+    name = daa.name
+    hlg = daa.dask
+    with pytest.raises(
+        ValueError, match="One of either divisions or npartitions must be defined."
+    ):
+        dakc.new_array_object(hlg, name, meta=None, npartitions=None, divisions=None)
+    with pytest.raises(
+        ValueError, match="Only one of either divisions or npartitions must be defined."
+    ):
+        dakc.new_array_object(
+            hlg, name, meta=None, npartitions=3, divisions=(0, 2, 4, 7)
+        )
+
+
 def test_partitions() -> None:
     daa = LAZY_RECORDS
     lop = list(daa.partitions)
@@ -107,6 +123,14 @@ def test_raise_in_finalize() -> None:
     res = daa.map_partitions(str)
     with pytest.raises(RuntimeError, match="type of first result: <class 'str'>"):
         res.compute()
+
+
+def test_type(line_delim_records_file) -> None:  # noqa: F811
+    daa = LAZY_RECORDS
+    assert dak.type(daa) is not None
+    daa = dak.from_json(line_delim_records_file)
+    daa.meta = None
+    assert dak.type(daa) is None
 
 
 def test_short_typestr() -> None:
