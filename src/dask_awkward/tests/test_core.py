@@ -58,7 +58,6 @@ def test_meta_and_typetracer_exist(line_delim_records_file) -> None:  # noqa: F8
     assert daa.meta is not None
     assert daa["analysis"]["x1"].meta is not None
     assert daa.typetracer is daa.meta
-    assert daa["analysis"]["y1"].meta is daa["analysis"]["y1"].typetracer
 
 
 def test_partitions() -> None:  # noqa: F811

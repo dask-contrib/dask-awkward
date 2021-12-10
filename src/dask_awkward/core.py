@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any, Callable
 
 import numpy as np
 from awkward._v2._connect.numpy import NDArrayOperatorsMixin
-from awkward._v2.contents import Content
 from awkward._v2.highlevel import Array
 from awkward._v2.operations.structure import concatenate
 from dask.base import (
@@ -122,7 +121,7 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
         self,
         dsk: HighLevelGraph,
         key: str,
-        meta: Any,
+        meta: Array | None,
         divisions: tuple[int | None, ...],
     ) -> None:
         self._dask: HighLevelGraph = dsk
@@ -219,15 +218,17 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
         return len(self.divisions) - 1
 
     @property
-    def meta(self) -> Any | None:
+    def meta(self) -> Array | None:
         return self._meta
 
     @meta.setter
-    def meta(self, m: Any | None) -> None:
+    def meta(self, m: Array | None) -> None:
+        if m is not None and not isinstance(m, Array):
+            raise TypeError("meta must be an instance of an Awkward Array.")
         self._meta = m
 
     @property
-    def typetracer(self) -> Any | None:
+    def typetracer(self) -> Array | None:
         return self.meta
 
     @property
@@ -390,7 +391,27 @@ class DaskAwkwardArray(DaskMethodsMixin, NDArrayOperatorsMixin):
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         if method != "__call__":
             raise NotImplementedError("Array ufunc supports only method == '__call__'")
-        return map_partitions(ufunc, *inputs, **kwargs)
+
+        new_meta = None
+
+        # divisions need to be compat. (identical for now?)
+
+        inputs_meta = []
+        for inp in inputs:
+            # if input is a Dask Awkward Array collection, grab it's meta
+            if isinstance(inp, DaskAwkwardArray):
+                inputs_meta.append(inp.meta)
+            # if input is a concrete Awkward Array, grab it's typetracer
+            elif isinstance(inp, Array):
+                inputs_meta.append(inp.layout.typetracer)
+            # otherwise pass along
+            else:
+                inputs_meta.append(inp)
+
+        # compute new meta from inputs
+        new_meta = ufunc(*inputs_meta)
+
+        return map_partitions(ufunc, *inputs, meta=new_meta)
 
 
 def _first_partition(array: DaskAwkwardArray) -> Array:
@@ -414,7 +435,7 @@ def _first_partition(array: DaskAwkwardArray) -> Array:
     return computed
 
 
-def _get_typetracer(array: DaskAwkwardArray) -> Content:
+def _get_typetracer(array: DaskAwkwardArray) -> Array:
     """Obtain the awkward type tracer associated with an array.
 
     This will compute the first partition of the array collection if
@@ -436,13 +457,13 @@ def _get_typetracer(array: DaskAwkwardArray) -> Content:
     first_part = _first_partition(array)
     if not isinstance(first_part, Array):
         raise TypeError(f"Should have an Array type, got {type(first_part)}")
-    return first_part.layout.typetracer
+    return Array(first_part.layout.typetracer)
 
 
 def new_array_object(
     dsk: HighLevelGraph,
     name: str,
-    meta: Content | None = None,
+    meta: Array | None = None,
     npartitions: int | None = None,
     divisions: tuple[Any, ...] | None = None,
 ) -> DaskAwkwardArray:
@@ -540,6 +561,7 @@ def map_partitions(
     func: Callable,
     *args: Any,
     name: str | None = None,
+    meta: Array | None = None,
     **kwargs: Any,
 ) -> DaskAwkwardArray:
     """Map a callable across all partitions of a collection.
@@ -572,7 +594,7 @@ def map_partitions(
         v for _, v in kwargs.items() if is_dask_collection(v)
     ]
     hlg = HighLevelGraph.from_collections(name, lay, dependencies=deps)
-    return new_array_object(hlg, name, None, npartitions=args[0].npartitions)
+    return new_array_object(hlg, name, meta, npartitions=args[0].npartitions)
 
 
 def pw_reduction_with_agg_to_scalar(
@@ -679,7 +701,7 @@ def _type(array: DaskAwkwardArray) -> Type | None:
         contain metadata ``None`` is returned.
 
     """
-    f = array.form
+    f = array.meta.layout.form
     return f.type if f is not None else None
 
 
@@ -721,5 +743,5 @@ def from_awkward(
         hlg,
         name,
         divisions=tuple(locs),
-        meta=source.layout.typetracer,
+        meta=Array(source.layout.typetracer),
     )
