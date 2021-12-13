@@ -20,7 +20,7 @@ We will always follow the standard import alias for awkward as well:
 
    import awkward as ak
 
-With the imports in mind, we will never have a naked ``Array`` object
+With the imports in mind, we will never have a unqualified ``Array`` object
 in the documentation, all instances will be either ``dak.Array`` or
 ``ak.Array``. We also discourage importing the objects from the
 namespaces:
