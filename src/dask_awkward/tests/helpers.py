@@ -9,15 +9,15 @@ import os
 import tempfile
 from typing import TYPE_CHECKING
 
+import awkward._v2.highlevel as ak
 import fsspec
-from awkward._v2.highlevel import Array
 from awkward._v2.operations.convert import from_iter
 
 from ..core import from_awkward
 from ..io import from_json
 
 if TYPE_CHECKING:
-    from ..core import DaskAwkwardArray
+    from ..core import Array
 
 import pytest
 
@@ -51,6 +51,7 @@ SINGLE_RECORD = """{"a":[1,2,3]}"""
 
 @pytest.fixture(scope="session")
 def line_delim_records_file(tmpdir_factory):
+    """Fixture providing a file name pointing to line deliminted JSON records."""
     fn = tmpdir_factory.mktemp("data").join("records.json")
     with open(fn, "w") as f:
         f.write(MANY_RECORDS)
@@ -59,17 +60,40 @@ def line_delim_records_file(tmpdir_factory):
 
 @pytest.fixture(scope="session")
 def single_record_file(tmpdir_factory):
+    """Fixture providing file name pointing to a single JSON record."""
     fn = tmpdir_factory.mktemp("data").join("single-record.json")
     with open(fn, "w") as f:
         f.write(SINGLE_RECORD)
     return str(fn)
 
 
-def records_from_temp_file(ntimes: int = 1) -> Array:
+def records_from_temp_file(n_times: int = 1) -> ak.Array:
+    """Get a concrete Array of records from a temporary file.
+
+    Parameters
+    ----------
+    n_times : int
+        Number of times to parse the file file of records.
+
+    Returns
+    -------
+    Array
+        Resulting concrete Awkward Array.
+
+    """
     with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
         f.write(MANY_RECORDS)
         name = f.name
-    x = load_records_eager(name, ntimes=ntimes)
+    x = load_records_eager(name, n_times=n_times)
+    os.remove(name)
+    return x
+
+
+def single_record_from_temp_file() -> ak.Array:
+    with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
+        f.write(SINGLE_RECORD)
+        name = f.name
+    x = load_single_record_eager(name)
     os.remove(name)
     return x
 
@@ -78,15 +102,49 @@ def load_records_lazy(
     fn: str,
     blocksize: int | str = 700,
     by_file: bool = False,
-    ntimes: int = 1,
-) -> DaskAwkwardArray:
+    n_times: int = 1,
+) -> Array:
+    """Load a record array Dask Awkward Array collection.
+
+    Parameters
+    ----------
+    fn : str
+        File name.
+    blocksize : int | str
+        Blocksize in bytes for lazy reading.
+    by_file : bool
+        Read by file instead of by bytes.
+    n_times : int
+        Number of times to read the file.
+
+    Returns
+    -------
+    Array
+        Resulting Dask Awkward Array collection.
+
+    """
     if by_file:
-        return from_json([fn] * ntimes)
+        return from_json([fn] * n_times)
     return from_json(fn, blocksize=blocksize)
 
 
-def load_records_eager(fn: str, ntimes: int = 1) -> Array:
-    files = [fn] * ntimes
+def load_records_eager(fn: str, n_times: int = 1) -> ak.Array:
+    """Load a concrete Awkward record array.
+
+    Parameters
+    ----------
+    fn : str
+        File name.
+    n_times : int
+        Number of times to read the file.
+
+    Returns
+    -------
+    Array
+        Resulting concrete Awkward Array.
+
+    """
+    files = [fn] * n_times
     loaded = []
     for ff in files:
         with fsspec.open(ff) as f:
@@ -94,7 +152,7 @@ def load_records_eager(fn: str, ntimes: int = 1) -> Array:
     return from_iter(loaded)
 
 
-def load_single_record_lazy(fn: str) -> DaskAwkwardArray:
+def load_single_record_lazy(fn: str) -> Array:
     return from_json(
         fn,
         delimiter=None,
@@ -103,9 +161,18 @@ def load_single_record_lazy(fn: str) -> DaskAwkwardArray:
     )
 
 
-def wipe_divisions(a: DaskAwkwardArray) -> None:
-    a._divisions = (None,) * (a.npartitions + 1)
+def load_single_record_eager(fn: str) -> ak.Array:
+    with fsspec.open(fn) as f:
+        d = json.load(f)
+    return ak.Array([d])
 
 
-def lazy_from_awkward(ntimes: int = 1, npartitions: int = 5):
-    return from_awkward(records_from_temp_file(ntimes), npartitions=npartitions)
+# def lazy_records_from_awkward(n_times: int = 1, npartitions: int = 5):
+#     return from_awkward(records_from_temp_file(n_times), npartitions=npartitions)
+
+
+# def lazy_record_from_awkward():
+#     return from_awkward(single_record_from_temp_file(), npartitions=1)
+
+LAZY_RECORDS = from_awkward(records_from_temp_file(), npartitions=5)
+LAZY_RECORD = from_awkward(single_record_from_temp_file(), npartitions=1)

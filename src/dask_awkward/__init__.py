@@ -1,7 +1,17 @@
-from ._version import version  # noqa
-from .core import _type as type  # noqa
-from .core import from_awkward  # noqa
-from .core import fields, map_partitions  # noqa
-from .io import from_json  # noqa
+from ._version import version
+from .core import Array
+from .core import _type as type
+from .core import fields, from_awkward, map_partitions
+from .io import from_json
 
-__version__ = version  # noqa
+__version__ = version
+
+
+__all__ = (
+    "Array",
+    "fields",
+    "from_awkward",
+    "from_json",
+    "map_partitions",
+    "type",
+)
