@@ -6,7 +6,7 @@
 dask-awkward
 ============
 
-A project providing a Dask collection for Awkward for nested, variable sized data.
+Connecting Dask to Awkward Array.
 
 .. toctree::
    :maxdepth: 2
