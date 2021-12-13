@@ -2,13 +2,11 @@ Terminology
 -----------
 
 The most common class in both dask-awkward and awkward-array is the
-``Array`` class. In dask-awkward ``Array`` is a Dask collection
-representing a partitioned and lazily computed version of the
-awkward-array ``Array`` object (more specifically, the dask-awkward
-``Array`` maintains a Dask task graph representing an eventual awkward
-array). To help mitigate confusion between dask-awkward and
-awkward-array, we try to maintain a clear distinction between objects
-in both projects.
+``Array`` class. In dask-awkward the ``Array`` class provides a Dask
+collection representing a partitioned and lazily computed version of
+the awkward-array ``Array`` class. To help mitigate confusion between
+dask-awkward and awkward-array, we try to maintain a clear distinction
+between objects in both projects.
 
 First, dask-awkward adopts ``dak`` as the standard import alias:
 
