@@ -24,7 +24,7 @@ def test_normalize_single_outer_inner_index() -> None:
         res = normalize_single_outer_inner_index(divisions, i)
         assert r == res
 
-    divisions = (0, 12)
+    divisions = (0, 12)  # type: ignore
     indices = [0, 2, 3, 6, 8, 11]
     results = [
         (0, 0),

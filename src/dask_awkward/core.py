@@ -228,7 +228,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         self._meta = m
 
     @property
-    def typetracer(self) -> Array | None:
+    def typetracer(self) -> ak.Array | None:
         return self.meta
 
     @property
