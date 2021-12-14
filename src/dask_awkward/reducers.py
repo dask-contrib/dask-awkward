@@ -265,7 +265,7 @@ def _min_or_max(
     **kwargs: Any,
 ) -> LazyResult:
     # translate negative axis (array.ndim currently raises)
-    if axis is not None and axis < 0:
+    if axis is not None and axis < 0 and array.ndim is not None:
         axis = array.ndim + axis + 1
     # get the correct trivial callable
     tf = _min_trivial if f == ak_reducers.min else _max_trivial
@@ -274,7 +274,7 @@ def _min_or_max(
         return tf(array, axis=axis, **kwargs)
     elif axis is None:
         return pw_reduction_with_agg_to_scalar(array, f, f, **kwargs)
-    elif axis == 0 or axis == -1 * array.ndim:
+    elif array.ndim is not None and (axis == 0 or axis == -1 * array.ndim):
         raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
     else:
         raise ValueError("axis must be None or an integer.")

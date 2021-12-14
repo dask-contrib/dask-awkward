@@ -123,6 +123,16 @@ def test_partitions() -> None:
     assert len(lop) == daa.npartitions
 
 
+def test_partitions_divisions() -> None:
+    daa = LAZY_RECORDS
+    divs = daa.divisions
+    t1 = daa.partitions[1:3]
+    assert not t1.known_divisions
+    t2 = daa.partitions[1]
+    assert t2.known_divisions
+    assert daa.partitions[1].divisions == (0, divs[2] - divs[1])  # type: ignore
+
+
 def test_raise_in_finalize() -> None:
     daa = LAZY_RECORDS
     res = daa.map_partitions(str)

@@ -253,14 +253,24 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         token = tokenize(self, index)
         from dask.array.slicing import normalize_index
 
-        index = normalize_index(index, (self.npartitions,))
-        index = tuple(slice(k, k + 1) if isinstance(k, Number) else k for k in index)  # type: ignore
+        raw = normalize_index(index, (self.npartitions,))
+        index = tuple(slice(k, k + 1) if isinstance(k, Number) else k for k in raw)  # type: ignore
         name = f"partitions-{token}"
         new_keys = self.keys_array[index].tolist()
-        divisions = (None,) * (len(new_keys) + 1)
         dsk = {(name, i): tuple(key) for i, key in enumerate(new_keys)}
         graph = HighLevelGraph.from_collections(name, dsk, dependencies=[self])
-        return new_array_object(graph, name, None, divisions=tuple(divisions))
+
+        # if a single partition was requested we trivially know the new divisions.
+        if len(raw) == 1 and isinstance(raw[0], int) and self.known_divisions:
+            new_divisions = (
+                0,
+                self.divisions[raw[0] + 1] - self.divisions[raw[0]],  # type: ignore
+            )
+        # otherwise nullify the known divisions
+        else:
+            new_divisions = (None,) * (len(new_keys) + 1)  # type: ignore
+
+        return new_array_object(graph, name, None, divisions=tuple(new_divisions))
 
     @property
     def partitions(self) -> IndexCallable:
