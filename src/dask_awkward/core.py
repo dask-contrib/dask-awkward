@@ -202,8 +202,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return self.key
 
     @property
-    def ndim(self) -> int:
-        raise NotImplementedError("TODO")
+    def ndim(self) -> int | None:
+        return ndim(self)
 
     @property
     def divisions(self) -> tuple[int | None, ...]:
@@ -371,7 +371,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         Returns
         -------
-        Array
+        dask_awkward.Array
             The new collection.
 
         See Also
@@ -419,7 +419,7 @@ def _first_partition(array: Array) -> ak.Array:
 
     Parameters
     ----------
-    array : Array
+    array : dask_awkward.Array
         Awkward collection.
 
     Returns
@@ -443,7 +443,7 @@ def _get_typetracer(array: Array) -> ak.Array:
 
     Parameters
     ----------
-    array : Array
+    array : dask_awkward.Array
         The collection.
 
     Returns
@@ -581,7 +581,7 @@ def map_partitions(
 
     Returns
     -------
-    Array
+    dask_awkward.Array
         The new collection.
 
     """
@@ -608,7 +608,7 @@ def pw_reduction_with_agg_to_scalar(
 
     Parameters
     ----------
-    array : Array
+    array : dask_awkward.Array
         Awkward array collection.
     func : Callable
         Function to apply on all partitions.
@@ -643,7 +643,7 @@ def calculate_known_divisions(array: Array) -> tuple[int, ...]:
 
     Parameters
     ----------
-    array : Array
+    array : dask_awkward.Array
         Awkard array collection.
 
     Returns
@@ -690,7 +690,7 @@ def _type(array: Array) -> Type | None:
 
     Parameters
     ----------
-    array : Array
+    array : dask_awkward.Array
         The collection.
 
     Returns
@@ -705,12 +705,32 @@ def _type(array: Array) -> Type | None:
     return None
 
 
+def ndim(array: Array) -> int | None:
+    """Number of dimensions before reaching a numeric type or a record.
+
+    Parameters
+    ----------
+    array : dask_awkward.Array
+        The collection
+
+    Returns
+    -------
+    int or None
+        Number of dimensions as an integer, or ``None`` if the
+        collection does not contain metadata.
+
+    """
+    if array.meta is not None:
+        return array.meta.ndim
+    return None
+
+
 def fields(array: Array) -> list[str] | None:
     """Get the fields of a Array collection.
 
     Parameters
     ----------
-    array : Array
+    array : dask_awkward.Array
         The collection.
 
     Returns

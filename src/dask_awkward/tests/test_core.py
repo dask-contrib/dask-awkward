@@ -94,6 +94,11 @@ def test_meta_raise(line_delim_records_file) -> None:  # noqa: F811
         daa.meta = "hello"
 
 
+def test_ndim(line_delim_records_file) -> None:  # noqa
+    daa = dak.from_json(line_delim_records_file, blocksize=700)
+    assert daa.ndim == daa.compute().ndim
+
+
 def test_new_array_object_raises(line_delim_records_file) -> None:  # noqa: F811
     daa = dak.from_json(line_delim_records_file)
     name = daa.name
