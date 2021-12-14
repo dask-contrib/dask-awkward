@@ -74,6 +74,10 @@ def test_from_awkward(line_delim_records_file) -> None:  # noqa: F811
     assert_eq(daa, daa)
 
 
+def test_get_typetracer() -> None:
+    assert dakc._get_typetracer(LAZY_RECORDS) is LAZY_RECORDS.meta
+
+
 def test_len(line_delim_records_file) -> None:  # noqa: F811
     daa = dak.from_json(line_delim_records_file)
     assert len(daa) == 20
@@ -97,6 +101,8 @@ def test_meta_raise(line_delim_records_file) -> None:  # noqa: F811
 def test_ndim(line_delim_records_file) -> None:  # noqa
     daa = dak.from_json(line_delim_records_file, blocksize=700)
     assert daa.ndim == daa.compute().ndim
+    daa.meta = None
+    assert daa.ndim is None
 
 
 def test_new_array_object_raises(line_delim_records_file) -> None:  # noqa: F811
@@ -138,6 +144,14 @@ def test_raise_in_finalize() -> None:
     res = daa.map_partitions(str)
     with pytest.raises(RuntimeError, match="type of first result: <class 'str'>"):
         res.compute()
+
+
+def test_rebuild(line_delim_records_file):  # noqa: F811
+    daa = dak.from_json(line_delim_records_file)
+    x = daa.compute()
+    daa = daa._rebuild(daa.dask)
+    y = daa.compute()
+    assert x.tolist() == y.tolist()
 
 
 def test_type(line_delim_records_file) -> None:  # noqa: F811

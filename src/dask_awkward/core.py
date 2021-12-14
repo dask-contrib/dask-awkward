@@ -413,7 +413,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 inputs_meta.append(inp.meta)
             # if input is a concrete Awkward Array, grab it's typetracer
             elif isinstance(inp, ak.Array):
-                inputs_meta.append(inp.layout.typetracer)
+                inputs_meta.append(ak.Array(inp.layout.typetracer))
             # otherwise pass along
             else:
                 inputs_meta.append(inp)

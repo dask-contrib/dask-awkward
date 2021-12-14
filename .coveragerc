@@ -4,7 +4,6 @@ omit =
      src/dask_awkward/tests/helpers.py
      src/dask_awkward/tests/__init__.py
      src/dask_awkward/_version.py
-     src/dask_awkward/structure.py
 source =
      src/dask_awkward
 
@@ -13,3 +12,4 @@ exclude_lines =
     pragma: no cover
     if TYPE_CHECKING:
     except ImportError:
+    NotImplementedError
