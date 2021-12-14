@@ -15,7 +15,7 @@ from .helpers import (  # noqa: F401
 
 
 def test_clear_divisions() -> None:
-    daa = LAZY_RECORDS
+    daa = dak.from_awkward(LAZY_RECORDS.compute(), npartitions=3)
     assert daa.known_divisions
     daa.clear_divisions()
     assert not daa.known_divisions
@@ -130,7 +130,7 @@ def test_partitions_divisions() -> None:
     assert not t1.known_divisions
     t2 = daa.partitions[1]
     assert t2.known_divisions
-    assert daa.partitions[1].divisions == (0, divs[2] - divs[1])  # type: ignore
+    assert t2.divisions == (0, divs[2] - divs[1])  # type: ignore
 
 
 def test_raise_in_finalize() -> None:
