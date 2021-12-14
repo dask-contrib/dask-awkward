@@ -5,14 +5,25 @@ from typing import Any
 import numpy as np
 from dask.base import is_dask_collection
 
+from .core import Scalar
+
 
 def assert_eq(a: Any, b: Any) -> None:
     if is_dask_collection(a) and not is_dask_collection(b):
-        assert a.compute().to_list() == b.to_list()
+        if isinstance(a, Scalar):
+            assert a.compute() == b
+        else:
+            assert a.compute().to_list() == b.to_list()
     elif is_dask_collection(b) and not is_dask_collection(a):
-        assert a.to_list() == b.compute().to_list()
+        if isinstance(b, Scalar):
+            assert a == b.compute()
+        else:
+            assert a.to_list() == b.compute().to_list()
     else:
-        assert a.compute().to_list() == b.compute().to_list()
+        if isinstance(a, Scalar) and isinstance(b, Scalar):
+            assert a.compute() == b.compute()
+        else:
+            assert a.compute().to_list() == b.compute().to_list()
 
 
 def normalize_single_outer_inner_index(
