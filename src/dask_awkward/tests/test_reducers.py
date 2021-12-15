@@ -5,8 +5,8 @@ import pytest
 
 import dask_awkward as dak
 
-from ..utils import assert_eq
 from .helpers import (  # noqa: F401
+    assert_eq,
     line_delim_records_file,
     load_records_eager,
     load_records_lazy,
