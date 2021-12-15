@@ -25,7 +25,7 @@ def test_single_string(line_delim_records_file) -> None:  # noqa: F811
     assert_eq(daa["analysis"], caa["analysis"])
 
 
-def test_list_with_ints(line_delim_records_file) -> None:  # noqa: F811
+def test_list_with_ints_raise(line_delim_records_file) -> None:  # noqa: F811
     daa = load_records_lazy(line_delim_records_file)
     with pytest.raises(NotImplementedError, match="Lists containing integers"):
         assert daa[[1, 2]]
