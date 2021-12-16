@@ -213,7 +213,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     @property
     def known_divisions(self) -> bool:
-        return len(self.divisions) > 0 and self.divisions[0] is not None
+        return len(self.divisions) > 0 and None not in self.divisions
 
     @property
     def npartitions(self) -> int:
@@ -311,16 +311,18 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return new_array_object(hlg, name, meta=meta, divisions=self.divisions)
 
     def _getitem_single_int(self, key: int) -> Array:
-        # determine which partition to grab from
-        pidx, nidx = normalize_single_outer_inner_index(self.divisions, key)
+        # determine which partition to grab from (pidx) and which
+        # index _inside_ of (relative to) that partition to then call
+        # getitem with (rewriting key).
+        pidx, key = normalize_single_outer_inner_index(self.divisions, key)
         partition = self.partitions[pidx]
         new_meta = partition.meta[key]
 
         # if we know a new array is going to be made, just call the
         # trivial inner on the new partition.
         if isinstance(new_meta, ak.Array):
-            result = partition._getitem_trivial_inner(nidx)
-            result.divisions = (0, None)
+            result = partition._getitem_trivial_inner(key)
+            result._divisions = (0, None)
             return result
 
         # otherwise make sure we have either a record or a scalar
