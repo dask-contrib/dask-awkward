@@ -22,6 +22,8 @@ from dask.highlevelgraph import HighLevelGraph
 from dask.threaded import get as threaded_get
 from dask.utils import IndexCallable, cached_property, funcname, key_split
 
+from .utils import normalize_single_outer_inner_index
+
 if TYPE_CHECKING:
     from awkward._v2.forms.form import Form
     from awkward._v2.types.type import Type
@@ -211,7 +213,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     @property
     def known_divisions(self) -> bool:
-        return len(self.divisions) > 0 and self.divisions[0] is not None
+        return len(self.divisions) > 0 and None not in self.divisions
 
     @property
     def npartitions(self) -> int:
@@ -298,7 +300,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         """
         return IndexCallable(self._partitions)
 
-    def _getitem_inner(self, key: Any) -> Array:
+    def _getitem_trivial_inner(self, key: Any) -> Array:
         token = tokenize(self, key)
         name = f"getitem-{token}"
         graphlayer = partitionwise_layer(
@@ -307,6 +309,40 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         hlg = HighLevelGraph.from_collections(name, graphlayer, dependencies=[self])
         meta = self.meta[key] if self.meta is not None else None
         return new_array_object(hlg, name, meta=meta, divisions=self.divisions)
+
+    def _getitem_single_int(self, key: int) -> Array:
+        # determine which partition to grab from (pidx) and which
+        # index _inside_ of (relative to) that partition to then call
+        # getitem with (rewriting key).
+        pidx, key = normalize_single_outer_inner_index(self.divisions, key)
+        partition = self.partitions[pidx]
+        new_meta = partition.meta[key]
+
+        # if we know a new array is going to be made, just call the
+        # trivial inner on the new partition.
+        if isinstance(new_meta, ak.Array):
+            result = partition._getitem_trivial_inner(key)
+            result._divisions = (0, None)
+            return result
+
+        # otherwise make sure we have either a record or a scalar
+        # expected result
+        from awkward._v2._typetracer import UnknownScalar
+
+        if not (isinstance(new_meta, ak.Record) or isinstance(new_meta, UnknownScalar)):
+            raise NotImplementedError("Key not supported for this array.")
+
+        token = tokenize(partition, key)
+        name = f"getitem-{token}"
+        dsk = {
+            name: (
+                lambda x, gikey: operator.getitem(x, gikey),
+                partition.__dask_keys__()[0],
+                key,
+            )
+        }
+        hlg = HighLevelGraph.from_collections(name, dsk, dependencies=[partition])
+        return new_scalar_object(hlg, name, new_meta)
 
     def __getitem__(self, key: Any) -> Array:
         """Select items from the collection.
@@ -332,20 +368,21 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         # a single string or a list.
         if isinstance(key, (str, list)):
-            return self._getitem_inner(key=key)
+            return self._getitem_trivial_inner(key=key)
 
         # an empty slice
         elif key == slice(None, None, None):
-            return self._getitem_inner(key=key)
+            return self._getitem_trivial_inner(key=key)
 
         # a single ellipsis
         elif key is Ellipsis:
-            return self._getitem_inner(key=key)
+            return self._getitem_trivial_inner(key=key)
+
+        elif isinstance(key, int):
+            return self._getitem_single_int(key=key)
 
         # unimplemented
 
-        elif isinstance(key, int):
-            raise NotImplementedError("__getitem__ int to be implemented.")
         elif isinstance(key, slice):
             raise NotImplementedError("__getitem__ single slice to be implemented.")
         elif isinstance(key, tuple):

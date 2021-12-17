@@ -7,19 +7,16 @@ except ImportError:
 
 import os
 import tempfile
-from typing import TYPE_CHECKING
+from typing import Any
 
 import awkward._v2.highlevel as ak
 import fsspec
-from awkward._v2.operations.convert import from_iter
-
-from ..core import from_awkward
-from ..io import from_json
-
-if TYPE_CHECKING:
-    from ..core import Array
-
 import pytest
+from awkward._v2.operations.convert import from_iter
+from dask.base import is_dask_collection
+
+from ..core import Array, Scalar, from_awkward
+from ..io import from_json
 
 # fmt: off
 MANY_RECORDS = \
@@ -47,6 +44,24 @@ MANY_RECORDS = \
 
 SINGLE_RECORD = """{"a":[1,2,3]}"""
 # fmt: on
+
+
+def assert_eq(a: Any, b: Any) -> None:
+    if is_dask_collection(a) and not is_dask_collection(b):
+        if isinstance(a, Scalar):
+            assert a.compute() == b
+        else:
+            assert a.compute().to_list() == b.to_list()
+    elif is_dask_collection(b) and not is_dask_collection(a):
+        if isinstance(b, Scalar):
+            assert a == b.compute()
+        else:
+            assert a.to_list() == b.compute().to_list()
+    else:
+        if isinstance(a, Scalar) and isinstance(b, Scalar):
+            assert a.compute() == b.compute()
+        else:
+            assert a.compute().to_list() == b.compute().to_list()
 
 
 @pytest.fixture(scope="session")

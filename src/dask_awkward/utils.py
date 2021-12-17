@@ -1,29 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
-
 import numpy as np
-from dask.base import is_dask_collection
-
-from .core import Scalar
-
-
-def assert_eq(a: Any, b: Any) -> None:
-    if is_dask_collection(a) and not is_dask_collection(b):
-        if isinstance(a, Scalar):
-            assert a.compute() == b
-        else:
-            assert a.compute().to_list() == b.to_list()
-    elif is_dask_collection(b) and not is_dask_collection(a):
-        if isinstance(b, Scalar):
-            assert a == b.compute()
-        else:
-            assert a.to_list() == b.compute().to_list()
-    else:
-        if isinstance(a, Scalar) and isinstance(b, Scalar):
-            assert a.compute() == b.compute()
-        else:
-            assert a.compute().to_list() == b.compute().to_list()
 
 
 def normalize_single_outer_inner_index(
@@ -57,6 +34,9 @@ def normalize_single_outer_inner_index(
     (2, 2)
 
     """
+    if index < 0:
+        index = divisions[-1] + index
+        print(index)
     if len(divisions) == 2:
         return (0, index)
     partition_index = int(np.digitize(index, divisions)) - 1
