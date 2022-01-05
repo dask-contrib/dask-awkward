@@ -102,9 +102,61 @@ class Scalar(DaskMethodsMixin):
     def meta(self) -> Any | None:
         return self._meta
 
+    def __repr__(self) -> str:
+        return self.__str__()
+
+    def __str__(self) -> str:
+        return f"dask.awkward<{key_split(self.name)}, type=Scalar>"
+
 
 def new_scalar_object(dsk: HighLevelGraph, name: str, meta: Any) -> Scalar:
     return Scalar(dsk, name, meta)
+
+
+class Record(Scalar):
+    def __init__(self, dsk: HighLevelGraph, key: str, meta: Any | None = None) -> None:
+        self._dask: HighLevelGraph = dsk
+        self._key: str = key
+        self._meta: Any | None = meta
+
+    def __getitem__(self, key: str) -> Any:
+        token = tokenize(self, key)
+        name = f"getitem-{token}"
+        new_meta = self._meta[key]
+
+        # first check for array type return
+        if isinstance(new_meta, ak.Array):
+            graphlayer = {(name, 0): (operator.getitem, self.name, key)}
+            hlg = HighLevelGraph.from_collections(name, graphlayer, dependencies=[self])
+            return new_array_object(hlg, name, new_meta, npartitions=1)
+
+        # then check for scalar (or record) type
+        graphlayer = {name: (operator.getitem, self.name, key)}
+        hlg = HighLevelGraph.from_collections(name, graphlayer, dependencies=[self])
+        if isinstance(new_meta, ak.Record):
+            return new_record_object(hlg, name, new_meta)
+        else:
+            return new_scalar_object(hlg, name, new_meta)
+
+    def __getattr__(self, attr: str) -> Any:
+        try:
+            return self.__getitem__(attr)
+        except (IndexError, KeyError):
+            raise AttributeError(f"{attr} not in fields.")
+
+    def __str__(self) -> str:
+        return f"dask.awkward<{key_split(self.name)}, type=Record>"
+
+    @property
+    def fields(self):
+        return self.meta.fields
+
+    def _ipython_key_completions_(self):
+        pass  # todo
+
+
+def new_record_object(dsk: HighLevelGraph, name: str, meta: Any) -> Record:
+    return Record(dsk, name, meta)
 
 
 class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
@@ -325,11 +377,15 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             result._divisions = (0, None)
             return result
 
-        # otherwise make sure we have either a record or a scalar
-        # expected result
-        from awkward._v2._typetracer import UnknownScalar
+        # otherwise make sure we have one of the other potential results.
+        from awkward._v2._typetracer import MaybeNone, OneOf, UnknownScalar
 
-        if not (isinstance(new_meta, ak.Record) or isinstance(new_meta, UnknownScalar)):
+        if not (
+            isinstance(new_meta, ak.Record)
+            or isinstance(new_meta, UnknownScalar)
+            or isinstance(new_meta, OneOf)
+            or isinstance(new_meta, MaybeNone)
+        ):
             raise NotImplementedError("Key not supported for this array.")
 
         token = tokenize(partition, key)
@@ -342,9 +398,12 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             )
         }
         hlg = HighLevelGraph.from_collections(name, dsk, dependencies=[partition])
-        return new_scalar_object(hlg, name, new_meta)
+        if isinstance(new_meta, ak.Record):
+            return new_record_object(hlg, name, new_meta)
+        else:
+            return new_scalar_object(hlg, name, new_meta)
 
-    def __getitem__(self, key: Any) -> Array:
+    def __getitem__(self, key: Any) -> Any:
         """Select items from the collection.
 
         Heavily under construction.
