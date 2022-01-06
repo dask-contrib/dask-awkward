@@ -115,14 +115,12 @@ def new_scalar_object(dsk: HighLevelGraph, name: str, meta: Any) -> Scalar:
 
 class Record(Scalar):
     def __init__(self, dsk: HighLevelGraph, key: str, meta: Any | None = None) -> None:
-        self._dask: HighLevelGraph = dsk
-        self._key: str = key
-        self._meta: Any | None = meta
+        super().__init__(dsk, key, meta)
 
     def __getitem__(self, key: str) -> Any:
         token = tokenize(self, key)
         name = f"getitem-{token}"
-        new_meta = self._meta[key]
+        new_meta = self._meta[key]  # type: ignore
 
         # first check for array type return
         if isinstance(new_meta, ak.Array):
@@ -131,7 +129,7 @@ class Record(Scalar):
             return new_array_object(hlg, name, new_meta, npartitions=1)
 
         # then check for scalar (or record) type
-        graphlayer = {name: (operator.getitem, self.name, key)}
+        graphlayer = {name: (operator.getitem, self.name, key)}  # type: ignore
         hlg = HighLevelGraph.from_collections(name, graphlayer, dependencies=[self])
         if isinstance(new_meta, ak.Record):
             return new_record_object(hlg, name, new_meta)
@@ -148,11 +146,10 @@ class Record(Scalar):
         return f"dask.awkward<{key_split(self.name)}, type=Record>"
 
     @property
-    def fields(self):
-        return self.meta.fields
-
-    def _ipython_key_completions_(self):
-        pass  # todo
+    def fields(self) -> list[str] | None:
+        if self.meta is not None:
+            return self.meta.fields
+        return None
 
 
 def new_record_object(dsk: HighLevelGraph, name: str, meta: Any) -> Record:
@@ -362,11 +359,12 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         meta = self.meta[key] if self.meta is not None else None
         return new_array_object(hlg, name, meta=meta, divisions=self.divisions)
 
-    def _getitem_single_int(self, key: int) -> Array:
+    def _getitem_single_int(self, key: int) -> Any:
         # determine which partition to grab from (pidx) and which
         # index _inside_ of (relative to) that partition to then call
         # getitem with (rewriting key).
-        pidx, key = normalize_single_outer_inner_index(self.divisions, key)
+        self._divisions = calculate_known_divisions(self)
+        pidx, key = normalize_single_outer_inner_index(self.divisions, key)  # type: ignore
         partition = self.partitions[pidx]
         new_meta = partition.meta[key]
 
@@ -415,7 +413,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         Returns
         -------
-        Array
+        Array | Record | Scalar
             Resulting collection.
 
         """
@@ -449,7 +447,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         return key
 
-    def __getattr__(self, attr: str) -> Array:
+    def __getattr__(self, attr: str) -> Any:
         try:
             return self.__getitem__(attr)
         except (IndexError, KeyError):

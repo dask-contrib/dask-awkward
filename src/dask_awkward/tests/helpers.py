@@ -82,6 +82,24 @@ def single_record_file(tmpdir_factory):
     return str(fn)
 
 
+@pytest.fixture(scope="session")
+def daa(tmpdir_factory):
+    """Fixture providing a file name pointing to line deliminted JSON records."""
+    fn = tmpdir_factory.mktemp("data").join("records.json")
+    with open(fn, "w") as f:
+        f.write(MANY_RECORDS)
+    return load_records_lazy(fn)
+
+
+@pytest.fixture(scope="session")
+def caa(tmpdir_factory):
+    """Fixture providing a file name pointing to line deliminted JSON records."""
+    fn = tmpdir_factory.mktemp("data").join("records.json")
+    with open(fn, "w") as f:
+        f.write(MANY_RECORDS)
+    return load_records_eager(fn)
+
+
 def records_from_temp_file(n_times: int = 1) -> ak.Array:
     """Get a concrete Array of records from a temporary file.
 
@@ -182,12 +200,9 @@ def load_single_record_eager(fn: str) -> ak.Array:
     return ak.Array([d])
 
 
-# def lazy_records_from_awkward(n_times: int = 1, npartitions: int = 5):
-#     return from_awkward(records_from_temp_file(n_times), npartitions=npartitions)
+def _lazyrecords() -> Array:
+    return from_awkward(records_from_temp_file(), npartitions=5)
 
 
-# def lazy_record_from_awkward():
-#     return from_awkward(single_record_from_temp_file(), npartitions=1)
-
-LAZY_RECORDS = from_awkward(records_from_temp_file(), npartitions=5)
-LAZY_RECORD = from_awkward(single_record_from_temp_file(), npartitions=1)
+def _lazyrecord() -> Array:
+    return from_awkward(single_record_from_temp_file(), npartitions=1)
