@@ -151,6 +151,16 @@ class Record(Scalar):
             return self.meta.fields
         return None
 
+    def _ipython_key_completions_(self) -> list[str]:
+        if self.meta is not None:
+            return self.meta._ipython_key_completions_()
+        return []
+
+    def __dir__(self) -> list[str]:
+        if self.meta is not None:
+            return self.meta.__dir__()
+        return []
+
 
 def new_record_object(dsk: HighLevelGraph, name: str, meta: Any) -> Record:
     return Record(dsk, name, meta)
@@ -239,6 +249,16 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     #     from IPython.display import display_json
     #
     #     display_json(json.loads(self.meta.form.to_json()), raw=True)
+
+    def _ipython_key_completions_(self) -> list[str]:
+        if self.meta is not None:
+            return self.meta._ipython_key_completions_()
+        return []
+
+    def __dir__(self) -> list[str]:
+        if self.meta is not None:
+            return self.meta.__dir__()
+        return []
 
     @property
     def dask(self) -> HighLevelGraph:
