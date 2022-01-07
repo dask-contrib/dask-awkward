@@ -154,7 +154,11 @@ class Record(Scalar):
 
     def __dir__(self) -> list[str]:
         if self.meta is not None:
-            return self.meta.__dir__()
+            import re
+
+            dirs = self.meta.__dir__()
+            reg = re.compile(r"^slot[0-9]{1}$")
+            return sorted(filter(lambda x: not reg.match(x), dirs))
         return []
 
 
@@ -261,7 +265,11 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     def __dir__(self) -> list[str]:
         if self.meta is not None:
-            return self.meta.__dir__()
+            import re
+
+            dirs = self.meta.__dir__()
+            reg = re.compile(r"^slot[0-9]{1}$")
+            return sorted(filter(lambda x: not reg.match(x), dirs))
         return []
 
     @property
