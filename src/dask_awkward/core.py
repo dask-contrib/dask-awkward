@@ -202,6 +202,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     def __dask_postcompute__(self) -> Any:
         return _finalize_array, ()
 
+    def __dask_postpersist__(self) -> Any:
+        return self._rebuild, ()
+
     @staticmethod
     def __dask_optimize__(dsk: Any, keys: Any, **kwargs: Any) -> HighLevelGraph:
         return dont_optimize(dsk, keys, **kwargs)
