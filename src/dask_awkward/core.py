@@ -4,19 +4,13 @@ import operator
 from functools import partial
 from math import ceil
 from numbers import Number
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, Mapping
 
 import awkward._v2.highlevel as ak
 import numpy as np
 from awkward._v2._connect.numpy import NDArrayOperatorsMixin
 from awkward._v2.operations.structure import concatenate
-from dask.base import (
-    DaskMethodsMixin,
-    dont_optimize,
-    is_dask_collection,
-    replace_name_in_key,
-    tokenize,
-)
+from dask.base import DaskMethodsMixin, dont_optimize, is_dask_collection, tokenize
 from dask.blockwise import blockwise as upstream_blockwise
 from dask.highlevelgraph import HighLevelGraph
 from dask.threaded import get as threaded_get
@@ -51,24 +45,24 @@ def _finalize_scalar(results: Any) -> Any:
 
 
 class Scalar(DaskMethodsMixin):
-    def __init__(self, dsk: HighLevelGraph, key: str, meta: Any | None = None) -> None:
+    def __init__(self, dsk: HighLevelGraph, name: str, meta: Any | None = None) -> None:
         self._dask: HighLevelGraph = dsk
-        self._key: str = key
+        self._name: str = name
         self._meta: Any | None = meta
 
     def __dask_graph__(self) -> HighLevelGraph:
         return self._dask
 
     def __dask_keys__(self) -> list[str]:
-        return [self._key]
+        return [self._name]
 
     def __dask_layers__(self) -> tuple[str, ...]:
         if isinstance(self._dask, HighLevelGraph) and len(self._dask.layers) == 1:
             return tuple(self._dask.layers)
-        return (self.key,)
+        return (self.name,)
 
     def __dask_tokenize__(self) -> str:
-        return self.key
+        return self.name
 
     @staticmethod
     def __dask_optimize__(dsk: Any, keys: Any, **kwargs: Any) -> HighLevelGraph:
@@ -82,21 +76,24 @@ class Scalar(DaskMethodsMixin):
     def __dask_postpersist__(self) -> Any:
         return self._rebuild, ()
 
-    def _rebuild(self, dsk: Any, *, rename: Any | None = None) -> Any:
-        key = replace_name_in_key(self.key, rename) if rename else self.key
-        return Scalar(dsk, key)  # type: ignore
+    def _rebuild(
+        self,
+        dsk: HighLevelGraph,
+        *,
+        rename: Mapping[str, str] | None = None,
+    ) -> Any:
+        name = self._name
+        if rename:
+            name = rename.get(name, name)
+        return type(self)(dsk, name, self.meta)
 
     @property
     def dask(self) -> HighLevelGraph:
         return self._dask
 
     @property
-    def key(self) -> str:
-        return self._key
-
-    @property
     def name(self) -> str:
-        return self.key
+        return self._name
 
     @property
     def meta(self) -> Any | None:
@@ -114,8 +111,8 @@ def new_scalar_object(dsk: HighLevelGraph, name: str, meta: Any) -> Scalar:
 
 
 class Record(Scalar):
-    def __init__(self, dsk: HighLevelGraph, key: str, meta: Any | None = None) -> None:
-        super().__init__(dsk, key, meta)
+    def __init__(self, dsk: HighLevelGraph, name: str, meta: Any | None = None) -> None:
+        super().__init__(dsk, name, meta)
 
     def __getitem__(self, key: str) -> Any:
         token = tokenize(self, key)
@@ -181,12 +178,12 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     def __init__(
         self,
         dsk: HighLevelGraph,
-        key: str,
+        name: str,
         meta: ak.Array | None,
         divisions: tuple[int | None, ...],
     ) -> None:
         self._dask: HighLevelGraph = dsk
-        self._key: str = key
+        self._name: str = name
         self._divisions = divisions
         self.meta = meta
 
@@ -211,7 +208,12 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     __dask_scheduler__ = staticmethod(threaded_get)
 
-    def _rebuild(self, dsk: Any, *, rename: Any | None = None) -> Any:
+    def _rebuild(
+        self,
+        dsk: HighLevelGraph,
+        *,
+        rename: Mapping[str, str] | None = None,
+    ) -> Array:
         name = self.name
         if rename:
             name = rename.get(name, name)
@@ -265,12 +267,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return self._dask
 
     @property
-    def key(self) -> str:
-        return self._key
-
-    @property
     def name(self) -> str:
-        return self.key
+        return self._name
 
     @property
     def ndim(self) -> int | None:
