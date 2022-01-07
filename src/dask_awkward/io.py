@@ -9,8 +9,7 @@ try:
 except ImportError:
     import json  # type: ignore
 
-from awkward._v2.highlevel import ak
-from awkward._v2.operations.convert.ak_from_iter import from_iter
+import awkward._v2 as ak
 from dask.base import flatten, tokenize
 from dask.bytes import read_bytes
 from dask.highlevelgraph import HighLevelGraph
@@ -35,12 +34,12 @@ def _from_json_single_object_in_file(source) -> ak.Array:
 
 def _from_json_line_by_line(source) -> ak.Array:
     with open(source) as f:
-        return from_iter(json.loads(line) for line in f)
+        return ak.from_iter(json.loads(line) for line in f)
 
 
 def _from_json_bytes(source) -> ak.Array:
-    # return from_iter(json.loads(ch) for ch in source.split(b"\n") if ch)
-    return from_iter(
+    # return ak.from_iter(json.loads(ch) for ch in source.split(b"\n") if ch)
+    return ak.from_iter(
         json.loads(ch) for ch in io.TextIOWrapper(io.BytesIO(source)) if ch
     )
 

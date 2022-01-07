@@ -9,10 +9,9 @@ import os
 import tempfile
 from typing import Any
 
-import awkward._v2.highlevel as ak
+import awkward._v2 as ak
 import fsspec
 import pytest
-from awkward._v2.operations.convert import from_iter
 from dask.base import is_dask_collection
 
 from ..core import Array, Scalar, from_awkward
@@ -182,7 +181,7 @@ def load_records_eager(fn: str, n_times: int = 1) -> ak.Array:
     for ff in files:
         with fsspec.open(ff) as f:
             loaded += list(json.loads(line) for line in f)
-    return from_iter(loaded)
+    return ak.from_iter(loaded)
 
 
 def load_single_record_lazy(fn: str) -> Array:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Callable, Union
 
-import awkward._v2.operations.reducers as ak_reducers
+import awkward._v2 as ak
 
 from .core import TrivialPartitionwiseOp, pw_reduction_with_agg_to_scalar
 
@@ -34,11 +34,11 @@ __all__ = (
     "var",
 )
 
-_count_trivial = TrivialPartitionwiseOp(ak_reducers.count, axis=1)
-_count_nonzero_trivial = TrivialPartitionwiseOp(ak_reducers.count_nonzero, axis=1)
-_min_trivial = TrivialPartitionwiseOp(ak_reducers.min, axis=1)
-_max_trivial = TrivialPartitionwiseOp(ak_reducers.max, axis=1)
-_sum_trivial = TrivialPartitionwiseOp(ak_reducers.sum, axis=1)
+_count_trivial = TrivialPartitionwiseOp(ak.count, axis=1)
+_count_nonzero_trivial = TrivialPartitionwiseOp(ak.count_nonzero, axis=1)
+_min_trivial = TrivialPartitionwiseOp(ak.min, axis=1)
+_max_trivial = TrivialPartitionwiseOp(ak.max, axis=1)
+_sum_trivial = TrivialPartitionwiseOp(ak.sum, axis=1)
 
 
 def all(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
@@ -88,8 +88,8 @@ def count(array, axis=None, keepdims=False, mask_identity=False, flatten_records
         )
         return pw_reduction_with_agg_to_scalar(
             trivial_result,
-            ak_reducers.sum,
-            ak_reducers.sum,
+            ak.sum,
+            ak.sum,
         )
     elif axis == 0 or axis == -1 * array.ndim:
         raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
@@ -118,8 +118,8 @@ def count_nonzero(
         )
         return pw_reduction_with_agg_to_scalar(
             trivial_result,
-            ak_reducers.sum,
-            ak_reducers.sum,
+            ak.sum,
+            ak.sum,
         )
     elif axis == 0 or axis == -1 * array.ndim:
         raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
@@ -160,7 +160,7 @@ def max(
     flatten_records=False,
 ):
     return _min_or_max(
-        ak_reducers.max,
+        ak.max,
         array,
         axis,
         keepdims=keepdims,
@@ -185,7 +185,7 @@ def min(
     flatten_records=False,
 ):
     return _min_or_max(
-        ak_reducers.min,
+        ak.min,
         array,
         axis,
         keepdims=keepdims,
@@ -239,7 +239,7 @@ def sum(array, axis=None, keepdims=False, mask_identity=False, flatten_records=F
             array, keepdims=False, mask_identity=False, flatten_records=False
         )
     elif axis is None:
-        return pw_reduction_with_agg_to_scalar(array, ak_reducers.sum, ak_reducers.sum)
+        return pw_reduction_with_agg_to_scalar(array, ak.sum, ak.sum)
     elif axis == 0:
         raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
     else:
@@ -268,7 +268,7 @@ def _min_or_max(
     if axis is not None and axis < 0 and array.ndim is not None:
         axis = array.ndim + axis + 1
     # get the correct trivial callable
-    tf = _min_trivial if f == ak_reducers.min else _max_trivial
+    tf = _min_trivial if f == ak.min else _max_trivial
     # generate collection based on axis
     if axis == 1:
         return tf(array, axis=axis, **kwargs)

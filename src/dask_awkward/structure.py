@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import awkward._v2.operations.structure as ak_structure  # noqa
+import awkward._v2 as ak  # noqa
 
 __all__ = (
     "argcartesian",

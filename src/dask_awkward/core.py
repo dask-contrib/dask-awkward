@@ -6,10 +6,9 @@ from math import ceil
 from numbers import Number
 from typing import TYPE_CHECKING, Any, Callable, Mapping
 
-import awkward._v2.highlevel as ak
+import awkward._v2 as ak
 import numpy as np
 from awkward._v2._connect.numpy import NDArrayOperatorsMixin
-from awkward._v2.operations.structure import concatenate
 from dask.base import DaskMethodsMixin, dont_optimize, is_dask_collection, tokenize
 from dask.blockwise import blockwise as upstream_blockwise
 from dask.highlevelgraph import HighLevelGraph
@@ -26,7 +25,7 @@ if TYPE_CHECKING:
 
 def _finalize_array(results: Any) -> Any:
     if any(isinstance(r, ak.Array) for r in results):
-        return concatenate(results)
+        return ak.concatenate(results)
     elif len(results) == 1 and isinstance(results[0], int):
         return results[0]
     elif all(isinstance(r, int) for r in results):
@@ -355,8 +354,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         Examples
         --------
         >>> import dask_awkward as dak
-        >>> from awkward._v2.highlevel import Array
-        >>> aa = Array([[1,2,3],[],[2]])
+        >>> import awkward._v2 as ak
+        >>> aa = ak.Array([[1, 2, 3], [], [2]])
         >>> a = dak.from_awkward(aa, npartitions=3)
         >>> a
         dask.awkward<from-awkward, npartitions=3>
