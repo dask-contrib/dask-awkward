@@ -477,7 +477,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         elif isinstance(key, int):
             return self._getitem_single_int(key=key)
 
-        elif isinstance(key, Array) and key.layout.content.dtype == np.dtype(bool):
+        elif isinstance(key, Array) and issubclass(
+            key.layout.content.dtype.type, (np.bool_, bool)
+        ):
             pass
 
         # unimplemented
