@@ -470,6 +470,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         elif isinstance(key, int):
             return self._getitem_single_int(key=key)
 
+        elif isinstance(key, Array) and key.meta.layout.content.dtype == np.dtype(bool):
+            pass
+
         # unimplemented
         elif isinstance(key, slice):
             pass
