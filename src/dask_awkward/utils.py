@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 
 
@@ -36,9 +38,20 @@ def normalize_single_outer_inner_index(
     """
     if index < 0:
         index = divisions[-1] + index
-        print(index)
     if len(divisions) == 2:
         return (0, index)
     partition_index = int(np.digitize(index, divisions)) - 1
     new_index = index - divisions[partition_index]
     return (partition_index, new_index)
+
+
+def is_empty_slice(s: Any) -> bool:
+    if not isinstance(s, slice):
+        return False
+    if s.start is not None:
+        return False
+    if s.stop is not None:
+        return False
+    if s.step is not None:
+        return False
+    return True

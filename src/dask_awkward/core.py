@@ -15,7 +15,7 @@ from dask.highlevelgraph import HighLevelGraph
 from dask.threaded import get as threaded_get
 from dask.utils import IndexCallable, cached_property, funcname, key_split
 
-from .utils import normalize_single_outer_inner_index
+from .utils import is_empty_slice, normalize_single_outer_inner_index
 
 if TYPE_CHECKING:
     from awkward._v2.forms.form import Form
@@ -429,6 +429,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         else:
             return new_scalar_object(hlg, name, new_meta)
 
+    def _getitem_boolean_array(self, key: Any) -> Any:
+        pass
+
     def __getitem__(self, key: Any) -> Any:
         """Select items from the collection.
 
@@ -456,24 +459,24 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             return self._getitem_trivial_inner(key=key)
 
         # an empty slice
-        elif key == slice(None, None, None):
+        elif is_empty_slice(key):
             return self._getitem_trivial_inner(key=key)
 
         # a single ellipsis
         elif key is Ellipsis:
             return self._getitem_trivial_inner(key=key)
 
+        # a single integer
         elif isinstance(key, int):
             return self._getitem_single_int(key=key)
 
         # unimplemented
-
         elif isinstance(key, slice):
-            raise NotImplementedError("__getitem__ single slice to be implemented.")
+            pass
         elif isinstance(key, tuple):
-            raise NotImplementedError("__getitem__ tuple to be implemented.")
+            pass
 
-        return key
+        raise NotImplementedError(f"__getitem__ doesn't support key {key}")
 
     def __getattr__(self, attr: str) -> Any:
         try:
