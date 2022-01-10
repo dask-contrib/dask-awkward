@@ -18,6 +18,7 @@ from dask.utils import IndexCallable, cached_property, funcname, key_split
 from .utils import is_empty_slice, normalize_single_outer_inner_index
 
 if TYPE_CHECKING:
+    from awkward._v2.contents.content import Content
     from awkward._v2.forms.form import Form
     from awkward._v2.types.type import Type
     from dask.blockwise import Blockwise
@@ -307,6 +308,12 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         self._meta = m
 
     @property
+    def layout(self) -> Content:
+        if self.meta is not None:
+            return self.meta.layout
+        raise ValueError("This collections meta is None; unknown layout.")
+
+    @property
     def typetracer(self) -> ak.Array | None:
         return self.meta
 
@@ -470,7 +477,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         elif isinstance(key, int):
             return self._getitem_single_int(key=key)
 
-        elif isinstance(key, Array) and key.meta.layout.content.dtype == np.dtype(bool):
+        elif isinstance(key, Array) and key.layout.content.dtype == np.dtype(bool):
             pass
 
         # unimplemented
