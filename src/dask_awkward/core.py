@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import keyword
 import operator
 from functools import partial
 from math import ceil
@@ -154,13 +155,20 @@ class Record(Scalar):
         return []
 
     def __dir__(self) -> list[str]:
-        if self.meta is not None:
-            import re
+        from awkward._v2.highlevel import _dir_pattern
 
-            dirs = self.meta.__dir__()
-            reg = re.compile(r"^slot[0-9]{1}$")
-            return sorted(filter(lambda x: not reg.match(x), dirs))
-        return []
+        fields = [] if self.meta is None else self.meta._layout.fields
+        return sorted(
+            set(
+                [x for x in dir(type(self)) if not x.startswith("_")]
+                + dir(super())
+                + [
+                    x
+                    for x in fields
+                    if _dir_pattern.match(x) and not keyword.iskeyword(x)
+                ]
+            )
+        )
 
 
 def new_record_object(dsk: HighLevelGraph, name: str, meta: Any) -> Record:
@@ -265,13 +273,20 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return []
 
     def __dir__(self) -> list[str]:
-        if self.meta is not None:
-            import re
+        from awkward._v2.highlevel import _dir_pattern
 
-            dirs = self.meta.__dir__()
-            reg = re.compile(r"^slot[0-9]{1}$")
-            return sorted(filter(lambda x: not reg.match(x), dirs))
-        return []
+        fields = [] if self.meta is None else self.meta._layout.fields
+        return sorted(
+            set(
+                [x for x in dir(type(self)) if not x.startswith("_")]
+                + dir(super())
+                + [
+                    x
+                    for x in fields
+                    if _dir_pattern.match(x) and not keyword.iskeyword(x)
+                ]
+            )
+        )
 
     @property
     def dask(self) -> HighLevelGraph:
@@ -436,8 +451,33 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         else:
             return new_scalar_object(hlg, name, new_meta)
 
-    def _getitem_boolean_array(self, key: Any) -> Any:
-        pass
+    def _getitem_boolean_lazy_array(self, key: Any) -> Any:
+        if key.known_divisions and self.known_divisions:
+            if key.divisions != self.divisions:
+                raise ValueError(
+                    "The boolean array (they key in this getitem call) "
+                    "must be partitioned in the same way as this array."
+                )
+        else:
+            if key.npartitions != self.npartitions:
+                raise ValueError(
+                    "The boolean array (they key in this getitem call) "
+                    "must be partitioned in the same way as this array."
+                )
+
+        new_meta = None
+        if key.meta is not None:
+            new_meta = operator.getitem(self.meta, key.meta)
+
+        s_keys = self.__dask_keys__()
+        k_keys = key.__dask_keys__()
+        name = f"getitem-{tokenize(self, key)}"
+        dsk = {
+            (name, i): (operator.getitem, sk, kk)
+            for i, (sk, kk) in enumerate(zip(s_keys, k_keys))
+        }
+        hlg = HighLevelGraph.from_collections(name, dsk, dependencies=(self, key))
+        return new_array_object(hlg, name, divisions=self.divisions, meta=new_meta)
 
     def __getitem__(self, key: Any) -> Any:
         """Select items from the collection.
@@ -480,7 +520,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         elif isinstance(key, Array) and issubclass(
             key.layout.content.dtype.type, (np.bool_, bool)
         ):
-            pass
+            return self._getitem_boolean_lazy_array(key=key)
 
         # unimplemented
         elif isinstance(key, slice):
@@ -740,7 +780,7 @@ def map_partitions(
         v for _, v in kwargs.items() if is_dask_collection(v)
     ]
     hlg = HighLevelGraph.from_collections(name, lay, dependencies=deps)
-    return new_array_object(hlg, name, meta, npartitions=args[0].npartitions)
+    return new_array_object(hlg, name, meta, divisions=args[0].divisions)
 
 
 def pw_reduction_with_agg_to_scalar(
