@@ -15,12 +15,6 @@ from .core import new_array_object
 
 
 def _parquet_schema_to_form(schema):
-    def lst(path):
-        return "lst:" + ".".join(path)
-
-    def col(path):
-        return "col:" + ".".join(path)
-
     def maybe_nullable(field, content):
         if field.nullable:
             if isinstance(content, forms.EmptyForm):
