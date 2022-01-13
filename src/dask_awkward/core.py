@@ -470,16 +470,6 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         return map_partitions(operator.getitem, self, key, meta=new_meta)
 
-        # s_keys = self.__dask_keys__()
-        # k_keys = key.__dask_keys__()
-        # dsk = {
-        #     (name, i): (operator.getitem, sk, kk)
-        #     for i, (sk, kk) in enumerate(zip(s_keys, k_keys))
-        # }
-
-        # hlg = HighLevelGraph.from_collections(name, layer, dependencies=(self, key))
-        # return new_array_object(hlg, name, divisions=self.divisions, meta=new_meta)
-
     def __getitem__(self, key: Any) -> Any:
         """Select items from the collection.
 
