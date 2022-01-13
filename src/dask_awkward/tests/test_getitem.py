@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import operator
+
 import pytest
 
+import dask_awkward as dak
 import dask_awkward.core as dakc
 
-from .helpers import assert_eq, caa, daa  # noqa: F401
+from .helpers import assert_eq, caa, daa, line_delim_records_file  # noqa: F401
 
 
 def test_getattr_raise(daa) -> None:  # noqa: F811
@@ -57,3 +60,16 @@ def test_record_getitem(daa, caa) -> None:  # noqa: F811
     assert daa["analysis"][0].compute().to_list() == caa["analysis"][0].to_list()
     assert daa["analysis"][0].x1.compute().to_list() == caa["analysis"][0].x1.to_list()
     assert daa[0]["analysis"]["x1"][0].compute() == caa[0]["analysis", "x1"][0]
+
+
+@pytest.mark.parametrize("op", [operator.gt, operator.ge, operator.le, operator.lt])
+def test_boolean_array(line_delim_records_file, op) -> None:  # noqa: F811
+    daa = dak.from_json([line_delim_records_file] * 3)  # noqa
+    caa = daa.compute()  # noqa
+    dx1 = daa.analysis.x1
+    cx1 = caa.analysis.x1
+    dx1s = op(dx1, 2)
+    cx1s = op(cx1, 2)
+    dx1_p = dx1[dx1s]
+    cx1_p = cx1[cx1s]
+    assert_eq(dx1_p, cx1_p)
