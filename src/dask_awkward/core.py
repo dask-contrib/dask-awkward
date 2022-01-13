@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Callable, Mapping
 import awkward._v2 as ak
 import numpy as np
 from awkward._v2._connect.numpy import NDArrayOperatorsMixin
+from awkward._v2.highlevel import _dir_pattern
 from dask.base import DaskMethodsMixin, dont_optimize, is_dask_collection, tokenize
 from dask.blockwise import blockwise as upstream_blockwise
 from dask.highlevelgraph import HighLevelGraph
@@ -155,8 +156,6 @@ class Record(Scalar):
         return []
 
     def __dir__(self) -> list[str]:
-        from awkward._v2.highlevel import _dir_pattern
-
         fields = [] if self.meta is None else self.meta._layout.fields
         return sorted(
             set(
@@ -273,8 +272,6 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return []
 
     def __dir__(self) -> list[str]:
-        from awkward._v2.highlevel import _dir_pattern
-
         fields = [] if self.meta is None else self.meta._layout.fields
         return sorted(
             set(
@@ -371,7 +368,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         else:
             new_divisions = (None,) * (len(new_keys) + 1)  # type: ignore
 
-        return new_array_object(graph, name, None, divisions=tuple(new_divisions))
+        return new_array_object(
+            graph, name, meta=self.meta, divisions=tuple(new_divisions)
+        )
 
     @property
     def partitions(self) -> IndexCallable:
@@ -469,15 +468,17 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if key.meta is not None:
             new_meta = operator.getitem(self.meta, key.meta)
 
-        s_keys = self.__dask_keys__()
-        k_keys = key.__dask_keys__()
-        name = f"getitem-{tokenize(self, key)}"
-        dsk = {
-            (name, i): (operator.getitem, sk, kk)
-            for i, (sk, kk) in enumerate(zip(s_keys, k_keys))
-        }
-        hlg = HighLevelGraph.from_collections(name, dsk, dependencies=(self, key))
-        return new_array_object(hlg, name, divisions=self.divisions, meta=new_meta)
+        return map_partitions(operator.getitem, self, key, meta=new_meta)
+
+        # s_keys = self.__dask_keys__()
+        # k_keys = key.__dask_keys__()
+        # dsk = {
+        #     (name, i): (operator.getitem, sk, kk)
+        #     for i, (sk, kk) in enumerate(zip(s_keys, k_keys))
+        # }
+
+        # hlg = HighLevelGraph.from_collections(name, layer, dependencies=(self, key))
+        # return new_array_object(hlg, name, divisions=self.divisions, meta=new_meta)
 
     def __getitem__(self, key: Any) -> Any:
         """Select items from the collection.
@@ -938,6 +939,9 @@ def from_awkward(source: ak.Array, npartitions: int, name: str | None = None) ->
     nrows = len(source)
     chunksize = int(ceil(nrows / npartitions))
     locs = list(range(0, nrows, chunksize)) + [nrows]
+
+    # views of the array (source) can be tricky; inline_array may be
+    # useful to look at.
     llg = {
         (name, i): source[start:stop]
         for i, (start, stop) in enumerate(zip(locs[:-1], locs[1:]))
