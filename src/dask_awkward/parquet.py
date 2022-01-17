@@ -1,6 +1,7 @@
 import itertools
 import operator
 
+import awkward._v2 as ak
 import awkward._v2.forms as forms
 import numpy as np
 import pyarrow
@@ -15,6 +16,8 @@ from .core import new_array_object
 
 
 def _parquet_schema_to_form(schema):
+    """Helpre for arrow parq schema->ak form"""
+
     def maybe_nullable(field, content):
         if field.nullable:
             if isinstance(content, forms.EmptyForm):
@@ -121,14 +124,20 @@ def _parquet_schema_to_form(schema):
     return forms.RecordForm(contents, schema.names)
 
 
-def _read_metadata(path, fs):
-    return pa_ds.dataset(path, filesystem=fs, format="parquet")
+def _read_metadata(path, fs, partition_base_dir=None, schema=None):
+    return pa_ds.dataset(
+        path,
+        filesystem=fs,
+        format="parquet",
+        partition_base_dir=partition_base_dir,
+        schema=schema,
+    )
 
 
 def read_parquet(
     path,
     storage_options=None,
-    ignore_metadata=True,
+    ignore_metadata=False,
     columns=None,
     filters=None,
     split_row_groups=None,
@@ -140,7 +149,13 @@ def read_parquet(
         for creating filesystem
     columns: list[str] or None
         Select columns to load
-
+    filters: list[list[tuple]]
+        parquet-style filters for excluding row groups based on column statistics
+    split_row_groups: bool | int
+        If True, each row group becomes a partition. If False, each file becomes
+        a partition. If int, at least this many row groups become a partition.
+        If None, the existence of a `_metadata` file implies True, else False.
+        The values True and 1 ar equivalent.
     """
     fs, tok, paths = get_fs_token_paths(
         path, mode="rb", storage_options=storage_options
@@ -212,10 +227,11 @@ def read_parquet(
         # file-wise
         dsk = {
             (name, i): (_file_to_partition, path, fs, columns, filters, metadata.schema)
-            for i, path in enumerate(paths)
+            for i, path in enumerate(allfiles)
         }
         divisions = (None,) * (len(dsk) + 1)
     else:
+        # organise row-groups into fragments
         frags = list(metadata.get_fragments())
         rgs = sum((frag.row_groups for frag in frags), [])
         frags2 = sum(
@@ -235,7 +251,7 @@ def read_parquet(
     arr = new_array_object(
         HighLevelGraph.from_collections("read-parquet", MaterializedLayer(dsk)),
         name=name,
-        meta=meta.layout.typetracer,
+        meta=ak.Array(meta.layout.typetracer),
         divisions=divisions,
     )
 
@@ -256,16 +272,19 @@ def _frag_subset(old_frag, row_groups):
 
 
 def _file_to_partition(path, fs, columns, filters, schema):
+    """read a whole parquet file to awkward"""
     ds = _read_metadata(path, fs)
     table = ds.to_table(
         use_threads=False,
         columns=columns,
         filter=pq._filters_to_expression(filters) if filters else None,
+        # schema=schema
     )
     return from_arrow(table)
 
 
 def _fragment_to_partition(frag, columns, filters, schema):
+    """read one or more row-groups to awkward"""
     table = frag.to_table(
         use_threads=False,
         schema=schema,
