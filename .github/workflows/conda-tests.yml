@@ -1,6 +1,12 @@
 name: conda Tests
 
 on:
+  push:
+    paths-ignore:
+    - '**.md'
+  pull_request:
+    paths-ignore:
+    - '**.md'
   workflow_dispatch:
 
 jobs:
@@ -8,7 +14,7 @@ jobs:
     strategy:
       matrix:
         platform: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: [3.7, 3.8, 3.9]
+        python-version: ["3.8", "3.9"]
     runs-on: ${{matrix.platform}}
     steps:
     - name: Checkout source
@@ -25,18 +31,18 @@ jobs:
         use-mamba: true
         channel-priority: strict
         python-version: ${{ matrix.python-version }}
-        environment-file: tests/environment-${{ matrix.python-version }}.yml
+        environment-file: .github/envs/environment-${{ matrix.python-version }}.yml
         activate-environment: test-environment
         auto-activate-base: false
     - name: Install package
       shell: bash -l {0}
       run: |
         conda activate test-environment
-        python -m pip install --ignore-installed -U -q --no-cache-dir -e .
+        python -m pip install --ignore-installed --no-deps -q --no-cache-dir -e .
     - name: Run tests
       shell: bash -l {0}
       run: |
         conda activate test-environment
         conda list
-        pip list
-        py.test tests
+        python -m pip list
+        python -m pytest

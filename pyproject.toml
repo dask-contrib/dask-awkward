@@ -12,7 +12,6 @@ write_to = "src/dask_awkward/_version.py"
 
 [tool.pytest.ini_options]
 addopts = "-v"
-testpaths = ["tests"]
 
 [tool.isort]
 profile = "black"
@@ -21,7 +20,7 @@ src_paths = ["src", "tests"]
 
 [tool.mypy]
 python_version = "3.7"
-files = ["src", "tests"]
+files = ["src"]
 warn_unused_configs = true
 
 [[tool.mypy.overrides]]
@@ -38,4 +37,8 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["fsspec.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["ujson.*"]
 ignore_missing_imports = true

@@ -1,5 +1,4 @@
 graft src
-graft tests
 
 global-exclude .git*
 global-exclude .pytest_cache
