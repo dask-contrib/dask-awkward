@@ -593,7 +593,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
 
 def _first_partition(array: Array) -> ak.Array:
-    """Compute the first partition of a Array collection.
+    """Compute the first partition of an Array collection.
 
     Parameters
     ----------
