@@ -398,29 +398,32 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         """
         return IndexCallable(self._partitions)
 
-    def _getitem_trivial_inner(self, key: Any) -> Array:
-        token = tokenize(self, key)
+    def _getitem_trivial_inner(self, where: Any) -> Array:
+        token = tokenize(self, where)
         name = f"getitem-{token}"
         graphlayer = partitionwise_layer(
-            lambda x, gikey: operator.getitem(x, gikey), name, self, gikey=key
+            lambda x, gikey: operator.getitem(x, gikey), name, self, gikey=where
         )
         hlg = HighLevelGraph.from_collections(name, graphlayer, dependencies=[self])
-        meta = self.meta[key] if self.meta is not None else None
+        meta = self.meta[where] if self.meta is not None else None
         return new_array_object(hlg, name, meta=meta, divisions=self.divisions)
 
-    def _getitem_single_int(self, key: int) -> Any:
+    def _getitem_single_int(self, where: int) -> Any:
         # determine which partition to grab from (pidx) and which
         # index _inside_ of (relative to) that partition to then call
         # getitem with (rewriting key).
+        outer_key = where[0]
         self._divisions = calculate_known_divisions(self)
-        pidx, key = normalize_single_outer_inner_index(self.divisions, key)  # type: ignore
+        pidx, outer_key = normalize_single_outer_inner_index(self.divisions, outer_key)  # type: ignore
+        rest = where[1:]
+        where = (outer_key, *rest)
         partition = self.partitions[pidx]
-        new_meta = partition.meta[key]
+        new_meta = partition.meta[where]
 
         # if we know a new array is going to be made, just call the
         # trivial inner on the new partition.
         if isinstance(new_meta, ak.Array):
-            result = partition._getitem_trivial_inner(key)
+            result = partition._getitem_trivial_inner(where)
             result._divisions = (0, None)
             return result
 
@@ -435,13 +438,13 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         ):
             raise NotImplementedError("Key not supported for this array.")
 
-        token = tokenize(partition, key)
+        token = tokenize(partition, where)
         name = f"getitem-{token}"
         dsk = {
             name: (
                 lambda x, gikey: operator.getitem(x, gikey),
                 partition.__dask_keys__()[0],
-                key,
+                where,
             )
         }
         hlg = HighLevelGraph.from_collections(name, dsk, dependencies=[partition])
@@ -450,34 +453,45 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         else:
             return new_scalar_object(hlg, name, new_meta)
 
-    def _getitem_boolean_lazy_array(self, key: Any) -> Any:
-        if key.known_divisions and self.known_divisions:
-            if key.divisions != self.divisions:
+    def _getitem_boolean_lazy_array(self, where: Any) -> Any:
+        outer_key = where[0]
+        if outer_key.known_divisions and self.known_divisions:
+            if outer_key.divisions != self.divisions:
                 raise ValueError(
-                    "The boolean array (they key in this getitem call) "
+                    "The boolean array (they where in this getitem call) "
                     "must be partitioned in the same way as this array."
                 )
         else:
-            if key.npartitions != self.npartitions:
+            if outer_key.npartitions != self.npartitions:
                 raise ValueError(
-                    "The boolean array (they key in this getitem call) "
+                    "The boolean array (they where in this getitem call) "
                     "must be partitioned in the same way as this array."
                 )
 
+        meta_where = []
+        meta_where_has_non_none = False
+        for iw in where:
+            if is_awkward_collection(iw) and iw.meta is not None:
+                meta_where.append(iw.meta)
+                meta_where_has_non_none = True
+            else:
+                meta_where.append(iw)
+        meta_where = tuple(meta_where)
+
         new_meta = None
-        if key.meta is not None:
-            new_meta = operator.getitem(self.meta, key.meta)
+        if meta_where_has_non_none:
+            new_meta = operator.getitem(self.meta, meta_where)
 
-        return map_partitions(operator.getitem, self, key, meta=new_meta)
+        return map_partitions(operator.getitem, self, *where, meta=new_meta)
 
-    def __getitem__(self, key: Any) -> Any:
+    def __getitem__(self, where: Any) -> Any:
         """Select items from the collection.
 
         Heavily under construction.
 
         Arguments
         ---------
-        key : many types supported
+        where : many types supported
             Selection criteria.
 
         Returns
@@ -488,38 +502,40 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         """
 
         # don't accept lists containing integers.
-        if isinstance(key, list):
-            if any(isinstance(k, int) for k in key):
+        if isinstance(where, list):
+            if any(isinstance(k, int) for k in where):
                 raise NotImplementedError("Lists containing integers not supported.")
 
+        if not isinstance(where, tuple):
+            where = (where,)
+
+        outer_key = where[0]
+
         # a single string or a list.
-        if isinstance(key, (str, list)):
-            return self._getitem_trivial_inner(key=key)
+        if isinstance(outer_key, (str, list)):
+            return self._getitem_trivial_inner(where)
 
         # an empty slice
-        elif is_empty_slice(key):
-            return self._getitem_trivial_inner(key=key)
+        elif is_empty_slice(outer_key):
+            if len(where) == 1:
+                return self
+            else:
+                return self[where[1:]]
 
         # a single ellipsis
-        elif key is Ellipsis:
-            return self._getitem_trivial_inner(key=key)
+        elif outer_key is Ellipsis:
+            return self._getitem_trivial_inner(where)
 
         # a single integer
-        elif isinstance(key, int):
-            return self._getitem_single_int(key=key)
+        elif isinstance(outer_key, int):
+            return self._getitem_single_int(where)
 
-        elif isinstance(key, Array) and issubclass(
-            key.layout.content.dtype.type, (np.bool_, bool)
+        elif isinstance(outer_key, Array) and issubclass(
+            outer_key.layout.content.dtype.type, (np.bool_, bool)
         ):
-            return self._getitem_boolean_lazy_array(key=key)
+            return self._getitem_boolean_lazy_array(where=where)
 
-        # unimplemented
-        elif isinstance(key, slice):
-            pass
-        elif isinstance(key, tuple):
-            pass
-
-        raise NotImplementedError(f"__getitem__ doesn't support key {key}")
+        raise NotImplementedError(f"__getitem__ doesn't support where={where}")
 
     def __getattr__(self, attr: str) -> Any:
         try:
@@ -943,3 +959,7 @@ def from_awkward(source: ak.Array, npartitions: int, name: str | None = None) ->
         divisions=tuple(locs),
         meta=ak.Array(source.layout.typetracer),
     )
+
+
+def is_awkward_collection(obj: Any) -> bool:
+    return isinstance(obj, (Array, Record))
