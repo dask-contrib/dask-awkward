@@ -986,5 +986,5 @@ def meta_or_identity(obj: Any) -> Any:
     return obj
 
 
-def convert_collections_to_metas(objects: Sequence[Any]) -> tuple[Any]:
+def convert_collections_to_metas(objects: Sequence[Any]) -> tuple[Any, ...]:
     return tuple(map(meta_or_identity, objects))
