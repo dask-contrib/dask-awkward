@@ -398,7 +398,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         """
         return IndexCallable(self._partitions)
 
-    def _getitem_trivial_inner(self, where: Any) -> Array:
+    def _getitem_trivial_inner(self, where: tuple[Any, ...]) -> Array:
         token = tokenize(self, where)
         name = f"getitem-{token}"
         graphlayer = partitionwise_layer(
@@ -408,7 +408,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         meta = self.meta[where] if self.meta is not None else None
         return new_array_object(hlg, name, meta=meta, divisions=self.divisions)
 
-    def _getitem_single_int(self, where: int) -> Any:
+    def _getitem_single_int(self, where: tuple[Any, ...]) -> Any:
         # determine which partition to grab from (pidx) and which
         # index _inside_ of (relative to) that partition to then call
         # getitem with (rewriting key).
@@ -453,7 +453,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         else:
             return new_scalar_object(hlg, name, new_meta)
 
-    def _getitem_boolean_lazy_array(self, where: Any) -> Any:
+    def _getitem_boolean_lazy_array(self, where: tuple[Any, ...]) -> Any:
         outer_key = where[0]
         if outer_key.known_divisions and self.known_divisions:
             if outer_key.divisions != self.divisions:
@@ -476,11 +476,11 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 meta_where_has_non_none = True
             else:
                 meta_where.append(iw)
-        meta_where = tuple(meta_where)
+        meta_where = tuple(meta_where)  # type: ignore
 
         new_meta = None
         if meta_where_has_non_none:
-            new_meta = operator.getitem(self.meta, meta_where)
+            new_meta = operator.getitem(self.meta, meta_where)  # type: ignore
 
         return map_partitions(operator.getitem, self, *where, meta=new_meta)
 
