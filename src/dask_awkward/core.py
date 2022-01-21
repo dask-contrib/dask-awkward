@@ -980,9 +980,11 @@ def is_awkward_collection(obj: Any) -> bool:
     return isinstance(obj, (Array, Record, Scalar))
 
 
+def meta_or_identity(obj: Any) -> Any:
+    if is_awkward_collection(obj):
+        return obj.meta
+    return obj
+
+
 def convert_collections_to_metas(objects: Sequence[Any]) -> tuple[Any]:
-    new_sequence = list(objects)
-    for i in range(len(new_sequence)):
-        if is_awkward_collection(new_sequence[i]):
-            new_sequence[i] = new_sequence[i].meta
-    return tuple(new_sequence)
+    return tuple(map(meta_or_identity, objects))
