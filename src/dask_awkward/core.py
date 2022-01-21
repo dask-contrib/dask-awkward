@@ -5,7 +5,7 @@ import operator
 from functools import partial
 from math import ceil
 from numbers import Number
-from typing import TYPE_CHECKING, Any, Callable, Mapping
+from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence
 
 import awkward._v2 as ak
 import numpy as np
@@ -977,4 +977,12 @@ def from_awkward(source: ak.Array, npartitions: int, name: str | None = None) ->
 
 
 def is_awkward_collection(obj: Any) -> bool:
-    return isinstance(obj, (Array, Record))
+    return isinstance(obj, (Array, Record, Scalar))
+
+
+def convert_collections_to_metas(objects: Sequence[Any]) -> tuple[Any]:
+    new_sequence = list(objects)
+    for i in range(len(new_sequence)):
+        if is_awkward_collection(new_sequence[i]):
+            new_sequence[i] = new_sequence[i].meta
+    return tuple(new_sequence)
