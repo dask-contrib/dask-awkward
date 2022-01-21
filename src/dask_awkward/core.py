@@ -398,7 +398,23 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         """
         return IndexCallable(self._partitions)
 
-    def _getitem_trivial_inner(self, where: tuple[Any, ...]) -> Array:
+    def _getitem_single_obj_map_partitions(self, where: Any) -> Array:
+        """Array getitem call where only map_partitions is necessary.
+
+        This is the simplest getitem path, where each partition is
+        treated identically; e.g. a single string or list of strings.
+
+        Parameters
+        ----------
+        where : Any
+            Key of the getitem call.
+
+        Returns
+        -------
+        Array
+            Resulting collection.
+
+        """
         token = tokenize(self, where)
         name = f"getitem-{token}"
         graphlayer = partitionwise_layer(
@@ -408,22 +424,25 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         meta = self.meta[where] if self.meta is not None else None
         return new_array_object(hlg, name, meta=meta, divisions=self.divisions)
 
-    def _getitem_single_int(self, where: tuple[Any, ...]) -> Any:
+    def _getitem_single_string(self, where: str) -> Array:
+        return self._getitem_single_obj_map_partitions(where)
+
+    def _getitem_single_list(self, where: list[str]) -> Array:
+        return self._getitem_single_obj_map_partitions(where)
+
+    def _getitem_single_int(self, where: int) -> Any:
         # determine which partition to grab from (pidx) and which
         # index _inside_ of (relative to) that partition to then call
         # getitem with (rewriting key).
-        outer_key = where[0]
         self._divisions = calculate_known_divisions(self)
-        pidx, outer_key = normalize_single_outer_inner_index(self.divisions, outer_key)  # type: ignore
-        rest = where[1:]
-        where = (outer_key, *rest)
+        pidx, where = normalize_single_outer_inner_index(self.divisions, where)  # type: ignore
         partition = self.partitions[pidx]
         new_meta = partition.meta[where]
 
         # if we know a new array is going to be made, just call the
         # trivial inner on the new partition.
         if isinstance(new_meta, ak.Array):
-            result = partition._getitem_trivial_inner(where)
+            result = partition._getitem_single_obj_map_partitions(where)
             result._divisions = (0, None)
             return result
 
@@ -453,36 +472,58 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         else:
             return new_scalar_object(hlg, name, new_meta)
 
-    def _getitem_boolean_lazy_array(self, where: tuple[Any, ...]) -> Any:
-        outer_key = where[0]
-        if outer_key.known_divisions and self.known_divisions:
-            if outer_key.divisions != self.divisions:
+    def _getitem_single_boolean_lazy_array(self, where: Array) -> Any:
+        if where.known_divisions and self.known_divisions:
+            if where.divisions != self.divisions:
                 raise ValueError(
                     "The boolean array (they where in this getitem call) "
                     "must be partitioned in the same way as this array."
                 )
         else:
-            if outer_key.npartitions != self.npartitions:
+            if where.npartitions != self.npartitions:
                 raise ValueError(
                     "The boolean array (they where in this getitem call) "
                     "must be partitioned in the same way as this array."
                 )
 
-        meta_where = []
-        meta_where_has_non_none = False
-        for iw in where:
-            if is_awkward_collection(iw) and iw.meta is not None:
-                meta_where.append(iw.meta)
-                meta_where_has_non_none = True
-            else:
-                meta_where.append(iw)
-        meta_where = tuple(meta_where)  # type: ignore
-
         new_meta = None
-        if meta_where_has_non_none:
-            new_meta = operator.getitem(self.meta, meta_where)  # type: ignore
+        if where.meta is not None:
+            new_meta = operator.getitem(self.meta, where.meta)  # type: ignore
 
-        return map_partitions(operator.getitem, self, *where, meta=new_meta)
+        return map_partitions(operator.getitem, self, where, meta=new_meta)
+
+    def _getitem_tuple(self, where: tuple[Any, ...]) -> Array:
+        raise NotImplementedError(
+            "Array.__getitem__ doesn't (yet) support multi-object (tuple) slices."
+        )
+
+    def _getitem_single(self, where: Any) -> Array:
+
+        # a single string
+        if isinstance(where, str):
+            return self._getitem_single_string(where)
+
+        elif isinstance(where, list):
+            return self._getitem_single_list(where)
+
+        # a single integer
+        elif isinstance(where, int):
+            return self._getitem_single_int(where)
+
+        elif isinstance(where, Array) and issubclass(
+            where.layout.content.dtype.type, (np.bool_, bool)
+        ):
+            return self._getitem_single_boolean_lazy_array(where=where)
+
+        # an empty slice
+        elif is_empty_slice(where):
+            return self
+
+        # a single ellipsis
+        elif where is Ellipsis:
+            return self._getitem_single_obj_map_partitions(where)
+
+        raise NotImplementedError(f"__getitem__ doesn't support where={where}")
 
     def __getitem__(self, where: Any) -> Any:
         """Select items from the collection.
@@ -506,36 +547,10 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             if any(isinstance(k, int) for k in where):
                 raise NotImplementedError("Lists containing integers not supported.")
 
-        if not isinstance(where, tuple):
-            where = (where,)
+        if isinstance(where, tuple):
+            return self._getitem_tuple(where)
 
-        outer_key = where[0]
-
-        # a single string or a list.
-        if isinstance(outer_key, (str, list)):
-            return self._getitem_trivial_inner(where)
-
-        # an empty slice
-        elif is_empty_slice(outer_key):
-            if len(where) == 1:
-                return self
-            else:
-                return self[where[1:]]
-
-        # a single ellipsis
-        elif outer_key is Ellipsis:
-            return self._getitem_trivial_inner(where)
-
-        # a single integer
-        elif isinstance(outer_key, int):
-            return self._getitem_single_int(where)
-
-        elif isinstance(outer_key, Array) and issubclass(
-            outer_key.layout.content.dtype.type, (np.bool_, bool)
-        ):
-            return self._getitem_boolean_lazy_array(where=where)
-
-        raise NotImplementedError(f"__getitem__ doesn't support where={where}")
+        return self._getitem_single(where)
 
     def __getattr__(self, attr: str) -> Any:
         try:

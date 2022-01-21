@@ -31,10 +31,11 @@ def test_single_string(daa, caa) -> None:  # noqa: F811
 
 
 def test_layered_string(daa, caa) -> None:  # noqa: F811
-    assert_eq(daa["analysis", "x1"], caa["analysis", "x1"])
-    assert_eq(daa["analysis", "x1"], caa["analysis"]["x1"])
-    assert_eq(caa["analysis", "x1"], daa["analysis"]["x1"])
-    assert_eq(daa["analysis", ["x1", "t1"]], caa["analysis", ["x1", "t1"]])
+    with pytest.raises(NotImplementedError, match="support multi-object"):
+        assert_eq(daa["analysis", "x1"], caa["analysis", "x1"])
+        assert_eq(daa["analysis", "x1"], caa["analysis"]["x1"])
+        assert_eq(caa["analysis", "x1"], daa["analysis"]["x1"])
+        assert_eq(daa["analysis", ["x1", "t1"]], caa["analysis", ["x1", "t1"]])
 
 
 def test_list_with_ints_raise(daa) -> None:  # noqa: F811
@@ -47,7 +48,9 @@ def test_single_int(daa, caa) -> None:  # noqa: F811
     for i in range(total):
         assert_eq(daa["analysis"]["x1"][i], caa["analysis"]["x1"][i])
         assert_eq(daa["analysis"]["y2"][-i], caa["analysis"]["y2"][-i])
-        assert_eq(daa[0, "analysis", "x1"], caa[0, "analysis", "x1"])
+        with pytest.raises(NotImplementedError, match="support multi-object"):
+            assert_eq(daa["analysis", ["x1", "t1"]], caa["analysis", ["x1", "t1"]])
+            assert_eq(daa[0, "analysis", "x1"], caa[0, "analysis", "x1"])
     for i in range(total):
         caa[i].tolist() == daa[i].compute().tolist()
         caa["analysis"][i].tolist() == daa["analysis"][i].compute().tolist()
@@ -59,7 +62,8 @@ def test_single_ellipsis(daa, caa) -> None:  # noqa: F811
 
 def test_empty_slice(daa, caa) -> None:  # noqa: F811
     assert_eq(daa[:], caa[:])
-    assert_eq(daa[:, "analysis"], caa[:, "analysis"])
+    with pytest.raises(NotImplementedError, match="support multi-object"):
+        assert_eq(daa[:, "analysis"], caa[:, "analysis"])
 
 
 def test_record_getitem(daa, caa) -> None:  # noqa: F811
