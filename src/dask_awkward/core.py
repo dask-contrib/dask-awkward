@@ -934,23 +934,27 @@ def ndim(array: Array) -> int | None:
     return None
 
 
-def fields(array: Array) -> list[str] | None:
+def fields(collection: Array | Record) -> list[str] | None:
     """Get the fields of a Array collection.
 
     Parameters
     ----------
-    array : dask_awkward.Array
-        The collection.
+    collection : dask_awkward.Array or dask_awkward.Record
+        Array or Record collection
 
     Returns
     -------
     list[str] or None
-        The fields of the array; if the array does not contain
-        metadata ``None`` is returned.
+        The fields of the collection; if the collection does not
+        contain metadata ``None`` is returned.
 
     """
-    if array.meta is not None:
-        return array.meta.fields
+    try:
+        m = collection.meta
+        if m is not None:
+            return m.fields
+    except AttributeError:
+        return None
     return None
 
 
@@ -978,6 +982,22 @@ def from_awkward(source: ak.Array, npartitions: int, name: str | None = None) ->
 
 def is_awkward_collection(obj: Any) -> bool:
     return isinstance(obj, (Array, Record, Scalar))
+
+
+def is_typetracer(obj: Any) -> bool:
+
+    if isinstance(obj, ak.Array):
+        if not obj.layout.nplike.known_shape and not obj.layout.nplike.known_data:
+            return True
+
+    if isinstance(obj, ak.Record):
+        if (
+            not obj.layout.array.nplike.known_shape
+            and not obj.layout.array.nplike.known_data
+        ):
+            return True
+
+    return False
 
 
 def meta_or_identity(obj: Any) -> Any:
