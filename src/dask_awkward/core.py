@@ -8,6 +8,7 @@ from numbers import Number
 from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence
 
 import awkward._v2 as ak
+import awkward._v2._typetracer as aktt
 import numpy as np
 from awkward._v2._connect.numpy import NDArrayOperatorsMixin
 from awkward._v2.highlevel import _dir_pattern
@@ -101,6 +102,14 @@ class Scalar(DaskMethodsMixin):
     def meta(self) -> Any | None:
         return self._meta
 
+    @meta.setter
+    def meta(self, m: Any | None) -> None:
+        if m is not None and not isinstance(
+            m, (aktt.MaybeNone, aktt.UnknownScalar, aktt.OneOf)
+        ):
+            raise TypeError(f"meta must be a typetracer module object, not a {type(m)}")
+        self._meta = m
+
     def __repr__(self) -> str:
         return self.__str__()
 
@@ -115,6 +124,16 @@ def new_scalar_object(dsk: HighLevelGraph, name: str, meta: Any) -> Scalar:
 class Record(Scalar):
     def __init__(self, dsk: HighLevelGraph, name: str, meta: Any | None = None) -> None:
         super().__init__(dsk, name, meta)
+
+    @property
+    def meta(self) -> Any | None:
+        return self._meta
+
+    @meta.setter
+    def meta(self, m: Any | None) -> None:
+        if m is not None and not isinstance(m, ak.Record):
+            raise TypeError(f"meta must be a Record typetracer object, not a {type(m)}")
+        self._meta = m
 
     def __getitem__(self, key: str) -> Any:
         token = tokenize(self, key)
@@ -447,13 +466,11 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             return result
 
         # otherwise make sure we have one of the other potential results.
-        from awkward._v2._typetracer import MaybeNone, OneOf, UnknownScalar
-
         if not (
             isinstance(new_meta, ak.Record)
-            or isinstance(new_meta, UnknownScalar)
-            or isinstance(new_meta, OneOf)
-            or isinstance(new_meta, MaybeNone)
+            or isinstance(new_meta, aktt.UnknownScalar)
+            or isinstance(new_meta, aktt.OneOf)
+            or isinstance(new_meta, aktt.MaybeNone)
         ):
             raise NotImplementedError("Key not supported for this array.")
 
@@ -985,18 +1002,20 @@ def is_awkward_collection(obj: Any) -> bool:
 
 
 def is_typetracer(obj: Any) -> bool:
-
+    # array typetracer
     if isinstance(obj, ak.Array):
         if not obj.layout.nplike.known_shape and not obj.layout.nplike.known_data:
             return True
-
+    # record typetracer
     if isinstance(obj, ak.Record):
         if (
             not obj.layout.array.nplike.known_shape
             and not obj.layout.array.nplike.known_data
         ):
             return True
-
+    # scalar-like typetracer
+    if isinstance(obj, (aktt.UnknownScalar, aktt.MaybeNone, aktt.OneOf)):
+        return True
     return False
 
 
