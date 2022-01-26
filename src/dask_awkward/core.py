@@ -457,7 +457,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         return map_partitions(operator.getitem, self, where, meta=new_meta)
 
-    def _getitem_outer_int(self, where: tuple) -> Any:
+    def _getitem_outer_int(self, where: int | tuple) -> Any:
         self._divisions = calculate_known_divisions(self)
 
         # multiple objects passed to getitem. collections passed in
