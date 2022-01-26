@@ -5,7 +5,7 @@ import operator
 from functools import partial
 from math import ceil
 from numbers import Number
-from typing import TYPE_CHECKING, Any, Callable, Mapping
+from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence
 
 import awkward._v2 as ak
 import awkward._v2._typetracer as aktt
@@ -440,7 +440,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             lambda x, gikey: operator.getitem(x, gikey), name, self, gikey=where
         )
         hlg = HighLevelGraph.from_collections(name, graphlayer, dependencies=[self])
-        (m,) = to_meta(where)
+        m = to_meta([where])[0]
         new_meta = self.meta[m] if self.meta is not None else None
         return new_array_object(hlg, name, meta=new_meta, divisions=self.divisions)
 
@@ -510,9 +510,56 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         return map_partitions(operator.getitem, self, where, meta=new_meta)
 
-    def _getitem_tuple(self, where: tuple[Any, ...]) -> Array:
+    def _getitem_outer_int(self, where: tuple) -> Any:
+        self._divisions = calculate_known_divisions(self)
+        if not isinstance(where[0], int):
+            raise TypeError("Expected where[0] to be and integer.")
+        pidx, outer_where = normalize_single_outer_inner_index(
+            self.divisions, where[0]  # type: ignore
+        )
+        partition = self.partitions[pidx]
+        rest = where[1:]
+        where = (outer_where, *rest)
+        metad = to_meta(where)
+        new_meta = partition.meta[metad]
+
+        # if we know a new array is going to be made, just call the
+        # trivial inner on the new partition.
+        if isinstance(new_meta, ak.Array):
+            result = partition._getitem_single_obj_map_partitions(where)
+            result._divisions = (0, None)
+            return result
+
+        # otherwise make sure we have one of the other potential results.
+        if not (
+            isinstance(new_meta, ak.Record)
+            or isinstance(new_meta, aktt.UnknownScalar)
+            or isinstance(new_meta, aktt.OneOf)
+            or isinstance(new_meta, aktt.MaybeNone)
+        ):
+            raise NotImplementedError("Key not supported for this array.")
+
+        token = tokenize(partition, where)
+        name = f"getitem-{token}"
+        dsk = {
+            name: (
+                lambda x, gikey: operator.getitem(x, gikey),
+                partition.__dask_keys__()[0],
+                where,
+            )
+        }
+        hlg = HighLevelGraph.from_collections(name, dsk, dependencies=[partition])
+        if isinstance(new_meta, ak.Record):
+            return new_record_object(hlg, name, new_meta)
+        else:
+            return new_scalar_object(hlg, name, new_meta)
+
+    def _getitem_tuple(self, where: tuple) -> Array:
+        if isinstance(where[0], int):
+            return self._getitem_outer_int(where)
+
         raise NotImplementedError(
-            "Array.__getitem__ doesn't (yet) support multi-object (tuple) slices."
+            f"Array.__getitem__ doesn't support multi-object: {where}."
         )
 
     def _getitem_single(self, where: Any) -> Array:
@@ -692,7 +739,7 @@ def new_array_object(
     name: str,
     meta: ak.Array | None = None,
     npartitions: int | None = None,
-    divisions: tuple[Any, ...] | None = None,
+    divisions: tuple | None = None,
 ) -> Array:
     """Instantiate a new Array collection object.
 
@@ -1026,5 +1073,5 @@ def meta_or_identity(obj: Any) -> Any:
     return obj
 
 
-def to_meta(*objects: Any) -> tuple[Any, ...]:
+def to_meta(objects: Sequence[Any]) -> tuple:
     return tuple(map(meta_or_identity, objects))

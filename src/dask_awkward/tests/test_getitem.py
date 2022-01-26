@@ -56,6 +56,10 @@ def test_single_int(daa, caa) -> None:  # noqa: F811
         caa["analysis"][i].tolist() == daa["analysis"][i].compute().tolist()
 
 
+def test_outer_single_int(daa, caa) -> None:  # noqa: F811
+    assert_eq(daa[0, "analysis", "x1"], caa[0, "analysis", "x1"])
+
+
 def test_single_ellipsis(daa, caa) -> None:  # noqa: F811
     assert_eq(daa[...], caa[...])
 

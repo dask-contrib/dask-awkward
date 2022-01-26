@@ -216,7 +216,7 @@ def test_to_meta() -> None:
     daa = _lazyrecords()
     x1 = daa["analysis"]["x1"]
     x1_0 = x1[0]
-    metad = dakc.to_meta(x1, 5, "ok", x1_0)
+    metad = dakc.to_meta([x1, 5, "ok", x1_0])
     assert isinstance(metad, tuple)
     for a, b in zip(metad, (x1.meta, 5, "ok", x1_0.meta)):
         if dakc.is_typetracer(a):
