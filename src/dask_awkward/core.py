@@ -460,6 +460,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     def _getitem_outer_int(self, where: tuple) -> Any:
         self._divisions = calculate_known_divisions(self)
 
+        # multiple objects passed to getitem. collections passed in
+        # the tuple of objects have not been tested!
         if isinstance(where, tuple):
             if not isinstance(where[0], int):
                 raise TypeError("Expected where[0] to be and integer.")
@@ -471,6 +473,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             where = (outer_where, *rest)
             metad = to_meta(where)
             new_meta = partition.meta[metad]
+        # single object passed to getitem
         elif isinstance(where, int):
             pidx, where = normalize_single_outer_inner_index(self.divisions, where)  # type: ignore
             partition = self.partitions[pidx]
