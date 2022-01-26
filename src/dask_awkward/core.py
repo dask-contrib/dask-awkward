@@ -417,38 +417,25 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         """
         return IndexCallable(self._partitions)
 
-    def _getitem_single_obj_map_partitions(self, where: Any) -> Array:
-        """Array getitem call where only map_partitions is necessary.
-
-        This is the simplest getitem path, where each partition is
-        treated identically; e.g. a single string or list of strings.
-
-        Parameters
-        ----------
-        where : Any
-            Key of the getitem call.
-
-        Returns
-        -------
-        Array
-            Resulting collection.
-
-        """
-        token = tokenize(self, where)
-        name = f"getitem-{token}"
-        graphlayer = partitionwise_layer(
-            lambda x, gikey: operator.getitem(x, gikey), name, self, gikey=where
-        )
-        hlg = HighLevelGraph.from_collections(name, graphlayer, dependencies=[self])
-        m = to_meta([where])[0]
-        new_meta = self.meta[m] if self.meta is not None else None
-        return new_array_object(hlg, name, meta=new_meta, divisions=self.divisions)
+    def _getitem_trivial_map_partitions(
+        self,
+        where: Any,
+        new_meta: Any | None = None,
+    ) -> Any:
+        if new_meta is None and self.meta is not None:
+            if isinstance(where, tuple):
+                metad = to_meta(where)
+                new_meta = self.meta[metad]
+            else:
+                m = to_meta([where])[0]
+                new_meta = self.meta[m]
+        return self.map_partitions(operator.getitem, where, meta=new_meta)
 
     def _getitem_single_string(self, where: str) -> Array:
-        return self._getitem_single_obj_map_partitions(where)
+        return self._getitem_trivial_map_partitions(where)
 
     def _getitem_single_list(self, where: list[str]) -> Array:
-        return self._getitem_single_obj_map_partitions(where)
+        return self._getitem_trivial_map_partitions(where)
 
     def _getitem_single_int(self, where: int) -> Any:
         # determine which partition to grab from (pidx) and which
@@ -462,7 +449,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         # if we know a new array is going to be made, just call the
         # trivial inner on the new partition.
         if isinstance(new_meta, ak.Array):
-            result = partition._getitem_single_obj_map_partitions(where)
+            result = partition._getitem_trivial_map_partitions(where, new_meta=new_meta)
             result._divisions = (0, None)
             return result
 
@@ -526,7 +513,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         # if we know a new array is going to be made, just call the
         # trivial inner on the new partition.
         if isinstance(new_meta, ak.Array):
-            result = partition._getitem_single_obj_map_partitions(where)
+            result = partition._getitem_trivial_map_partitions(where)
             result._divisions = (0, None)
             return result
 
@@ -586,7 +573,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         # a single ellipsis
         elif where is Ellipsis:
-            return self._getitem_single_obj_map_partitions(where)
+            return self._getitem_trivial_map_partitions(where)
 
         raise NotImplementedError(f"__getitem__ doesn't support where={where}")
 
@@ -834,7 +821,7 @@ def map_partitions(
     func: Callable,
     *args: Any,
     name: str | None = None,
-    meta: ak.Array | None = None,
+    meta: Any | None = None,
     **kwargs: Any,
 ) -> Array:
     """Map a callable across all partitions of a collection.
@@ -850,6 +837,8 @@ def map_partitions(
     name : str, optional
         Name for the Dask graph layer; if left to ``None`` (default),
         the name of the function will be used.
+    meta : Any, optional
+        Metadata (typetracer) information of the result (if known).
     **kwargs : Any
         Additional keyword arguments passed to the `func`.
 
@@ -867,7 +856,7 @@ def map_partitions(
         v for _, v in kwargs.items() if is_dask_collection(v)
     ]
     hlg = HighLevelGraph.from_collections(name, lay, dependencies=deps)
-    return new_array_object(hlg, name, meta, divisions=args[0].divisions)
+    return new_array_object(hlg, name=name, meta=meta, divisions=args[0].divisions)
 
 
 def pw_reduction_with_agg_to_scalar(
