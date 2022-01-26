@@ -5,7 +5,7 @@ import operator
 from functools import partial
 from math import ceil
 from numbers import Number
-from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Mapping
 
 import awkward._v2 as ak
 import awkward._v2._typetracer as aktt
@@ -440,8 +440,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             lambda x, gikey: operator.getitem(x, gikey), name, self, gikey=where
         )
         hlg = HighLevelGraph.from_collections(name, graphlayer, dependencies=[self])
-        meta = self.meta[where] if self.meta is not None else None
-        return new_array_object(hlg, name, meta=meta, divisions=self.divisions)
+        (m,) = to_meta(where)
+        new_meta = self.meta[m] if self.meta is not None else None
+        return new_array_object(hlg, name, meta=new_meta, divisions=self.divisions)
 
     def _getitem_single_string(self, where: str) -> Array:
         return self._getitem_single_obj_map_partitions(where)
@@ -1025,5 +1026,5 @@ def meta_or_identity(obj: Any) -> Any:
     return obj
 
 
-def convert_collections_to_metas(objects: Sequence[Any]) -> tuple[Any, ...]:
+def to_meta(*objects: Any) -> tuple[Any, ...]:
     return tuple(map(meta_or_identity, objects))

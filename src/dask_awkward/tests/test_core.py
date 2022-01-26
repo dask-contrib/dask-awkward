@@ -212,12 +212,13 @@ def test_meta_or_identity() -> None:
     assert dakc.meta_or_identity(5) == 5
 
 
-def test_convert_collections_to_metas() -> None:
+def test_to_meta() -> None:
     daa = _lazyrecords()
     x1 = daa["analysis"]["x1"]
-    metad = dakc.convert_collections_to_metas([x1, 5, "ok"])
+    x1_0 = x1[0]
+    metad = dakc.to_meta(x1, 5, "ok", x1_0)
     assert isinstance(metad, tuple)
-    for a, b in zip(metad, (x1.meta, 5, "ok")):
+    for a, b in zip(metad, (x1.meta, 5, "ok", x1_0.meta)):
         if dakc.is_typetracer(a):
             assert a is b
         else:
