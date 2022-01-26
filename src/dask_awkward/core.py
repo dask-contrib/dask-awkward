@@ -420,16 +420,16 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     def _getitem_trivial_map_partitions(
         self,
         where: Any,
-        new_meta: Any | None = None,
+        meta: Any | None = None,
     ) -> Any:
-        if new_meta is None and self.meta is not None:
+        if meta is None and self.meta is not None:
             if isinstance(where, tuple):
                 metad = to_meta(where)
-                new_meta = self.meta[metad]
+                meta = self.meta[metad]
             else:
                 m = to_meta([where])[0]
-                new_meta = self.meta[m]
-        return self.map_partitions(operator.getitem, where, meta=new_meta)
+                meta = self.meta[m]
+        return self.map_partitions(operator.getitem, where, meta=meta)
 
     def _getitem_single_string(self, where: str) -> Array:
         return self._getitem_trivial_map_partitions(where)
@@ -457,6 +457,16 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         return map_partitions(operator.getitem, self, where, meta=new_meta)
 
+    def _getitem_outer_str(self, where: str | tuple) -> Any:
+        if isinstance(where, tuple):
+            if not isinstance(where[0], str):
+                raise TypeError("Expected where[0] to be a string")
+            metad = to_meta(where)
+            new_meta = self.meta[metad]
+        elif isinstance(where, str):
+            new_meta = self.meta[where]
+        return self._getitem_trivial_map_partitions(where, meta=new_meta)
+
     def _getitem_outer_int(self, where: int | tuple) -> Any:
         self._divisions = calculate_known_divisions(self)
 
@@ -482,7 +492,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         # if we know a new array is going to be made, just call the
         # trivial inner on the new partition.
         if isinstance(new_meta, ak.Array):
-            result = partition._getitem_trivial_map_partitions(where, new_meta=new_meta)
+            result = partition._getitem_trivial_map_partitions(where, meta=new_meta)
             result._divisions = (0, None)
             return result
 
@@ -514,6 +524,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if isinstance(where[0], int):
             return self._getitem_outer_int(where)
 
+        elif isinstance(where[0], str):
+            return self._getitem_outer_str(where)
+
         raise NotImplementedError(
             f"Array.__getitem__ doesn't support multi-object: {where}."
         )
@@ -522,7 +535,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         # a single string
         if isinstance(where, str):
-            return self._getitem_single_string(where)
+            return self._getitem_outer_str(where)
 
         elif isinstance(where, list):
             return self._getitem_single_list(where)
