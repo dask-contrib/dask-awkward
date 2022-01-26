@@ -499,11 +499,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             return result
 
         # otherwise make sure we have one of the other potential results.
-        if not (
-            isinstance(new_meta, ak.Record)
-            or isinstance(new_meta, aktt.UnknownScalar)
-            or isinstance(new_meta, aktt.OneOf)
-            or isinstance(new_meta, aktt.MaybeNone)
+        if not isinstance(
+            new_meta, (ak.Record, aktt.UnknownScalar, aktt.OneOf, aktt.MaybeNone)
         ):
             raise NotImplementedError("Key not supported for this array.")
 
