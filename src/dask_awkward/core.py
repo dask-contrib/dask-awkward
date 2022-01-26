@@ -431,9 +431,6 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 meta = self.meta[m]
         return self.map_partitions(operator.getitem, where, meta=meta)
 
-    def _getitem_single_string(self, where: str) -> Array:
-        return self._getitem_trivial_map_partitions(where)
-
     def _getitem_single_list(self, where: list[str]) -> Array:
         return self._getitem_trivial_map_partitions(where)
 
@@ -458,18 +455,21 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return map_partitions(operator.getitem, self, where, meta=new_meta)
 
     def _getitem_outer_str(self, where: str | tuple) -> Any:
-        if isinstance(where, tuple):
-            if not isinstance(where[0], str):
-                raise TypeError("Expected where[0] to be a string")
-            metad = to_meta(where)
-            new_meta = self.meta[metad]
-        elif isinstance(where, str):
-            new_meta = self.meta[where]
+        new_meta: Any | None = None
+        if self.meta is not None:
+            if isinstance(where, tuple):
+                if not isinstance(where[0], str):
+                    raise TypeError("Expected where[0] to be a string")
+                metad = to_meta(where)
+                new_meta = self.meta[metad]
+            elif isinstance(where, str):
+                new_meta = self.meta[where]
         return self._getitem_trivial_map_partitions(where, meta=new_meta)
 
     def _getitem_outer_int(self, where: int | tuple) -> Any:
         self._divisions = calculate_known_divisions(self)
 
+        new_meta: Any | None = None
         # multiple objects passed to getitem. collections passed in
         # the tuple of objects have not been tested!
         if isinstance(where, tuple):
@@ -481,13 +481,15 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             partition = self.partitions[pidx]
             rest = where[1:]
             where = (outer_where, *rest)
-            metad = to_meta(where)
-            new_meta = partition.meta[metad]
+            if partition.meta is not None:
+                metad = to_meta(where)
+                new_meta = partition.meta[metad]
         # single object passed to getitem
         elif isinstance(where, int):
             pidx, where = normalize_single_outer_inner_index(self.divisions, where)  # type: ignore
             partition = self.partitions[pidx]
-            new_meta = partition.meta[where]
+            if partition.meta is not None:
+                new_meta = partition.meta[where]
 
         # if we know a new array is going to be made, just call the
         # trivial inner on the new partition.
