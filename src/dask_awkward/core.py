@@ -437,46 +437,6 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     def _getitem_single_list(self, where: list[str]) -> Array:
         return self._getitem_trivial_map_partitions(where)
 
-    def _getitem_single_int(self, where: int) -> Any:
-        # determine which partition to grab from (pidx) and which
-        # index _inside_ of (relative to) that partition to then call
-        # getitem with (rewriting key).
-        self._divisions = calculate_known_divisions(self)
-        pidx, where = normalize_single_outer_inner_index(self.divisions, where)  # type: ignore
-        partition = self.partitions[pidx]
-        new_meta = partition.meta[where]
-
-        # if we know a new array is going to be made, just call the
-        # trivial inner on the new partition.
-        if isinstance(new_meta, ak.Array):
-            result = partition._getitem_trivial_map_partitions(where, new_meta=new_meta)
-            result._divisions = (0, None)
-            return result
-
-        # otherwise make sure we have one of the other potential results.
-        if not (
-            isinstance(new_meta, ak.Record)
-            or isinstance(new_meta, aktt.UnknownScalar)
-            or isinstance(new_meta, aktt.OneOf)
-            or isinstance(new_meta, aktt.MaybeNone)
-        ):
-            raise NotImplementedError("Key not supported for this array.")
-
-        token = tokenize(partition, where)
-        name = f"getitem-{token}"
-        dsk = {
-            name: (
-                lambda x, gikey: operator.getitem(x, gikey),
-                partition.__dask_keys__()[0],
-                where,
-            )
-        }
-        hlg = HighLevelGraph.from_collections(name, dsk, dependencies=[partition])
-        if isinstance(new_meta, ak.Record):
-            return new_record_object(hlg, name, new_meta)
-        else:
-            return new_scalar_object(hlg, name, new_meta)
-
     def _getitem_single_boolean_lazy_array(self, where: Array) -> Any:
         if where.known_divisions and self.known_divisions:
             if where.divisions != self.divisions:
@@ -499,21 +459,27 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     def _getitem_outer_int(self, where: tuple) -> Any:
         self._divisions = calculate_known_divisions(self)
-        if not isinstance(where[0], int):
-            raise TypeError("Expected where[0] to be and integer.")
-        pidx, outer_where = normalize_single_outer_inner_index(
-            self.divisions, where[0]  # type: ignore
-        )
-        partition = self.partitions[pidx]
-        rest = where[1:]
-        where = (outer_where, *rest)
-        metad = to_meta(where)
-        new_meta = partition.meta[metad]
+
+        if isinstance(where, tuple):
+            if not isinstance(where[0], int):
+                raise TypeError("Expected where[0] to be and integer.")
+            pidx, outer_where = normalize_single_outer_inner_index(
+                self.divisions, where[0]  # type: ignore
+            )
+            partition = self.partitions[pidx]
+            rest = where[1:]
+            where = (outer_where, *rest)
+            metad = to_meta(where)
+            new_meta = partition.meta[metad]
+        elif isinstance(where, int):
+            pidx, where = normalize_single_outer_inner_index(self.divisions, where)  # type: ignore
+            partition = self.partitions[pidx]
+            new_meta = partition.meta[where]
 
         # if we know a new array is going to be made, just call the
         # trivial inner on the new partition.
         if isinstance(new_meta, ak.Array):
-            result = partition._getitem_trivial_map_partitions(where)
+            result = partition._getitem_trivial_map_partitions(where, new_meta=new_meta)
             result._divisions = (0, None)
             return result
 
@@ -560,7 +526,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         # a single integer
         elif isinstance(where, int):
-            return self._getitem_single_int(where)
+            return self._getitem_outer_int(where)
 
         elif isinstance(where, Array) and issubclass(
             where.layout.content.dtype.type, (np.bool_, bool)
@@ -929,25 +895,6 @@ def calculate_known_divisions(array: Array) -> tuple[int, ...]:
     return (0, array.map_partitions(len).compute())
 
 
-class TrivialPartitionwiseOp:
-    def __init__(
-        self,
-        func: Callable,
-        *,
-        name: str | None = None,
-        **kwargs: Any,
-    ) -> None:
-        self._func = func
-        self.name = func.__name__ if name is None else name
-        self._kwargs = kwargs
-
-    def __call__(self, collection: Array, **kwargs: Any) -> Array:
-        # overwrite any saved kwargs in self._kwargs
-        for k, v in kwargs.items():
-            self._kwargs[k] = v
-        return map_partitions(self._func, collection, name=self.name, **self._kwargs)
-
-
 def _type(array: Array) -> Type | None:
     """Get the type object associated with an array.
 
@@ -1064,3 +1011,28 @@ def meta_or_identity(obj: Any) -> Any:
 
 def to_meta(objects: Sequence[Any]) -> tuple:
     return tuple(map(meta_or_identity, objects))
+
+
+class TrivialPartitionwiseOp:
+    def __init__(
+        self,
+        func: Callable,
+        *,
+        name: str | None = None,
+        **kwargs: Any,
+    ) -> None:
+        self._func = func
+        self.name = func.__name__ if name is None else name
+        self._kwargs = kwargs
+
+    def __call__(self, collection: Array, **kwargs: Any) -> Array:
+        # overwrite any saved kwargs in self._kwargs
+        for k, v in kwargs.items():
+            self._kwargs[k] = v
+        try:
+            new_meta = self._func(collection.meta, **kwargs)
+        except NotImplementedError:
+            new_meta = None
+        return map_partitions(
+            self._func, collection, name=self.name, meta=new_meta, **self._kwargs
+        )
