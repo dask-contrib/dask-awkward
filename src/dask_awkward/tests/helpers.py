@@ -14,7 +14,7 @@ import fsspec
 import pytest
 from dask.base import is_dask_collection
 
-from ..core import Array, Scalar, from_awkward
+from ..core import Array, Record, from_awkward
 from ..io import from_json
 
 # fmt: off
@@ -46,21 +46,39 @@ SINGLE_RECORD = """{"a":[1,2,3]}"""
 
 
 def assert_eq(a: Any, b: Any) -> None:
-    if is_dask_collection(a) and not is_dask_collection(b):
-        if isinstance(a, Scalar):
-            assert a.compute() == b
-        else:
-            assert a.compute().to_list() == b.to_list()
-    elif is_dask_collection(b) and not is_dask_collection(a):
-        if isinstance(b, Scalar):
-            assert a == b.compute()
-        else:
-            assert a.to_list() == b.compute().to_list()
+    if isinstance(a, (Array, ak.Array)):
+        assert_eq_arrays(a, b)
+    elif isinstance(a, (Record, ak.Record)):
+        assert_eq_records(a, b)
     else:
-        if isinstance(a, Scalar) and isinstance(b, Scalar):
-            assert a.compute() == b.compute()
-        else:
-            assert a.compute().to_list() == b.compute().to_list()
+        assert_eq_other(a, b)
+
+
+def assert_eq_arrays(a: Array | ak.Array, b: Array | ak.Array) -> None:
+    if is_dask_collection(a) and not is_dask_collection(b):
+        assert a.compute().to_list() == b.to_list()
+    if is_dask_collection(b) and not is_dask_collection(a):
+        assert a.to_list() == b.compute().to_list()
+    if not is_dask_collection(a) and not is_dask_collection(b):
+        assert a.to_list() == b.to_list()
+
+
+def assert_eq_records(a: Record | ak.Record, b: Record | ak.Record) -> None:
+    if is_dask_collection(a) and not is_dask_collection(b):
+        assert a.compute().to_list() == b.to_list()
+    if is_dask_collection(b) and not is_dask_collection(a):
+        assert a.to_list() == b.compute().to_list()
+    if not is_dask_collection(a) and not is_dask_collection(b):
+        assert a.to_list() == b.to_list()
+
+
+def assert_eq_other(a: Any, b: Any) -> None:
+    if is_dask_collection(a) and not is_dask_collection(b):
+        assert a.compute() == b
+    if is_dask_collection(b) and not is_dask_collection(a):
+        assert a == b.compute()
+    if not is_dask_collection(a) and not is_dask_collection(b):
+        assert a == b
 
 
 @pytest.fixture(scope="session")
