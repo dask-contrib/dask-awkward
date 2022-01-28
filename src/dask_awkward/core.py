@@ -466,27 +466,15 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                     meta=new_meta,
                 )
 
-    def _getitem_outer_list(self, where: list | tuple) -> Any:
+    def _getitem_outer_str_or_list(self, where: str | list | tuple) -> Any:
         new_meta: Any | None = None
         if self.meta is not None:
             if isinstance(where, tuple):
-                if not isinstance(where[0], list):
-                    raise TypeError("Expected where[0] to be a list")
+                if not isinstance(where[0], (str, list)):
+                    raise TypeError("Expected where[0] to be a string or list")
                 metad = to_meta(where)
                 new_meta = self.meta[metad]
-            elif isinstance(where, list):
-                new_meta = self.meta[where]
-        return self._getitem_trivial_map_partitions(where, meta=new_meta)
-
-    def _getitem_outer_str(self, where: str | tuple) -> Any:
-        new_meta: Any | None = None
-        if self.meta is not None:
-            if isinstance(where, tuple):
-                if not isinstance(where[0], str):
-                    raise TypeError("Expected where[0] to be a string")
-                metad = to_meta(where)
-                new_meta = self.meta[metad]
-            elif isinstance(where, str):
+            elif isinstance(where, (str, list)):
                 new_meta = self.meta[where]
         return self._getitem_trivial_map_partitions(where, meta=new_meta)
 
@@ -548,10 +536,10 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             return self._getitem_outer_int(where)
 
         elif isinstance(where[0], str):
-            return self._getitem_outer_str(where)
+            return self._getitem_outer_str_or_list(where)
 
         elif isinstance(where[0], list):
-            return self._getitem_outer_list(where)
+            return self._getitem_outer_str_or_list(where)
 
         # boolean array
         elif isinstance(where[0], Array) and issubclass(
@@ -567,10 +555,10 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         # a single string
         if isinstance(where, str):
-            return self._getitem_outer_str(where)
+            return self._getitem_outer_str_or_list(where)
 
         elif isinstance(where, list):
-            return self._getitem_outer_list(where)
+            return self._getitem_outer_str_or_list(where)
 
         # a single integer
         elif isinstance(where, int):
