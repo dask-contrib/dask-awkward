@@ -34,6 +34,7 @@ def test_layered_string(daa, caa) -> None:  # noqa: F811
     assert_eq(daa["analysis", "x1"], caa["analysis", "x1"])
     assert_eq(daa["analysis", "x1"], caa["analysis"]["x1"])
     assert_eq(caa["analysis", "x1"], daa["analysis"]["x1"])
+    assert_eq(daa[["analysis"], ["x1", "t1"]], caa[["analysis"], ["x1", "t1"]])
     assert_eq(daa["analysis", ["x1", "t1"]], caa["analysis", ["x1", "t1"]])
 
 

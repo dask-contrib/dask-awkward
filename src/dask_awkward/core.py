@@ -431,9 +431,6 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 meta = self.meta[m]
         return self.map_partitions(operator.getitem, where, meta=meta)
 
-    def _getitem_single_list(self, where: list[str]) -> Array:
-        return self._getitem_trivial_map_partitions(where)
-
     def _getitem_single_boolean_lazy_array(self, where: Array) -> Any:
         if where.known_divisions and self.known_divisions:
             if where.divisions != self.divisions:
@@ -453,6 +450,18 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             new_meta = operator.getitem(self.meta, where.meta)  # type: ignore
 
         return map_partitions(operator.getitem, self, where, meta=new_meta)
+
+    def _getitem_outer_list(self, where: list | tuple) -> Any:
+        new_meta: Any | None = None
+        if self.meta is not None:
+            if isinstance(where, tuple):
+                if not isinstance(where[0], list):
+                    raise TypeError("Expected where[0] to be a list")
+                metad = to_meta(where)
+                new_meta = self.meta[metad]
+            elif isinstance(where, list):
+                new_meta = self.meta[where]
+        return self._getitem_trivial_map_partitions(where, meta=new_meta)
 
     def _getitem_outer_str(self, where: str | tuple) -> Any:
         new_meta: Any | None = None
@@ -526,6 +535,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         elif isinstance(where[0], str):
             return self._getitem_outer_str(where)
 
+        elif isinstance(where[0], list):
+            return self._getitem_outer_list(where)
+
         raise NotImplementedError(
             f"Array.__getitem__ doesn't support multi-object: {where}."
         )
@@ -537,7 +549,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             return self._getitem_outer_str(where)
 
         elif isinstance(where, list):
-            return self._getitem_single_list(where)
+            return self._getitem_outer_list(where)
 
         # a single integer
         elif isinstance(where, int):
