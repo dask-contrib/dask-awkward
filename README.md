@@ -6,7 +6,7 @@ dask-awkward
 
 [![Tests](https://github.com/ContinuumIO/dask-awkward/actions/workflows/pypi-tests.yml/badge.svg)](https://github.com/ContinuumIO/dask-awkward/actions/workflows/pypi-tests.yml)
 [![Tests](https://github.com/ContinuumIO/dask-awkward/actions/workflows/conda-tests.yml/badge.svg)](https://github.com/ContinuumIO/dask-awkward/actions/workflows/conda-tests.yml)
-[![stability-alpha](https://img.shields.io/badge/stability-alpha-f4d03f.svg)]
+![stability-alpha](https://img.shields.io/badge/stability-alpha-blue.svg)
 
 **This software is very alpha!**
 
