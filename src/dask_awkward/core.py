@@ -431,25 +431,40 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 meta = self.meta[m]
         return self.map_partitions(operator.getitem, where, meta=meta)
 
-    def _getitem_single_boolean_lazy_array(self, where: Array) -> Any:
-        if where.known_divisions and self.known_divisions:
-            if where.divisions != self.divisions:
+    def _getitem_outer_boolean_lazy_array(self, where: Array | tuple) -> Any:
+        ba = where if isinstance(where, Array) else where[0]
+        if ba.known_divisions and self.known_divisions:
+            if ba.divisions != self.divisions:
                 raise ValueError(
-                    "The boolean array (they where in this getitem call) "
-                    "must be partitioned in the same way as this array."
+                    "The boolean array must be partitioned in the same way as this array."
                 )
         else:
-            if where.npartitions != self.npartitions:
+            if ba.npartitions != self.npartitions:
                 raise ValueError(
-                    "The boolean array (they where in this getitem call) "
-                    "must be partitioned in the same way as this array."
+                    "The boolean array must be partitioned in the same way as this array."
                 )
 
-        new_meta = None
-        if where.meta is not None:
-            new_meta = operator.getitem(self.meta, where.meta)  # type: ignore
-
-        return map_partitions(operator.getitem, self, where, meta=new_meta)
+        new_meta: Any | None = None
+        if self.meta is not None:
+            if isinstance(where, tuple):
+                if not isinstance(where[0], Array):
+                    raise TypeError("Expected where[0] to be an Array collection.")
+                metad = to_meta(where)
+                new_meta = self.meta[metad]
+                rest = tuple(where[1:])
+                return self.map_partitions(
+                    operator.getitem,
+                    where[0],
+                    *rest,
+                    meta=new_meta,
+                )
+            elif isinstance(where, Array):
+                new_meta = self.meta[where.meta]
+                return self.map_partitions(
+                    operator.getitem,
+                    where,
+                    meta=new_meta,
+                )
 
     def _getitem_outer_list(self, where: list | tuple) -> Any:
         new_meta: Any | None = None
@@ -538,6 +553,12 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         elif isinstance(where[0], list):
             return self._getitem_outer_list(where)
 
+        # boolean array
+        elif isinstance(where[0], Array) and issubclass(
+            where[0].layout.content.dtype.type, (np.bool_, bool)
+        ):
+            return self._getitem_outer_boolean_lazy_array(where=where)
+
         raise NotImplementedError(
             f"Array.__getitem__ doesn't support multi-object: {where}."
         )
@@ -558,7 +579,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         elif isinstance(where, Array) and issubclass(
             where.layout.content.dtype.type, (np.bool_, bool)
         ):
-            return self._getitem_single_boolean_lazy_array(where=where)
+            return self._getitem_outer_boolean_lazy_array(where)
 
         # an empty slice
         elif is_empty_slice(where):
