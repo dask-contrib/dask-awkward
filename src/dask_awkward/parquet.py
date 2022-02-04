@@ -292,3 +292,27 @@ def _fragment_to_partition(frag, columns, filters, schema):
         filter=pq._filters_to_expression(filters) if filters else None,
     )
     return from_arrow(table)
+
+
+def _write__metadata(path_list, fs, out_path):
+    """
+    path_list: list[str]
+        Input data files
+    fs: AbstractFileSystem instance
+    out_path: str
+        Root directory of the dataset
+    """
+    meta = None
+    out_path = out_path.rstrip("/")
+    for path in path_list:
+        assert path.startswith(out_path)
+        with fs.open(path, "rb") as f:
+            _meta = pq.ParquetFile(f).metadata
+        _meta.set_file_path(path[len(out_path) + 1 :])
+        if meta:
+            meta.append_row_groups(_meta)
+        else:
+            meta = _meta
+    metadata_path = "/".join([out_path, "_metadata"])
+    with fs.open(metadata_path, "wb") as fil:
+        meta.write_metadata_file(fil)
