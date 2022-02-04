@@ -223,3 +223,11 @@ def _lazyrecords() -> Array:
 
 def _lazyrecord() -> Array:
     return from_awkward(single_record_from_temp_file(), npartitions=1)
+
+
+def _lazyjsonrecords() -> Array:
+    with tempfile.NamedTemporaryFile("w", delete=False) as fp:
+        name = fp.name
+        fp.write(MANY_RECORDS)
+    arr = from_json([name, name])
+    return arr
