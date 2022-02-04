@@ -191,3 +191,35 @@ def test_record_collection() -> None:
 def test_scalar_collection() -> None:
     daa = _lazyrecords()
     assert type(daa["analysis"]["x1"][0][0]) is dakc.Scalar
+
+
+def test_is_typetracer() -> None:
+    daa = _lazyrecords()
+    assert not dakc.is_typetracer(daa)
+    assert not dakc.is_typetracer(daa[0])
+    assert not dakc.is_typetracer(daa["analysis"])
+    assert not dakc.is_typetracer(daa.compute())
+    assert dakc.is_typetracer(daa.meta)
+    assert dakc.is_typetracer(daa[0].meta)
+    assert dakc.is_typetracer(daa["analysis"].meta)
+    assert dakc.is_typetracer(daa["analysis"][0]["x1"][0].meta)
+
+
+def test_meta_or_identity() -> None:
+    daa = _lazyrecords()
+    assert dakc.is_typetracer(dakc.meta_or_identity(daa))
+    assert dakc.meta_or_identity(daa) is daa.meta
+    assert dakc.meta_or_identity(5) == 5
+
+
+def test_to_meta() -> None:
+    daa = _lazyrecords()
+    x1 = daa["analysis"]["x1"]
+    x1_0 = x1[0]
+    metad = dakc.to_meta(x1, 5, "ok", x1_0)
+    assert isinstance(metad, tuple)
+    for a, b in zip(metad, (x1.meta, 5, "ok", x1_0.meta)):
+        if dakc.is_typetracer(a):
+            assert a is b
+        else:
+            assert a == b
