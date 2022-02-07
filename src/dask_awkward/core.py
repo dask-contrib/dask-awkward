@@ -640,6 +640,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         return map_partitions(ufunc, *inputs, meta=new_meta, **kwargs)
 
+    # def to_parquet
+
 
 def _first_partition(array: Array) -> ak.Array:
     """Compute the first partition of an Array collection.

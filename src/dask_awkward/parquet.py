@@ -3,16 +3,17 @@ import operator
 
 import awkward._v2 as ak
 import awkward._v2.forms as forms
+import fsspec
 import numpy as np
 import pyarrow
 import pyarrow.dataset as pa_ds
 import pyarrow.parquet as pq
-from awkward._v2.operations.convert import from_arrow, from_buffers
+from awkward._v2.operations.convert import from_arrow, from_buffers, to_arrow
 from dask.base import tokenize
 from dask.highlevelgraph import HighLevelGraph, MaterializedLayer
 from fsspec.core import get_fs_token_paths
 
-from .core import new_array_object
+from .core import Scalar, new_array_object
 
 
 def _parquet_schema_to_form(schema):
@@ -294,8 +295,14 @@ def _fragment_to_partition(frag, columns, filters, schema):
     return from_arrow(table)
 
 
-def _write__metadata(path_list, fs, out_path):
+def _metadata_file_from_data_files(path_list, fs, out_path):
     """
+    Aggregate _metadata and _common_metadata from data files
+
+    Maybe only used in testing
+
+    (similar to fastparquet's merge)
+
     path_list: list[str]
         Input data files
     fs: AbstractFileSystem instance
@@ -313,6 +320,97 @@ def _write__metadata(path_list, fs, out_path):
             meta.append_row_groups(_meta)
         else:
             meta = _meta
+    _write_metadata(fs, out_path, meta)
+
+
+def _metadata_file_from_metas(fs, out_path, *metas):
+    """Agregate metadata from arrow objects and write"""
+    meta = metas[0]
+    for _meta in metas[1:]:
+        meta.append_row_groups(_meta)
+    _write_metadata(fs, out_path, meta)
+
+
+def _write_metadata(fs, out_path, meta):
+    """Output metadata files"""
     metadata_path = "/".join([out_path, "_metadata"])
     with fs.open(metadata_path, "wb") as fil:
         meta.write_metadata_file(fil)
+    metadata_path = "/".join([out_path, "_metadata"])
+    with fs.open(metadata_path, "wb") as fil:
+        meta.write_metadata_file(fil)
+
+
+def _write_partition(
+    data,
+    path,  # dataset root
+    fs,
+    filename,  # relative path within the dataset
+    # partition_on=Fa,  # must be top-level leaf (i.e., a simple column)
+    return_metadata=False,  # whether making global _metadata
+    compression=None,  # TBD
+    head=False,  # is this the first piece
+    # custom_metadata=None,
+):
+    t = pyarrow.Table.from_arrays([to_arrow(data)], ["data"])
+    md_list = []
+    with fs.open(fs.sep.join([path, filename]), "wb") as fil:
+        pq.write_table(
+            t,
+            fil,
+            compression=compression,
+            metadata_collector=md_list,
+        )
+
+    # Return the schema needed to write global _metadata
+    if return_metadata:
+        _meta = md_list[0]
+        _meta.set_file_path(filename)
+        d = {"meta": _meta}
+        if head:
+            # Only return schema if this is the "head" partition
+            d["schema"] = t.schema
+        return [d]
+    else:
+        return []
+
+
+def to_parquet(data, path, storage_options=None, write_metadata=False, compute=True):
+    """Write data to parquet format
+
+    Parameters
+    ----------
+    data: DaskAwrkardArray
+    path: str
+        Root directory of location to write to
+    storage_options: dict
+        rguments to pass to fsspec for creating the filesystem
+    write_metadata: bool
+        Whether to create _metadata and _common_metadata files
+    compute: bool
+        Whether to immediately start writing or to return the dask
+        collection which can be computed at the user's discression.
+
+    Returns
+    -------
+    If compute=False, a dask Scalar representing the process
+    """
+    fs, _ = fsspec.core.url_to_fs(path, **(storage_options or {}))
+    tok = tokenize(fs, data, path)
+    name = "write-parquet-" + tok
+    dsk = {
+        (name, i): (_write_partition, k, path, fs, f"part{i}.parquet", write_metadata)
+        for i, k in enumerate(data.__dask_keys__())
+    }
+    if write_metadata:
+        final_name = name + "-metadata"
+        dsk[final_name] = (_metadata_file_from_metas, fs, path) + tuple(dsk)
+    else:
+        final_name = name + "-finalize"
+        dsk[final_name] = (lambda *_: None,) + tuple(dsk)
+    graph = HighLevelGraph.from_collections(final_name, dsk, dependencies=[data])
+    out = Scalar(graph, final_name, "")
+    if compute:
+        out.compute()
+    else:
+        return out
