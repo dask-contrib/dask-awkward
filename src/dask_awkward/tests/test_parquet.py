@@ -11,13 +11,14 @@ data = [[1, 2, 3], [4, None], None]
 arr = pa.array(data)
 ds = pa.Table.from_arrays([arr], names=["arr"])
 fs = fsspec.filesystem("file")
+sample = (
+    "https://github.com/scikit-hep/awkward-1.0/raw/main/tests/"
+    "samples/nullable-record-primitives-simple.parquet"
+)
 
 
 def test_remote_single():
-    arr = dak.read_parquet(
-        "github://scikit-hep:awkward-1.0@/tests/samples/"
-        "nullable-record-primitives-simple.parquet"
-    )
+    arr = dak.read_parquet(sample)
     assert arr.compute().to_list() == [
         {"u4": None, "u8": 1},
         {"u4": None, "u8": 2},
@@ -28,14 +29,7 @@ def test_remote_single():
 
 
 def test_remote_double():
-    arr = dak.read_parquet(
-        [
-            "github://scikit-hep:awkward-1.0@/tests/samples/"
-            "nullable-record-primitives-simple.parquet",
-            "github://scikit-hep:awkward-1.0@/tests/samples/"
-            "nullable-record-primitives-simple.parquet",
-        ]
-    )
+    arr = dak.read_parquet([sample, sample])
     assert arr.npartitions == 2
     assert (
         arr.compute().to_list()
@@ -93,9 +87,14 @@ def test_write_simple(tmpdir):
     tmpdir = str(tmpdir)
     arr = dak.from_awkward(ak.from_iter(data), 2)
     to_parquet(arr, tmpdir)
-    files = fs.ls(tmpdir)
-    assert files == ["/".join([tmpdir, _]) for _ in ["part0.parquet", "part1.parquet"]]
-    # arr = dak.read_parquet(tmpdir)
-
+    files = set(fs.ls(tmpdir))
+    assert files == {"/".join([tmpdir, _]) for _ in ["part0.parquet", "part1.parquet"]}
     t = pq.read_table(tmpdir)
     assert t.to_pydict()["data"] == data
+
+
+def test_write_roundtrip(tmpdir):
+    tmpdir = str(tmpdir)
+    arr = dak.from_awkward(ak.from_iter(data), 2)
+    to_parquet(arr, tmpdir)
+    arr = dak.read_parquet(tmpdir)

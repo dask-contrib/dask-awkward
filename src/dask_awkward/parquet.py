@@ -352,7 +352,7 @@ def _write_partition(
     head=False,  # is this the first piece
     # custom_metadata=None,
 ):
-    t = pyarrow.Table.from_arrays([to_arrow(data)], ["data"])
+    t = pyarrow.Table.from_arrays([to_arrow(data, extensionarray=False)], ["data"])
     md_list = []
     with fs.open(fs.sep.join([path, filename]), "wb") as fil:
         pq.write_table(
@@ -384,7 +384,7 @@ def to_parquet(data, path, storage_options=None, write_metadata=False, compute=T
     path: str
         Root directory of location to write to
     storage_options: dict
-        rguments to pass to fsspec for creating the filesystem
+        arguments to pass to fsspec for creating the filesystem
     write_metadata: bool
         Whether to create _metadata and _common_metadata files
     compute: bool
