@@ -82,13 +82,18 @@ def test_dir_of_two_files_metadata(tmpdir, ignore_metadata):
 
 
 def test_write_simple(tmpdir):
+    import os
+
     import pyarrow.parquet as pq
 
     tmpdir = str(tmpdir)
     arr = dak.from_awkward(ak.from_iter(data), 2)
     to_parquet(arr, tmpdir)
-    files = set(fs.ls(tmpdir))
-    assert files == {"/".join([tmpdir, _]) for _ in ["part0.parquet", "part1.parquet"]}
+    files = fs.ls(tmpdir)
+    assert [os.path.basename(_) for _ in sorted(files)] == [
+        "part0.parquet",
+        "part1.parquet",
+    ]
     t = pq.read_table(tmpdir)
     assert t.to_pydict()["data"] == data
 
