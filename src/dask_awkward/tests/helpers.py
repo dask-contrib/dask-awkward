@@ -18,7 +18,7 @@ import dask_awkward as dak
 
 from ..core import Array, Record, from_awkward
 from ..io import from_json
-from ..utils import idemptotent_concatenate
+from ..utils import idempotent_concatenate
 
 # fmt: off
 MANY_RECORDS = \
@@ -60,8 +60,8 @@ def aeq(a, b):
     assert a_comp.tolist() == b_comp.tolist()
 
     # then check forms
-    a_concated_form = idemptotent_concatenate(a_tt).layout.form
-    b_concated_form = idemptotent_concatenate(b_tt).layout.form
+    a_concated_form = idempotent_concatenate(a_tt).layout.form
+    b_concated_form = idempotent_concatenate(b_tt).layout.form
     assert a_concated_form == b_concated_form
     if a_is_coll:
         assert a_comp.layout.form == a_concated_form

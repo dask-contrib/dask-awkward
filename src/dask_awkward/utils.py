@@ -58,5 +58,5 @@ def is_empty_slice(s: Any) -> bool:
     return True
 
 
-def idemptotent_concatenate(x: ak.Array) -> ak.Array:
+def idempotent_concatenate(x: ak.Array) -> ak.Array:
     return ak.concatenate([x, x[0:0]])
