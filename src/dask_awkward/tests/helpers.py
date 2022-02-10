@@ -18,7 +18,6 @@ import dask_awkward as dak
 
 from ..core import Array, Record, from_awkward
 from ..io import from_json
-from ..utils import idempotent_concatenate
 
 # fmt: off
 MANY_RECORDS = \
@@ -46,6 +45,10 @@ MANY_RECORDS = \
 
 SINGLE_RECORD = """{"a":[1,2,3]}"""
 # fmt: on
+
+
+def idempotent_concatenate(x: ak.Array) -> ak.Array:
+    return ak.concatenate([x, x[0:0]])
 
 
 def aeq(a, b):
