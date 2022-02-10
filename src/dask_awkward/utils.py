@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import awkward._v2 as ak
 import numpy as np
 
 
@@ -55,3 +56,7 @@ def is_empty_slice(s: Any) -> bool:
     if s.step is not None:
         return False
     return True
+
+
+def idemptotent_concatenate(x: ak.Array) -> ak.Array:
+    return ak.concatenate([x, x[0:0]])

@@ -14,8 +14,11 @@ import fsspec
 import pytest
 from dask.base import is_dask_collection
 
+import dask_awkward as dak
+
 from ..core import Array, Record, from_awkward
 from ..io import from_json
+from ..utils import idemptotent_concatenate
 
 # fmt: off
 MANY_RECORDS = \
@@ -45,31 +48,52 @@ SINGLE_RECORD = """{"a":[1,2,3]}"""
 # fmt: on
 
 
+def aeq(a, b):
+    a_is_coll = is_dask_collection(a)
+    b_is_coll = is_dask_collection(b)
+    a_comp = a.compute() if a_is_coll else a
+    b_comp = b.compute() if b_is_coll else b
+    a_tt = dak.typetracer_array(a)
+    b_tt = dak.typetracer_array(b)
+
+    # first check high level values
+    assert a_comp.tolist() == b_comp.tolist()
+
+    # then check forms
+    a_concated_form = idemptotent_concatenate(a_tt).layout.form
+    b_concated_form = idemptotent_concatenate(b_tt).layout.form
+    assert a_concated_form == b_concated_form
+    if a_is_coll:
+        assert a_comp.layout.form == a_concated_form
+    if b_is_coll:
+        assert b_comp.layout.form == b_concated_form
+
+    # check the unconcatenated versions as well
+    if a_is_coll and not b_is_coll:
+        assert b_tt.layout.form == a.partitions[0].compute().layout.form
+    if not a_is_coll and b_is_coll:
+        assert a_tt.layout.form == b.partitions[0].compute().layout.form
+
+
 def assert_eq(a: Any, b: Any) -> None:
     if isinstance(a, (Array, ak.Array)):
-        assert_eq_arrays(a, b)
+        aeq(a, b)
     elif isinstance(a, (Record, ak.Record)):
-        assert_eq_records(a, b)
+        aeq(a, b)
     else:
         assert_eq_other(a, b)
 
 
 def assert_eq_arrays(a: Array | ak.Array, b: Array | ak.Array) -> None:
-    if is_dask_collection(a) and not is_dask_collection(b):
-        assert a.compute().to_list() == b.to_list()
-    if is_dask_collection(b) and not is_dask_collection(a):
-        assert a.to_list() == b.compute().to_list()
-    if not is_dask_collection(a) and not is_dask_collection(b):
-        assert a.to_list() == b.to_list()
+    ares = a.compute() if is_dask_collection(a) else a
+    bres = b.compute() if is_dask_collection(b) else b
+    assert ares.tolist() == bres.tolist()
 
 
 def assert_eq_records(a: Record | ak.Record, b: Record | ak.Record) -> None:
-    if is_dask_collection(a) and not is_dask_collection(b):
-        assert a.compute().to_list() == b.to_list()
-    if is_dask_collection(b) and not is_dask_collection(a):
-        assert a.to_list() == b.compute().to_list()
-    if not is_dask_collection(a) and not is_dask_collection(b):
-        assert a.to_list() == b.to_list()
+    ares = a.compute() if is_dask_collection(a) else a
+    bres = b.compute() if is_dask_collection(b) else b
+    assert ares.tolist() == bres.tolist()
 
 
 def assert_eq_other(a: Any, b: Any) -> None:

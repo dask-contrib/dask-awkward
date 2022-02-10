@@ -1049,6 +1049,13 @@ def to_meta(objects: Sequence[Any]) -> tuple:
     return tuple(map(meta_or_identity, objects))
 
 
+def typetracer_array(a: ak.Array | Array) -> ak.Array:
+    if isinstance(a, Array):
+        return a.typetracer
+    else:
+        return ak.Array(a.layout.typetracer)
+
+
 class TrivialPartitionwiseOp:
     def __init__(
         self,

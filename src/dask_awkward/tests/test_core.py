@@ -259,3 +259,11 @@ def test_array_dir() -> None:
     d = dir(a)
     for f in a.fields:
         assert f in d
+
+
+def test_typetracer_function() -> None:
+    daa = _lazyrecords()
+    aa = daa.compute()
+    assert dak.typetracer_array(daa) is not None
+    assert dak.typetracer_array(daa) is daa.typetracer
+    assert dak.typetracer_array(aa).layout.form == aa.layout.form
