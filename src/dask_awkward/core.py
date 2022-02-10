@@ -5,7 +5,7 @@ import operator
 from functools import partial
 from math import ceil
 from numbers import Number
-from typing import TYPE_CHECKING, Any, Callable, Mapping
+from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence
 
 import awkward._v2 as ak
 import awkward._v2._typetracer as aktt
@@ -417,61 +417,102 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         """
         return IndexCallable(self._partitions)
 
-    def _getitem_single_obj_map_partitions(self, where: Any) -> Array:
-        """Array getitem call where only map_partitions is necessary.
+    def _getitem_trivial_map_partitions(
+        self,
+        where: Any,
+        meta: Any | None = None,
+    ) -> Any:
+        if meta is None and self.meta is not None:
+            if isinstance(where, tuple):
+                metad = to_meta(where)
+                meta = self.meta[metad]
+            else:
+                m = to_meta([where])[0]
+                meta = self.meta[m]
+        return self.map_partitions(operator.getitem, where, meta=meta)
 
-        This is the simplest getitem path, where each partition is
-        treated identically; e.g. a single string or list of strings.
+    def _getitem_outer_boolean_lazy_array(self, where: Array | tuple) -> Any:
+        ba = where if isinstance(where, Array) else where[0]
+        if ba.known_divisions and self.known_divisions:
+            if ba.divisions != self.divisions:
+                raise ValueError(
+                    "The boolean array must be partitioned in the same way as this array."
+                )
+        else:
+            if ba.npartitions != self.npartitions:
+                raise ValueError(
+                    "The boolean array must be partitioned in the same way as this array."
+                )
 
-        Parameters
-        ----------
-        where : Any
-            Key of the getitem call.
+        new_meta: Any | None = None
+        if self.meta is not None:
+            if isinstance(where, tuple):
+                if not isinstance(where[0], Array):
+                    raise TypeError("Expected where[0] to be an Array collection.")
+                metad = to_meta(where)
+                new_meta = self.meta[metad]
+                rest = tuple(where[1:])
+                return self.map_partitions(
+                    operator.getitem,
+                    where[0],
+                    *rest,
+                    meta=new_meta,
+                )
+            elif isinstance(where, Array):
+                new_meta = self.meta[where.meta]
+                return self.map_partitions(
+                    operator.getitem,
+                    where,
+                    meta=new_meta,
+                )
 
-        Returns
-        -------
-        Array
-            Resulting collection.
+    def _getitem_outer_str_or_list(self, where: str | list | tuple) -> Any:
+        new_meta: Any | None = None
+        if self.meta is not None:
+            if isinstance(where, tuple):
+                if not isinstance(where[0], (str, list)):
+                    raise TypeError("Expected where[0] to be a string or list")
+                metad = to_meta(where)
+                new_meta = self.meta[metad]
+            elif isinstance(where, (str, list)):
+                new_meta = self.meta[where]
+        return self._getitem_trivial_map_partitions(where, meta=new_meta)
 
-        """
-        token = tokenize(self, where)
-        name = f"getitem-{token}"
-        graphlayer = partitionwise_layer(
-            lambda x, gikey: operator.getitem(x, gikey), name, self, gikey=where
-        )
-        hlg = HighLevelGraph.from_collections(name, graphlayer, dependencies=[self])
-        (m,) = to_meta(where)
-        new_meta = self.meta[m] if self.meta is not None else None
-        return new_array_object(hlg, name, meta=new_meta, divisions=self.divisions)
-
-    def _getitem_single_string(self, where: str) -> Array:
-        return self._getitem_single_obj_map_partitions(where)
-
-    def _getitem_single_list(self, where: list[str]) -> Array:
-        return self._getitem_single_obj_map_partitions(where)
-
-    def _getitem_single_int(self, where: int) -> Any:
-        # determine which partition to grab from (pidx) and which
-        # index _inside_ of (relative to) that partition to then call
-        # getitem with (rewriting key).
+    def _getitem_outer_int(self, where: int | tuple) -> Any:
         self._divisions = calculate_known_divisions(self)
-        pidx, where = normalize_single_outer_inner_index(self.divisions, where)  # type: ignore
-        partition = self.partitions[pidx]
-        new_meta = partition.meta[where]
+
+        new_meta: Any | None = None
+        # multiple objects passed to getitem. collections passed in
+        # the tuple of objects have not been tested!
+        if isinstance(where, tuple):
+            if not isinstance(where[0], int):
+                raise TypeError("Expected where[0] to be and integer.")
+            pidx, outer_where = normalize_single_outer_inner_index(
+                self.divisions, where[0]  # type: ignore
+            )
+            partition = self.partitions[pidx]
+            rest = where[1:]
+            where = (outer_where, *rest)
+            if partition.meta is not None:
+                metad = to_meta(where)
+                new_meta = partition.meta[metad]
+        # single object passed to getitem
+        elif isinstance(where, int):
+            pidx, where = normalize_single_outer_inner_index(self.divisions, where)  # type: ignore
+            partition = self.partitions[pidx]
+            if partition.meta is not None:
+                new_meta = partition.meta[where]
 
         # if we know a new array is going to be made, just call the
         # trivial inner on the new partition.
         if isinstance(new_meta, ak.Array):
-            result = partition._getitem_single_obj_map_partitions(where)
+            result = partition._getitem_trivial_map_partitions(where, meta=new_meta)
             result._divisions = (0, None)
             return result
 
         # otherwise make sure we have one of the other potential results.
-        if not (
-            isinstance(new_meta, ak.Record)
-            or isinstance(new_meta, aktt.UnknownScalar)
-            or isinstance(new_meta, aktt.OneOf)
-            or isinstance(new_meta, aktt.MaybeNone)
+        if not isinstance(
+            new_meta, (ak.Record, aktt.UnknownScalar, aktt.OneOf, aktt.MaybeNone)
         ):
             raise NotImplementedError("Key not supported for this array.")
 
@@ -490,48 +531,43 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         else:
             return new_scalar_object(hlg, name, new_meta)
 
-    def _getitem_single_boolean_lazy_array(self, where: Array) -> Any:
-        if where.known_divisions and self.known_divisions:
-            if where.divisions != self.divisions:
-                raise ValueError(
-                    "The boolean array (they where in this getitem call) "
-                    "must be partitioned in the same way as this array."
-                )
-        else:
-            if where.npartitions != self.npartitions:
-                raise ValueError(
-                    "The boolean array (they where in this getitem call) "
-                    "must be partitioned in the same way as this array."
-                )
+    def _getitem_tuple(self, where: tuple) -> Array:
+        if isinstance(where[0], int):
+            return self._getitem_outer_int(where)
 
-        new_meta = None
-        if where.meta is not None:
-            new_meta = operator.getitem(self.meta, where.meta)  # type: ignore
+        elif isinstance(where[0], str):
+            return self._getitem_outer_str_or_list(where)
 
-        return map_partitions(operator.getitem, self, where, meta=new_meta)
+        elif isinstance(where[0], list):
+            return self._getitem_outer_str_or_list(where)
 
-    def _getitem_tuple(self, where: tuple[Any, ...]) -> Array:
+        # boolean array
+        elif isinstance(where[0], Array) and issubclass(
+            where[0].layout.content.dtype.type, (np.bool_, bool)
+        ):
+            return self._getitem_outer_boolean_lazy_array(where=where)
+
         raise NotImplementedError(
-            "Array.__getitem__ doesn't (yet) support multi-object (tuple) slices."
+            f"Array.__getitem__ doesn't support multi-object: {where}."
         )
 
     def _getitem_single(self, where: Any) -> Array:
 
         # a single string
         if isinstance(where, str):
-            return self._getitem_single_string(where)
+            return self._getitem_outer_str_or_list(where)
 
         elif isinstance(where, list):
-            return self._getitem_single_list(where)
+            return self._getitem_outer_str_or_list(where)
 
         # a single integer
         elif isinstance(where, int):
-            return self._getitem_single_int(where)
+            return self._getitem_outer_int(where)
 
         elif isinstance(where, Array) and issubclass(
             where.layout.content.dtype.type, (np.bool_, bool)
         ):
-            return self._getitem_single_boolean_lazy_array(where=where)
+            return self._getitem_outer_boolean_lazy_array(where)
 
         # an empty slice
         elif is_empty_slice(where):
@@ -539,7 +575,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         # a single ellipsis
         elif where is Ellipsis:
-            return self._getitem_single_obj_map_partitions(where)
+            return self._getitem_trivial_map_partitions(where)
 
         raise NotImplementedError(f"__getitem__ doesn't support where={where}")
 
@@ -692,7 +728,7 @@ def new_array_object(
     name: str,
     meta: ak.Array | None = None,
     npartitions: int | None = None,
-    divisions: tuple[Any, ...] | None = None,
+    divisions: tuple | None = None,
 ) -> Array:
     """Instantiate a new Array collection object.
 
@@ -787,7 +823,7 @@ def map_partitions(
     func: Callable,
     *args: Any,
     name: str | None = None,
-    meta: ak.Array | None = None,
+    meta: Any | None = None,
     **kwargs: Any,
 ) -> Array:
     """Map a callable across all partitions of a collection.
@@ -803,6 +839,8 @@ def map_partitions(
     name : str, optional
         Name for the Dask graph layer; if left to ``None`` (default),
         the name of the function will be used.
+    meta : Any, optional
+        Metadata (typetracer) information of the result (if known).
     **kwargs : Any
         Additional keyword arguments passed to the `func`.
 
@@ -820,7 +858,7 @@ def map_partitions(
         v for _, v in kwargs.items() if is_dask_collection(v)
     ]
     hlg = HighLevelGraph.from_collections(name, lay, dependencies=deps)
-    return new_array_object(hlg, name, meta, divisions=args[0].divisions)
+    return new_array_object(hlg, name=name, meta=meta, divisions=args[0].divisions)
 
 
 def pw_reduction_with_agg_to_scalar(
@@ -891,25 +929,6 @@ def calculate_known_divisions(array: Array) -> tuple[int, ...]:
 
     # if only 1 partition just get it's length
     return (0, array.map_partitions(len).compute())
-
-
-class TrivialPartitionwiseOp:
-    def __init__(
-        self,
-        func: Callable,
-        *,
-        name: str | None = None,
-        **kwargs: Any,
-    ) -> None:
-        self._func = func
-        self.name = func.__name__ if name is None else name
-        self._kwargs = kwargs
-
-    def __call__(self, collection: Array, **kwargs: Any) -> Array:
-        # overwrite any saved kwargs in self._kwargs
-        for k, v in kwargs.items():
-            self._kwargs[k] = v
-        return map_partitions(self._func, collection, name=self.name, **self._kwargs)
 
 
 def _type(array: Array) -> Type | None:
@@ -1026,5 +1045,30 @@ def meta_or_identity(obj: Any) -> Any:
     return obj
 
 
-def to_meta(*objects: Any) -> tuple[Any, ...]:
+def to_meta(objects: Sequence[Any]) -> tuple:
     return tuple(map(meta_or_identity, objects))
+
+
+class TrivialPartitionwiseOp:
+    def __init__(
+        self,
+        func: Callable,
+        *,
+        name: str | None = None,
+        **kwargs: Any,
+    ) -> None:
+        self._func = func
+        self.name = func.__name__ if name is None else name
+        self._kwargs = kwargs
+
+    def __call__(self, collection: Array, **kwargs: Any) -> Array:
+        # overwrite any saved kwargs in self._kwargs
+        for k, v in kwargs.items():
+            self._kwargs[k] = v
+        try:
+            new_meta = self._func(collection.meta, **kwargs)
+        except NotImplementedError:
+            new_meta = None
+        return map_partitions(
+            self._func, collection, name=self.name, meta=new_meta, **self._kwargs
+        )

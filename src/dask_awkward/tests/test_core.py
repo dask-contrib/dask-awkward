@@ -216,10 +216,46 @@ def test_to_meta() -> None:
     daa = _lazyrecords()
     x1 = daa["analysis"]["x1"]
     x1_0 = x1[0]
-    metad = dakc.to_meta(x1, 5, "ok", x1_0)
+    metad = dakc.to_meta([x1, 5, "ok", x1_0])
     assert isinstance(metad, tuple)
     for a, b in zip(metad, (x1.meta, 5, "ok", x1_0.meta)):
         if dakc.is_typetracer(a):
             assert a is b
         else:
             assert a == b
+
+
+def test_record_str() -> None:
+    daa = _lazyrecords()
+    r = daa[0]
+    assert str(r) == "dask.awkward<getitem, type=Record>"
+
+
+def test_record_fields() -> None:
+    daa = _lazyrecords()
+    r = daa[0]
+    r.meta = None
+    assert r.fields is None
+
+
+def test_record_meta_setter() -> None:
+    daa = _lazyrecords()
+    r = daa[0]
+    with pytest.raises(TypeError, match="meta must be a Record"):
+        r.meta = "test"
+
+
+def test_record_dir() -> None:
+    daa = _lazyrecords()
+    r = daa["analysis"][0]
+    d = dir(r)
+    for f in r.fields:
+        assert f in d
+
+
+def test_array_dir() -> None:
+    daa = _lazyrecords()
+    a = daa["analysis"]
+    d = dir(a)
+    for f in a.fields:
+        assert f in d
