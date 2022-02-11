@@ -8,7 +8,7 @@ import numpy as np
 import pyarrow
 import pyarrow.dataset as pa_ds
 import pyarrow.parquet as pq
-from awkward._v2.operations.convert import from_arrow, from_buffers, to_arrow
+from awkward._v2.operations.convert import from_arrow, from_buffers, to_arrow_table
 from dask.base import tokenize
 from dask.highlevelgraph import HighLevelGraph, MaterializedLayer
 from fsspec.core import get_fs_token_paths
@@ -352,7 +352,7 @@ def _write_partition(
     head=False,  # is this the first piece
     # custom_metadata=None,
 ):
-    t = pyarrow.Table.from_arrays([to_arrow(data, extensionarray=False)], ["data"])
+    t = to_arrow_table(data)
     md_list = []
     with fs.open(fs.sep.join([path, filename]), "wb") as fil:
         pq.write_table(
@@ -395,6 +395,13 @@ def to_parquet(data, path, storage_options=None, write_metadata=False, compute=T
     -------
     If compute=False, a dask Scalar representing the process
     """
+    # TODO options we need:
+    #  - compression per data type or per leaf column ("path.to.leaf": "zstd" format)
+    #  - byte stream split for floats if compression is not None or lzma
+    #  - partitioning
+    #  - parquet 2 for full set of time and int types
+    #  - v2 data page (for possible later fastparquet implementation)
+    #  - dict encoding always off
     fs, _ = fsspec.core.url_to_fs(path, **(storage_options or {}))
     tok = tokenize(fs, data, path)
     name = "write-parquet-" + tok
