@@ -59,12 +59,19 @@ def aeq(a, b):
     a_tt = dak.typetracer_array(a)
     b_tt = dak.typetracer_array(b)
 
+    assert a_tt is not None
+    assert b_tt is not None
+
     # checking forms
     a_concated_form = idempotent_concatenate(a_tt).layout.form
     b_concated_form = idempotent_concatenate(b_tt).layout.form
     assert a_concated_form == b_concated_form
+    # if a is a collection its computed from should be the same the
+    # concated version
     if a_is_coll:
         assert a_comp.layout.form == a_concated_form
+    # if b is a collection its computed from should be the same the
+    # concated version
     if b_is_coll:
         assert b_comp.layout.form == b_concated_form
 
@@ -73,6 +80,13 @@ def aeq(a, b):
         assert b_tt.layout.form == a.partitions[0].compute().layout.form
     if not a_is_coll and b_is_coll:
         assert a_tt.layout.form == b.partitions[0].compute().layout.form
+
+    # check divisions if both collections
+    if a_is_coll and b_is_coll:
+        if a.known_divisions and b.known_divisions:
+            assert a.divisions == b.divisions
+        else:
+            assert a.npartitions == b.npartitions
 
     # finally check the values
     assert a_comp.tolist() == b_comp.tolist()
