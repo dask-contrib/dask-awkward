@@ -19,7 +19,7 @@ line_length = 88
 src_paths = ["src", "tests"]
 
 [tool.mypy]
-python_version = "3.7"
+python_version = "3.8"
 files = ["src"]
 warn_unused_configs = true
 

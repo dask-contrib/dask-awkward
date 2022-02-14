@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import keyword
 import operator
-from functools import partial
+from functools import cached_property, partial
 from math import ceil
 from numbers import Number
 from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence
@@ -16,7 +16,7 @@ from dask.base import DaskMethodsMixin, dont_optimize, is_dask_collection, token
 from dask.blockwise import blockwise as upstream_blockwise
 from dask.highlevelgraph import HighLevelGraph
 from dask.threaded import get as threaded_get
-from dask.utils import IndexCallable, cached_property, funcname, key_split
+from dask.utils import IndexCallable, funcname, key_split
 
 from .utils import is_empty_slice, normalize_single_outer_inner_index
 
