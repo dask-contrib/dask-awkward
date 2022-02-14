@@ -59,10 +59,7 @@ def aeq(a, b):
     a_tt = dak.typetracer_array(a)
     b_tt = dak.typetracer_array(b)
 
-    # first check high level values
-    assert a_comp.tolist() == b_comp.tolist()
-
-    # then check forms
+    # checking forms
     a_concated_form = idempotent_concatenate(a_tt).layout.form
     b_concated_form = idempotent_concatenate(b_tt).layout.form
     assert a_concated_form == b_concated_form
@@ -76,6 +73,9 @@ def aeq(a, b):
         assert b_tt.layout.form == a.partitions[0].compute().layout.form
     if not a_is_coll and b_is_coll:
         assert a_tt.layout.form == b.partitions[0].compute().layout.form
+
+    # finally check the values
+    assert a_comp.tolist() == b_comp.tolist()
 
 
 def assert_eq(a: Any, b: Any) -> None:
