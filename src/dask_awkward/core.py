@@ -1022,6 +1022,26 @@ def is_awkward_collection(obj: Any) -> bool:
 
 
 def is_typetracer(obj: Any) -> bool:
+    """Check if an object is an Awkward typetracer.
+
+    Typetracers can be one of these categories:
+    - Array
+    - Record
+    - UnknownScalar
+    - MaybeNone
+    - OneOf
+
+    Parameters
+    ----------
+    obj : Any
+        The object to test.
+
+    Returns
+    -------
+    bool
+        True if the `obj` is a typetracer like object.
+
+    """
     # array typetracer
     if isinstance(obj, ak.Array):
         if not obj.layout.nplike.known_shape and not obj.layout.nplike.known_data:
@@ -1040,12 +1060,56 @@ def is_typetracer(obj: Any) -> bool:
 
 
 def meta_or_identity(obj: Any) -> Any:
+    """Retrieve the meta of an object or simply pass through.
+
+    Parameters
+    ----------
+    obj : Any
+        The object of interest.
+
+    Returns
+    -------
+    Any
+        If `obj` is an Awkward Dask collection it is `obj.meta`; if
+        not we simply return `obj`.
+
+    Examples
+    --------
+    >>> import awkward._v2 as ak
+    >>> import dask_awkward as dak
+    >>> from dask_awkward.core import meta_or_identity
+    >>> x = ak.from_iter([[1, 2, 3], [4]])
+    >>> x = dak.from_awkward(x, npartitions=2)
+    >>> x
+    dask.awkward<from-awkward, npartitions=2>
+    >>> meta_or_identity(x)
+    <Array-typetracer type='?? * var * int64'>
+    >>> meta_or_identity(5)
+    5
+    >>> meta_or_identity("foo")
+    'foo'
+
+    """
     if is_awkward_collection(obj):
         return obj.meta
     return obj
 
 
 def to_meta(objects: Sequence[Any]) -> tuple:
+    """In a sequence convert Dask Awkward collections to their metas.
+
+    Parameters
+    ----------
+    objects : Sequence[Any]
+        Sequence of objects.
+
+    Returns
+    -------
+    tuple
+        The sequence of objects where collections have been replaced
+        with their metadata.
+
+    """
     return tuple(map(meta_or_identity, objects))
 
 
