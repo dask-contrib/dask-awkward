@@ -266,4 +266,6 @@ def test_typetracer_function() -> None:
     aa = daa.compute()
     assert dak.typetracer_array(daa) is not None
     assert dak.typetracer_array(daa) is daa.typetracer
-    assert dak.typetracer_array(aa).layout.form == aa.layout.form
+    tta = dak.typetracer_array(aa)
+    assert tta is not None
+    assert tta.layout.form == aa.layout.form
