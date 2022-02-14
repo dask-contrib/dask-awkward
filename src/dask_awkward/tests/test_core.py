@@ -264,8 +264,8 @@ def test_array_dir() -> None:
 def test_typetracer_function() -> None:
     daa = _lazyrecords()
     aa = daa.compute()
-    assert dak.typetracer_array(daa) is not None
-    assert dak.typetracer_array(daa) is daa.typetracer
-    tta = dak.typetracer_array(aa)
+    assert dakc.typetracer_array(daa) is not None
+    assert dakc.typetracer_array(daa) is daa.typetracer
+    tta = dakc.typetracer_array(aa)
     assert tta is not None
     assert tta.layout.form == aa.layout.form
