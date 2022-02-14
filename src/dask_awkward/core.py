@@ -378,7 +378,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         graph = HighLevelGraph.from_collections(name, dsk, dependencies=[self])
 
         # if a single partition was requested we trivially know the new divisions.
-        if len(raw) == 1 and isinstance(raw[0], int) and self.known_divisions:
+        if len(raw) == 1 and isinstance(raw[0], int) and self.known_divisions:  # type: ignore
             new_divisions = (
                 0,
                 self.divisions[raw[0] + 1] - self.divisions[raw[0]],  # type: ignore
