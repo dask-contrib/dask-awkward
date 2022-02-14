@@ -4,11 +4,11 @@ import pytest
 
 import dask_awkward as dak
 import dask_awkward.core as dakc
+from dask_awkward.testutils import assert_eq
 
 from .helpers import (  # noqa: F401
     _lazyrecord,
     _lazyrecords,
-    assert_eq,
     line_delim_records_file,
     load_records_eager,
 )
@@ -126,7 +126,7 @@ def test_new_array_object_raises(line_delim_records_file) -> None:  # noqa: F811
 
 def test_partitions() -> None:
     daa = _lazyrecords()
-    lop = list(daa.partitions)
+    lop = list(daa.partitions)  # type: ignore
     for part in lop:
         assert part.npartitions == 1
     assert len(lop) == daa.npartitions
