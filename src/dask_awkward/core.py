@@ -1018,6 +1018,19 @@ def from_awkward(source: ak.Array, npartitions: int, name: str | None = None) ->
 
 
 def is_awkward_collection(obj: Any) -> bool:
+    """Check if an object is a Dask Awkward collection.
+
+    Parameters
+    ----------
+    obj : Any
+        The object of interest.
+
+    Returns
+    -------
+    bool
+        True if `obj` is an Awkward Dask collection.
+
+    """
     return isinstance(obj, (Array, Record, Scalar))
 
 
