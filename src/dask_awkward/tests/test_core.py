@@ -11,6 +11,7 @@ from .helpers import (  # noqa: F401
     _lazyrecords,
     line_delim_records_file,
     load_records_eager,
+    load_records_lazy,
 )
 
 
@@ -184,7 +185,8 @@ def test_record_collection() -> None:
     daa = _lazyrecords()
     assert type(daa[0]) is dakc.Record
     aa = daa.compute()
-    assert daa[0].compute().tolist() == aa[0].tolist()
+    assert_eq(daa[0], aa[0])
+    # assert daa[0].compute().tolist() == aa[0].tolist()
 
 
 def test_scalar_collection() -> None:
@@ -268,3 +270,11 @@ def test_typetracer_function() -> None:
     tta = dakc.typetracer_array(aa)
     assert tta is not None
     assert tta.layout.form == aa.layout.form
+
+
+def test_single_partition(line_delim_records_file) -> None:  # noqa: F811
+    daa = load_records_lazy(line_delim_records_file, by_file=True, n_times=1)
+    caa = load_records_eager(line_delim_records_file)
+    assert daa.npartitions == 1
+    assert_eq(daa, caa)
+    assert_eq(caa, daa)

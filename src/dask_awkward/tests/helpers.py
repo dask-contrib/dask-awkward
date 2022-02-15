@@ -63,7 +63,7 @@ def single_record_file(tmpdir_factory):
 
 @pytest.fixture(scope="session")
 def daa(tmpdir_factory):
-    """Fixture providing a file name pointing to line deliminted JSON records."""
+    """Fixture providing a Dask Awkward Array collection."""
     fn = tmpdir_factory.mktemp("data").join("records.json")
     with open(fn, "w") as f:
         f.write(MANY_RECORDS)
@@ -72,7 +72,7 @@ def daa(tmpdir_factory):
 
 @pytest.fixture(scope="session")
 def caa(tmpdir_factory):
-    """Fixture providing a file name pointing to line deliminted JSON records."""
+    """Fixture providing a concrete Awkward Array."""
     fn = tmpdir_factory.mktemp("data").join("records.json")
     with open(fn, "w") as f:
         f.write(MANY_RECORDS)

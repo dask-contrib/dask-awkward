@@ -135,6 +135,11 @@ class Record(Scalar):
             raise TypeError(f"meta must be a Record typetracer object, not a {type(m)}")
         self._meta = m
 
+    @property
+    def npartitions(self):
+        """Records are unpartitioned by definition."""
+        return 1
+
     def __getitem__(self, key: str) -> Any:
         token = tokenize(self, key)
         name = f"getitem-{token}"
