@@ -546,6 +546,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         elif isinstance(where[0], list):
             return self._getitem_outer_str_or_list(where)
 
+        elif isinstance(where[0], slice) and is_empty_slice(where[0]):
+            return self._getitem_trivial_map_partitions(where)
+
         # boolean array
         elif isinstance(where[0], Array) and issubclass(
             where[0].layout.content.dtype.type, (np.bool_, bool)
@@ -577,6 +580,12 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         # an empty slice
         elif is_empty_slice(where):
             return self
+
+        # non-empty slice is not supported yet
+        elif isinstance(where, slice):
+            raise NotImplementedError(
+                "__getitem__ with a non-empty slice is not supported yet."
+            )
 
         # a single ellipsis
         elif where is Ellipsis:
