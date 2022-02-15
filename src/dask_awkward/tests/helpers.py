@@ -7,14 +7,12 @@ except ImportError:
 
 import os
 import tempfile
-from typing import Any
 
 import awkward._v2 as ak
 import fsspec
 import pytest
-from dask.base import is_dask_collection
 
-from ..core import Array, Record, from_awkward
+from ..core import Array, from_awkward
 from ..io import from_json
 
 # fmt: off
@@ -45,42 +43,6 @@ SINGLE_RECORD = """{"a":[1,2,3]}"""
 # fmt: on
 
 
-def assert_eq(a: Any, b: Any) -> None:
-    if isinstance(a, (Array, ak.Array)):
-        assert_eq_arrays(a, b)
-    elif isinstance(a, (Record, ak.Record)):
-        assert_eq_records(a, b)
-    else:
-        assert_eq_other(a, b)
-
-
-def assert_eq_arrays(a: Array | ak.Array, b: Array | ak.Array) -> None:
-    if is_dask_collection(a) and not is_dask_collection(b):
-        assert a.compute().to_list() == b.to_list()
-    if is_dask_collection(b) and not is_dask_collection(a):
-        assert a.to_list() == b.compute().to_list()
-    if not is_dask_collection(a) and not is_dask_collection(b):
-        assert a.to_list() == b.to_list()
-
-
-def assert_eq_records(a: Record | ak.Record, b: Record | ak.Record) -> None:
-    if is_dask_collection(a) and not is_dask_collection(b):
-        assert a.compute().to_list() == b.to_list()
-    if is_dask_collection(b) and not is_dask_collection(a):
-        assert a.to_list() == b.compute().to_list()
-    if not is_dask_collection(a) and not is_dask_collection(b):
-        assert a.to_list() == b.to_list()
-
-
-def assert_eq_other(a: Any, b: Any) -> None:
-    if is_dask_collection(a) and not is_dask_collection(b):
-        assert a.compute() == b
-    if is_dask_collection(b) and not is_dask_collection(a):
-        assert a == b.compute()
-    if not is_dask_collection(a) and not is_dask_collection(b):
-        assert a == b
-
-
 @pytest.fixture(scope="session")
 def line_delim_records_file(tmpdir_factory):
     """Fixture providing a file name pointing to line deliminted JSON records."""
@@ -101,7 +63,7 @@ def single_record_file(tmpdir_factory):
 
 @pytest.fixture(scope="session")
 def daa(tmpdir_factory):
-    """Fixture providing a file name pointing to line deliminted JSON records."""
+    """Fixture providing a Dask Awkward Array collection."""
     fn = tmpdir_factory.mktemp("data").join("records.json")
     with open(fn, "w") as f:
         f.write(MANY_RECORDS)
@@ -110,7 +72,7 @@ def daa(tmpdir_factory):
 
 @pytest.fixture(scope="session")
 def caa(tmpdir_factory):
-    """Fixture providing a file name pointing to line deliminted JSON records."""
+    """Fixture providing a concrete Awkward Array."""
     fn = tmpdir_factory.mktemp("data").join("records.json")
     with open(fn, "w") as f:
         f.write(MANY_RECORDS)

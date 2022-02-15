@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import keyword
 import operator
-from functools import partial
+from functools import cached_property, partial
 from math import ceil
 from numbers import Number
 from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence
@@ -16,7 +16,7 @@ from dask.base import DaskMethodsMixin, dont_optimize, is_dask_collection, token
 from dask.blockwise import blockwise as upstream_blockwise
 from dask.highlevelgraph import HighLevelGraph
 from dask.threaded import get as threaded_get
-from dask.utils import IndexCallable, cached_property, funcname, key_split
+from dask.utils import IndexCallable, funcname, key_split
 
 from .utils import is_empty_slice, normalize_single_outer_inner_index
 
@@ -134,6 +134,11 @@ class Record(Scalar):
         if m is not None and not isinstance(m, ak.Record):
             raise TypeError(f"meta must be a Record typetracer object, not a {type(m)}")
         self._meta = m
+
+    @property
+    def npartitions(self):
+        """Records are unpartitioned by definition."""
+        return 1
 
     def __getitem__(self, key: str) -> Any:
         token = tokenize(self, key)
@@ -378,7 +383,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         graph = HighLevelGraph.from_collections(name, dsk, dependencies=[self])
 
         # if a single partition was requested we trivially know the new divisions.
-        if len(raw) == 1 and isinstance(raw[0], int) and self.known_divisions:
+        if len(raw) == 1 and isinstance(raw[0], int) and self.known_divisions:  # type: ignore
             new_divisions = (
                 0,
                 self.divisions[raw[0] + 1] - self.divisions[raw[0]],  # type: ignore
@@ -431,7 +436,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 meta = self.meta[m]
         return self.map_partitions(operator.getitem, where, meta=meta)
 
-    def _getitem_outer_boolean_lazy_array(self, where: Array | tuple) -> Any:
+    def _getitem_outer_boolean_lazy_array(self, where: Array | tuple[Any, ...]) -> Any:
         ba = where if isinstance(where, Array) else where[0]
         if ba.known_divisions and self.known_divisions:
             if ba.divisions != self.divisions:
@@ -466,7 +471,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                     meta=new_meta,
                 )
 
-    def _getitem_outer_str_or_list(self, where: str | list | tuple) -> Any:
+    def _getitem_outer_str_or_list(self, where: str | list | tuple[Any, ...]) -> Any:
         new_meta: Any | None = None
         if self.meta is not None:
             if isinstance(where, tuple):
@@ -478,7 +483,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 new_meta = self.meta[where]
         return self._getitem_trivial_map_partitions(where, meta=new_meta)
 
-    def _getitem_outer_int(self, where: int | tuple) -> Any:
+    def _getitem_outer_int(self, where: int | tuple[Any, ...]) -> Any:
         self._divisions = calculate_known_divisions(self)
 
         new_meta: Any | None = None
@@ -531,7 +536,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         else:
             return new_scalar_object(hlg, name, new_meta)
 
-    def _getitem_tuple(self, where: tuple) -> Array:
+    def _getitem_tuple(self, where: tuple[Any, ...]) -> Array:
         if isinstance(where[0], int):
             return self._getitem_outer_int(where)
 
@@ -728,7 +733,7 @@ def new_array_object(
     name: str,
     meta: ak.Array | None = None,
     npartitions: int | None = None,
-    divisions: tuple | None = None,
+    divisions: tuple[int | None, ...] | None = None,
 ) -> Array:
     """Instantiate a new Array collection object.
 
@@ -1018,10 +1023,43 @@ def from_awkward(source: ak.Array, npartitions: int, name: str | None = None) ->
 
 
 def is_awkward_collection(obj: Any) -> bool:
+    """Check if an object is a Dask Awkward collection.
+
+    Parameters
+    ----------
+    obj : Any
+        The object of interest.
+
+    Returns
+    -------
+    bool
+        True if `obj` is an Awkward Dask collection.
+
+    """
     return isinstance(obj, (Array, Record, Scalar))
 
 
 def is_typetracer(obj: Any) -> bool:
+    """Check if an object is an Awkward typetracer.
+
+    Typetracers can be one of these categories:
+    - Array
+    - Record
+    - UnknownScalar
+    - MaybeNone
+    - OneOf
+
+    Parameters
+    ----------
+    obj : Any
+        The object to test.
+
+    Returns
+    -------
+    bool
+        True if the `obj` is a typetracer like object.
+
+    """
     # array typetracer
     if isinstance(obj, ak.Array):
         if not obj.layout.nplike.known_shape and not obj.layout.nplike.known_data:
@@ -1040,13 +1078,77 @@ def is_typetracer(obj: Any) -> bool:
 
 
 def meta_or_identity(obj: Any) -> Any:
+    """Retrieve the meta of an object or simply pass through.
+
+    Parameters
+    ----------
+    obj : Any
+        The object of interest.
+
+    Returns
+    -------
+    Any
+        If `obj` is an Awkward Dask collection it is `obj.meta`; if
+        not we simply return `obj`.
+
+    Examples
+    --------
+    >>> import awkward._v2 as ak
+    >>> import dask_awkward as dak
+    >>> from dask_awkward.core import meta_or_identity
+    >>> x = ak.from_iter([[1, 2, 3], [4]])
+    >>> x = dak.from_awkward(x, npartitions=2)
+    >>> x
+    dask.awkward<from-awkward, npartitions=2>
+    >>> meta_or_identity(x)
+    <Array-typetracer type='?? * var * int64'>
+    >>> meta_or_identity(5)
+    5
+    >>> meta_or_identity("foo")
+    'foo'
+
+    """
     if is_awkward_collection(obj):
         return obj.meta
     return obj
 
 
-def to_meta(objects: Sequence[Any]) -> tuple:
+def to_meta(objects: Sequence[Any]) -> tuple[Any, ...]:
+    """In a sequence convert Dask Awkward collections to their metas.
+
+    Parameters
+    ----------
+    objects : Sequence[Any]
+        Sequence of objects.
+
+    Returns
+    -------
+    tuple[Any, ...]
+        The sequence of objects where collections have been replaced
+        with their metadata.
+
+    """
     return tuple(map(meta_or_identity, objects))
+
+
+def typetracer_array(a: ak.Array | Array) -> ak.Array | None:
+    """Retrieve the typetracer Array from a concrete or lazy instance.
+
+    Parameters
+    ----------
+    a : ak.Array | Array
+        Array of interest.
+
+    Returns
+    -------
+    ak.Array | None
+        Typetracer array associated with `a`.
+
+    """
+    if isinstance(a, Array):
+        return a.typetracer
+    else:
+        return ak.Array(a.layout.typetracer)
 
 
 class TrivialPartitionwiseOp:

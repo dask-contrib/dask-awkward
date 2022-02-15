@@ -4,13 +4,14 @@ import pytest
 
 import dask_awkward as dak
 import dask_awkward.core as dakc
+from dask_awkward.testutils import assert_eq
 
 from .helpers import (  # noqa: F401
     _lazyrecord,
     _lazyrecords,
-    assert_eq,
     line_delim_records_file,
     load_records_eager,
+    load_records_lazy,
 )
 
 
@@ -20,6 +21,7 @@ def test_clear_divisions() -> None:
     daa.clear_divisions()
     assert not daa.known_divisions
     assert len(daa.divisions) == daa.npartitions + 1
+    assert_eq(daa, daa)
 
 
 def test_dunder_str(line_delim_records_file) -> None:  # noqa: F811
@@ -126,10 +128,9 @@ def test_new_array_object_raises(line_delim_records_file) -> None:  # noqa: F811
 
 def test_partitions() -> None:
     daa = _lazyrecords()
-    lop = list(daa.partitions)
-    for part in lop:
+    for i in range(daa.npartitions):
+        part = daa.partitions[i]
         assert part.npartitions == 1
-    assert len(lop) == daa.npartitions
 
 
 def test_partitions_divisions() -> None:
@@ -185,7 +186,8 @@ def test_record_collection() -> None:
     daa = _lazyrecords()
     assert type(daa[0]) is dakc.Record
     aa = daa.compute()
-    assert daa[0].compute().tolist() == aa[0].tolist()
+    assert_eq(daa[0], aa[0])
+    # assert daa[0].compute().tolist() == aa[0].tolist()
 
 
 def test_scalar_collection() -> None:
@@ -259,3 +261,21 @@ def test_array_dir() -> None:
     d = dir(a)
     for f in a.fields:
         assert f in d
+
+
+def test_typetracer_function() -> None:
+    daa = _lazyrecords()
+    aa = daa.compute()
+    assert dakc.typetracer_array(daa) is not None
+    assert dakc.typetracer_array(daa) is daa.typetracer
+    tta = dakc.typetracer_array(aa)
+    assert tta is not None
+    assert tta.layout.form == aa.layout.form
+
+
+def test_single_partition(line_delim_records_file) -> None:  # noqa: F811
+    daa = load_records_lazy(line_delim_records_file, by_file=True, n_times=1)
+    caa = load_records_eager(line_delim_records_file)
+    assert daa.npartitions == 1
+    assert_eq(daa, caa)
+    assert_eq(caa, daa)
