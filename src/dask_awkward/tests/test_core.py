@@ -21,6 +21,7 @@ def test_clear_divisions() -> None:
     daa.clear_divisions()
     assert not daa.known_divisions
     assert len(daa.divisions) == daa.npartitions + 1
+    assert_eq(daa, daa)
 
 
 def test_dunder_str(line_delim_records_file) -> None:  # noqa: F811
