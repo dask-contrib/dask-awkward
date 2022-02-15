@@ -431,7 +431,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 meta = self.meta[m]
         return self.map_partitions(operator.getitem, where, meta=meta)
 
-    def _getitem_outer_boolean_lazy_array(self, where: Array | tuple) -> Any:
+    def _getitem_outer_boolean_lazy_array(self, where: Array | tuple[Any, ...]) -> Any:
         ba = where if isinstance(where, Array) else where[0]
         if ba.known_divisions and self.known_divisions:
             if ba.divisions != self.divisions:
@@ -466,7 +466,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                     meta=new_meta,
                 )
 
-    def _getitem_outer_str_or_list(self, where: str | list | tuple) -> Any:
+    def _getitem_outer_str_or_list(self, where: str | list | tuple[Any, ...]) -> Any:
         new_meta: Any | None = None
         if self.meta is not None:
             if isinstance(where, tuple):
@@ -478,7 +478,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 new_meta = self.meta[where]
         return self._getitem_trivial_map_partitions(where, meta=new_meta)
 
-    def _getitem_outer_int(self, where: int | tuple) -> Any:
+    def _getitem_outer_int(self, where: int | tuple[Any, ...]) -> Any:
         self._divisions = calculate_known_divisions(self)
 
         new_meta: Any | None = None
@@ -531,7 +531,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         else:
             return new_scalar_object(hlg, name, new_meta)
 
-    def _getitem_tuple(self, where: tuple) -> Array:
+    def _getitem_tuple(self, where: tuple[Any, ...]) -> Array:
         if isinstance(where[0], int):
             return self._getitem_outer_int(where)
 
@@ -728,7 +728,7 @@ def new_array_object(
     name: str,
     meta: ak.Array | None = None,
     npartitions: int | None = None,
-    divisions: tuple | None = None,
+    divisions: tuple[int | None, ...] | None = None,
 ) -> Array:
     """Instantiate a new Array collection object.
 
@@ -1108,7 +1108,7 @@ def meta_or_identity(obj: Any) -> Any:
     return obj
 
 
-def to_meta(objects: Sequence[Any]) -> tuple:
+def to_meta(objects: Sequence[Any]) -> tuple[Any, ...]:
     """In a sequence convert Dask Awkward collections to their metas.
 
     Parameters
@@ -1118,7 +1118,7 @@ def to_meta(objects: Sequence[Any]) -> tuple:
 
     Returns
     -------
-    tuple
+    tuple[Any, ...]
         The sequence of objects where collections have been replaced
         with their metadata.
 

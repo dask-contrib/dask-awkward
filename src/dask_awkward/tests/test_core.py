@@ -126,10 +126,9 @@ def test_new_array_object_raises(line_delim_records_file) -> None:  # noqa: F811
 
 def test_partitions() -> None:
     daa = _lazyrecords()
-    lop = list(daa.partitions)  # type: ignore
-    for part in lop:
+    for i in range(daa.npartitions):
+        part = daa.partitions[i]
         assert part.npartitions == 1
-    assert len(lop) == daa.npartitions
 
 
 def test_partitions_divisions() -> None:
