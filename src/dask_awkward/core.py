@@ -27,6 +27,12 @@ if TYPE_CHECKING:
     from dask.blockwise import Blockwise
 
 
+_NOT_SUPPORTED_MSG = """
+
+If think this unsupported call should be supported by dask-awkward
+please open an issue at https://github.com/ContinuumIO/dask-awkward."""
+
+
 def _finalize_array(results: Any) -> Any:
     if any(isinstance(r, ak.Array) for r in results):
         return ak.concatenate(results)
@@ -519,7 +525,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if not isinstance(
             new_meta, (ak.Record, aktt.UnknownScalar, aktt.OneOf, aktt.MaybeNone)
         ):
-            raise NotImplementedError("Key not supported for this array.")
+            raise NotImplementedError(
+                f"Key type not supported for this array. {_NOT_SUPPORTED_MSG}"
+            )
 
         token = tokenize(partition, where)
         name = f"getitem-{token}"
@@ -551,12 +559,12 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         # boolean array
         elif isinstance(where[0], Array) and issubclass(
-            where[0].layout.content.dtype.type, (np.bool_, bool)
+            where[0].layout.dtype.type, (np.bool_, bool)
         ):
             return self._getitem_outer_boolean_lazy_array(where=where)
 
         raise NotImplementedError(
-            f"Array.__getitem__ doesn't support multi-object: {where}."
+            f"Array.__getitem__ doesn't support multi-object: {where}. {_NOT_SUPPORTED_MSG}"
         )
 
     def _getitem_single(self, where: Any) -> Array:
@@ -581,17 +589,13 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         elif is_empty_slice(where):
             return self
 
-        # non-empty slice is not supported yet
-        elif isinstance(where, slice):
-            raise NotImplementedError(
-                "__getitem__ with a non-empty slice is not supported yet."
-            )
-
         # a single ellipsis
         elif where is Ellipsis:
             return self._getitem_trivial_map_partitions(where)
 
-        raise NotImplementedError(f"__getitem__ doesn't support where={where}")
+        raise NotImplementedError(
+            f"__getitem__ doesn't support where={where}. {_NOT_SUPPORTED_MSG}"
+        )
 
     def __getitem__(self, where: Any) -> Any:
         """Select items from the collection.
