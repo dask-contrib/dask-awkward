@@ -25,3 +25,7 @@ def test_num(line_delim_records_file, axis) -> None:  # noqa: F811
     daa = load_records_lazy(line_delim_records_file)["analysis"]
     caa = load_records_eager(line_delim_records_file)["analysis"]
     assert_eq(dak.num(daa.x1, axis=axis), ak.num(caa.x1, axis=axis))
+    if axis == 1:
+        c1 = dak.num(daa.x1, axis=axis) > 2
+        c2 = ak.num(caa.x1, axis=axis) > 2
+        assert_eq(daa[c1], caa[c2])
