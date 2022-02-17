@@ -560,9 +560,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         # boolean array
         elif isinstance(where[0], Array):
             try:
-                dtype = where.layout.dtype.type
+                dtype = where[0].layout.dtype.type
             except AttributeError:
-                dtype = where.layout.content.dtype.type
+                dtype = where[0].layout.content.dtype.type
             if issubclass(dtype, (np.bool_, bool)):
                 return self._getitem_outer_boolean_lazy_array(where)
 
