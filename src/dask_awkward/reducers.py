@@ -42,19 +42,19 @@ _sum_trivial = TrivialPartitionwiseOp(ak.sum, axis=1)
 
 
 def all(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
-    NotImplementedError("TODO")
+    raise NotImplementedError("TODO")
 
 
 def any(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
-    NotImplementedError("TODO")
+    raise NotImplementedError("TODO")
 
 
 def argmax(array, axis=None, keepdims=False, mask_identity=True, flatten_records=False):
-    NotImplementedError("TODO")
+    raise NotImplementedError("TODO")
 
 
 def argmin(array, axis=None, keepdims=False, mask_identity=True, flatten_records=False):
-    NotImplementedError("TODO")
+    raise NotImplementedError("TODO")
 
 
 def corr(
@@ -66,7 +66,7 @@ def corr(
     mask_identity=True,
     flatten_records=False,
 ):
-    NotImplementedError("TODO")
+    raise NotImplementedError("TODO")
 
 
 def count(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
@@ -136,7 +136,7 @@ def covar(
     mask_identity=True,
     flatten_records=False,
 ):
-    NotImplementedError("TODO")
+    raise NotImplementedError("TODO")
 
 
 def linear_fit(
@@ -148,7 +148,7 @@ def linear_fit(
     mask_identity=True,
     flatten_records=False,
 ):
-    NotImplementedError("TODO")
+    raise NotImplementedError("TODO")
 
 
 def max(
@@ -173,7 +173,7 @@ def max(
 def mean(
     x, weight=None, axis=None, keepdims=False, mask_identity=True, flatten_records=False
 ):
-    NotImplementedError("TODO")
+    raise NotImplementedError("TODO")
 
 
 def min(
@@ -204,19 +204,19 @@ def moment(
     mask_identity=True,
     flatten_records=False,
 ):
-    NotImplementedError("TODO")
+    raise NotImplementedError("TODO")
 
 
 def prod(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
-    NotImplementedError("TODO")
+    raise NotImplementedError("TODO")
 
 
 def ptp(arr, axis=None, keepdims=False, mask_identity=True, flatten_records=False):
-    NotImplementedError("TODO")
+    raise NotImplementedError("TODO")
 
 
 def softmax(x, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
-    NotImplementedError("TODO")
+    raise NotImplementedError("TODO")
 
 
 def std(
@@ -228,7 +228,7 @@ def std(
     mask_identity=True,
     flatten_records=False,
 ):
-    NotImplementedError("TODO")
+    raise NotImplementedError("TODO")
 
 
 def sum(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
@@ -255,7 +255,7 @@ def var(
     mask_identity=True,
     flatten_records=False,
 ):
-    NotImplementedError("TODO")
+    raise NotImplementedError("TODO")
 
 
 def _min_or_max(
