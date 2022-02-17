@@ -10,8 +10,9 @@ except ImportError:
     import json  # type: ignore
 
 import awkward._v2 as ak
-from dask.base import flatten, tokenize
-from dask.bytes import read_bytes
+from dask.base import tokenize
+from dask.bytes.core import read_bytes
+from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
 
 from .core import new_array_object

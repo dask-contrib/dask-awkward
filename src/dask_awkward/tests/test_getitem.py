@@ -6,9 +6,12 @@ import pytest
 
 import dask_awkward as dak
 import dask_awkward.core as dakc
-from dask_awkward.testutils import assert_eq
-
-from .helpers import caa, daa, line_delim_records_file  # noqa: F401
+from dask_awkward.testutils import (  # noqa: F401
+    assert_eq,
+    caa,
+    daa,
+    line_delim_records_file,
+)
 
 
 def test_getattr_raise(daa) -> None:  # noqa: F811
