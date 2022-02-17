@@ -558,10 +558,13 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             return self._getitem_trivial_map_partitions(where)
 
         # boolean array
-        elif isinstance(where[0], Array) and issubclass(
-            where[0].layout.dtype.type, (np.bool_, bool)
-        ):
-            return self._getitem_outer_boolean_lazy_array(where=where)
+        elif isinstance(where[0], Array):
+            try:
+                dtype = where.layout.dtype.type
+            except AttributeError:
+                dtype = where.layout.content.dtype.type
+            if issubclass(dtype, (np.bool_, bool)):
+                return self._getitem_outer_boolean_lazy_array(where)
 
         raise NotImplementedError(
             f"Array.__getitem__ doesn't support multi-object: {where}. {_NOT_SUPPORTED_MSG}"
@@ -580,10 +583,13 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         elif isinstance(where, int):
             return self._getitem_outer_int(where)
 
-        elif isinstance(where, Array) and issubclass(
-            where.layout.dtype.type, (np.bool_, bool)
-        ):
-            return self._getitem_outer_boolean_lazy_array(where)
+        elif isinstance(where, Array):
+            try:
+                dtype = where.layout.dtype.type
+            except AttributeError:
+                dtype = where.layout.content.dtype.type
+            if issubclass(dtype, (np.bool_, bool)):
+                return self._getitem_outer_boolean_lazy_array(where)
 
         # an empty slice
         elif is_empty_slice(where):
