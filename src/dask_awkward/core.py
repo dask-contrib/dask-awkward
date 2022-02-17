@@ -573,7 +573,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             return self._getitem_outer_int(where)
 
         elif isinstance(where, Array) and issubclass(
-            where.layout.content.dtype.type, (np.bool_, bool)
+            where.layout.dtype.type, (np.bool_, bool)
         ):
             return self._getitem_outer_boolean_lazy_array(where)
 
