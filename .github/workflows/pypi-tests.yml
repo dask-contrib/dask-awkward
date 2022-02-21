@@ -29,7 +29,7 @@ jobs:
         pip install pip setuptools -U
         pip install wheel -U
         pip install dask[complete]
-        pip install -r ./.github/envs/requirements.txt
+        pip install --ignore-installed -q --no-cache-dir git+https://github.com/scikit-hep/awkward-1.0@main -v
         pip install --ignore-installed -q --no-cache-dir -e .[complete]
         pip list
     - name: test
