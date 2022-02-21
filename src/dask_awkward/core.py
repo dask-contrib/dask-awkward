@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 _NOT_SUPPORTED_MSG = """
 
-If you would like this unsupported call should be supported by
+If you would like this unsupported call to be supported by
 dask-awkward please open an issue at:
 https://github.com/ContinuumIO/dask-awkward."""
 
