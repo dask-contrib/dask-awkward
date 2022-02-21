@@ -29,8 +29,9 @@ if TYPE_CHECKING:
 
 _NOT_SUPPORTED_MSG = """
 
-If think this unsupported call should be supported by dask-awkward
-please open an issue at https://github.com/ContinuumIO/dask-awkward."""
+If you would like this unsupported call should be supported by
+dask-awkward please open an issue at:
+https://github.com/ContinuumIO/dask-awkward."""
 
 
 def _finalize_array(results: Any) -> Any:
