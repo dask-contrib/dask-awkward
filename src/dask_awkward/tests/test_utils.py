@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..utils import is_empty_slice, normalize_single_outer_inner_index
+from dask_awkward.utils import is_empty_slice, normalize_single_outer_inner_index
 
 
 def test_normalize_single_outer_inner_index() -> None:

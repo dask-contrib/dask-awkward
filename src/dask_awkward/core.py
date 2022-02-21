@@ -27,6 +27,13 @@ if TYPE_CHECKING:
     from dask.blockwise import Blockwise
 
 
+_NOT_SUPPORTED_MSG = """
+
+If you would like this unsupported call to be supported by
+dask-awkward please open an issue at:
+https://github.com/ContinuumIO/dask-awkward."""
+
+
 def _finalize_array(results: Any) -> Any:
     if any(isinstance(r, ak.Array) for r in results):
         return ak.concatenate(results)
@@ -519,7 +526,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if not isinstance(
             new_meta, (ak.Record, aktt.UnknownScalar, aktt.OneOf, aktt.MaybeNone)
         ):
-            raise NotImplementedError("Key not supported for this array.")
+            raise NotImplementedError(
+                f"Key type not supported for this array. {_NOT_SUPPORTED_MSG}"
+            )
 
         token = tokenize(partition, where)
         name = f"getitem-{token}"
@@ -546,14 +555,20 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         elif isinstance(where[0], list):
             return self._getitem_outer_str_or_list(where)
 
+        elif isinstance(where[0], slice) and is_empty_slice(where[0]):
+            return self._getitem_trivial_map_partitions(where)
+
         # boolean array
-        elif isinstance(where[0], Array) and issubclass(
-            where[0].layout.content.dtype.type, (np.bool_, bool)
-        ):
-            return self._getitem_outer_boolean_lazy_array(where=where)
+        elif isinstance(where[0], Array):
+            try:
+                dtype = where[0].layout.dtype.type
+            except AttributeError:
+                dtype = where[0].layout.content.dtype.type
+            if issubclass(dtype, (np.bool_, bool)):
+                return self._getitem_outer_boolean_lazy_array(where)
 
         raise NotImplementedError(
-            f"Array.__getitem__ doesn't support multi-object: {where}."
+            f"Array.__getitem__ doesn't support multi-object: {where}. {_NOT_SUPPORTED_MSG}"
         )
 
     def _getitem_single(self, where: Any) -> Array:
@@ -569,10 +584,13 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         elif isinstance(where, int):
             return self._getitem_outer_int(where)
 
-        elif isinstance(where, Array) and issubclass(
-            where.layout.content.dtype.type, (np.bool_, bool)
-        ):
-            return self._getitem_outer_boolean_lazy_array(where)
+        elif isinstance(where, Array):
+            try:
+                dtype = where.layout.dtype.type
+            except AttributeError:
+                dtype = where.layout.content.dtype.type
+            if issubclass(dtype, (np.bool_, bool)):
+                return self._getitem_outer_boolean_lazy_array(where)
 
         # an empty slice
         elif is_empty_slice(where):
@@ -582,7 +600,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         elif where is Ellipsis:
             return self._getitem_trivial_map_partitions(where)
 
-        raise NotImplementedError(f"__getitem__ doesn't support where={where}")
+        raise NotImplementedError(
+            f"__getitem__ doesn't support where={where}. {_NOT_SUPPORTED_MSG}"
+        )
 
     def __getitem__(self, where: Any) -> Any:
         """Select items from the collection.
