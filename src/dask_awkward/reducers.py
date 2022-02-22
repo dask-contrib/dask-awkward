@@ -4,7 +4,11 @@ from typing import TYPE_CHECKING, Any, Callable, Union
 
 import awkward._v2 as ak
 
-from .core import TrivialPartitionwiseOp, pw_reduction_with_agg_to_scalar
+from .core import (
+    DaskAwkwardNotImplemented,
+    TrivialPartitionwiseOp,
+    pw_reduction_with_agg_to_scalar,
+)
 
 if TYPE_CHECKING:
     from .core import Array, Scalar
@@ -42,19 +46,19 @@ _sum_trivial = TrivialPartitionwiseOp(ak.sum, axis=1)
 
 
 def all(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
-    raise NotImplementedError("TODO")
+    raise DaskAwkwardNotImplemented("TODO")
 
 
 def any(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
-    raise NotImplementedError("TODO")
+    raise DaskAwkwardNotImplemented("TODO")
 
 
 def argmax(array, axis=None, keepdims=False, mask_identity=True, flatten_records=False):
-    raise NotImplementedError("TODO")
+    raise DaskAwkwardNotImplemented("TODO")
 
 
 def argmin(array, axis=None, keepdims=False, mask_identity=True, flatten_records=False):
-    raise NotImplementedError("TODO")
+    raise DaskAwkwardNotImplemented("TODO")
 
 
 def corr(
@@ -66,7 +70,7 @@ def corr(
     mask_identity=True,
     flatten_records=False,
 ):
-    raise NotImplementedError("TODO")
+    raise DaskAwkwardNotImplemented("TODO")
 
 
 def count(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
@@ -92,7 +96,9 @@ def count(array, axis=None, keepdims=False, mask_identity=False, flatten_records
             ak.sum,
         )
     elif axis == 0 or axis == -1 * array.ndim:
-        raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
+        raise DaskAwkwardNotImplemented(
+            f"axis={axis} is not supported for this array yet."
+        )
     else:
         raise ValueError("axis must be None or an integer.")
 
@@ -122,7 +128,9 @@ def count_nonzero(
             ak.sum,
         )
     elif axis == 0 or axis == -1 * array.ndim:
-        raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
+        raise DaskAwkwardNotImplemented(
+            f"axis={axis} is not supported for this array yet."
+        )
     else:
         raise ValueError("axis must be None or an integer.")
 
@@ -136,7 +144,7 @@ def covar(
     mask_identity=True,
     flatten_records=False,
 ):
-    raise NotImplementedError("TODO")
+    raise DaskAwkwardNotImplemented("TODO")
 
 
 def linear_fit(
@@ -148,7 +156,7 @@ def linear_fit(
     mask_identity=True,
     flatten_records=False,
 ):
-    raise NotImplementedError("TODO")
+    raise DaskAwkwardNotImplemented("TODO")
 
 
 def max(
@@ -173,7 +181,7 @@ def max(
 def mean(
     x, weight=None, axis=None, keepdims=False, mask_identity=True, flatten_records=False
 ):
-    raise NotImplementedError("TODO")
+    raise DaskAwkwardNotImplemented("TODO")
 
 
 def min(
@@ -204,19 +212,19 @@ def moment(
     mask_identity=True,
     flatten_records=False,
 ):
-    raise NotImplementedError("TODO")
+    raise DaskAwkwardNotImplemented("TODO")
 
 
 def prod(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
-    raise NotImplementedError("TODO")
+    raise DaskAwkwardNotImplemented("TODO")
 
 
 def ptp(arr, axis=None, keepdims=False, mask_identity=True, flatten_records=False):
-    raise NotImplementedError("TODO")
+    raise DaskAwkwardNotImplemented("TODO")
 
 
 def softmax(x, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
-    raise NotImplementedError("TODO")
+    raise DaskAwkwardNotImplemented("TODO")
 
 
 def std(
@@ -228,7 +236,7 @@ def std(
     mask_identity=True,
     flatten_records=False,
 ):
-    raise NotImplementedError("TODO")
+    raise DaskAwkwardNotImplemented("TODO")
 
 
 def sum(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
@@ -241,7 +249,9 @@ def sum(array, axis=None, keepdims=False, mask_identity=False, flatten_records=F
     elif axis is None:
         return pw_reduction_with_agg_to_scalar(array, ak.sum, ak.sum)
     elif axis == 0:
-        raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
+        raise DaskAwkwardNotImplemented(
+            f"axis={axis} is not supported for this array yet."
+        )
     else:
         raise ValueError("axis must be none or an integer")
 
@@ -255,7 +265,7 @@ def var(
     mask_identity=True,
     flatten_records=False,
 ):
-    raise NotImplementedError("TODO")
+    raise DaskAwkwardNotImplemented("TODO")
 
 
 def _min_or_max(
@@ -275,6 +285,8 @@ def _min_or_max(
     elif axis is None:
         return pw_reduction_with_agg_to_scalar(array, f, f, **kwargs)
     elif array.ndim is not None and (axis == 0 or axis == -1 * array.ndim):
-        raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
+        raise DaskAwkwardNotImplemented(
+            f"axis={axis} is not supported for this array yet."
+        )
     else:
         raise ValueError("axis must be None or an integer.")

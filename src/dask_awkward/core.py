@@ -29,11 +29,17 @@ if TYPE_CHECKING:
 
 T = TypeVar("T")
 
-_NOT_SUPPORTED_MSG = """
+
+class DaskAwkwardNotImplemented(NotImplementedError):
+    _NOT_SUPPORTED_MSG = """
 
 If you would like this unsupported call to be supported by
 dask-awkward please open an issue at:
 https://github.com/ContinuumIO/dask-awkward."""
+
+    def __init__(self, msg: str | None = None) -> None:
+        msg = f"{msg or ''}{self._NOT_SUPPORTED_MSG}"
+        super().__init__(msg)
 
 
 def _finalize_array(
@@ -530,9 +536,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if not isinstance(
             new_meta, (ak.Record, aktt.UnknownScalar, aktt.OneOf, aktt.MaybeNone)
         ):
-            raise NotImplementedError(
-                f"Key type not supported for this array. {_NOT_SUPPORTED_MSG}"
-            )
+            raise DaskAwkwardNotImplemented("Key type not supported for this array.")
 
         token = tokenize(partition, where)
         name = f"getitem-{token}"
@@ -571,8 +575,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             if issubclass(dtype, (np.bool_, bool)):
                 return self._getitem_outer_boolean_lazy_array(where)
 
-        raise NotImplementedError(
-            f"Array.__getitem__ doesn't support multi-object: {where}. {_NOT_SUPPORTED_MSG}"
+        raise DaskAwkwardNotImplemented(
+            f"Array.__getitem__ doesn't support multi object: {where}"
         )
 
     def _getitem_single(self, where: Any) -> Array:
@@ -604,9 +608,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         elif where is Ellipsis:
             return self._getitem_trivial_map_partitions(where)
 
-        raise NotImplementedError(
-            f"__getitem__ doesn't support where={where}. {_NOT_SUPPORTED_MSG}"
-        )
+        raise DaskAwkwardNotImplemented(f"__getitem__ doesn't support where={where}.")
 
     def __getitem__(self, where: Any) -> Any:
         """Select items from the collection.
@@ -628,7 +630,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         # don't accept lists containing integers.
         if isinstance(where, list):
             if any(isinstance(k, int) for k in where):
-                raise NotImplementedError("Lists containing integers not supported.")
+                # this is something we'll likely never support so we
+                # do not use the DaskAwkwardNotImplemented exception.
+                raise RuntimeError("Lists containing integers are not supported.")
 
         if isinstance(where, tuple):
             return self._getitem_tuple(where)
@@ -682,7 +686,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         if method != "__call__":
-            raise NotImplementedError("Array ufunc supports only method == '__call__'")
+            raise RuntimeError("Array ufunc supports only method == '__call__'")
 
         new_meta = None
 
@@ -832,7 +836,7 @@ def partitionwise_layer(
             pairs.extend([arg.name, "i"])
             numblocks[arg.name] = (arg.npartitions,)
         elif is_dask_collection(arg):
-            raise NotImplementedError(
+            raise DaskAwkwardNotImplemented(
                 "Use of Array with other Dask collections is currently unsupported."
             )
         else:
