@@ -5,7 +5,7 @@ import operator
 from functools import cached_property, partial
 from math import ceil
 from numbers import Number
-from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Hashable, Mapping, Sequence, TypeVar
 
 import awkward._v2 as ak
 import awkward._v2._typetracer as aktt
@@ -27,6 +27,8 @@ if TYPE_CHECKING:
     from dask.blockwise import Blockwise
 
 
+T = TypeVar("T")
+
 _NOT_SUPPORTED_MSG = """
 
 If you would like this unsupported call to be supported by
@@ -34,7 +36,9 @@ dask-awkward please open an issue at:
 https://github.com/ContinuumIO/dask-awkward."""
 
 
-def _finalize_array(results: Any) -> Any:
+def _finalize_array(
+    results: Sequence[Number | ak.Array | ak.Record],
+) -> Number | ak.Array:
     if any(isinstance(r, ak.Array) for r in results):
         return ak.concatenate(results)
     elif len(results) == 1 and isinstance(results[0], int):
@@ -50,7 +54,7 @@ def _finalize_array(results: Any) -> Any:
         raise RuntimeError(msg)
 
 
-def _finalize_scalar(results: Any) -> Any:
+def _finalize_scalar(results: Sequence[T]) -> T:
     return results[0]
 
 
@@ -71,7 +75,7 @@ class Scalar(DaskMethodsMixin):
             return tuple(self._dask.layers)
         return (self.name,)
 
-    def __dask_tokenize__(self) -> str:
+    def __dask_tokenize__(self) -> Hashable:
         return self.name
 
     @staticmethod
@@ -80,10 +84,10 @@ class Scalar(DaskMethodsMixin):
 
     __dask_scheduler__ = staticmethod(threaded_get)
 
-    def __dask_postcompute__(self) -> Any:
+    def __dask_postcompute__(self) -> tuple[Callable, tuple]:
         return _finalize_scalar, ()
 
-    def __dask_postpersist__(self) -> Any:
+    def __dask_postpersist__(self) -> tuple[Callable, tuple]:
         return self._rebuild, ()
 
     def _rebuild(
@@ -238,13 +242,13 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     def __dask_layers__(self) -> tuple[str]:
         return (self.name,)
 
-    def __dask_tokenize__(self) -> str:
+    def __dask_tokenize__(self) -> Hashable:
         return self.name
 
-    def __dask_postcompute__(self) -> Any:
+    def __dask_postcompute__(self) -> tuple[Callable, tuple]:
         return _finalize_array, ()
 
-    def __dask_postpersist__(self) -> Any:
+    def __dask_postpersist__(self) -> tuple[Callable, tuple]:
         return self._rebuild, ()
 
     @staticmethod
