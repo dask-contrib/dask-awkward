@@ -144,7 +144,7 @@ def test_partitions_divisions() -> None:
 
 def test_raise_in_finalize() -> None:
     daa = _lazyrecords()
-    res = daa.map_partitions(str)
+    res = daa.map_partitions(str, ignore_meta=True)
     with pytest.raises(RuntimeError, match="type of first result: <class 'str'>"):
         res.compute()
 

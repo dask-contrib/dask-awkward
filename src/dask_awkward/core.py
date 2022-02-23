@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import keyword
 import operator
+import warnings
 from functools import cached_property, partial
 from math import ceil
 from numbers import Number
@@ -177,6 +178,8 @@ class Record(Scalar):
             return new_scalar_object(hlg, name, new_meta)
 
     def __getattr__(self, attr: str) -> Any:
+        if attr not in (self.fields or []):
+            raise AttributeError(f"{attr} not in fields.")
         try:
             return self.__getitem__(attr)
         except (IndexError, KeyError):
@@ -640,6 +643,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return self._getitem_single(where)
 
     def __getattr__(self, attr: str) -> Any:
+        if attr not in (self.fields or []):
+            raise AttributeError(f"{attr} not in fields.")
         try:
             return self.__getitem__(attr)
         except (IndexError, KeyError):
@@ -857,6 +862,7 @@ def map_partitions(
     *args: Any,
     name: str | None = None,
     meta: Any | None = None,
+    ignore_meta: bool = False,
     **kwargs: Any,
 ) -> Array:
     """Map a callable across all partitions of a collection.
@@ -890,6 +896,16 @@ def map_partitions(
     deps = [a for a in args if is_dask_collection(a)] + [
         v for _, v in kwargs.items() if is_dask_collection(v)
     ]
+
+    if meta is None and not ignore_meta:
+        metas = to_meta(args)
+        try:
+            meta = func(*metas, **kwargs)
+        except Exception:
+            warnings.warn(
+                "metadata could not be determined; "
+                "a compute on the first partition will occur."
+            )
     hlg = HighLevelGraph.from_collections(name, lay, dependencies=deps)
     return new_array_object(hlg, name=name, meta=meta, divisions=args[0].divisions)
 
@@ -956,12 +972,12 @@ def calculate_known_divisions(array: Array) -> tuple[int, ...]:
 
     # if more than 1 partition use cumulative sum
     if array.npartitions > 1:
-        nums = array.map_partitions(len).compute()
+        nums = array.map_partitions(len, ignore_meta=True).compute()
         cs = list(np.cumsum(nums))
         return tuple([0, *cs])
 
     # if only 1 partition just get it's length
-    return (0, array.map_partitions(len).compute())
+    return (0, array.map_partitions(len, ignore_meta=True).compute())
 
 
 def _type(array: Array) -> Type | None:

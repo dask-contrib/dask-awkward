@@ -172,6 +172,10 @@ def num(array: Any, axis: int | None = 1, highlevel: bool = True, behavior=None)
             highlevel=True,
             behavior=behavior,
         )
+    if axis == 0:
+        if array.known_divisions:
+            res = array.divisions[-1]  # noqa: F841
+            # eventually return res wrapped by a lazy computation.
 
     raise DaskAwkwardNotImplemented("TODO")
 
