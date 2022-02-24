@@ -286,16 +286,15 @@ def test_new_known_scalar() -> None:
     c = dakc.new_known_scalar(s1)
     assert c.compute() == s1
     assert c.meta is not None
-    assert c.meta.dtype == np.int64
     s2 = 5.5
     c = dakc.new_known_scalar(s2)
     assert c.compute() == 5.5
     assert c.meta is not None
-    assert c.meta.dtype == np.float64
 
 
 def test_scalar_dtype() -> None:
-    c = dakc.new_known_scalar(2)
-    assert c.dtype == np.int64
+    s = 2
+    c = dakc.new_known_scalar(s)
+    assert c.dtype == np.dtype(type(s))
     c.meta = None
     assert c.dtype is None
