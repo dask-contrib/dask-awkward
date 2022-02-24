@@ -15,7 +15,6 @@ if TYPE_CHECKING:
 
     LazyResult = Union[Array, Scalar]
 
-
 __all__ = (
     "all",
     "any",
@@ -43,6 +42,7 @@ _count_nonzero_trivial = TrivialPartitionwiseOp(ak.count_nonzero, axis=1)
 _min_trivial = TrivialPartitionwiseOp(ak.min, axis=1)
 _max_trivial = TrivialPartitionwiseOp(ak.max, axis=1)
 _sum_trivial = TrivialPartitionwiseOp(ak.sum, axis=1)
+_std_trivial = TrivialPartitionwiseOp(ak.std, axis=1)
 
 
 def all(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
@@ -236,6 +236,19 @@ def std(
     mask_identity=True,
     flatten_records=False,
 ):
+    if weight is not None:
+        raise DaskAwkwardNotImplemented("dak.std with weights is not supported yet.")
+
+    if axis == 1:
+        return _std_trivial(
+            x,
+            weight=weight,
+            ddof=ddof,
+            axis=axis,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+            flatten_records=flatten_records,
+        )
     raise DaskAwkwardNotImplemented("TODO")
 
 
