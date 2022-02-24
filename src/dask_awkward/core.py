@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from awkward._v2.forms.form import Form
     from awkward._v2.types.type import Type
     from dask.blockwise import Blockwise
+    from numpy.typing import DTypeLike
 
 
 T = TypeVar("T")
@@ -128,15 +129,37 @@ class Scalar(DaskMethodsMixin):
             raise TypeError(f"meta must be a typetracer module object, not a {type(m)}")
         self._meta = m
 
+    @property
+    def dtype(self) -> np.dtype | None:
+        try:
+            if self.meta is not None:
+                return self.meta.dtype
+        except AttributeError:
+            pass
+        return None
+
     def __repr__(self) -> str:
         return self.__str__()
 
     def __str__(self) -> str:
-        return f"dask.awkward<{key_split(self.name)}, type=Scalar>"
+        dt = str(self.dtype) or "Unknown"
+        return f"dask.awkward<{key_split(self.name)}, type=Scalar, dtype={dt}>"
 
 
 def new_scalar_object(dsk: HighLevelGraph, name: str, meta: Any) -> Scalar:
     return Scalar(dsk, name, meta)
+
+
+def new_known_scalar(s: Any, dtype: DTypeLike | None = None) -> Scalar:
+    name = tokenize(s)
+    if dtype is None:
+        if isinstance(s, (int, np.integer)):
+            dtype = np.int64
+        elif isinstance(s, (float, np.floating)):
+            dtype = np.float64
+    llg = {name: s}
+    hlg = HighLevelGraph.from_collections(name, llg, dependencies=())
+    return new_scalar_object(hlg, name, meta=aktt.UnknownScalar(dtype))
 
 
 class Record(Scalar):

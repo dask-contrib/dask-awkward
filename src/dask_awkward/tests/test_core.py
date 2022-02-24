@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import numpy as np
 import pytest
 
 import dask_awkward as dak
@@ -278,3 +279,23 @@ def test_single_partition(line_delim_records_file) -> None:  # noqa: F811
     assert daa.npartitions == 1
     assert_eq(daa, caa)
     assert_eq(caa, daa)
+
+
+def test_new_known_scalar() -> None:
+    s1 = 5
+    c = dakc.new_known_scalar(s1)
+    assert c.compute() == s1
+    assert c.meta is not None
+    assert c.meta.dtype == np.int64
+    s2 = 5.5
+    c = dakc.new_known_scalar(s2)
+    assert c.compute() == 5.5
+    assert c.meta is not None
+    assert c.meta.dtype == np.float64
+
+
+def test_scalar_dtype() -> None:
+    c = dakc.new_known_scalar(2)
+    assert c.dtype == np.int64
+    c.meta = None
+    assert c.dtype is None
