@@ -154,9 +154,9 @@ def new_known_scalar(s: Any, dtype: DTypeLike | None = None) -> Scalar:
     name = tokenize(s)
     if dtype is None:
         if isinstance(s, (int, np.integer)):
-            dtype = np.int64
+            dtype = np.dtype(int)
         elif isinstance(s, (float, np.floating)):
-            dtype = np.float64
+            dtype = np.dtype(float)
     llg = {name: s}
     hlg = HighLevelGraph.from_collections(name, llg, dependencies=())
     return new_scalar_object(hlg, name, meta=aktt.UnknownScalar(dtype))
