@@ -4,7 +4,11 @@ from typing import Any
 
 import awkward._v2 as ak
 
-from dask_awkward.core import DaskAwkwardNotImplemented, TrivialPartitionwiseOp
+from dask_awkward.core import (
+    DaskAwkwardNotImplemented,
+    TrivialPartitionwiseOp,
+    new_known_scalar,
+)
 
 __all__ = (
     "argcartesian",
@@ -175,7 +179,7 @@ def num(array: Any, axis: int | None = 1, highlevel: bool = True, behavior=None)
     if axis == 0:
         if array.known_divisions:
             res = array.divisions[-1]  # noqa: F841
-            # eventually return res wrapped by a lazy computation.
+            return new_known_scalar(array.divisions[-1], dtype=int)
 
     raise DaskAwkwardNotImplemented("TODO")
 
