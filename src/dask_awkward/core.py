@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from awkward._v2.forms.form import Form
     from awkward._v2.types.type import Type
     from dask.blockwise import Blockwise
+    from dask.delayed import Delayed
     from numpy.typing import DTypeLike
 
 
@@ -71,6 +72,7 @@ class Scalar(DaskMethodsMixin):
         self._dask: HighLevelGraph = dsk
         self._name: str = name
         self._meta: Any | None = meta
+        self._known_value: Any | None = None
 
     def __dask_graph__(self) -> HighLevelGraph:
         return self._dask
@@ -109,6 +111,9 @@ class Scalar(DaskMethodsMixin):
             name = rename.get(name, name)
         return type(self)(dsk, name, self.meta)
 
+    def __reduce__(self):
+        return (Scalar, (self.dask, self.name, self.meta))
+
     @property
     def dask(self) -> HighLevelGraph:
         return self._dask
@@ -138,12 +143,28 @@ class Scalar(DaskMethodsMixin):
             pass
         return None
 
+    @staticmethod
+    def from_known(s: Any, dtype: DTypeLike | None = None) -> Scalar:
+        return new_known_scalar(s, dtype=dtype)
+
     def __repr__(self) -> str:
         return self.__str__()
 
     def __str__(self) -> str:
         dt = str(self.dtype) or "Unknown"
         return f"dask.awkward<{key_split(self.name)}, type=Scalar, dtype={dt}>"
+
+    @property
+    def known_value(self) -> Any | None:
+        return self._known_value
+
+    def to_delayed(self, optimize_graph: bool = True) -> Delayed:
+        from dask.delayed import Delayed
+
+        dsk = self.__dask_graph__()
+        if optimize_graph:
+            dsk = self.__dask_optimize__(dsk, self.__dask_keys__())
+        return Delayed(self.name, dsk)
 
 
 def new_scalar_object(dsk: HighLevelGraph, name: str, meta: Any) -> Scalar:
@@ -157,9 +178,13 @@ def new_known_scalar(s: Any, dtype: DTypeLike | None = None) -> Scalar:
             dtype = np.dtype(int)
         elif isinstance(s, (float, np.floating)):
             dtype = np.dtype(float)
+        else:
+            dtype = np.dtype(type(s))
     llg = {name: s}
     hlg = HighLevelGraph.from_collections(name, llg, dependencies=())
-    return new_scalar_object(hlg, name, meta=aktt.UnknownScalar(dtype))
+    c = new_scalar_object(hlg, name, meta=aktt.UnknownScalar(dtype))
+    c._known_value = s
+    return c
 
 
 class Record(Scalar):
@@ -189,12 +214,20 @@ class Record(Scalar):
         # first check for array type return
         if isinstance(new_meta, ak.Array):
             graphlayer = {(name, 0): (operator.getitem, self.name, key)}
-            hlg = HighLevelGraph.from_collections(name, graphlayer, dependencies=[self])
+            hlg = HighLevelGraph.from_collections(
+                name,
+                graphlayer,
+                dependencies=[self],  # type: ignore
+            )
             return new_array_object(hlg, name, new_meta, npartitions=1)
 
         # then check for scalar (or record) type
         graphlayer = {name: (operator.getitem, self.name, key)}  # type: ignore
-        hlg = HighLevelGraph.from_collections(name, graphlayer, dependencies=[self])
+        hlg = HighLevelGraph.from_collections(
+            name,
+            graphlayer,
+            dependencies=[self],  # type: ignore
+        )
         if isinstance(new_meta, ak.Record):
             return new_record_object(hlg, name, new_meta)
         else:
@@ -210,6 +243,9 @@ class Record(Scalar):
 
     def __str__(self) -> str:
         return f"dask.awkward<{key_split(self.name)}, type=Record>"
+
+    def __reduce__(self):
+        return (Record, (self.dask, self.name, self.meta))
 
     @property
     def fields(self) -> list[str] | None:
@@ -423,7 +459,11 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         name = f"partitions-{token}"
         new_keys = self.keys_array[index].tolist()
         dsk = {(name, i): tuple(key) for i, key in enumerate(new_keys)}
-        graph = HighLevelGraph.from_collections(name, dsk, dependencies=[self])
+        graph = HighLevelGraph.from_collections(
+            name,
+            dsk,
+            dependencies=[self],  # type: ignore
+        )
 
         # if a single partition was requested we trivially know the new divisions.
         if len(raw) == 1 and isinstance(raw[0], int) and self.known_divisions:  # type: ignore
@@ -573,7 +613,11 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 where,
             )
         }
-        hlg = HighLevelGraph.from_collections(name, dsk, dependencies=[partition])
+        hlg = HighLevelGraph.from_collections(
+            name,
+            dsk,
+            dependencies=[partition],  # type: ignore
+        )
         if isinstance(new_meta, ak.Record):
             return new_record_object(hlg, name, new_meta)
         else:
@@ -929,7 +973,11 @@ def map_partitions(
                 "metadata could not be determined; "
                 "a compute on the first partition will occur."
             )
-    hlg = HighLevelGraph.from_collections(name, lay, dependencies=deps)
+    hlg = HighLevelGraph.from_collections(
+        name,
+        lay,
+        dependencies=deps,  # type: ignore
+    )
     return new_array_object(hlg, name=name, meta=meta, divisions=args[0].divisions)
 
 
@@ -969,7 +1017,11 @@ def pw_reduction_with_agg_to_scalar(
     func = partial(func, **kwargs)
     dsk = {(name, i): (func, k) for i, k in enumerate(array.__dask_keys__())}
     dsk[name] = (agg, list(dsk.keys()))  # type: ignore
-    hlg = HighLevelGraph.from_collections(name, dsk, dependencies=[array])
+    hlg = HighLevelGraph.from_collections(
+        name,
+        dsk,
+        dependencies=[array],  # type: ignore
+    )
     return new_scalar_object(hlg, name, None)
 
 
@@ -1080,7 +1132,11 @@ def from_awkward(source: ak.Array, npartitions: int, name: str | None = None) ->
         (name, i): source[start:stop]
         for i, (start, stop) in enumerate(zip(locs[:-1], locs[1:]))
     }
-    hlg = HighLevelGraph.from_collections(name, llg, dependencies=set())
+    hlg = HighLevelGraph.from_collections(
+        name,
+        llg,
+        dependencies=set(),  # type: ignore
+    )
     return new_array_object(
         hlg,
         name,

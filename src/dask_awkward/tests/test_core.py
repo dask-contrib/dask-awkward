@@ -6,6 +6,7 @@ import pytest
 import dask_awkward as dak
 import dask_awkward.core as dakc
 from dask_awkward.testutils import (  # noqa: F401
+    _lazyjsonrecords,
     _lazyrecord,
     _lazyrecords,
     assert_eq,
@@ -233,6 +234,13 @@ def test_record_str() -> None:
     assert str(r) == "dask.awkward<getitem, type=Record>"
 
 
+def test_record_to_delayed() -> None:
+    daa = _lazyrecords()
+    r = daa[0]
+    d = r.to_delayed()
+    assert r.compute().tolist() == d.compute().tolist()
+
+
 def test_record_fields() -> None:
     daa = _lazyrecords()
     r = daa[0]
@@ -291,6 +299,10 @@ def test_new_known_scalar() -> None:
     assert c.compute() == 5.5
     assert c.meta is not None
 
+    c = dak.Scalar.from_known(s1)
+    assert c.known_value == s1
+    assert c.compute() == s1
+
 
 def test_scalar_dtype() -> None:
     s = 2
@@ -298,3 +310,30 @@ def test_scalar_dtype() -> None:
     assert c.dtype == np.dtype(type(s))
     c.meta = None
     assert c.dtype is None
+
+
+def test_scalar_pickle() -> None:
+    import pickle
+
+    s = 2
+    c1 = dakc.new_known_scalar(s)
+    s = pickle.dumps(c1)
+    c2 = pickle.loads(s)
+    assert_eq(c1, c2)
+    daa = _lazyjsonrecords()
+    s1 = dak.sum(daa["analysis"]["x1"], axis=None)
+    s = pickle.dumps(s1)
+    s2 = pickle.loads(s)
+    assert_eq(s1, s2)
+
+    assert s1.known_value is None
+
+
+def test_scalar_to_delayed() -> None:
+    daa = _lazyjsonrecords()
+    s1 = dak.sum(daa["analysis"]["x1"], axis=None)
+    d1 = s1.to_delayed()
+    d2 = s1.to_delayed(optimize_graph=False)
+    s1c = s1.compute()
+    assert d1.compute() == s1c
+    assert d2.compute() == s1c
