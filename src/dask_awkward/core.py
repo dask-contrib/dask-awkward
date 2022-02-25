@@ -152,6 +152,13 @@ class Scalar(DaskMethodsMixin):
 
     def __str__(self) -> str:
         dt = str(self.dtype) or "Unknown"
+        if self.known_value is not None:
+            return (
+                f"dask.awkward<{key_split(self.name)}, "
+                "type=Scalar, "
+                f"dtype={dt}, "
+                f"known_value={self.known_value}>"
+            )
         return f"dask.awkward<{key_split(self.name)}, type=Scalar, dtype={dt}>"
 
     @property
