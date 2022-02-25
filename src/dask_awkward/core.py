@@ -68,11 +68,17 @@ def _finalize_scalar(results: Sequence[T]) -> T:
 
 
 class Scalar(DaskMethodsMixin):
-    def __init__(self, dsk: HighLevelGraph, name: str, meta: Any | None = None) -> None:
+    def __init__(
+        self,
+        dsk: HighLevelGraph,
+        name: str,
+        meta: Any | None = None,
+        known_value: Any | None = None,
+    ) -> None:
         self._dask: HighLevelGraph = dsk
         self._name: str = name
         self._meta: Any | None = meta
-        self._known_value: Any | None = None
+        self._known_value: Any | None = known_value
 
     def __dask_graph__(self) -> HighLevelGraph:
         return self._dask
@@ -109,10 +115,10 @@ class Scalar(DaskMethodsMixin):
         name = self._name
         if rename:
             name = rename.get(name, name)
-        return type(self)(dsk, name, self.meta)
+        return type(self)(dsk, name, self.meta, self.known_value)
 
     def __reduce__(self):
-        return (Scalar, (self.dask, self.name, self.meta))
+        return (Scalar, (self.dask, self.name, self.meta, self.known_value))
 
     @property
     def dask(self) -> HighLevelGraph:
@@ -189,9 +195,7 @@ def new_known_scalar(s: Any, dtype: DTypeLike | None = None) -> Scalar:
             dtype = np.dtype(type(s))
     llg = {name: s}
     hlg = HighLevelGraph.from_collections(name, llg, dependencies=())
-    c = new_scalar_object(hlg, name, meta=aktt.UnknownScalar(dtype))
-    c._known_value = s
-    return c
+    return Scalar(hlg, name, meta=aktt.UnknownScalar(dtype), known_value=s)
 
 
 class Record(Scalar):
