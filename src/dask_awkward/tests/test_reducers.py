@@ -4,14 +4,7 @@ import awkward._v2 as ak
 import pytest
 
 import dask_awkward as dak
-from dask_awkward.testutils import (  # noqa: F401
-    assert_eq,
-    caa,
-    daa,
-    line_delim_records_file,
-    load_records_eager,
-    load_records_lazy,
-)
+from dask_awkward.testutils import assert_eq, caa, daa  # noqa: F401
 
 
 @pytest.mark.parametrize("axis", [1])
