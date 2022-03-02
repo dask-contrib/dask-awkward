@@ -26,7 +26,7 @@ def test_num(line_delim_records_file, axis) -> None:  # noqa: F811
 
     # TODO: also test before this forced computation.
     if axis == 0:
-        daa._compute_divisions()
+        daa.eager_compute_divisions()
 
     assert_eq(dak.num(daa.x1, axis=axis), ak.num(caa.x1, axis=axis))
 

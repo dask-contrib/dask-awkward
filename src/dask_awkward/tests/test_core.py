@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import awkward._v2 as ak
 import numpy as np
 import pytest
 
@@ -39,7 +40,7 @@ def test_calculate_known_divisions(line_delim_records_file) -> None:  # noqa: F8
     assert dakc.calculate_known_divisions(daa.analysis.x1) == target
     assert dakc.calculate_known_divisions(daa["analysis"][["x1", "x2"]]) == target
     daa = dak.from_json([line_delim_records_file] * 3)
-    daa._compute_divisions()
+    daa.eager_compute_divisions()
     assert daa.known_divisions
     assert dakc.calculate_known_divisions(daa) == target
 
@@ -337,3 +338,20 @@ def test_scalar_to_delayed() -> None:
     s1c = s1.compute()
     assert d1.compute() == s1c
     assert d2.compute() == s1c
+
+
+def test_compatible_partitions() -> None:
+    daa1 = _lazyjsonrecords()
+    daa2 = _lazyrecords()
+    assert dakc.compatible_partitions(daa1, daa1)
+    assert dakc.compatible_partitions(daa1, daa1, daa1)
+    assert not dakc.compatible_partitions(daa1, daa2)
+    daa1.eager_compute_divisions()
+    assert dakc.compatible_partitions(daa1, daa1)
+    x = ak.Array([[1, 2, 3], [1, 2, 3], [3, 4, 5]])
+    y = ak.Array([[1, 2, 3], [3, 4, 5]])
+    x = dak.from_awkward(x, npartitions=2)
+    y = dak.from_awkward(y, npartitions=2)
+    assert not dakc.compatible_partitions(x, y)
+    assert not dakc.compatible_partitions(x, x, y)
+    assert dakc.compatible_partitions(y, y)

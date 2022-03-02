@@ -348,7 +348,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return type(self)(dsk, name, self.meta, divisions=self.divisions)
 
     def __len__(self) -> int:
-        self._compute_divisions()
+        self.eager_compute_divisions()
         return self.divisions[-1]  # type: ignore
 
     def _shorttypestr(self, max: int = 10) -> str:
@@ -760,7 +760,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         """
         return map_partitions(func, self, *args, **kwargs)
 
-    def _compute_divisions(self) -> None:
+    def eager_compute_divisions(self) -> None:
         self._divisions = calculate_known_divisions(self)
 
     def clear_divisions(self) -> None:
@@ -1283,6 +1283,42 @@ def typetracer_array(a: ak.Array | Array) -> ak.Array | None:
         return a.typetracer
     else:
         return ak.Array(a.layout.typetracer)
+
+
+def compatible_partitions(*args: Array) -> bool:
+    """Check if all arguments are compatibly partitioned.
+
+    In operations where the blocks of multiple collections are used
+    simultaneously, we need the collections to be equally partitioned.
+
+    If the first argument has known divisions, other collections with
+    known divisions will be tested against the first arguments
+    divisions.
+
+    Parameters
+    ----------
+    *args : Array
+        Array collections of interest.
+
+    Returns
+    -------
+    bool
+        ``True`` if the collections appear to be equally partitioned.
+
+    """
+    a = args[0]
+
+    for arg in args[1:]:
+        if a.npartitions != arg.npartitions:
+            return False
+
+    if a.known_divisions:
+        for arg in args[1:]:
+            if arg.known_divisions:
+                if a.divisions != arg.divisions:
+                    return False
+
+    return True
 
 
 class TrivialPartitionwiseOp:
