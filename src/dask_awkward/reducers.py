@@ -107,12 +107,13 @@ def corr(
     mask_identity=True,
     flatten_records=False,
 ):
-    raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
+    raise DaskAwkwardNotImplemented("TODO")
 
 
 def count(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
-    if axis == 1:
-        return _count_trivial(
+    if axis and axis >= 1:
+        return map_partitions(
+            ak.count,
             array,
             axis=axis,
             keepdims=keepdims,
@@ -120,7 +121,8 @@ def count(array, axis=None, keepdims=False, mask_identity=False, flatten_records
             flatten_records=flatten_records,
         )
     elif axis is None:
-        trivial_result = _count_trivial(
+        trivial_result = map_partitions(
+            ak.count,
             array,
             axis=1,
             keepdims=keepdims,
@@ -181,7 +183,7 @@ def covar(
     mask_identity=True,
     flatten_records=False,
 ):
-    raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
+    raise DaskAwkwardNotImplemented("TODO")
 
 
 def linear_fit(
@@ -193,7 +195,7 @@ def linear_fit(
     mask_identity=True,
     flatten_records=False,
 ):
-    raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
+    raise DaskAwkwardNotImplemented("TODO")
 
 
 def max(
@@ -218,7 +220,7 @@ def max(
 def mean(
     x, weight=None, axis=None, keepdims=False, mask_identity=True, flatten_records=False
 ):
-    raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
+    raise DaskAwkwardNotImplemented("TODO")
 
 
 def min(
@@ -249,19 +251,19 @@ def moment(
     mask_identity=True,
     flatten_records=False,
 ):
-    raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
+    raise DaskAwkwardNotImplemented("TODO")
 
 
 def prod(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
-    raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
+    raise DaskAwkwardNotImplemented("TODO")
 
 
 def ptp(arr, axis=None, keepdims=False, mask_identity=True, flatten_records=False):
-    raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
+    raise DaskAwkwardNotImplemented("TODO")
 
 
 def softmax(x, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
-    raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
+    raise DaskAwkwardNotImplemented("TODO")
 
 
 def std(
