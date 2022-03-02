@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import keyword
 import operator
+import warnings
 from functools import cached_property, partial
 from math import ceil
 from numbers import Number
-from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Hashable, Mapping, Sequence, TypeVar
 
 import awkward._v2 as ak
 import awkward._v2._typetracer as aktt
@@ -25,16 +26,28 @@ if TYPE_CHECKING:
     from awkward._v2.forms.form import Form
     from awkward._v2.types.type import Type
     from dask.blockwise import Blockwise
+    from dask.delayed import Delayed
+    from numpy.typing import DTypeLike
 
 
-_NOT_SUPPORTED_MSG = """
+T = TypeVar("T")
+
+
+class DaskAwkwardNotImplemented(NotImplementedError):
+    NOT_SUPPORTED_MSG = """
 
 If you would like this unsupported call to be supported by
 dask-awkward please open an issue at:
 https://github.com/ContinuumIO/dask-awkward."""
 
+    def __init__(self, msg: str | None = None) -> None:
+        msg = f"{msg or ''}{self.NOT_SUPPORTED_MSG}"
+        super().__init__(msg)
 
-def _finalize_array(results: Any) -> Any:
+
+def _finalize_array(
+    results: Sequence[Number | ak.Array | ak.Record],
+) -> Number | ak.Array:
     if any(isinstance(r, ak.Array) for r in results):
         return ak.concatenate(results)
     elif len(results) == 1 and isinstance(results[0], int):
@@ -50,15 +63,22 @@ def _finalize_array(results: Any) -> Any:
         raise RuntimeError(msg)
 
 
-def _finalize_scalar(results: Any) -> Any:
+def _finalize_scalar(results: Sequence[T]) -> T:
     return results[0]
 
 
 class Scalar(DaskMethodsMixin):
-    def __init__(self, dsk: HighLevelGraph, name: str, meta: Any | None = None) -> None:
+    def __init__(
+        self,
+        dsk: HighLevelGraph,
+        name: str,
+        meta: Any | None = None,
+        known_value: Any | None = None,
+    ) -> None:
         self._dask: HighLevelGraph = dsk
         self._name: str = name
         self._meta: Any | None = meta
+        self._known_value: Any | None = known_value
 
     def __dask_graph__(self) -> HighLevelGraph:
         return self._dask
@@ -71,7 +91,7 @@ class Scalar(DaskMethodsMixin):
             return tuple(self._dask.layers)
         return (self.name,)
 
-    def __dask_tokenize__(self) -> str:
+    def __dask_tokenize__(self) -> Hashable:
         return self.name
 
     @staticmethod
@@ -80,10 +100,10 @@ class Scalar(DaskMethodsMixin):
 
     __dask_scheduler__ = staticmethod(threaded_get)
 
-    def __dask_postcompute__(self) -> Any:
+    def __dask_postcompute__(self) -> tuple[Callable, tuple]:
         return _finalize_scalar, ()
 
-    def __dask_postpersist__(self) -> Any:
+    def __dask_postpersist__(self) -> tuple[Callable, tuple]:
         return self._rebuild, ()
 
     def _rebuild(
@@ -95,7 +115,10 @@ class Scalar(DaskMethodsMixin):
         name = self._name
         if rename:
             name = rename.get(name, name)
-        return type(self)(dsk, name, self.meta)
+        return type(self)(dsk, name, self.meta, self.known_value)
+
+    def __reduce__(self):
+        return (Scalar, (self.dask, self.name, self.meta, self.known_value))
 
     @property
     def dask(self) -> HighLevelGraph:
@@ -117,15 +140,62 @@ class Scalar(DaskMethodsMixin):
             raise TypeError(f"meta must be a typetracer module object, not a {type(m)}")
         self._meta = m
 
+    @property
+    def dtype(self) -> np.dtype | None:
+        try:
+            if self.meta is not None:
+                return self.meta.dtype
+        except AttributeError:
+            pass
+        return None
+
+    @staticmethod
+    def from_known(s: Any, dtype: DTypeLike | None = None) -> Scalar:
+        return new_known_scalar(s, dtype=dtype)
+
     def __repr__(self) -> str:
         return self.__str__()
 
     def __str__(self) -> str:
-        return f"dask.awkward<{key_split(self.name)}, type=Scalar>"
+        dt = str(self.dtype) or "Unknown"
+        if self.known_value is not None:
+            return (
+                f"dask.awkward<{key_split(self.name)}, "
+                "type=Scalar, "
+                f"dtype={dt}, "
+                f"known_value={self.known_value}>"
+            )
+        return f"dask.awkward<{key_split(self.name)}, type=Scalar, dtype={dt}>"
+
+    @property
+    def known_value(self) -> Any | None:
+        return self._known_value
+
+    def to_delayed(self, optimize_graph: bool = True) -> Delayed:
+        from dask.delayed import Delayed
+
+        dsk = self.__dask_graph__()
+        if optimize_graph:
+            dsk = self.__dask_optimize__(dsk, self.__dask_keys__())
+        return Delayed(self.name, dsk)
 
 
 def new_scalar_object(dsk: HighLevelGraph, name: str, meta: Any) -> Scalar:
     return Scalar(dsk, name, meta)
+
+
+def new_known_scalar(s: Any, dtype: DTypeLike | None = None) -> Scalar:
+    name = tokenize(s)
+    if dtype is None:
+        if isinstance(s, (int, np.integer)):
+            dtype = np.dtype(int)
+        elif isinstance(s, (float, np.floating)):
+            dtype = np.dtype(float)
+        else:
+            dtype = np.dtype(type(s))
+    llg = {name: s}
+    hlg = HighLevelGraph.from_collections(name, llg, dependencies=())
+    return Scalar(hlg, name, meta=aktt.UnknownScalar(dtype), known_value=s)
 
 
 class Record(Scalar):
@@ -155,18 +225,28 @@ class Record(Scalar):
         # first check for array type return
         if isinstance(new_meta, ak.Array):
             graphlayer = {(name, 0): (operator.getitem, self.name, key)}
-            hlg = HighLevelGraph.from_collections(name, graphlayer, dependencies=[self])
+            hlg = HighLevelGraph.from_collections(
+                name,
+                graphlayer,
+                dependencies=[self],  # type: ignore
+            )
             return new_array_object(hlg, name, new_meta, npartitions=1)
 
         # then check for scalar (or record) type
         graphlayer = {name: (operator.getitem, self.name, key)}  # type: ignore
-        hlg = HighLevelGraph.from_collections(name, graphlayer, dependencies=[self])
+        hlg = HighLevelGraph.from_collections(
+            name,
+            graphlayer,
+            dependencies=[self],  # type: ignore
+        )
         if isinstance(new_meta, ak.Record):
             return new_record_object(hlg, name, new_meta)
         else:
             return new_scalar_object(hlg, name, new_meta)
 
     def __getattr__(self, attr: str) -> Any:
+        if attr not in (self.fields or []):
+            raise AttributeError(f"{attr} not in fields.")
         try:
             return self.__getitem__(attr)
         except (IndexError, KeyError):
@@ -174,6 +254,9 @@ class Record(Scalar):
 
     def __str__(self) -> str:
         return f"dask.awkward<{key_split(self.name)}, type=Record>"
+
+    def __reduce__(self):
+        return (Record, (self.dask, self.name, self.meta))
 
     @property
     def fields(self) -> list[str] | None:
@@ -238,13 +321,13 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     def __dask_layers__(self) -> tuple[str]:
         return (self.name,)
 
-    def __dask_tokenize__(self) -> str:
+    def __dask_tokenize__(self) -> Hashable:
         return self.name
 
-    def __dask_postcompute__(self) -> Any:
+    def __dask_postcompute__(self) -> tuple[Callable, tuple]:
         return _finalize_array, ()
 
-    def __dask_postpersist__(self) -> Any:
+    def __dask_postpersist__(self) -> tuple[Callable, tuple]:
         return self._rebuild, ()
 
     @staticmethod
@@ -265,7 +348,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return type(self)(dsk, name, self.meta, divisions=self.divisions)
 
     def __len__(self) -> int:
-        self._compute_divisions()
+        self.eager_compute_divisions()
         return self.divisions[-1]  # type: ignore
 
     def _shorttypestr(self, max: int = 10) -> str:
@@ -387,7 +470,11 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         name = f"partitions-{token}"
         new_keys = self.keys_array[index].tolist()
         dsk = {(name, i): tuple(key) for i, key in enumerate(new_keys)}
-        graph = HighLevelGraph.from_collections(name, dsk, dependencies=[self])
+        graph = HighLevelGraph.from_collections(
+            name,
+            dsk,
+            dependencies=[self],  # type: ignore
+        )
 
         # if a single partition was requested we trivially know the new divisions.
         if len(raw) == 1 and isinstance(raw[0], int) and self.known_divisions:  # type: ignore
@@ -526,9 +613,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if not isinstance(
             new_meta, (ak.Record, aktt.UnknownScalar, aktt.OneOf, aktt.MaybeNone)
         ):
-            raise NotImplementedError(
-                f"Key type not supported for this array. {_NOT_SUPPORTED_MSG}"
-            )
+            raise DaskAwkwardNotImplemented("Key type not supported for this array.")
 
         token = tokenize(partition, where)
         name = f"getitem-{token}"
@@ -539,7 +624,11 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 where,
             )
         }
-        hlg = HighLevelGraph.from_collections(name, dsk, dependencies=[partition])
+        hlg = HighLevelGraph.from_collections(
+            name,
+            dsk,
+            dependencies=[partition],  # type: ignore
+        )
         if isinstance(new_meta, ak.Record):
             return new_record_object(hlg, name, new_meta)
         else:
@@ -567,8 +656,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             if issubclass(dtype, (np.bool_, bool)):
                 return self._getitem_outer_boolean_lazy_array(where)
 
-        raise NotImplementedError(
-            f"Array.__getitem__ doesn't support multi-object: {where}. {_NOT_SUPPORTED_MSG}"
+        raise DaskAwkwardNotImplemented(
+            f"Array.__getitem__ doesn't support multi object: {where}"
         )
 
     def _getitem_single(self, where: Any) -> Array:
@@ -600,9 +689,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         elif where is Ellipsis:
             return self._getitem_trivial_map_partitions(where)
 
-        raise NotImplementedError(
-            f"__getitem__ doesn't support where={where}. {_NOT_SUPPORTED_MSG}"
-        )
+        raise DaskAwkwardNotImplemented(f"__getitem__ doesn't support where={where}.")
 
     def __getitem__(self, where: Any) -> Any:
         """Select items from the collection.
@@ -624,7 +711,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         # don't accept lists containing integers.
         if isinstance(where, list):
             if any(isinstance(k, int) for k in where):
-                raise NotImplementedError("Lists containing integers not supported.")
+                # this is something we'll likely never support so we
+                # do not use the DaskAwkwardNotImplemented exception.
+                raise RuntimeError("Lists containing integers are not supported.")
 
         if isinstance(where, tuple):
             return self._getitem_tuple(where)
@@ -632,6 +721,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return self._getitem_single(where)
 
     def __getattr__(self, attr: str) -> Any:
+        if attr not in (self.fields or []):
+            raise AttributeError(f"{attr} not in fields.")
         try:
             return self.__getitem__(attr)
         except (IndexError, KeyError):
@@ -669,7 +760,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         """
         return map_partitions(func, self, *args, **kwargs)
 
-    def _compute_divisions(self) -> None:
+    def eager_compute_divisions(self) -> None:
         self._divisions = calculate_known_divisions(self)
 
     def clear_divisions(self) -> None:
@@ -678,7 +769,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         if method != "__call__":
-            raise NotImplementedError("Array ufunc supports only method == '__call__'")
+            raise RuntimeError("Array ufunc supports only method == '__call__'")
 
         new_meta = None
 
@@ -828,7 +919,7 @@ def partitionwise_layer(
             pairs.extend([arg.name, "i"])
             numblocks[arg.name] = (arg.npartitions,)
         elif is_dask_collection(arg):
-            raise NotImplementedError(
+            raise DaskAwkwardNotImplemented(
                 "Use of Array with other Dask collections is currently unsupported."
             )
         else:
@@ -849,6 +940,7 @@ def map_partitions(
     *args: Any,
     name: str | None = None,
     meta: Any | None = None,
+    ignore_meta: bool = False,
     **kwargs: Any,
 ) -> Array:
     """Map a callable across all partitions of a collection.
@@ -882,7 +974,21 @@ def map_partitions(
     deps = [a for a in args if is_dask_collection(a)] + [
         v for _, v in kwargs.items() if is_dask_collection(v)
     ]
-    hlg = HighLevelGraph.from_collections(name, lay, dependencies=deps)
+
+    if meta is None and not ignore_meta:
+        metas = to_meta(args)
+        try:
+            meta = func(*metas, **kwargs)
+        except Exception:
+            warnings.warn(
+                "metadata could not be determined; "
+                "a compute on the first partition will occur."
+            )
+    hlg = HighLevelGraph.from_collections(
+        name,
+        lay,
+        dependencies=deps,  # type: ignore
+    )
     return new_array_object(hlg, name=name, meta=meta, divisions=args[0].divisions)
 
 
@@ -922,7 +1028,11 @@ def pw_reduction_with_agg_to_scalar(
     func = partial(func, **kwargs)
     dsk = {(name, i): (func, k) for i, k in enumerate(array.__dask_keys__())}
     dsk[name] = (agg, list(dsk.keys()))  # type: ignore
-    hlg = HighLevelGraph.from_collections(name, dsk, dependencies=[array])
+    hlg = HighLevelGraph.from_collections(
+        name,
+        dsk,
+        dependencies=[array],  # type: ignore
+    )
     return new_scalar_object(hlg, name, None)
 
 
@@ -948,12 +1058,12 @@ def calculate_known_divisions(array: Array) -> tuple[int, ...]:
 
     # if more than 1 partition use cumulative sum
     if array.npartitions > 1:
-        nums = array.map_partitions(len).compute()
+        nums = array.map_partitions(len, ignore_meta=True).compute()
         cs = list(np.cumsum(nums))
         return tuple([0, *cs])
 
     # if only 1 partition just get it's length
-    return (0, array.map_partitions(len).compute())
+    return (0, array.map_partitions(len, ignore_meta=True).compute())
 
 
 def _type(array: Array) -> Type | None:
@@ -1033,7 +1143,11 @@ def from_awkward(source: ak.Array, npartitions: int, name: str | None = None) ->
         (name, i): source[start:stop]
         for i, (start, stop) in enumerate(zip(locs[:-1], locs[1:]))
     }
-    hlg = HighLevelGraph.from_collections(name, llg, dependencies=set())
+    hlg = HighLevelGraph.from_collections(
+        name,
+        llg,
+        dependencies=set(),  # type: ignore
+    )
     return new_array_object(
         hlg,
         name,
@@ -1169,6 +1283,42 @@ def typetracer_array(a: ak.Array | Array) -> ak.Array | None:
         return a.typetracer
     else:
         return ak.Array(a.layout.typetracer)
+
+
+def compatible_partitions(*args: Array) -> bool:
+    """Check if all arguments are compatibly partitioned.
+
+    In operations where the blocks of multiple collections are used
+    simultaneously, we need the collections to be equally partitioned.
+
+    If the first argument has known divisions, other collections with
+    known divisions will be tested against the first arguments
+    divisions.
+
+    Parameters
+    ----------
+    *args : Array
+        Array collections of interest.
+
+    Returns
+    -------
+    bool
+        ``True`` if the collections appear to be equally partitioned.
+
+    """
+    a = args[0]
+
+    for arg in args[1:]:
+        if a.npartitions != arg.npartitions:
+            return False
+
+    if a.known_divisions:
+        for arg in args[1:]:
+            if arg.known_divisions:
+                if a.divisions != arg.divisions:
+                    return False
+
+    return True
 
 
 class TrivialPartitionwiseOp:

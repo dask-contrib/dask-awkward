@@ -30,5 +30,5 @@ def test_ufunc_sin(line_delim_records_file) -> None:  # noqa: F811
 @pytest.mark.parametrize("f", [np.add.accumulate, np.add.reduce])
 def test_ufunc_method_raise(line_delim_records_file, f) -> None:  # noqa: F811
     daa = load_records_lazy(line_delim_records_file).analysis.x1
-    with pytest.raises(NotImplementedError, match="Array ufunc supports only method"):
+    with pytest.raises(RuntimeError, match="Array ufunc supports only method"):
         f(daa, daa)

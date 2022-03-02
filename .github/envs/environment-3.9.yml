@@ -9,4 +9,4 @@ dependencies:
   - pyarrow
   - pip
   - pip:
-    - awkward==1.8.0rc4
+    - awkward>=1.8.0

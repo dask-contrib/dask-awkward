@@ -43,7 +43,7 @@ def test_layered_string(daa, caa) -> None:  # noqa: F811
 
 
 def test_list_with_ints_raise(daa) -> None:  # noqa: F811
-    with pytest.raises(NotImplementedError, match="Lists containing integers"):
+    with pytest.raises(RuntimeError, match="Lists containing integers"):
         assert daa[[1, 2]]
 
 
