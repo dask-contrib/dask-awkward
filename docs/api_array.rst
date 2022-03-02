@@ -1,5 +1,5 @@
-API
----
+Array
+-----
 
 .. currentmodule:: dask_awkward
 
@@ -7,7 +7,6 @@ API
 
    Array
    map_partitions
-
 
 .. autoclass:: Array
    :members:

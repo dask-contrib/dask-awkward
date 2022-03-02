@@ -10,11 +10,17 @@ Connecting Dask to Awkward Array.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: Contents
 
+   intro.rst
    terminology.rst
-   api.rst
 
+.. toctree::
+   :maxdepth: 2
+   :caption: API
+
+   api_array.rst
+   api_io.rst
 
 ..   Indices and tables
 ..   ==================
