@@ -854,12 +854,12 @@ def new_array_object(
         Graph backing the collection.
     name : str
         Unique name for the collection.
-    meta : Content, the awkward-array type tracing information, optional
-        Object metadata; this is an awkward-array type tracer.
+    meta : Array, optional
+        Collection metadata; this is an awkward-array type tracer.
     npartitions : int, optional
         Total number of partitions; if used `divisions` will be a
         tuple of length `npartitions` + 1 with all elements``None``.
-    divisions : tuple[int or None, ...], optional
+    divisions : tuple[int | None, ...], optional
         Tuple identifying the locations of the divisions between the
         partitions.
 
@@ -1010,9 +1010,9 @@ def pw_reduction_with_agg_to_scalar(
         Function to apply on all partitions.
     agg : Callable
         Function to aggregate the result on each partition.
-    name : str | None
-        Name for the computation, if ``None`` we use the name of
-        `func`.
+    name : str, optional
+        Name for the computation, if ``None`` the name of `func` will
+        be used.
     **kwargs : Any
         Keyword arguments passed to `func`.
 
