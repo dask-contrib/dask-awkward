@@ -52,7 +52,7 @@ def _finalize_array(
         return ak.concatenate(results)
     elif len(results) == 1 and isinstance(results[0], int):
         return results[0]
-    elif all(isinstance(r, int) for r in results):
+    elif all(isinstance(r, (int, np.integer)) for r in results):
         return ak.Array(results)
     else:
         msg = (
@@ -995,9 +995,10 @@ def map_partitions(
 def pw_reduction_with_agg_to_scalar(
     array: Array,
     func: Callable,
-    agg: Callable,
     *,
-    name: str | None = None,
+    agg: Callable,
+    dtype: Any | None = None,
+    agg_kwargs: Mapping[str, Any] | None = None,
     **kwargs: Any,
 ) -> Scalar:
     """Partitionwise operation with aggregation to scalar.
@@ -1023,17 +1024,21 @@ def pw_reduction_with_agg_to_scalar(
 
     """
     token = tokenize(array)
-    name = func.__name__ if name is None else name
-    name = f"{name}-{token}"
+    namefunc = func.__name__
+    nameagg = agg.__name__
+    namefunc = f"{namefunc}-{token}"
+    nameagg = f"{nameagg}-{token}"
     func = partial(func, **kwargs)
-    dsk = {(name, i): (func, k) for i, k in enumerate(array.__dask_keys__())}
-    dsk[name] = (agg, list(dsk.keys()))  # type: ignore
+    agg = partial(agg, **agg_kwargs) if agg_kwargs is not None else agg
+    dsk = {(namefunc, i): (func, k) for i, k in enumerate(array.__dask_keys__())}
+    dsk[nameagg] = (agg, list(dsk.keys()))  # type: ignore
     hlg = HighLevelGraph.from_collections(
-        name,
+        nameagg,
         dsk,
         dependencies=[array],  # type: ignore
     )
-    return new_scalar_object(hlg, name, None)
+    meta = aktt.UnknownScalar(np.dtype(dtype)) if dtype is not None else None
+    return new_scalar_object(hlg, name=nameagg, meta=meta)
 
 
 def calculate_known_divisions(array: Array) -> tuple[int, ...]:
