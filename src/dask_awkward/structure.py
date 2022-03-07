@@ -5,7 +5,7 @@ from typing import Any
 import awkward._v2 as ak
 import numpy as np
 
-from dask_awkward.core import (
+from .core import (
     DaskAwkwardNotImplemented,
     TrivialPartitionwiseOp,
     map_partitions,
