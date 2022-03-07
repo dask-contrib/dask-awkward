@@ -11,13 +11,13 @@ from typing import TYPE_CHECKING, Any, Callable, Hashable, Mapping, Sequence, Ty
 import awkward._v2 as ak
 import awkward._v2._typetracer as aktt
 import numpy as np
-from awkward._v2._connect.numpy import NDArrayOperatorsMixin
 from awkward._v2.highlevel import _dir_pattern
 from dask.base import DaskMethodsMixin, dont_optimize, is_dask_collection, tokenize
 from dask.blockwise import blockwise as upstream_blockwise
 from dask.highlevelgraph import HighLevelGraph
 from dask.threaded import get as threaded_get
 from dask.utils import IndexCallable, funcname, key_split
+from numpy.lib.mixins import NDArrayOperatorsMixin
 
 from .utils import is_empty_slice, normalize_single_outer_inner_index
 
