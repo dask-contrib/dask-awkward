@@ -46,6 +46,29 @@ def normalize_single_outer_inner_index(
 
 
 def is_empty_slice(s: Any) -> bool:
+    """Check if a slice is empty.
+
+    Parameters
+    ----------
+    s : Any
+        Slice of interest
+
+    Returns
+    -------
+    bool
+        True if the slice is empty
+
+    Examples
+    --------
+    >>> from dask_awkward.utils import is_empty_slice
+    >>> is_empty_slice(slice(1, 5, None))
+    False
+    >>> is_empty_slice(slice(None, None, 2))
+    False
+    >>> is_empty_slice(slice(None, None, None))
+    True
+
+    """
     if not isinstance(s, slice):
         return False
     if s.start is not None:
