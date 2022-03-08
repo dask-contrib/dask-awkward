@@ -827,8 +827,8 @@ def _get_typetracer(array: Array) -> ak.Array:
 
     Returns
     -------
-    Content
-        Awkward Content object representing the typetracer (metadata).
+    Array
+        Awkward high level array wrapping the typetracer (metadata).
 
     """
     if array.meta is not None:
