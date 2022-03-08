@@ -1029,7 +1029,7 @@ def pw_reduction_with_agg_to_scalar(
     namefunc = f"{namefunc}-{token}"
     nameagg = f"{nameagg}-{token}"
     func = partial(func, **kwargs)
-    agg = partial(agg, **agg_kwargs) if agg_kwargs is not None else agg
+    agg = partial(agg, **agg_kwargs) if agg_kwargs is not None else agg  # type: ignore
     dsk = {(namefunc, i): (func, k) for i, k in enumerate(array.__dask_keys__())}
     dsk[nameagg] = (agg, list(dsk.keys()))  # type: ignore
     hlg = HighLevelGraph.from_collections(

@@ -318,13 +318,13 @@ def test_scalar_pickle() -> None:
 
     s = 2
     c1 = dakc.new_known_scalar(s)
-    s = pickle.dumps(c1)
-    c2 = pickle.loads(s)
+    s_dumped = pickle.dumps(c1)
+    c2 = pickle.loads(s_dumped)
     assert_eq(c1, c2)
     daa = _lazyjsonrecords()
     s1 = dak.sum(daa["analysis"]["x1"], axis=None)
-    s = pickle.dumps(s1)
-    s2 = pickle.loads(s)
+    s_dumped = pickle.dumps(s1)
+    s2 = pickle.loads(s_dumped)
     assert_eq(s1, s2)
 
     assert s1.known_value is None
