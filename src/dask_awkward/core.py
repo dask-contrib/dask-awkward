@@ -1111,30 +1111,6 @@ def ndim(array: Array) -> int | None:
     return None
 
 
-def fields(collection: Array | Record) -> list[str] | None:
-    """Get the fields of a Array collection.
-
-    Parameters
-    ----------
-    collection : dask_awkward.Array or dask_awkward.Record
-        Array or Record collection
-
-    Returns
-    -------
-    list[str] or None
-        The fields of the collection; if the collection does not
-        contain metadata ``None`` is returned.
-
-    """
-    try:
-        m = collection.meta
-        if m is not None:
-            return m.fields
-    except AttributeError:
-        return None
-    return None
-
-
 def from_awkward(source: ak.Array, npartitions: int, name: str | None = None) -> Array:
     if name is None:
         name = f"from-awkward-{tokenize(source, npartitions)}"
