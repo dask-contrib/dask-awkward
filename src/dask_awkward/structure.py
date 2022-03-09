@@ -184,7 +184,6 @@ def num(array: Any, axis: int | None = 1, highlevel: bool = True, behavior=None)
         )
     if axis == 0:
         if array.known_divisions:
-            res = array.divisions[-1]  # noqa: F841
             return new_known_scalar(array.divisions[-1], dtype=int)
         else:
             return pw_reduction_with_agg_to_scalar(

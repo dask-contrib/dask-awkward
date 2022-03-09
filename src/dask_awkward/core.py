@@ -181,7 +181,7 @@ class Scalar(DaskMethodsMixin):
 
 
 def new_scalar_object(dsk: HighLevelGraph, name: str, meta: Any) -> Scalar:
-    return Scalar(dsk, name, meta)
+    return Scalar(dsk, name, meta, known_value=None)
 
 
 def new_known_scalar(s: Any, dtype: DTypeLike | None = None) -> Scalar:
@@ -261,7 +261,7 @@ class Record(Scalar):
     @property
     def fields(self) -> list[str] | None:
         if self.meta is not None:
-            return self.meta.fields
+            return ak.fields(self.meta)
         return None
 
     def _ipython_key_completions_(self) -> list[str]:
@@ -446,7 +446,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     @property
     def fields(self) -> list[str] | None:
         if self.meta is not None:
-            return self.meta.fields
+            return ak.fields(self.meta)
         return None
 
     @property
@@ -836,7 +836,7 @@ def _get_typetracer(array: Array) -> ak.Array:
     first_part = _first_partition(array)
     if not isinstance(first_part, ak.Array):
         raise TypeError(f"Should have an ak.Array type, got {type(first_part)}")
-    return ak.Array(first_part.layout.typetracer)
+    return ak.Array(first_part.layout.typetracer.forget_length())
 
 
 def new_array_object(
@@ -1157,7 +1157,7 @@ def from_awkward(source: ak.Array, npartitions: int, name: str | None = None) ->
         hlg,
         name,
         divisions=tuple(locs),
-        meta=ak.Array(source.layout.typetracer),
+        meta=ak.Array(source.layout.typetracer.forget_length()),
     )
 
 

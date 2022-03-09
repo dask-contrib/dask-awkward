@@ -50,10 +50,8 @@ def test_fields(line_delim_records_file) -> None:
     assert daa[0].analysis.fields == daa.analysis.fields
     aa = daa.compute()
     assert daa.fields == aa.fields
-    assert dak.fields(daa) == aa.fields
     daa.meta = None
     assert daa.fields is None
-    assert dak.fields(daa) is None
 
 
 def test_form(line_delim_records_file) -> None:
@@ -151,7 +149,7 @@ def test_raise_in_finalize() -> None:
         res.compute()
 
 
-def test_rebuild(line_delim_records_file):  # noqa: F811
+def test_rebuild(line_delim_records_file):
     daa = dak.from_json(line_delim_records_file)
     x = daa.compute()
     daa = daa._rebuild(daa.dask)
