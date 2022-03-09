@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Callable, Union
 
 import awkward._v2 as ak
+import numpy as np
 
 from .core import (
     DaskAwkwardNotImplemented,
@@ -132,7 +133,8 @@ def count(array, axis=None, keepdims=False, mask_identity=False, flatten_records
         return pw_reduction_with_agg_to_scalar(
             trivial_result,
             ak.sum,
-            ak.sum,
+            agg=ak.sum,
+            dtype=np.int64,
         )
     elif axis == 0 or axis == -1 * array.ndim:
         raise DaskAwkwardNotImplemented(
@@ -164,7 +166,8 @@ def count_nonzero(
         return pw_reduction_with_agg_to_scalar(
             trivial_result,
             ak.sum,
-            ak.sum,
+            agg=ak.sum,
+            dtype=np.int64,
         )
     elif axis == 0 or axis == -1 * array.ndim:
         raise DaskAwkwardNotImplemented(
@@ -299,7 +302,7 @@ def sum(array, axis=None, keepdims=False, mask_identity=False, flatten_records=F
             array, keepdims=False, mask_identity=False, flatten_records=False
         )
     elif axis is None:
-        return pw_reduction_with_agg_to_scalar(array, ak.sum, ak.sum)
+        return pw_reduction_with_agg_to_scalar(array, ak.sum, agg=ak.sum)
     elif axis == 0:
         raise DaskAwkwardNotImplemented(
             f"axis={axis} is not supported for this array yet."
@@ -335,7 +338,7 @@ def _min_or_max(
     if axis == 1:
         return tf(array, axis=axis, **kwargs)
     elif axis is None:
-        return pw_reduction_with_agg_to_scalar(array, f, f, **kwargs)
+        return pw_reduction_with_agg_to_scalar(array, f, agg=f, **kwargs)
     elif array.ndim is not None and (axis == 0 or axis == -1 * array.ndim):
         raise DaskAwkwardNotImplemented(
             f"axis={axis} is not supported for this array yet."

@@ -6,12 +6,11 @@ import pytest
 
 import dask_awkward as dak
 import dask_awkward.core as dakc
-from dask_awkward.testutils import (  # noqa: F401
+from dask_awkward.testutils import (
     _lazyjsonrecords,
     _lazyrecord,
     _lazyrecords,
     assert_eq,
-    line_delim_records_file,
     load_records_eager,
     load_records_lazy,
 )
@@ -26,13 +25,13 @@ def test_clear_divisions() -> None:
     assert_eq(daa, daa)
 
 
-def test_dunder_str(line_delim_records_file) -> None:  # noqa: F811
+def test_dunder_str(line_delim_records_file) -> None:
     aa = load_records_eager(line_delim_records_file)
     daa = dak.from_awkward(aa, npartitions=6)
     assert str(daa) == "dask.awkward<from-awkward, npartitions=5>"
 
 
-def test_calculate_known_divisions(line_delim_records_file) -> None:  # noqa: F811
+def test_calculate_known_divisions(line_delim_records_file) -> None:
     daa = dak.from_json([line_delim_records_file] * 3)
     target = (0, 20, 40, 60)
     assert dakc.calculate_known_divisions(daa) == target
@@ -45,7 +44,7 @@ def test_calculate_known_divisions(line_delim_records_file) -> None:  # noqa: F8
     assert dakc.calculate_known_divisions(daa) == target
 
 
-def test_fields(line_delim_records_file) -> None:  # noqa: F811
+def test_fields(line_delim_records_file) -> None:
     daa = dak.from_json(line_delim_records_file, blocksize=340)
     # records fields same as array of records fields
     assert daa[0].analysis.fields == daa.analysis.fields
@@ -57,7 +56,7 @@ def test_fields(line_delim_records_file) -> None:  # noqa: F811
     assert dak.fields(daa) is None
 
 
-def test_form(line_delim_records_file) -> None:  # noqa: F811
+def test_form(line_delim_records_file) -> None:
     daa = dak.from_json(line_delim_records_file)
     assert daa.form
     daa.meta = None
@@ -65,7 +64,7 @@ def test_form(line_delim_records_file) -> None:  # noqa: F811
 
 
 @pytest.mark.xfail
-def test_form_equality(line_delim_records_file) -> None:  # noqa: F811
+def test_form_equality(line_delim_records_file) -> None:
     # NOTE: forms come from meta which currently depends on partitioning
     daa = dak.from_json(line_delim_records_file)
     assert daa.form == daa.compute().layout.form
@@ -73,7 +72,7 @@ def test_form_equality(line_delim_records_file) -> None:  # noqa: F811
     assert daa.form == daa.compute().layout.form
 
 
-def test_from_awkward(line_delim_records_file) -> None:  # noqa: F811
+def test_from_awkward(line_delim_records_file) -> None:
     aa = load_records_eager(line_delim_records_file)
     daa = dak.from_awkward(aa, npartitions=4)
     assert_eq(aa, daa)
@@ -85,19 +84,19 @@ def test_get_typetracer() -> None:
     assert dakc._get_typetracer(daa) is daa.meta
 
 
-def test_len(line_delim_records_file) -> None:  # noqa: F811
+def test_len(line_delim_records_file) -> None:
     daa = dak.from_json(line_delim_records_file)
     assert len(daa) == 20
 
 
-def test_meta_and_typetracer_exist(line_delim_records_file) -> None:  # noqa: F811
+def test_meta_and_typetracer_exist(line_delim_records_file) -> None:
     daa = dak.from_json(line_delim_records_file, blocksize=700)
     assert daa.meta is not None
     assert daa["analysis"]["x1"].meta is not None
     assert daa.typetracer is daa.meta
 
 
-def test_meta_raise(line_delim_records_file) -> None:  # noqa: F811
+def test_meta_raise(line_delim_records_file) -> None:
     daa = dak.from_json(line_delim_records_file)
     with pytest.raises(
         TypeError, match="meta must be an instance of an Awkward Array."
@@ -105,14 +104,14 @@ def test_meta_raise(line_delim_records_file) -> None:  # noqa: F811
         daa.meta = "hello"
 
 
-def test_ndim(line_delim_records_file) -> None:  # noqa
+def test_ndim(line_delim_records_file) -> None:
     daa = dak.from_json(line_delim_records_file, blocksize=700)
     assert daa.ndim == daa.compute().ndim
     daa.meta = None
     assert daa.ndim is None
 
 
-def test_new_array_object_raises(line_delim_records_file) -> None:  # noqa: F811
+def test_new_array_object_raises(line_delim_records_file) -> None:
     daa = dak.from_json(line_delim_records_file)
     name = daa.name
     hlg = daa.dask
@@ -282,7 +281,7 @@ def test_typetracer_function() -> None:
     assert tta.layout.form == aa.layout.form
 
 
-def test_single_partition(line_delim_records_file) -> None:  # noqa: F811
+def test_single_partition(line_delim_records_file) -> None:
     daa = load_records_lazy(line_delim_records_file, by_file=True, n_times=1)
     caa = load_records_eager(line_delim_records_file)
     assert daa.npartitions == 1
@@ -318,13 +317,13 @@ def test_scalar_pickle() -> None:
 
     s = 2
     c1 = dakc.new_known_scalar(s)
-    s = pickle.dumps(c1)
-    c2 = pickle.loads(s)
+    s_dumped = pickle.dumps(c1)
+    c2 = pickle.loads(s_dumped)
     assert_eq(c1, c2)
     daa = _lazyjsonrecords()
     s1 = dak.sum(daa["analysis"]["x1"], axis=None)
-    s = pickle.dumps(s1)
-    s2 = pickle.loads(s)
+    s_dumped = pickle.dumps(s1)
+    s2 = pickle.loads(s_dumped)
     assert_eq(s1, s2)
 
     assert s1.known_value is None

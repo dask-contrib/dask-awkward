@@ -3,11 +3,14 @@ from __future__ import annotations
 from typing import Any
 
 import awkward._v2 as ak
+import numpy as np
 
-from dask_awkward.core import (
+from .core import (
     DaskAwkwardNotImplemented,
     TrivialPartitionwiseOp,
+    map_partitions,
     new_known_scalar,
+    pw_reduction_with_agg_to_scalar,
 )
 
 __all__ = (
@@ -133,7 +136,13 @@ def firsts(array, axis=1, highlevel=True, behavior=None):
 
 
 def flatten(array, axis=1, highlevel=True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+    return map_partitions(
+        ak.flatten,
+        array,
+        axis=axis,
+        highlevel=highlevel,
+        behavior=behavior,
+    )
 
 
 def from_regular(array, axis=1, highlevel=True, behavior=None):
@@ -170,17 +179,24 @@ def nan_to_num(
 
 def num(array: Any, axis: int | None = 1, highlevel: bool = True, behavior=None) -> Any:
     if axis == 1:
-        return _num_trivial(
-            array,
-            axis=axis,
-            highlevel=True,
-            behavior=behavior,
+        return map_partitions(
+            ak.num, array, axis=axis, highlevel=highlevel, behavior=behavior
         )
     if axis == 0:
         if array.known_divisions:
             res = array.divisions[-1]  # noqa: F841
             return new_known_scalar(array.divisions[-1], dtype=int)
-
+        else:
+            return pw_reduction_with_agg_to_scalar(
+                array,
+                ak.num,
+                axis=0,
+                dtype=np.int64,
+                agg=ak.sum,
+                agg_kwargs={"axis": None},
+                highlevel=highlevel,
+                behavior=behavior,
+            )
     raise DaskAwkwardNotImplemented("TODO")
 
 
