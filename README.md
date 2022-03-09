@@ -8,7 +8,7 @@ dask-awkward
 [![Tests](https://github.com/ContinuumIO/dask-awkward/actions/workflows/conda-tests.yml/badge.svg)](https://github.com/ContinuumIO/dask-awkward/actions/workflows/conda-tests.yml)
 ![stability-alpha](https://img.shields.io/badge/stability-alpha-blue.svg)
 
-**This software is very alpha!**
+**This is alpha software** without any guaranteed API stability.
 
 Development
 -----------
