@@ -10,6 +10,7 @@ except ImportError:
     import json  # type: ignore
 
 import awkward._v2 as ak
+import fsspec
 from dask.base import tokenize
 from dask.bytes.core import read_bytes
 from dask.core import flatten
@@ -28,18 +29,21 @@ def is_file_path(source: Any) -> bool:
         return False
 
 
+class JsonLineDelimitedWrapper:
+    def __init__(self, compression: str | None = None):
+        self.compression = compression
+
+    def __call__(self, source: str) -> ak.Array:
+        with fsspec.open(source, compression=self.compression) as f:
+            return ak.from_iter(json.loads(line) for line in f)
+
+
 def _from_json_single_object_in_file(source) -> ak.Array:
-    with open(source) as f:
+    with fsspec.open(source) as f:
         return ak.Array([json.load(f)])
 
 
-def _from_json_line_by_line(source) -> ak.Array:
-    with open(source) as f:
-        return ak.from_iter(json.loads(line) for line in f)
-
-
 def _from_json_bytes(source) -> ak.Array:
-    # return ak.from_iter(json.loads(ch) for ch in source.split(b"\n") if ch)
     return ak.from_iter(
         json.loads(ch) for ch in io.TextIOWrapper(io.BytesIO(source)) if ch
     )
@@ -50,6 +54,7 @@ def from_json(
     blocksize: int | str | None = None,
     delimiter: bytes | None = None,
     one_obj_per_file: bool = False,
+    compression: str | None = None,
 ) -> Array:
     token = tokenize(source, delimiter, blocksize, one_obj_per_file)
     name = f"from-json-{token}"
@@ -69,7 +74,7 @@ def from_json(
         concrete = (
             _from_json_single_object_in_file
             if one_obj_per_file
-            else _from_json_line_by_line
+            else JsonLineDelimitedWrapper(compression=compression)
         )
         dsk = {(name, i): (concrete, s) for i, s in enumerate(source)}
         deps = set()
