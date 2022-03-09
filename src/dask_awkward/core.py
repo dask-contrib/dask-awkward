@@ -12,9 +12,12 @@ import awkward._v2 as ak
 import awkward._v2._typetracer as aktt
 import numpy as np
 from awkward._v2.highlevel import _dir_pattern
-from dask.base import DaskMethodsMixin, dont_optimize, is_dask_collection, tokenize
+from dask.base import DaskMethodsMixin
+from dask.base import compute as dask_compute
+from dask.base import is_dask_collection, tokenize
 from dask.blockwise import blockwise as upstream_blockwise
 from dask.highlevelgraph import HighLevelGraph
+from dask.optimization import cull
 from dask.threaded import get as threaded_get
 from dask.utils import IndexCallable, funcname, key_split
 from numpy.lib.mixins import NDArrayOperatorsMixin
@@ -96,7 +99,8 @@ class Scalar(DaskMethodsMixin):
 
     @staticmethod
     def __dask_optimize__(dsk: Any, keys: Any, **kwargs: Any) -> HighLevelGraph:
-        return dont_optimize(dsk, keys, **kwargs)
+        dsk2, _ = cull(dsk, keys)
+        return dsk2
 
     __dask_scheduler__ = staticmethod(threaded_get)
 
@@ -332,7 +336,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     @staticmethod
     def __dask_optimize__(dsk: Any, keys: Any, **kwargs: Any) -> HighLevelGraph:
-        return dont_optimize(dsk, keys, **kwargs)
+        dsk2, _ = cull(dsk, keys)
+        return dsk2
 
     __dask_scheduler__ = staticmethod(threaded_get)
 
@@ -459,7 +464,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     def keys_array(self) -> np.ndarray:
         return np.array(self.__dask_keys__(), dtype=object)
 
-    def _partitions(self, index: Any) -> Array:
+    def _partitions(self, index: Any, ignore_meta: bool = False) -> Array:
         if not isinstance(index, tuple):
             index = (index,)
         token = tokenize(self, index)
@@ -475,6 +480,15 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             dsk,
             dependencies=[self],  # type: ignore
         )
+
+        if ignore_meta:
+            return new_array_object(
+                graph,
+                name,
+                meta=None,
+                npartitions=1,
+                ignore_meta=True,
+            )
 
         # if a single partition was requested we trivially know the new divisions.
         if len(raw) == 1 and isinstance(raw[0], int) and self.known_divisions:  # type: ignore
@@ -808,8 +822,11 @@ def _first_partition(array: Array) -> ak.Array:
         awkward array.
 
     """
-    computed = array.__dask_scheduler__(
-        array.__dask_graph__(), array.__dask_keys__()[0]
+    (computed,) = dask_compute(
+        array._partitions(0, ignore_meta=True),
+        traverse=False,
+        optimize_graph=True,
+        scheduler="threads",
     )
     return computed
 
@@ -845,6 +862,7 @@ def new_array_object(
     meta: ak.Array | None = None,
     npartitions: int | None = None,
     divisions: tuple[int | None, ...] | None = None,
+    ignore_meta: bool = False,
 ) -> Array:
     """Instantiate a new Array collection object.
 
@@ -878,11 +896,14 @@ def new_array_object(
 
     array = Array(dsk, name, meta, divisions)  # type: ignore
 
-    if meta is None:
-        try:
-            array.meta = _get_typetracer(array)
-        except (AttributeError, AssertionError, TypeError):
-            array.meta = None
+    if ignore_meta:
+        array.meta = None
+    else:
+        if meta is None:
+            try:
+                array.meta = _get_typetracer(array)
+            except (AttributeError, AssertionError, TypeError):
+                array.meta = None
 
     return array
 
@@ -989,7 +1010,13 @@ def map_partitions(
         lay,
         dependencies=deps,  # type: ignore
     )
-    return new_array_object(hlg, name=name, meta=meta, divisions=args[0].divisions)
+    return new_array_object(
+        hlg,
+        name=name,
+        meta=meta,
+        ignore_meta=ignore_meta,
+        divisions=args[0].divisions,
+    )
 
 
 def pw_reduction_with_agg_to_scalar(
