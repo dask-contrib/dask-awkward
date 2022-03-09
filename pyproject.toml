@@ -11,7 +11,8 @@ build-backend = "setuptools.build_meta"
 write_to = "src/dask_awkward/_version.py"
 
 [tool.pytest.ini_options]
-addopts = "-v"
+testpaths = ["src/dask_awkward/tests"]
+addopts = ["-v", "-ra", "--showlocals", "--strict-markers", "--strict-config"]
 
 [tool.isort]
 profile = "black"

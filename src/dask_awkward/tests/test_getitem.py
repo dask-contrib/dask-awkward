@@ -6,15 +6,10 @@ import pytest
 
 import dask_awkward as dak
 import dask_awkward.core as dakc
-from dask_awkward.testutils import (  # noqa: F401
-    assert_eq,
-    caa,
-    daa,
-    line_delim_records_file,
-)
+from dask_awkward.testutils import assert_eq
 
 
-def test_getattr_raise(daa) -> None:  # noqa: F811
+def test_getattr_raise(daa) -> None:
     dar = daa[0]
     assert type(dar) is dakc.Record
     with pytest.raises(AttributeError, match="not in fields"):
@@ -23,18 +18,18 @@ def test_getattr_raise(daa) -> None:  # noqa: F811
         assert dar.x3
 
 
-def test_multi_string(daa, caa) -> None:  # noqa: F811
+def test_multi_string(daa, caa) -> None:
     assert_eq(
         daa["analysis"][["x1", "y2"]],
         caa["analysis"][["x1", "y2"]],
     )
 
 
-def test_single_string(daa, caa) -> None:  # noqa: F811
+def test_single_string(daa, caa) -> None:
     assert_eq(daa["analysis"], caa["analysis"])
 
 
-def test_layered_string(daa, caa) -> None:  # noqa: F811
+def test_layered_string(daa, caa) -> None:
     assert_eq(daa["analysis", "x1"], caa["analysis", "x1"])
     assert_eq(daa["analysis", "x1"], caa["analysis"]["x1"])
     assert_eq(caa["analysis", "x1"], daa["analysis"]["x1"])
@@ -42,12 +37,12 @@ def test_layered_string(daa, caa) -> None:  # noqa: F811
     assert_eq(daa["analysis", ["x1", "t1"]], caa["analysis", ["x1", "t1"]])
 
 
-def test_list_with_ints_raise(daa) -> None:  # noqa: F811
+def test_list_with_ints_raise(daa) -> None:
     with pytest.raises(RuntimeError, match="Lists containing integers"):
         assert daa[[1, 2]]
 
 
-def test_single_int(daa, caa) -> None:  # noqa: F811
+def test_single_int(daa, caa) -> None:
     total = len(daa)
     for i in range(total):
         assert_eq(daa["analysis"]["x1"][i], caa["analysis"]["x1"][i])
@@ -58,16 +53,16 @@ def test_single_int(daa, caa) -> None:  # noqa: F811
         caa["analysis"][i].tolist() == daa["analysis"][i].compute().tolist()
 
 
-def test_single_ellipsis(daa, caa) -> None:  # noqa: F811
+def test_single_ellipsis(daa, caa) -> None:
     assert_eq(daa[...], caa[...])
 
 
-def test_empty_slice(daa, caa) -> None:  # noqa: F811
+def test_empty_slice(daa, caa) -> None:
     assert_eq(daa[:], caa[:])
     assert_eq(daa[:, "analysis"], caa[:, "analysis"])
 
 
-def test_record_getitem(daa, caa) -> None:  # noqa: F811
+def test_record_getitem(daa, caa) -> None:
     assert daa[0].compute().to_list() == caa[0].to_list()
     assert daa["analysis"]["x1"][0][0].compute() == caa["analysis"]["x1"][0][0]
     assert daa[0]["analysis"].compute().to_list() == caa[0]["analysis"].to_list()
@@ -77,7 +72,7 @@ def test_record_getitem(daa, caa) -> None:  # noqa: F811
 
 
 @pytest.mark.parametrize("op", [operator.gt, operator.ge, operator.le, operator.lt])
-def test_boolean_array(line_delim_records_file, op) -> None:  # noqa: F811
+def test_boolean_array(line_delim_records_file, op) -> None:
     daa = dak.from_json([line_delim_records_file] * 3)  # noqa
     caa = daa.compute()  # noqa
     dx1 = daa.analysis.x1

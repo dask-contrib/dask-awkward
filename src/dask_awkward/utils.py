@@ -19,9 +19,9 @@ def normalize_single_outer_inner_index(
 
     Returns
     -------
-    int
+    partition_index : int
         Which partition in the collection.
-    int
+    new_index : int
         Which inner index in the determined partition.
 
     Examples
@@ -55,7 +55,7 @@ def is_empty_slice(s: Any) -> bool:
 
     Returns
     -------
-    bool
+    result : bool
         True if the slice is empty
 
     Examples
