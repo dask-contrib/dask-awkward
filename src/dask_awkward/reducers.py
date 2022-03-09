@@ -39,13 +39,6 @@ __all__ = (
     "var",
 )
 
-_count_trivial = TrivialPartitionwiseOp(ak.count, axis=1)
-_count_nonzero_trivial = TrivialPartitionwiseOp(ak.count_nonzero, axis=1)
-_min_trivial = TrivialPartitionwiseOp(ak.min, axis=1)
-_max_trivial = TrivialPartitionwiseOp(ak.max, axis=1)
-_sum_trivial = TrivialPartitionwiseOp(ak.sum, axis=1)
-_std_trivial = TrivialPartitionwiseOp(ak.std, axis=1)
-
 
 def all(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
     if axis and axis >= 1:
@@ -148,20 +141,22 @@ def count_nonzero(
     array, axis=None, keepdims=False, mask_identity=False, flatten_records=False
 ):
     if axis is not None and axis == 1:
-        return _count_nonzero_trivial(
+        return map_partitions(
+            ak.count_nonzero,
             array,
             axis=1,
-            keepdims=False,
-            mask_identity=False,
-            flatten_records=False,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+            flatten_records=flatten_records,
         )
     elif axis is None:
-        trivial_result = _count_nonzero_trivial(
+        trivial_result = map_partitions(
+            ak.count_nonzero,
             array,
             axis=1,
-            keepdims=False,
-            mask_identity=False,
-            flatten_records=False,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+            flatten_records=flatten_records,
         )
         return pw_reduction_with_agg_to_scalar(
             trivial_result,
@@ -282,7 +277,8 @@ def std(
         raise DaskAwkwardNotImplemented("dak.std with weights is not supported yet.")
 
     if axis == 1:
-        return _std_trivial(
+        return map_partitions(
+            ak.std,
             x,
             weight=weight,
             ddof=ddof,
@@ -298,8 +294,13 @@ def sum(array, axis=None, keepdims=False, mask_identity=False, flatten_records=F
     if axis is not None and axis < 0:
         axis = array.ndim + axis + 1
     if axis == 1:
-        return _sum_trivial(
-            array, keepdims=False, mask_identity=False, flatten_records=False
+        return map_partitions(
+            ak.sum,
+            array,
+            axis=axis,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+            flatten_records=flatten_records,
         )
     elif axis is None:
         return pw_reduction_with_agg_to_scalar(array, ak.sum, agg=ak.sum)
@@ -321,6 +322,10 @@ def var(
     flatten_records=False,
 ):
     raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
+
+
+_min_trivial = TrivialPartitionwiseOp(ak.min, axis=1)
+_max_trivial = TrivialPartitionwiseOp(ak.max, axis=1)
 
 
 def _min_or_max(
