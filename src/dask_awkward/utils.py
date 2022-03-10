@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 
@@ -78,3 +78,13 @@ def is_empty_slice(s: Any) -> bool:
     if s.step is not None:
         return False
     return True
+
+
+def borrow_docstring(original: Callable) -> Callable:
+    def wrapper(method):
+        method.__doc__ = (
+            f"Partitioned version of ak.{original.__name__}\n" f"{original.__doc__}"
+        )
+        return method
+
+    return wrapper

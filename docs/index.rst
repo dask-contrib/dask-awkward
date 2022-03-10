@@ -21,6 +21,8 @@ Connecting Dask to Awkward Array.
 
    api_array.rst
    api_io.rst
+   api_reducers.rst
+   api_structure.rst
 
 ..   Indices and tables
 ..   ==================

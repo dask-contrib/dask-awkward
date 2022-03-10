@@ -11,6 +11,7 @@ from .core import (
     map_partitions,
     pw_reduction_with_agg_to_scalar,
 )
+from .utils import borrow_docstring
 
 if TYPE_CHECKING:
     from .core import Array, Scalar
@@ -40,6 +41,7 @@ __all__ = (
 )
 
 
+@borrow_docstring(ak.all)
 def all(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
     if axis and axis >= 1:
         return map_partitions(
@@ -53,6 +55,7 @@ def all(array, axis=None, keepdims=False, mask_identity=False, flatten_records=F
     raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
 
 
+@borrow_docstring(ak.any)
 def any(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
     if axis and axis >= 1:
         return map_partitions(
@@ -66,6 +69,7 @@ def any(array, axis=None, keepdims=False, mask_identity=False, flatten_records=F
     raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
 
 
+@borrow_docstring(ak.argmax)
 def argmax(array, axis=None, keepdims=False, mask_identity=True, flatten_records=False):
     if axis and axis >= 1:
         return map_partitions(
@@ -79,6 +83,7 @@ def argmax(array, axis=None, keepdims=False, mask_identity=True, flatten_records
     raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
 
 
+@borrow_docstring(ak.argmin)
 def argmin(array, axis=None, keepdims=False, mask_identity=True, flatten_records=False):
     if axis and axis >= 1:
         return map_partitions(
@@ -92,6 +97,7 @@ def argmin(array, axis=None, keepdims=False, mask_identity=True, flatten_records
     raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
 
 
+@borrow_docstring(ak.corr)
 def corr(
     x,
     y,
@@ -104,6 +110,7 @@ def corr(
     raise DaskAwkwardNotImplemented("TODO")
 
 
+@borrow_docstring(ak.count)
 def count(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
     if axis and axis >= 1:
         return map_partitions(
@@ -137,6 +144,7 @@ def count(array, axis=None, keepdims=False, mask_identity=False, flatten_records
         raise ValueError("axis must be None or an integer.")
 
 
+@borrow_docstring(ak.count_nonzero)
 def count_nonzero(
     array, axis=None, keepdims=False, mask_identity=False, flatten_records=False
 ):
@@ -172,6 +180,7 @@ def count_nonzero(
         raise ValueError("axis must be None or an integer.")
 
 
+@borrow_docstring(ak.covar)
 def covar(
     x,
     y,
@@ -184,6 +193,7 @@ def covar(
     raise DaskAwkwardNotImplemented("TODO")
 
 
+@borrow_docstring(ak.linear_fit)
 def linear_fit(
     x,
     y,
@@ -196,6 +206,7 @@ def linear_fit(
     raise DaskAwkwardNotImplemented("TODO")
 
 
+@borrow_docstring(ak.max)
 def max(
     array,
     axis=None,
@@ -215,12 +226,14 @@ def max(
     )
 
 
+@borrow_docstring(ak.mean)
 def mean(
     x, weight=None, axis=None, keepdims=False, mask_identity=True, flatten_records=False
 ):
     raise DaskAwkwardNotImplemented("TODO")
 
 
+@borrow_docstring(ak.min)
 def min(
     array,
     axis=None,
@@ -240,6 +253,7 @@ def min(
     )
 
 
+@borrow_docstring(ak.moment)
 def moment(
     x,
     n,
@@ -252,18 +266,22 @@ def moment(
     raise DaskAwkwardNotImplemented("TODO")
 
 
+@borrow_docstring(ak.prod)
 def prod(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
     raise DaskAwkwardNotImplemented("TODO")
 
 
+@borrow_docstring(ak.ptp)
 def ptp(arr, axis=None, keepdims=False, mask_identity=True, flatten_records=False):
     raise DaskAwkwardNotImplemented("TODO")
 
 
+@borrow_docstring(ak.softmax)
 def softmax(x, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
     raise DaskAwkwardNotImplemented("TODO")
 
 
+@borrow_docstring(ak.std)
 def std(
     x,
     weight=None,
@@ -290,6 +308,7 @@ def std(
     raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
 
 
+@borrow_docstring(ak.sum)
 def sum(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
     if axis is not None and axis < 0:
         axis = array.ndim + axis + 1
@@ -312,6 +331,7 @@ def sum(array, axis=None, keepdims=False, mask_identity=False, flatten_records=F
         raise ValueError("axis must be none or an integer")
 
 
+@borrow_docstring(ak.var)
 def var(
     x,
     weight=None,
