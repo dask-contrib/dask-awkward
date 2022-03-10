@@ -62,13 +62,13 @@ def _from_json_bytes(source) -> ak.Array:
 
 
 def from_json(
-    source: str | list[str],
+    urlpath: str | list[str],
     blocksize: int | str | None = None,
     delimiter: bytes | None = None,
     one_obj_per_file: bool = False,
     compression: str | None = "infer",
 ) -> Array:
-    token = tokenize(source, delimiter, blocksize, one_obj_per_file)
+    token = tokenize(urlpath, delimiter, blocksize, one_obj_per_file)
     name = f"from-json-{token}"
 
     # allow either blocksize or delimieter being not-None to trigger
@@ -81,25 +81,26 @@ def from_json(
     # if delimiter is None and blocksize is None we are expecting to
     # read a single file or a list of files.
     if delimiter is None and blocksize is None:
-        if is_file_path(source):
-            source = [source]  # type: ignore
+        if is_file_path(urlpath):
+            urlpath = [urlpath]  # type: ignore
+
+        urlpath = fsspec.get_fs_token_paths(urlpath)[2]
 
         if compression == "infer":
-            paths = fsspec.get_fs_token_paths(source)[2]
-            compression = infer_compression(paths[0])
+            compression = infer_compression(urlpath[0])
 
         if one_obj_per_file:
             f: FromJsonWrapper = FromJsonSingleObjInFileWrapper(compression=compression)
         else:
             f = FromJsonLineDelimitedWrapper(compression=compression)
 
-        dsk = {(name, i): (f, s) for i, s in enumerate(source)}
+        dsk = {(name, i): (f, s) for i, s in enumerate(urlpath)}
         deps = set()
         n = len(dsk)
 
     elif delimiter is not None and blocksize is not None:
         _, chunks = read_bytes(
-            source,
+            urlpath,
             delimiter=delimiter,
             blocksize=blocksize,
             sample=None,
