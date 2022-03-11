@@ -725,7 +725,6 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return self._getitem_single(where)
 
     def __getattr__(self, attr: str) -> Any:
-        print(attr)
         if attr not in (self.fields or []):
             raise AttributeError(f"{attr} not in fields.")
         try:
