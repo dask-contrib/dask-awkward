@@ -11,7 +11,7 @@ def optimize(
     dsk: Mapping,
     keys: Hashable | list[Hashable] | set[Hashable],
     **kwargs: Any,
-):
+) -> Mapping:
     if not isinstance(keys, (list, set)):
         keys = [keys]
     keys = list(flatten(keys))
