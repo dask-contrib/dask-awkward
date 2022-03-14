@@ -218,7 +218,7 @@ def max(
     return _min_or_max(
         ak.max,
         array,
-        axis,
+        axis=axis,
         keepdims=keepdims,
         initial=initial,
         mask_identity=mask_identity,
@@ -228,8 +228,22 @@ def max(
 
 @borrow_docstring(ak.mean)
 def mean(
-    x, weight=None, axis=None, keepdims=False, mask_identity=True, flatten_records=False
+    array,
+    weight=None,
+    axis=None,
+    keepdims=False,
+    mask_identity=True,
+    flatten_records=False,
 ):
+    if axis and axis >= 1:
+        return map_partitions(
+            ak.mean,
+            array,
+            axis=axis,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+            flatten_records=flatten_records,
+        )
     raise DaskAwkwardNotImplemented("TODO")
 
 

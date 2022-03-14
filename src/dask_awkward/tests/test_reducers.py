@@ -75,6 +75,14 @@ def test_max(daa, caa, axis, attr) -> None:
     assert_eq(ar, dr)
 
 
+@pytest.mark.parametrize("axis", [1])
+@pytest.mark.parametrize("attr", ["z2", "y1"])
+def test_mean(daa, caa, axis, attr) -> None:
+    ar = ak.mean(caa.analysis[attr], axis=axis)
+    dr = dak.mean(daa.analysis[attr], axis=axis)
+    assert_eq(ar, dr)
+
+
 @pytest.mark.parametrize("axis", [None, 1, pytest.param(-1, marks=pytest.mark.xfail)])
 @pytest.mark.parametrize("attr", ["x1", "z2"])
 def test_min(daa, caa, axis, attr) -> None:
