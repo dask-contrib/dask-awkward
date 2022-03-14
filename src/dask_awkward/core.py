@@ -15,14 +15,15 @@ import numpy as np
 from awkward._v2.highlevel import _dir_pattern
 from dask.base import DaskMethodsMixin
 from dask.base import compute as dask_compute
-from dask.base import is_dask_collection, tokenize
+from dask.base import dont_optimize, is_dask_collection, tokenize
 from dask.blockwise import blockwise as upstream_blockwise
+from dask.context import globalmethod
 from dask.highlevelgraph import HighLevelGraph
-from dask.optimization import cull
 from dask.threaded import get as threaded_get
 from dask.utils import IndexCallable, funcname, key_split
 from numpy.lib.mixins import NDArrayOperatorsMixin
 
+from .optimize import optimize
 from .utils import is_empty_slice, normalize_single_outer_inner_index
 
 if TYPE_CHECKING:
@@ -98,10 +99,9 @@ class Scalar(DaskMethodsMixin):
     def __dask_tokenize__(self) -> Hashable:
         return self.name
 
-    @staticmethod
-    def __dask_optimize__(dsk: Any, keys: Any, **kwargs: Any) -> HighLevelGraph:
-        dsk2, _ = cull(dsk, keys)
-        return dsk2
+    __dask_optimize__ = globalmethod(
+        optimize, key="awkward_scalar_optimize", falsey=dont_optimize
+    )
 
     __dask_scheduler__ = staticmethod(threaded_get)
 
@@ -333,10 +333,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     def __dask_postpersist__(self) -> tuple[Callable, tuple]:
         return self._rebuild, ()
 
-    @staticmethod
-    def __dask_optimize__(dsk: Any, keys: Any, **kwargs: Any) -> HighLevelGraph:
-        dsk2, _ = cull(dsk, keys)
-        return dsk2
+    __dask_optimize__ = globalmethod(
+        optimize, key="awkward_array_optimize", falsey=dont_optimize
+    )
 
     __dask_scheduler__ = staticmethod(threaded_get)
 
