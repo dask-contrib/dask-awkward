@@ -5,14 +5,14 @@ from typing import Any
 import awkward._v2 as ak
 import numpy as np
 
-from .core import (
+from dask_awkward.core import (
     DaskAwkwardNotImplemented,
     TrivialPartitionwiseOp,
     map_partitions,
     new_known_scalar,
     pw_reduction_with_agg_to_scalar,
 )
-from .utils import borrow_docstring
+from dask_awkward.utils import borrow_docstring
 
 __all__ = (
     "argcartesian",

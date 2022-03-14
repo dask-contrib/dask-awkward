@@ -23,8 +23,8 @@ from dask.threaded import get as threaded_get
 from dask.utils import IndexCallable, funcname, key_split
 from numpy.lib.mixins import NDArrayOperatorsMixin
 
-from .optimize import optimize
-from .utils import is_empty_slice, normalize_single_outer_inner_index
+from dask_awkward.optimize import optimize
+from dask_awkward.utils import is_empty_slice, normalize_single_outer_inner_index
 
 if TYPE_CHECKING:
     from awkward._v2.contents.content import Content

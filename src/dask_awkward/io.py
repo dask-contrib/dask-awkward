@@ -17,10 +17,10 @@ from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
 from fsspec.utils import infer_compression
 
-from .core import new_array_object
+from dask_awkward.core import new_array_object
 
 if TYPE_CHECKING:
-    from .core import Array
+    from dask_awkward.core import Array
 
 __all__ = ["from_json"]
 

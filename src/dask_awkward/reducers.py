@@ -5,16 +5,16 @@ from typing import TYPE_CHECKING, Any, Callable, Union
 import awkward._v2 as ak
 import numpy as np
 
-from .core import (
+from dask_awkward.core import (
     DaskAwkwardNotImplemented,
     TrivialPartitionwiseOp,
     map_partitions,
     pw_reduction_with_agg_to_scalar,
 )
-from .utils import borrow_docstring
+from dask_awkward.utils import borrow_docstring
 
 if TYPE_CHECKING:
-    from .core import Array, Scalar
+    from dask_awkward.core import Array, Scalar
 
     LazyResult = Union[Array, Scalar]
 

@@ -13,8 +13,8 @@ try:
 except ImportError:
     import json  # type: ignore
 
-from .core import Array, Record, from_awkward, typetracer_array
-from .io import from_json
+from dask_awkward.core import Array, Record, from_awkward, typetracer_array
+from dask_awkward.io import from_json
 
 
 def assert_eq(a: Any, b: Any) -> None:
