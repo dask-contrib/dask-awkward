@@ -336,6 +336,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     __dask_optimize__ = globalmethod(
         optimize, key="awkward_array_optimize", falsey=dont_optimize
     )
+
     __dask_scheduler__ = staticmethod(threaded_get)
 
     def _rebuild(
