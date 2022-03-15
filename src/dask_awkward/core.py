@@ -901,7 +901,10 @@ def new_array_object(
                 array._meta = None
     else:
         if not isinstance(meta, (ak.Array, TypeTracerArray)):
-            msg = "meta should be an ak.Array object.\n" f"got: {type(meta)}"
+            msg = (
+                "meta should be an awkward Array or TypeTracerArray object.\n"
+                f"got: {type(meta)}"
+            )
             raise ValueError(msg)
 
     return array
