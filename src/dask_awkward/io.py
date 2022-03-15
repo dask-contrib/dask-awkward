@@ -117,13 +117,16 @@ def from_json(
 
     1. Line delimited style: file(s) with one JSON object per line.
        The function argument defaults are setup to handle this style.
+       This method assumes newline characters are not embedded in JSON
+       values.
     2. Single JSON object per file (this requires `one_obj_per_file`
        to be set to ``True``.
     3. Reading some number of bytes at a time. If at least one of
-       `blocksize` or `delimiter` are defined, Dasks's
+       `blocksize` or `delimiter` are defined, Dask's
        :py:func:`~dask.bytes.read_bytes` function will be used to
        lazily read bytes (`blocksize` bytes per partition) and split
-       on `delimiter`).
+       on `delimiter`). This method assumes line delimited JSON
+       without newline characters embedded in JSON values.
 
     Parameters
     ----------
