@@ -69,7 +69,7 @@ def derive_json_meta(
     source: str,
     compression: str | None = "infer",
     sample_rows: int = 5,
-    bytechunks: str | int = "8 KiB",
+    bytechunks: str | int = "16 KiB",
     force_by_lines: bool = False,
 ) -> ak.Array:
     if compression == "infer":
@@ -94,7 +94,8 @@ def derive_json_meta(
             warnings.warn(
                 f"Couldn't determine metadata from reading first {bytechunks} "
                 f"of the dataset; will read the first {sample_rows} instead. "
-                "Try increasing the value of `bytechunks` to remove this warning."
+                "Try increasing the value of `bytechunks` or decreasing `sample_rows` "
+                "to remove this warning."
             )
 
     # for compressed data (or if explicitly asked for with
