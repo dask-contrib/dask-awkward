@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import os
+import warnings
 from typing import TYPE_CHECKING, Any
 
 try:
@@ -88,7 +89,13 @@ def derive_json_meta(
                 ]
                 return ak.Array(ak.from_iter(lines).layout.typetracer.forget_length())
         except ValueError:
-            pass
+            # we'll get a ValueError if we can't decode the JSON from
+            # the bytes that we grabbed.
+            warnings.warn(
+                f"Couldn't determine metadata from reading first {bytechunks} "
+                f"of the dataset; will read the first {sample_rows} instead. "
+                "Try increasing the value of `bytechunks` to remove this warning."
+            )
 
     # for compressed data (or if explicitly asked for with
     # force_by_lines set to True) we read the first `sample_rows`
