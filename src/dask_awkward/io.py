@@ -67,6 +67,8 @@ def from_json(
     delimiter: bytes | None = None,
     one_obj_per_file: bool = False,
     compression: str | None = "infer",
+    sample_rows: int = 5,
+    meta: Any | None = None,
 ) -> Array:
     token = tokenize(urlpath, delimiter, blocksize, one_obj_per_file)
     name = f"from-json-{token}"
@@ -98,6 +100,15 @@ def from_json(
         deps = set()
         n = len(dsk)
 
+        if meta is None:
+            with fsspec.open(urlpath[0], "rt", compression="infer") as f0:
+                lines = []
+                for i, line in enumerate(f0):
+                    lines.append(json.loads(line))
+                    if i >= sample_rows:
+                        break
+                meta = ak.Array(ak.from_iter(lines).layout.typetracer.forget_length())
+
     elif delimiter is not None and blocksize is not None:
         _, chunks = read_bytes(
             urlpath,
@@ -109,8 +120,9 @@ def from_json(
         dsk = {(name, i): (_from_json_bytes, d.key) for i, d in enumerate(chunks)}  # type: ignore
         deps = chunks
         n = len(deps)
+
     else:
         raise TypeError("Incompatible combination of arguments.")
 
     hlg = HighLevelGraph.from_collections(name, dsk, dependencies=deps)
-    return new_array_object(hlg, name, None, npartitions=n)
+    return new_array_object(hlg, name, meta=meta, npartitions=n)

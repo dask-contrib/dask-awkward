@@ -9,14 +9,14 @@ from numbers import Number
 from typing import TYPE_CHECKING, Any, Callable, Hashable, Mapping, Sequence, TypeVar
 
 import awkward._v2 as ak
-import awkward._v2._typetracer as aktt
 import dask.config
 import numpy as np
+from awkward._v2._typetracer import MaybeNone, OneOf, TypeTracerArray, UnknownScalar
 from awkward._v2.highlevel import _dir_pattern
 from dask.base import DaskMethodsMixin
 from dask.base import compute as dask_compute
 from dask.base import dont_optimize, is_dask_collection, tokenize
-from dask.blockwise import blockwise as upstream_blockwise
+from dask.blockwise import blockwise as dask_blockwise
 from dask.context import globalmethod
 from dask.highlevelgraph import HighLevelGraph
 from dask.threaded import get as threaded_get
@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from awkward._v2.contents.content import Content
     from awkward._v2.forms.form import Form
     from awkward._v2.types.type import Type
+    from dask.array.core import Array as DaskArray
     from dask.blockwise import Blockwise
     from dask.delayed import Delayed
     from numpy.typing import DTypeLike
@@ -142,9 +143,7 @@ class Scalar(DaskMethodsMixin):
         self.__meta = self._check_meta(m)
 
     def _check_meta(self, m: Any | None) -> Any | None:
-        if m is not None and not isinstance(
-            m, (aktt.MaybeNone, aktt.UnknownScalar, aktt.OneOf)
-        ):
+        if m is not None and not isinstance(m, (MaybeNone, UnknownScalar, OneOf)):
             raise TypeError(f"meta must be a typetracer module object, not a {type(m)}")
         return m
 
@@ -188,7 +187,7 @@ class Scalar(DaskMethodsMixin):
         return Delayed(self.name, dsk)
 
 
-def new_scalar_object(dsk: HighLevelGraph, name: str, meta: Any) -> Scalar:
+def new_scalar_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Scalar:
     return Scalar(dsk, name, meta, known_value=None)
 
 
@@ -203,7 +202,7 @@ def new_known_scalar(s: Any, dtype: DTypeLike | None = None) -> Scalar:
             dtype = np.dtype(type(s))
     llg = {name: s}
     hlg = HighLevelGraph.from_collections(name, llg, dependencies=())
-    return Scalar(hlg, name, meta=aktt.UnknownScalar(dtype), known_value=s)
+    return Scalar(hlg, name, meta=UnknownScalar(dtype), known_value=s)
 
 
 class Record(Scalar):
@@ -233,7 +232,7 @@ class Record(Scalar):
                 graphlayer,
                 dependencies=[self],  # type: ignore
             )
-            return new_array_object(hlg, name, new_meta, npartitions=1)
+            return new_array_object(hlg, name, meta=new_meta, npartitions=1)
 
         # then check for scalar (or record) type
         graphlayer = {name: (operator.getitem, self.name, key)}  # type: ignore
@@ -243,9 +242,9 @@ class Record(Scalar):
             dependencies=[self],  # type: ignore
         )
         if isinstance(new_meta, ak.Record):
-            return new_record_object(hlg, name, new_meta)
+            return new_record_object(hlg, name, meta=new_meta)
         else:
-            return new_scalar_object(hlg, name, new_meta)
+            return new_scalar_object(hlg, name, meta=new_meta)
 
     def __getattr__(self, attr: str) -> Any:
         if attr not in (self.fields or []):
@@ -287,7 +286,7 @@ class Record(Scalar):
         )
 
 
-def new_record_object(dsk: HighLevelGraph, name: str, meta: Any) -> Record:
+def new_record_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Record:
     return Record(dsk, name, meta)
 
 
@@ -405,6 +404,10 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     @property
     def dask(self) -> HighLevelGraph:
         return self._dask
+
+    @property
+    def keys(self) -> list[tuple[str, int]]:
+        return self.__dask_keys__()
 
     @property
     def name(self) -> str:
@@ -613,9 +616,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             return result
 
         # otherwise make sure we have one of the other potential results.
-        if not isinstance(
-            new_meta, (ak.Record, aktt.UnknownScalar, aktt.OneOf, aktt.MaybeNone)
-        ):
+        if not isinstance(new_meta, (ak.Record, UnknownScalar, OneOf, MaybeNone)):
             raise DaskAwkwardNotImplemented("Key type not supported for this array.")
 
         token = tokenize(partition, where)
@@ -633,9 +634,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             dependencies=[partition],  # type: ignore
         )
         if isinstance(new_meta, ak.Record):
-            return new_record_object(hlg, name, new_meta)
+            return new_record_object(hlg, name, meta=new_meta)
         else:
-            return new_scalar_object(hlg, name, new_meta)
+            return new_scalar_object(hlg, name, meta=new_meta)
 
     def _getitem_tuple(self, where: tuple[Any, ...]) -> Array:
         if isinstance(where[0], int):
@@ -785,7 +786,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 inputs_meta.append(inp._meta)
             # if input is a concrete Awkward Array, grab it's typetracer
             elif isinstance(inp, ak.Array):
-                inputs_meta.append(ak.Array(inp.layout.typetracer))
+                inputs_meta.append(ak.Array(inp.layout.typetracer.forget_length()))
             # otherwise pass along
             else:
                 inputs_meta.append(inp)
@@ -794,6 +795,12 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         new_meta = ufunc(*inputs_meta)
 
         return map_partitions(ufunc, *inputs, meta=new_meta, **kwargs)
+
+    def to_delayed(self, optimize_graph: bool = True) -> list[Delayed]:
+        return to_delayed(self, optimize_graph=optimize_graph)
+
+    def to_dask_array(self) -> DaskArray:
+        return to_dask_array(self)
 
 
 def _first_partition(array: Array) -> ak.Array:
@@ -849,6 +856,7 @@ def _get_typetracer(array: Array) -> ak.Array:
 def new_array_object(
     dsk: HighLevelGraph,
     name: str,
+    *,
     meta: ak.Array | None = None,
     npartitions: int | None = None,
     divisions: tuple[int | None, ...] | None = None,
@@ -891,6 +899,13 @@ def new_array_object(
                 array._meta = _get_typetracer(array)
             except (AttributeError, AssertionError, TypeError):
                 array._meta = None
+    else:
+        if not isinstance(meta, (ak.Array, TypeTracerArray)):
+            msg = (
+                "meta should be an awkward Array or TypeTracerArray object.\n"
+                f"got: {type(meta)}"
+            )
+            raise ValueError(msg)
 
     return array
 
@@ -932,7 +947,7 @@ def partitionwise_layer(
             )
         else:
             pairs.extend([arg, None])
-    return upstream_blockwise(
+    return dask_blockwise(
         func,
         name,
         "i",
@@ -1052,7 +1067,7 @@ def pw_reduction_with_agg_to_scalar(
         dsk,
         dependencies=[array],  # type: ignore
     )
-    meta = aktt.UnknownScalar(np.dtype(dtype)) if dtype is not None else None
+    meta = UnknownScalar(np.dtype(dtype)) if dtype is not None else None
     return new_scalar_object(hlg, name=nameagg, meta=meta)
 
 
@@ -1203,7 +1218,7 @@ def is_typetracer(obj: Any) -> bool:
         ):
             return True
     # scalar-like typetracer
-    if isinstance(obj, (aktt.UnknownScalar, aktt.MaybeNone, aktt.OneOf)):
+    if isinstance(obj, (UnknownScalar, MaybeNone, OneOf)):
         return True
     return False
 
@@ -1279,7 +1294,7 @@ def typetracer_array(a: ak.Array | Array) -> ak.Array | None:
     if isinstance(a, Array):
         return a._typetracer
     else:
-        return ak.Array(a.layout.typetracer)
+        return ak.Array(a.layout.typetracer.forget_length())
 
 
 def compatible_partitions(*args: Array) -> bool:
@@ -1348,3 +1363,38 @@ def incompatible_partitions_msg(name: str, *args: Any) -> str:
     for i, arg in enumerate(args):
         msg += f"- arg{i} divisions: {arg.divisions}\n"
     return msg
+
+
+def to_delayed(array: Array, optimize_graph: bool = True) -> list[Delayed]:
+    from dask.delayed import Delayed
+
+    keys = array.__dask_keys__()
+    graph = array.__dask_graph__()
+    layer = array.__dask_layers__()[0]
+    if optimize_graph:
+        graph = array.__dask_optimize__(graph, keys)
+        layer = f"delayed-{array.name}"
+        graph = HighLevelGraph.from_collections(layer, graph, dependencies=())
+    return [Delayed(k, graph, layer=layer) for k in keys]
+
+
+def to_dask_array(array: Array) -> DaskArray:
+    from dask.array.core import new_da_object
+
+    new = map_partitions(ak.to_numpy, array)
+    graph = new.dask
+    keys = new.keys
+    dtype = new._meta.dtype if new._meta is not None else None
+    chunks = ((np.nan,) * array.npartitions,)
+    if new._meta is not None:
+        if new._meta.ndim > 1:
+            raise DaskAwkwardNotImplemented(
+                "only one dimensional arrays are supported."
+            )
+    return new_da_object(
+        new.__dask_optimize__(graph, keys),
+        new.name,
+        meta=None,
+        chunks=chunks,
+        dtype=dtype,
+    )
