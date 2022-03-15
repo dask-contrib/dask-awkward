@@ -360,3 +360,23 @@ def test_compatible_partitions() -> None:
 def test_bad_meta_type(line_delim_records_file, meta) -> None:
     with pytest.raises(ValueError, match=r"meta should be an ak.Array object."):
         dak.from_json([line_delim_records_file] * 3, meta=meta)
+
+
+def test_to_dask_array(daa, caa) -> None:
+    from dask.array.utils import assert_eq
+
+    da = dak.to_dask_array(dak.flatten(daa.analysis.x1))
+    ca = ak.to_numpy(ak.flatten(caa.analysis.x1))
+    assert_eq(da, ca)
+    da = dak.flatten(daa.analysis.x1).to_dask_array()
+    assert_eq(da, ca)
+
+
+@pytest.mark.parametrize("optimize_graph", [True, False])
+def test_to_delayed(daa, caa, optimize_graph):
+    delayeds = dak.to_delayed(daa.analysis, optimize_graph=optimize_graph)
+    comped = ak.concatenate([d.compute() for d in delayeds])
+    assert caa.analysis.tolist() == comped.tolist()
+    delayeds = daa.analysis.to_delayed(optimize_graph=optimize_graph)
+    comped = ak.concatenate([d.compute() for d in delayeds])
+    assert caa.analysis.tolist() == comped.tolist()
