@@ -891,6 +891,9 @@ def new_array_object(
                 array._meta = _get_typetracer(array)
             except (AttributeError, AssertionError, TypeError):
                 array._meta = None
+    else:
+        if not isinstance(meta, ak.Array):
+            raise ValueError("meta should be an ak.Array object.")
 
     return array
 

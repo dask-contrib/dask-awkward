@@ -354,3 +354,9 @@ def test_compatible_partitions() -> None:
     assert not dakc.compatible_partitions(x, y)
     assert not dakc.compatible_partitions(x, x, y)
     assert dakc.compatible_partitions(y, y)
+
+
+@pytest.mark.parametrize("meta", [5, False, [1, 2, 3]])
+def test_bad_meta_type(line_delim_records_file, meta) -> None:
+    with pytest.raises(ValueError, match=r"meta should be an ak.Array object."):
+        dak.from_json([line_delim_records_file] * 3, meta=meta)
