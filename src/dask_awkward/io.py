@@ -116,7 +116,7 @@ def from_json(
     delimiter: bytes | None = None,
     one_obj_per_file: bool = False,
     compression: str | None = "infer",
-    meta: Any | None = None,
+    meta: ak.Array | None = None,
     derive_meta_kwargs: dict[str, Any] | None = None,
 ) -> Array:
     """Create an Awkward Array collection from JSON data.
@@ -196,8 +196,10 @@ def from_json(
         else:
             f = FromJsonLineDelimitedWrapper(compression=compression)
 
-        dsk = {(name, i): (f, s) for i, s in enumerate(urlpath)}
-        deps = set()
+        dsk: dict[tuple[str, int], tuple[Any, ...]] = {
+            (name, i): (f, s) for i, s in enumerate(urlpath)
+        }
+        deps: set[Any] = set()
         n = len(dsk)
 
         if meta is None:
@@ -218,7 +220,7 @@ def from_json(
             (name, i): (_from_json_bytes, delayed_chunk.key)
             for i, delayed_chunk in enumerate(flat_chunks)
         }
-        deps = flat_chunks
+        deps = set(flat_chunks)
         n = len(deps)
 
     else:
