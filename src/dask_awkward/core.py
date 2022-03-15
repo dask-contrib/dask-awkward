@@ -188,7 +188,7 @@ class Scalar(DaskMethodsMixin):
         return Delayed(self.name, dsk)
 
 
-def new_scalar_object(dsk: HighLevelGraph, name: str, meta: Any) -> Scalar:
+def new_scalar_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Scalar:
     return Scalar(dsk, name, meta, known_value=None)
 
 
@@ -233,7 +233,7 @@ class Record(Scalar):
                 graphlayer,
                 dependencies=[self],  # type: ignore
             )
-            return new_array_object(hlg, name, new_meta, npartitions=1)
+            return new_array_object(hlg, name, meta=new_meta, npartitions=1)
 
         # then check for scalar (or record) type
         graphlayer = {name: (operator.getitem, self.name, key)}  # type: ignore
@@ -243,9 +243,9 @@ class Record(Scalar):
             dependencies=[self],  # type: ignore
         )
         if isinstance(new_meta, ak.Record):
-            return new_record_object(hlg, name, new_meta)
+            return new_record_object(hlg, name, meta=new_meta)
         else:
-            return new_scalar_object(hlg, name, new_meta)
+            return new_scalar_object(hlg, name, meta=new_meta)
 
     def __getattr__(self, attr: str) -> Any:
         if attr not in (self.fields or []):
@@ -287,7 +287,7 @@ class Record(Scalar):
         )
 
 
-def new_record_object(dsk: HighLevelGraph, name: str, meta: Any) -> Record:
+def new_record_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Record:
     return Record(dsk, name, meta)
 
 
@@ -633,9 +633,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             dependencies=[partition],  # type: ignore
         )
         if isinstance(new_meta, ak.Record):
-            return new_record_object(hlg, name, new_meta)
+            return new_record_object(hlg, name, meta=new_meta)
         else:
-            return new_scalar_object(hlg, name, new_meta)
+            return new_scalar_object(hlg, name, meta=new_meta)
 
     def _getitem_tuple(self, where: tuple[Any, ...]) -> Array:
         if isinstance(where[0], int):
@@ -849,6 +849,7 @@ def _get_typetracer(array: Array) -> ak.Array:
 def new_array_object(
     dsk: HighLevelGraph,
     name: str,
+    *,
     meta: ak.Array | None = None,
     npartitions: int | None = None,
     divisions: tuple[int | None, ...] | None = None,
