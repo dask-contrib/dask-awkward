@@ -329,14 +329,13 @@ def test_scalar_pickle() -> None:
     assert s1.known_value is None
 
 
-def test_scalar_to_delayed() -> None:
+@pytest.mark.parametrize("optimize_graph", [True, False])
+def test_scalar_to_delayed(optimize_graph) -> None:
     daa = _lazyjsonrecords()
     s1 = dak.sum(daa["analysis"]["x1"], axis=None)
-    d1 = s1.to_delayed()
-    d2 = s1.to_delayed(optimize_graph=False)
+    d1 = s1.to_delayed(optimize_graph=optimize_graph)
     s1c = s1.compute()
-    assert d1.compute() == s1c
-    assert d2.compute() == s1c
+    assert d1.compute() == s1c  # type: ignore
 
 
 def test_compatible_partitions() -> None:
