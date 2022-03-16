@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import os
 import warnings
+from math import ceil
 from typing import TYPE_CHECKING, Any
 
 try:
@@ -12,6 +13,7 @@ except ImportError:
 
 import awkward._v2 as ak
 import fsspec
+import numpy as np
 from dask.base import tokenize
 from dask.bytes.core import read_bytes
 from dask.core import flatten
@@ -19,9 +21,14 @@ from dask.highlevelgraph import HighLevelGraph
 from dask.utils import parse_bytes
 from fsspec.utils import infer_compression
 
-from dask_awkward.core import new_array_object
+from dask_awkward.core import (
+    DaskAwkwardNotImplemented,
+    map_partitions,
+    new_array_object,
+)
 
 if TYPE_CHECKING:
+    from dask.array.core import Array as DaskArray
     from dask.delayed import Delayed
 
     from dask_awkward.core import Array
@@ -228,3 +235,64 @@ def from_json(
 
     hlg = HighLevelGraph.from_collections(name, dsk, dependencies=deps)
     return new_array_object(hlg, name, meta=meta, npartitions=n)
+
+
+def from_awkward(source: ak.Array, npartitions: int, name: str | None = None) -> Array:
+    if name is None:
+        name = f"from-awkward-{tokenize(source, npartitions)}"
+    nrows = len(source)
+    chunksize = int(ceil(nrows / npartitions))
+    locs = list(range(0, nrows, chunksize)) + [nrows]
+
+    # views of the array (source) can be tricky; inline_array may be
+    # useful to look at.
+    llg = {
+        (name, i): source[start:stop]
+        for i, (start, stop) in enumerate(zip(locs[:-1], locs[1:]))
+    }
+    hlg = HighLevelGraph.from_collections(
+        name,
+        llg,
+        dependencies=set(),  # type: ignore
+    )
+    return new_array_object(
+        hlg,
+        name,
+        divisions=tuple(locs),
+        meta=ak.Array(source.layout.typetracer.forget_length()),
+    )
+
+
+def to_delayed(array: Array, optimize_graph: bool = True) -> list[Delayed]:
+    from dask.delayed import Delayed
+
+    keys = array.__dask_keys__()
+    graph = array.__dask_graph__()
+    layer = array.__dask_layers__()[0]
+    if optimize_graph:
+        graph = array.__dask_optimize__(graph, keys)
+        layer = f"delayed-{array.name}"
+        graph = HighLevelGraph.from_collections(layer, graph, dependencies=())
+    return [Delayed(k, graph, layer=layer) for k in keys]
+
+
+def to_dask_array(array: Array) -> DaskArray:
+    from dask.array.core import new_da_object
+
+    new = map_partitions(ak.to_numpy, array)
+    graph = new.dask
+    keys = new.keys
+    dtype = new._meta.dtype if new._meta is not None else None
+    chunks = ((np.nan,) * array.npartitions,)
+    if new._meta is not None:
+        if new._meta.ndim > 1:
+            raise DaskAwkwardNotImplemented(
+                "only one dimensional arrays are supported."
+            )
+    return new_da_object(
+        new.__dask_optimize__(graph, keys),
+        new.name,
+        meta=None,
+        chunks=chunks,
+        dtype=dtype,
+    )

@@ -7,7 +7,6 @@ import numpy as np
 
 from dask_awkward.core import (
     DaskAwkwardNotImplemented,
-    TrivialPartitionwiseOp,
     map_partitions,
     new_known_scalar,
     pw_reduction_with_agg_to_scalar,
@@ -54,8 +53,6 @@ __all__ = (
     "zeros_like",
     "zip",
 )
-
-_num_trivial = TrivialPartitionwiseOp(ak.num, axis=1)
 
 
 @borrow_docstring(ak.argcartesian)
