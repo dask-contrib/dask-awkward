@@ -49,8 +49,8 @@ def test_single_int(daa, caa) -> None:
         assert_eq(daa["analysis"]["y2"][-i], caa["analysis"]["y2"][-i])
         assert_eq(daa[i, "analysis", "x1"], caa[i, "analysis", "x1"])
     for i in range(total):
-        caa[i].tolist() == daa[i].compute().tolist()
-        caa["analysis"][i].tolist() == daa["analysis"][i].compute().tolist()
+        assert caa[i].tolist() == daa[i].compute().tolist()
+        assert caa["analysis"][i].tolist() == daa["analysis"][i].compute().tolist()
 
 
 def test_single_ellipsis(daa, caa) -> None:
