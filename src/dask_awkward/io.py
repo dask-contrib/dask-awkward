@@ -30,6 +30,7 @@ from dask_awkward.core import (
 if TYPE_CHECKING:
     from dask.array.core import Array as DaskArray
     from dask.delayed import Delayed
+    from fsspec.spec import AbstractFileSystem
 
     from dask_awkward.core import Array
 
@@ -44,25 +45,26 @@ def is_file_path(source: Any) -> bool:
 
 
 class FromJsonWrapper:
-    def __init__(self, *, compression: str | None = None):
+    def __init__(self, *, storage: AbstractFileSystem, compression: str | None = None):
         self.compression = compression
+        self.storage = storage
 
 
 class FromJsonLineDelimitedWrapper(FromJsonWrapper):
-    def __init__(self, *, compression: str | None = None):
-        super().__init__(compression=compression)
+    def __init__(self, *, storage: AbstractFileSystem, compression: str | None = None):
+        super().__init__(storage=storage, compression=compression)
 
     def __call__(self, source: str) -> ak.Array:
-        with fsspec.open(source, mode="rt", compression=self.compression) as f:
+        with self.storage.open(source, mode="rt", compression=self.compression) as f:
             return ak.from_iter(json.loads(line) for line in f)
 
 
 class FromJsonSingleObjInFileWrapper(FromJsonWrapper):
-    def __init__(self, *, compression: str | None = None):
-        super().__init__(compression=compression)
+    def __init__(self, *, storage: AbstractFileSystem, compression: str | None = None):
+        super().__init__(storage=storage, compression=compression)
 
     def __call__(self, source: str) -> ak.Array:
-        with fsspec.open(source, mode="r", compression=self.compression) as f:
+        with self.storage.open(source, mode="r", compression=self.compression) as f:
             return ak.Array([json.load(f)])
 
 
@@ -73,6 +75,7 @@ def _from_json_bytes(source) -> ak.Array:
 
 
 def derive_json_meta(
+    storage: AbstractFileSystem,
     source: str,
     compression: str | None = "infer",
     sample_rows: int = 5,
@@ -89,7 +92,7 @@ def derive_json_meta(
     # `sample_rows` number of lines.
     if compression is None and not force_by_lines:
         try:
-            with fsspec.open(source, mode="rb") as f:
+            with storage.open(source, mode="rb", cache_type="none") as f:
                 byteread = f.read(bytechunks)
                 lines = [
                     json.loads(ln) for ln in byteread.split(b"\n")[:sample_rows] if ln
@@ -108,7 +111,7 @@ def derive_json_meta(
     # for compressed data (or if explicitly asked for with
     # force_by_lines set to True) we read the first `sample_rows`
     # number of rows after opening the compressed file.
-    with fsspec.open(source, mode="rt", compression=compression) as f:
+    with storage.open(source, mode="rt", compression=compression) as f:
         lines = []
         for i, line in enumerate(f):
             lines.append(json.loads(line))
@@ -193,15 +196,18 @@ def from_json(
         if is_file_path(urlpath):
             urlpath = [urlpath]  # type: ignore
 
-        urlpath = fsspec.get_fs_token_paths(urlpath)[2]
+        fs, fstoken, urlpath = fsspec.get_fs_token_paths(urlpath)
 
         if compression == "infer":
             compression = infer_compression(urlpath[0])
 
         if one_obj_per_file:
-            f: FromJsonWrapper = FromJsonSingleObjInFileWrapper(compression=compression)
+            f: FromJsonWrapper = FromJsonSingleObjInFileWrapper(
+                storage=fs,
+                compression=compression,
+            )
         else:
-            f = FromJsonLineDelimitedWrapper(compression=compression)
+            f = FromJsonLineDelimitedWrapper(storage=fs, compression=compression)
 
         dsk: dict[tuple[str, int], tuple[Any, ...]] = {
             (name, i): (f, s) for i, s in enumerate(urlpath)
@@ -211,7 +217,7 @@ def from_json(
 
         if meta is None:
             meta_read_kwargs = derive_meta_kwargs or {}
-            meta = derive_json_meta(urlpath[0], **meta_read_kwargs)
+            meta = derive_json_meta(fs, urlpath[0], **meta_read_kwargs)
 
     # if a `delimiter` and `blocksize` are defined we use Dask's
     # `read_bytes` function to get delayed chunks of bytes.
