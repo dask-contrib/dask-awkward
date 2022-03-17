@@ -92,12 +92,9 @@ def derive_json_meta(
     # `sample_rows` number of lines.
     if compression is None and not force_by_lines:
         try:
-            with storage.open(source, mode="rb", cache_type="none") as f:
-                byteread = f.read(bytechunks)
-                lines = [
-                    json.loads(ln) for ln in byteread.split(b"\n")[:sample_rows] if ln
-                ]
-                return ak.Array(ak.from_iter(lines).layout.typetracer.forget_length())
+            bytes = storage.cat(source, start=0, end=bytechunks)
+            lines = [json.loads(ln) for ln in bytes.split(b"\n")[:sample_rows]]
+            return ak.Array(ak.from_iter(lines).layout.typetracer.forget_length())
         except ValueError:
             # we'll get a ValueError if we can't decode the JSON from
             # the bytes that we grabbed.
