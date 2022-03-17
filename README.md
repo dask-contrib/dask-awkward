@@ -32,3 +32,7 @@ installed with:
 ```
 pip install git+https://github.com/scikit-hep/awkward-1.0@main
 ```
+
+Since `dask-awkward` is designed for `awkward` version 2, the
+concrete, high-level array object (`ak.Array`) that we use is actually
+the `awkward._v2.Array` object.
