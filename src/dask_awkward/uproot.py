@@ -8,21 +8,35 @@ from awkward._v2.tmp_for_testing import v1_to_v2
 from dask.base import tokenize
 from dask.highlevelgraph import HighLevelGraph
 
-from dask_awkward.core import new_array_object
+from dask_awkward.core import Array, new_array_object
 
 
 class UprootReadWrapper:
-    def __init__(self, source, tree_name, branches):
+    def __init__(
+        self,
+        source: str,
+        tree_name: str,
+        branches: list[str] | None,
+    ) -> None:
         self.source = source
         self.tree_name = tree_name
         self.branches = branches
 
-    def __call__(self, start, stop):
+    def __call__(
+        self,
+        start: int | None,
+        stop: int | None,
+    ) -> ak.Array:
         t = uproot.open(self.source)[self.tree_name]
         return t.arrays(self.branches, entry_start=start, entry_stop=stop)
 
 
-def from_uproot(source, tree_name, npartitions, branches=None):
+def from_uproot(
+    source: str,
+    tree_name: str,
+    npartitions: int,
+    branches: list[str] | None = None,
+) -> Array:
     token = tokenize(source, tree_name, npartitions, branches)
     name = f"from-uproot-{token}"
 
@@ -52,7 +66,11 @@ def from_uproot(source, tree_name, npartitions, branches=None):
     return new_array_object(hlg, name, divisions=tuple(locs), meta=meta)
 
 
-def from_uproot_files(files, tree_name, branches=None):
+def from_uproot_files(
+    files: list[str],
+    tree_name: str,
+    branches: list[str] | None = None,
+) -> Array:
     token = tokenize(files, tree_name, branches)
     name = f"from-uproot-{token}"
 
