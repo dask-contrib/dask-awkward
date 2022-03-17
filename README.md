@@ -10,13 +10,24 @@ dask-awkward
 
 **This is alpha software** without any guaranteed API stability.
 
-Development
------------
+Install
+-------
+
+If you are interested in experimenting with `dask-awkward` we
+recommend installing from the `main` branch with:
+
+```
+pip install git+https://github.com/ContinuumIO/dask-awkward@main
+```
 
 The [awkward-array](https://github.com/scikit-hep/awkward-1.0) project
-is working on version 2 of the core `awkward` Python library.
-Development of dask-awkward relies on the latest additions to
-`awkward`; to use dask-awkward install `awkward` with:
+is working on version 2 of the core `awkward` Python library. Version
+1.8.0 of `awkward` includes most of the necessary components of what
+will be version 2, but in the `awkward._v2` module. Installing
+`dask-awkward` requires `awkward >=1.8.0`.
+
+It's recommended to have a bleeding edge version of `awkward`
+installed with:
 
 ```
 pip install git+https://github.com/scikit-hep/awkward-1.0@main
