@@ -40,6 +40,8 @@ def from_uproot(
     token = tokenize(source, tree_name, npartitions, branches)
     name = f"from-uproot-{token}"
 
+    # determine partitioning based on npartitions argument and
+    # determine meta from the first 5 entries in the tree.
     tree = uproot.open(source)[tree_name]
     nrows = tree.num_entries
     chunksize = int(ceil(nrows / npartitions))
@@ -49,6 +51,7 @@ def from_uproot(
     v2first5 = ak.Array(v1_to_v2(first5.layout))
     meta = ak.Array(v2first5.layout.typetracer.forget_length())
 
+    # low level graph; one partition per (start, stop) pair.
     llg = {
         (name, i): (
             UprootReadWrapper(
@@ -62,6 +65,7 @@ def from_uproot(
         for i, (start, stop) in enumerate(tuple(start_stop_pairs))
     }
 
+    # instantiate the collection
     hlg = HighLevelGraph.from_collections(name, llg, dependencies=set())
     return new_array_object(hlg, name, divisions=tuple(locs), meta=meta)
 
@@ -74,11 +78,13 @@ def from_uproot_files(
     token = tokenize(files, tree_name, branches)
     name = f"from-uproot-{token}"
 
+    # use first 5 entries in the first file to derive meta
     tree1 = uproot.open(files[0])[tree_name]
     first5 = tree1.arrays(branches, entry_start=0, entry_stop=5)
     v2first5 = ak.Array(v1_to_v2(first5.layout))
     meta = ak.Array(v2first5.layout.typetracer.forget_length())
 
+    # low level graph; one partition per file.
     llg = {
         (name, i): (
             UprootReadWrapper(
@@ -92,5 +98,6 @@ def from_uproot_files(
         for i, fname in enumerate(files)
     }
 
+    # instantiate the collection
     hlg = HighLevelGraph.from_collections(name, llg, dependencies=set())
     return new_array_object(hlg, name, npartitions=len(files), meta=meta)
