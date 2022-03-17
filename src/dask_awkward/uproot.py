@@ -11,7 +11,7 @@ from dask.highlevelgraph import HighLevelGraph
 from dask_awkward.core import new_array_object
 
 
-class UprootWrapper:
+class UprootReadWrapper:
     def __init__(self, source, tree_name, branches):
         self.source = source
         self.tree_name = tree_name
@@ -37,7 +37,7 @@ def from_uproot(source, tree_name, npartitions, branches=None):
 
     llg = {
         (name, i): (
-            UprootWrapper(
+            UprootReadWrapper(
                 source,
                 tree_name,
                 branches,
@@ -63,7 +63,7 @@ def from_uproot_files(files, tree_name, branches=None):
 
     llg = {
         (name, i): (
-            UprootWrapper(
+            UprootReadWrapper(
                 fname,
                 tree_name,
                 branches,
