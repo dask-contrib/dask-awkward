@@ -54,6 +54,19 @@ https://github.com/ContinuumIO/dask-awkward."""
         super().__init__(msg)
 
 
+class IncompatiblePartitions(ValueError):
+    def __init__(self, name, *args) -> None:
+        msg = self.divisions_msg(name, *args)
+        super().__init__(msg)
+
+    @staticmethod
+    def divisions_msg(name: str, *args: Any) -> str:
+        msg = f"The inputs to {name} are incompatibly partitioned\n"
+        for i, arg in enumerate(args):
+            msg += f"- arg{i} divisions: {arg.divisions}\n"
+        return msg
+
+
 def _finalize_array(
     results: Sequence[Number | ak.Array | ak.Record],
 ) -> Number | ak.Array:
@@ -1322,10 +1335,3 @@ class TrivialPartitionwiseOp:
         return map_partitions(
             self._func, collection, name=self.name, meta=new_meta, **self._kwargs
         )
-
-
-def incompatible_partitions_msg(name: str, *args: Any) -> str:
-    msg = f"The inputs to {name} are incompatibly partitioned\n"
-    for i, arg in enumerate(args):
-        msg += f"- arg{i} divisions: {arg.divisions}\n"
-    return msg
