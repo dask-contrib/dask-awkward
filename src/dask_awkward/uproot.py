@@ -28,7 +28,9 @@ class UprootReadWrapper:
         stop: int | None,
     ) -> ak.Array:
         t = uproot.open(self.source)[self.tree_name]
-        return t.arrays(self.branches, entry_start=start, entry_stop=stop)
+        arr = t.arrays(self.branches, entry_start=start, entry_stop=stop)
+        # uproot returns an awkward v1 array; we convert to v2
+        return ak.Array(v1_to_v2(arr.layout))
 
 
 def from_uproot(
