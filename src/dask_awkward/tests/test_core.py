@@ -159,7 +159,7 @@ def test_rebuild(line_delim_records_file):
     assert x.tolist() == y.tolist()
 
 
-def test_type(line_delim_records_file) -> None:  # noqa: F811
+def test_type(line_delim_records_file) -> None:
     daa = _lazyrecords()
     assert dak.type(daa) is not None
     daa = dak.from_json(line_delim_records_file)

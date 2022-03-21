@@ -73,8 +73,8 @@ def test_record_getitem(daa, caa) -> None:
 
 @pytest.mark.parametrize("op", [operator.gt, operator.ge, operator.le, operator.lt])
 def test_boolean_array(line_delim_records_file, op) -> None:
-    daa = dak.from_json([line_delim_records_file] * 3)  # noqa
-    caa = daa.compute()  # noqa
+    daa = dak.from_json([line_delim_records_file] * 3)
+    caa = daa.compute()
     dx1 = daa.analysis.x1
     cx1 = caa.analysis.x1
     dx1s = op(dx1, 2)

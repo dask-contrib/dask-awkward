@@ -36,7 +36,7 @@ def test_any(daa, caa, axis, keepdims, mask_identity, testval) -> None:
 
 
 @pytest.mark.parametrize("axis", [1])
-def test_argmax(daa, caa, axis) -> None:  # noqa: F811
+def test_argmax(daa, caa, axis) -> None:
     x1d = daa.analysis.x1
     x1c = caa.analysis.x1
     dr = dak.argmax(x1d, axis=axis)
