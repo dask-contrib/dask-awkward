@@ -434,7 +434,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     @_meta.setter
     def _meta(self, m: ak.Array | None) -> None:
-        if m is not None and not isinstance(m, ak.Array):
+        if m is not None and not isinstance(m, (ak.Array, TypeTracerArray)):
             raise TypeError("meta must be an instance of an Awkward Array.")
         self.__meta = m
 
