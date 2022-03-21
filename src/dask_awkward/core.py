@@ -309,7 +309,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         self._divisions = divisions
         if meta is None:
             self._meta = empty_typetracer()
-        if meta is not None and not isinstance(meta, (ak.Array, TypeTracerArray)):
+        elif not isinstance(meta, (ak.Array, TypeTracerArray)):
             raise TypeError("meta must be an instance of an Awkward Array.")
         self._meta = meta
 
