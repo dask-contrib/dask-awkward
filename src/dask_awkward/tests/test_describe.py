@@ -9,6 +9,6 @@ def test_fields(line_delim_records_file) -> None:
     assert dak.fields(daa[0].analysis) == dak.fields(daa.analysis)
     # computed is same as collection
     assert dak.fields(daa) == ak.fields(daa.compute())
-    daa._meta = None
+    daa.reset_meta()
     # removed meta gives None fields
-    assert dak.fields(daa) is None
+    assert dak.fields(daa) == []

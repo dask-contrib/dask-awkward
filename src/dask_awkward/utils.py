@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
+import awkward._v2 as ak
 import numpy as np
 
 
@@ -88,3 +89,8 @@ def borrow_docstring(original: Callable) -> Callable:
         return method
 
     return wrapper
+
+
+def empty_typetracer() -> ak.Array:
+    a = ak.Array([])
+    return ak.Array(a.layout.typetracer.forget_length())

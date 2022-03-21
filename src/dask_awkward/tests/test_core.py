@@ -51,15 +51,18 @@ def test_fields(line_delim_records_file) -> None:
     assert daa[0].analysis.fields == daa.analysis.fields
     aa = daa.compute()
     assert daa.fields == aa.fields
-    daa._meta = None
-    assert daa.fields is None
+    daa.reset_meta()
+    assert daa.fields == []
 
 
 def test_form(line_delim_records_file) -> None:
     daa = dak.from_json(line_delim_records_file)
     assert daa.form
-    daa._meta = None
-    assert daa.form is None
+    daa.reset_meta()
+
+    from awkward._v2.forms.emptyform import EmptyForm
+
+    assert daa.form == EmptyForm()
 
 
 @pytest.mark.xfail
@@ -96,11 +99,10 @@ def test_meta_and_typetracer_exist(line_delim_records_file) -> None:
 
 
 def test_meta_raise(line_delim_records_file) -> None:
-    daa = dak.from_json(line_delim_records_file)
     with pytest.raises(
         TypeError, match="meta must be an instance of an Awkward Array."
     ):
-        daa._meta = "hello"
+        dak.from_json(line_delim_records_file, meta=5)
 
 
 def test_ndim(line_delim_records_file) -> None:
@@ -248,13 +250,6 @@ def test_record_fields() -> None:
     assert r.fields is None
 
 
-def test_record_meta_setter() -> None:
-    daa = _lazyrecords()
-    r = daa[0]
-    with pytest.raises(TypeError, match="meta must be a Record"):
-        r._meta = "test"
-
-
 def test_record_dir() -> None:
     daa = _lazyrecords()
     r = daa["analysis"][0]
@@ -357,7 +352,7 @@ def test_compatible_partitions() -> None:
 
 @pytest.mark.parametrize("meta", [5, False, [1, 2, 3]])
 def test_bad_meta_type(line_delim_records_file, meta) -> None:
-    with pytest.raises(ValueError, match="meta should be an awkward"):
+    with pytest.raises(TypeError, match="meta must be an instance of an Awkward Array"):
         dak.from_json([line_delim_records_file] * 3, meta=meta)
 
 

@@ -23,7 +23,11 @@ from dask.utils import IndexCallable, funcname, key_split
 from numpy.lib.mixins import NDArrayOperatorsMixin
 
 from dask_awkward.optimize import optimize
-from dask_awkward.utils import is_empty_slice, normalize_single_outer_inner_index
+from dask_awkward.utils import (
+    empty_typetracer,
+    is_empty_slice,
+    normalize_single_outer_inner_index,
+)
 
 if TYPE_CHECKING:
     from awkward._v2.contents.content import Content
@@ -82,7 +86,7 @@ class Scalar(DaskMethodsMixin):
     ) -> None:
         self._dask: HighLevelGraph = dsk
         self._name: str = name
-        self.__meta: Any | None = meta
+        self._meta: Any | None = self._check_meta(meta)
         self._known_value: Any | None = known_value
 
     def __dask_graph__(self) -> HighLevelGraph:
@@ -132,14 +136,6 @@ class Scalar(DaskMethodsMixin):
     @property
     def name(self) -> str:
         return self._name
-
-    @property
-    def _meta(self) -> Any | None:
-        return self.__meta
-
-    @_meta.setter
-    def _meta(self, m: Any | None) -> None:
-        self.__meta = self._check_meta(m)
 
     def _check_meta(self, m: Any | None) -> Any | None:
         if m is not None and not isinstance(m, (MaybeNone, UnknownScalar, OneOf)):
@@ -311,7 +307,11 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         self._dask: HighLevelGraph = dsk
         self._name: str = name
         self._divisions = divisions
-        self.__meta = meta
+        if meta is None:
+            self._meta = empty_typetracer()
+        if meta is not None and not isinstance(meta, (ak.Array, TypeTracerArray)):
+            raise TypeError("meta must be an instance of an Awkward Array.")
+        self._meta = meta
 
     def __dask_graph__(self) -> HighLevelGraph:
         return self.dask
@@ -371,6 +371,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     def __repr__(self) -> str:
         return self.__str__()
 
+    def reset_meta(self) -> None:
+        self._meta = empty_typetracer()
+
     # def _ipython_display_(self) -> None:
     #     if self._meta is None:
     #         return None
@@ -429,36 +432,22 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return len(self.divisions) - 1
 
     @property
-    def _meta(self) -> ak.Array | None:
-        return self.__meta
-
-    @_meta.setter
-    def _meta(self, m: ak.Array | None) -> None:
-        if m is not None and not isinstance(m, (ak.Array, TypeTracerArray)):
-            raise TypeError("meta must be an instance of an Awkward Array.")
-        self.__meta = m
-
-    @property
     def layout(self) -> Content:
         if self._meta is not None:
             return self._meta.layout
         raise ValueError("This collections meta is None; unknown layout.")
 
     @property
-    def _typetracer(self) -> ak.Array | None:
+    def _typetracer(self) -> ak.Array:
         return self._meta
 
     @property
-    def fields(self) -> list[str] | None:
-        if self._meta is not None:
-            return ak.fields(self._meta)
-        return None
+    def fields(self) -> list[str]:
+        return ak.fields(self._meta)
 
     @property
-    def form(self) -> Form | None:
-        if self._meta is not None:
-            return self._meta.layout.form
-        return None
+    def form(self) -> Form:
+        return self._meta.layout.form
 
     @cached_property
     def keys_array(self) -> np.ndarray:
@@ -901,7 +890,7 @@ def new_array_object(
             try:
                 array._meta = _get_typetracer(array)
             except (AttributeError, AssertionError, TypeError):
-                array._meta = None
+                array._meta = empty_typetracer()
     else:
         if not isinstance(meta, (ak.Array, TypeTracerArray)):
             msg = (
