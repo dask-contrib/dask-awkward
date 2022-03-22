@@ -117,6 +117,7 @@ def from_json(
     compression: str | None = "infer",
     meta: ak.Array | None = None,
     derive_meta_kwargs: dict[str, Any] | None = None,
+    storage_options: dict[str, Any] | None = None,
 ) -> Array:
     """Create an Awkward Array collection from JSON data.
 
@@ -196,7 +197,11 @@ def from_json(
     # read a single file or a list of files. The list of files are
     # expected to be line delimited (one JSON object per line)
     if delimiter is None and blocksize is None:
-        fs, fstoken, urlpath = fsspec.get_fs_token_paths(urlpath)
+        fs, fstoken, urlpath = fsspec.get_fs_token_paths(
+            urlpath,
+            mode="rb",
+            storage_options=storage_options,
+        )
         if meta is None:
             meta_read_kwargs = derive_meta_kwargs or {}
             meta = derive_json_meta(fs, urlpath[0], **meta_read_kwargs)
@@ -226,11 +231,13 @@ def from_json(
     elif delimiter is not None and blocksize is not None:
         token = tokenize(urlpath, delimiter, blocksize, meta)
         name = f"from-json-{token}"
+        storage_options = storage_options or {}
         _, bytechunks = read_bytes(
             urlpath,
             delimiter=delimiter,
             blocksize=blocksize,  # type: ignore
             sample=None,  # type: ignore
+            **storage_options,
         )
         flat_chunks: list[Delayed] = list(flatten(bytechunks))
         dsk = {
