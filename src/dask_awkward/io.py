@@ -24,6 +24,7 @@ from dask_awkward.core import (
     DaskAwkwardNotImplemented,
     map_partitions,
     new_array_object,
+    typetracer_array,
 )
 
 if TYPE_CHECKING:
@@ -310,7 +311,11 @@ def to_dask_array(array: Array) -> DaskArray:
     graph = new.dask
     keys = new.keys
     dtype = new._meta.dtype if new._meta is not None else None
-    chunks = ((np.nan,) * array.npartitions,)
+    if array.known_divisions:
+        divs = np.array(array.divisions)
+        chunks = (tuple(divs[1:] - divs[:-1]),)
+    else:
+        chunks = ((np.nan,) * array.npartitions,)
     if new._meta is not None:
         if new._meta.ndim > 1:
             raise DaskAwkwardNotImplemented(
@@ -323,3 +328,50 @@ def to_dask_array(array: Array) -> DaskArray:
         chunks=chunks,
         dtype=dtype,
     )
+
+
+def from_dask_array(array: DaskArray) -> Array:
+    """Convert a Dask Array collection to a Dask Awkard Array collection.
+
+    Parameters
+    ----------
+    array : dask.array.Array
+        Array to convert.
+
+    Returns
+    -------
+    Array
+        The Awkward Array Dask collection.
+
+    Examples
+    --------
+    >>> import dask.array as da
+    >>> import dask_awkward as dak
+    >>> x = da.ones(1000, chunks=250)
+    >>> y = dak.from_dask_array(x)
+    >>> y
+    dask.awkward<from-dask-array, npartitions=4>
+
+    """
+
+    from dask.blockwise import blockwise as dask_blockwise
+
+    token = tokenize(array)
+    name = f"from-dask-array-{token}"
+    meta = typetracer_array(ak.from_numpy(array._meta))
+    pairs = [array.name, "i"]
+    numblocks = {array.name: array.numblocks}
+    layer = dask_blockwise(
+        ak.from_numpy,
+        name,
+        "i",
+        *pairs,
+        numblocks=numblocks,
+        concatenate=True,
+    )
+    hlg = HighLevelGraph.from_collections(name, layer, dependencies=[array])
+    if np.any(np.isnan(array.chunks)):
+        return new_array_object(hlg, name, npartitions=array.npartitions, meta=meta)
+    else:
+        divs = (0, *np.cumsum(array.chunks))
+        return new_array_object(hlg, name, divisions=divs, meta=meta)
