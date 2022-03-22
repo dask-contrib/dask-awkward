@@ -1,24 +1,16 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Union
-
 import awkward._v2 as ak
 import numpy as np
 
 from dask_awkward.core import (
     DaskAwkwardNotImplemented,
-    TrivialPartitionwiseOp,
+    IncompatiblePartitions,
     compatible_partitions,
-    incompatible_partitions_msg,
     map_partitions,
     pw_reduction_with_agg_to_scalar,
 )
 from dask_awkward.utils import borrow_docstring
-
-if TYPE_CHECKING:
-    from dask_awkward.core import Array, Scalar
-
-    LazyResult = Union[Array, Scalar]
 
 __all__ = (
     "all",
@@ -110,7 +102,7 @@ def corr(
     flatten_records=False,
 ):
     if not compatible_partitions(x, y):
-        raise ValueError(incompatible_partitions_msg("corr", x, y))
+        raise IncompatiblePartitions("corr", x, y)
     raise DaskAwkwardNotImplemented("TODO")
 
 
@@ -135,9 +127,9 @@ def count(array, axis=None, keepdims=False, mask_identity=False, flatten_records
             flatten_records=flatten_records,
         )
         return pw_reduction_with_agg_to_scalar(
-            trivial_result,
             ak.sum,
-            agg=ak.sum,
+            ak.sum,
+            trivial_result,
             dtype=np.int64,
         )
     elif axis == 0 or axis == -1 * array.ndim:
@@ -171,9 +163,9 @@ def count_nonzero(
             flatten_records=flatten_records,
         )
         return pw_reduction_with_agg_to_scalar(
-            trivial_result,
             ak.sum,
-            agg=ak.sum,
+            ak.sum,
+            trivial_result,
             dtype=np.int64,
         )
     elif axis == 0 or axis == -1 * array.ndim:
@@ -195,7 +187,7 @@ def covar(
     flatten_records=False,
 ):
     if not compatible_partitions(x, y):
-        raise ValueError(incompatible_partitions_msg("covar", x, y))
+        raise IncompatiblePartitions("covar", x, y)
     raise DaskAwkwardNotImplemented("TODO")
 
 
@@ -210,7 +202,7 @@ def linear_fit(
     flatten_records=False,
 ):
     if not compatible_partitions(x, y):
-        raise ValueError(incompatible_partitions_msg("linear_fit", x, y))
+        raise IncompatiblePartitions("linear_fit", x, y)
     raise DaskAwkwardNotImplemented("TODO")
 
 
@@ -223,15 +215,26 @@ def max(
     mask_identity=True,
     flatten_records=False,
 ):
-    return _min_or_max(
-        ak.max,
-        array,
-        axis=axis,
-        keepdims=keepdims,
-        initial=initial,
-        mask_identity=mask_identity,
-        flatten_records=flatten_records,
-    )
+    if axis and axis >= 1:
+        return map_partitions(
+            ak.max,
+            array,
+            axis=axis,
+            keepdims=keepdims,
+            initial=initial,
+            mask_identity=mask_identity,
+            flatten_records=flatten_records,
+        )
+    if axis is None:
+        return pw_reduction_with_agg_to_scalar(
+            ak.max,
+            ak.max,
+            array,
+            axis=1,
+            agg_kwargs={"axis": None},
+        )
+    else:
+        raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
 
 
 @borrow_docstring(ak.mean)
@@ -264,15 +267,26 @@ def min(
     mask_identity=True,
     flatten_records=False,
 ):
-    return _min_or_max(
-        ak.min,
-        array,
-        axis,
-        keepdims=keepdims,
-        initial=initial,
-        mask_identity=mask_identity,
-        flatten_records=flatten_records,
-    )
+    if axis and axis >= 1:
+        return map_partitions(
+            ak.min,
+            array,
+            axis=axis,
+            keepdims=keepdims,
+            initial=initial,
+            mask_identity=mask_identity,
+            flatten_records=flatten_records,
+        )
+    if axis is None:
+        return pw_reduction_with_agg_to_scalar(
+            ak.min,
+            ak.min,
+            array,
+            axis=1,
+            agg_kwargs={"axis": None},
+        )
+    else:
+        raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
 
 
 @borrow_docstring(ak.moment)
@@ -344,7 +358,7 @@ def sum(array, axis=None, keepdims=False, mask_identity=False, flatten_records=F
             flatten_records=flatten_records,
         )
     elif axis is None:
-        return pw_reduction_with_agg_to_scalar(array, ak.sum, agg=ak.sum)
+        return pw_reduction_with_agg_to_scalar(ak.sum, ak.sum, array)
     elif axis == 0:
         raise DaskAwkwardNotImplemented(
             f"axis={axis} is not supported for this array yet."
@@ -364,31 +378,3 @@ def var(
     flatten_records=False,
 ):
     raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
-
-
-_min_trivial = TrivialPartitionwiseOp(ak.min, axis=1)
-_max_trivial = TrivialPartitionwiseOp(ak.max, axis=1)
-
-
-def _min_or_max(
-    f: Callable,
-    array: Array,
-    axis: int | None = None,
-    **kwargs: Any,
-) -> LazyResult:
-    # translate negative axis (array.ndim currently raises)
-    if axis is not None and axis < 0 and array.ndim is not None:
-        axis = array.ndim + axis + 1
-    # get the correct trivial callable
-    tf = _min_trivial if f == ak.min else _max_trivial
-    # generate collection based on axis
-    if axis == 1:
-        return tf(array, axis=axis, **kwargs)
-    elif axis is None:
-        return pw_reduction_with_agg_to_scalar(array, f, agg=f, **kwargs)
-    elif array.ndim is not None and (axis == 0 or axis == -1 * array.ndim):
-        raise DaskAwkwardNotImplemented(
-            f"axis={axis} is not supported for this array yet."
-        )
-    else:
-        raise ValueError("axis must be None or an integer.")

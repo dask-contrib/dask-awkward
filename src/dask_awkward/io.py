@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import io
-import os
 import warnings
 from math import ceil
 from typing import TYPE_CHECKING, Any
@@ -35,13 +34,6 @@ if TYPE_CHECKING:
     from dask_awkward.core import Array
 
 __all__ = ["from_json"]
-
-
-def is_file_path(source: Any) -> bool:
-    try:
-        return os.path.isfile(source)
-    except (ValueError, TypeError):
-        return False
 
 
 class FromJsonWrapper:
@@ -125,6 +117,7 @@ def from_json(
     compression: str | None = "infer",
     meta: ak.Array | None = None,
     derive_meta_kwargs: dict[str, Any] | None = None,
+    storage_options: dict[str, Any] | None = None,
 ) -> Array:
     """Create an Awkward Array collection from JSON data.
 
@@ -149,11 +142,14 @@ def from_json(
         The source of the JSON dataset.
     blocksize : int | str, optional
         If defined, each partition will be created from a block of
-        JSON data of this size.
+        JSON bytes of this size. If `delimiter` is defined (not
+        ``None``) but this value remains ``None``, a default value of
+        ``128 MiB`` will be used.
     delimiter : bytes, optional
-        If defined (not ``None``), the byte character to split on when
-        reading `blocksizes`. If this is ``None`` but `blocksize` is
-        defined, the default byte charater is ``b"\\n"``.
+        If defined (not ``None``), this will be the byte(s) to split
+        on when reading `blocksizes`. If this is ``None`` but
+        `blocksize` is defined (not ``None``), the default byte
+        charater will be the newline (``b"\\n"``).
     one_obj_per_file : bool
         If ``True`` each file will be considered a single JSON object.
     compression : str, optional
@@ -173,11 +169,22 @@ def from_json(
 
     Examples
     --------
+    One partition per file:
+
     >>> import dask_awkard as dak
+    >>> a = dak.from_json("dataset*.json")
+
+    One partition ber 200 MB of JSON data:
+
+    >>> a = dak.from_json("dataset*.json", blocksize="200 MB")
+
+    Same as previous call (explicit definition of the delimeter):
+
+    >>> a = dak.from_json(
+    ...     "dataset*.json", blocksize="200 MB", delimeter=b"\\n",
+    ... )
 
     """
-    token = tokenize(urlpath, delimiter, blocksize, one_obj_per_file)
-    name = f"from-json-{token}"
 
     # allow either blocksize or delimieter being not-None to trigger
     # line deliminated JSON reading.
@@ -190,10 +197,17 @@ def from_json(
     # read a single file or a list of files. The list of files are
     # expected to be line delimited (one JSON object per line)
     if delimiter is None and blocksize is None:
-        if is_file_path(urlpath):
-            urlpath = [urlpath]  # type: ignore
+        fs, fstoken, urlpath = fsspec.get_fs_token_paths(
+            urlpath,
+            mode="rb",
+            storage_options=storage_options,
+        )
+        if meta is None:
+            meta_read_kwargs = derive_meta_kwargs or {}
+            meta = derive_json_meta(fs, urlpath[0], **meta_read_kwargs)
 
-        fs, fstoken, urlpath = fsspec.get_fs_token_paths(urlpath)
+        token = tokenize(fstoken, one_obj_per_file, compression, meta)
+        name = f"from-json-{token}"
 
         if compression == "infer":
             compression = infer_compression(urlpath[0])
@@ -209,32 +223,32 @@ def from_json(
         dsk: dict[tuple[str, int], tuple[Any, ...]] = {
             (name, i): (f, s) for i, s in enumerate(urlpath)
         }
-        deps: set[Any] = set()
+        deps: set[Any] | list[Any] = set()
         n = len(dsk)
-
-        if meta is None:
-            meta_read_kwargs = derive_meta_kwargs or {}
-            meta = derive_json_meta(fs, urlpath[0], **meta_read_kwargs)
 
     # if a `delimiter` and `blocksize` are defined we use Dask's
     # `read_bytes` function to get delayed chunks of bytes.
     elif delimiter is not None and blocksize is not None:
+        token = tokenize(urlpath, delimiter, blocksize, meta)
+        name = f"from-json-{token}"
+        storage_options = storage_options or {}
         _, bytechunks = read_bytes(
             urlpath,
             delimiter=delimiter,
             blocksize=blocksize,  # type: ignore
             sample=None,  # type: ignore
+            **storage_options,
         )
         flat_chunks: list[Delayed] = list(flatten(bytechunks))
         dsk = {
             (name, i): (_from_json_bytes, delayed_chunk.key)
             for i, delayed_chunk in enumerate(flat_chunks)
         }
-        deps = set(flat_chunks)
+        deps = flat_chunks
         n = len(deps)
 
     else:
-        raise TypeError("Incompatible combination of arguments.")
+        raise TypeError("Incompatible combination of arguments.")  # pragma: no cover
 
     hlg = HighLevelGraph.from_collections(name, dsk, dependencies=deps)
     return new_array_object(hlg, name, meta=meta, npartitions=n)

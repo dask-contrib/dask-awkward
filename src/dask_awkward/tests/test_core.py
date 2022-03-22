@@ -357,13 +357,13 @@ def test_bad_meta_type(line_delim_records_file, meta) -> None:
 
 
 def test_to_dask_array(daa, caa) -> None:
-    from dask.array.utils import assert_eq
+    from dask.array.utils import assert_eq as da_assert_eq
 
     da = dak.to_dask_array(dak.flatten(daa.analysis.x1))
     ca = ak.to_numpy(ak.flatten(caa.analysis.x1))
-    assert_eq(da, ca)
+    da_assert_eq(da, ca)
     da = dak.flatten(daa.analysis.x1).to_dask_array()
-    assert_eq(da, ca)
+    da_assert_eq(da, ca)
 
 
 @pytest.mark.parametrize("optimize_graph", [True, False])
@@ -374,3 +374,22 @@ def test_to_delayed(daa, caa, optimize_graph):
     delayeds = daa.analysis.to_delayed(optimize_graph=optimize_graph)
     comped = ak.concatenate([d.compute() for d in delayeds])
     assert caa.analysis.tolist() == comped.tolist()
+
+
+def test_scalar_repr(daa: dakc.Array) -> None:
+    s = dak.max(daa.analysis.x1)
+    sstr = str(s)
+    assert "type=Scalar" in sstr
+
+
+def test_array_persist(daa: dakc.Array) -> None:
+    daa2 = daa["analysis"]["x1"].persist()
+    assert_eq(daa["analysis"]["x1"], daa2)
+    daa2 = daa.persist()
+    assert_eq(daa2, daa)
+
+
+def test_scalar_persist(daa: dakc.Array) -> None:
+    coll = daa["analysis"]["x1"][0][0]
+    coll2 = coll.persist()
+    assert_eq(coll, coll2)

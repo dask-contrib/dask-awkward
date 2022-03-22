@@ -54,6 +54,19 @@ https://github.com/ContinuumIO/dask-awkward."""
         super().__init__(msg)
 
 
+class IncompatiblePartitions(ValueError):
+    def __init__(self, name, *args) -> None:
+        msg = self.divisions_msg(name, *args)
+        super().__init__(msg)
+
+    @staticmethod
+    def divisions_msg(name: str, *args: Any) -> str:
+        msg = f"The inputs to {name} are incompatibly partitioned\n"
+        for i, arg in enumerate(args):
+            msg += f"- arg{i} divisions: {arg.divisions}\n"
+        return msg
+
+
 def _finalize_array(
     results: Sequence[Number | ak.Array | ak.Record],
 ) -> Number | ak.Array:
@@ -155,7 +168,7 @@ class Scalar(DaskMethodsMixin):
     def from_known(s: Any, dtype: DTypeLike | None = None) -> Scalar:
         return new_known_scalar(s, dtype=dtype)
 
-    def __repr__(self) -> str:
+    def __repr__(self) -> str:  # pragma: no cover
         return self.__str__()
 
     def __str__(self) -> str:
@@ -346,7 +359,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         name = self.name
         if rename:
             name = rename.get(name, name)
-        return type(self)(dsk, name, self._meta, divisions=self.divisions)
+        return Array(dsk, name, self._meta, divisions=self.divisions)
 
     def __len__(self) -> int:
         self.eager_compute_divisions()
@@ -368,7 +381,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             ">"
         )
 
-    def __repr__(self) -> str:
+    def __repr__(self) -> str:  # pragma: no cover
         return self.__str__()
 
     def reset_meta(self) -> None:
@@ -1015,10 +1028,10 @@ def map_partitions(
 
 
 def pw_reduction_with_agg_to_scalar(
-    array: Array,
     func: Callable,
-    *,
     agg: Callable,
+    array: Array,
+    *,
     dtype: Any | None = None,
     agg_kwargs: Mapping[str, Any] | None = None,
     **kwargs: Any,
@@ -1045,13 +1058,15 @@ def pw_reduction_with_agg_to_scalar(
         Resulting scalar Dask collection.
 
     """
+    if agg_kwargs is None:
+        agg_kwargs = {}
     token = tokenize(array)
     namefunc = func.__name__
     nameagg = agg.__name__
     namefunc = f"{namefunc}-{token}"
     nameagg = f"{nameagg}-{token}"
     func = partial(func, **kwargs)
-    agg = partial(agg, **agg_kwargs) if agg_kwargs is not None else agg  # type: ignore
+    agg = partial(agg, **agg_kwargs)
     dsk = {(namefunc, i): (func, k) for i, k in enumerate(array.__dask_keys__())}
     dsk[nameagg] = (agg, list(dsk.keys()))  # type: ignore
     hlg = HighLevelGraph.from_collections(
@@ -1299,33 +1314,26 @@ def compatible_partitions(*args: Array) -> bool:
     return True
 
 
-class TrivialPartitionwiseOp:
-    def __init__(
-        self,
-        func: Callable,
-        *,
-        name: str | None = None,
-        **kwargs: Any,
-    ) -> None:
-        self._func = func
-        self.name = func.__name__ if name is None else name
-        self._kwargs = kwargs
+# class TrivialPartitionwiseOp:
+#     def __init__(
+#         self,
+#         func: Callable,
+#         *,
+#         name: str | None = None,
+#         **kwargs: Any,
+#     ) -> None:
+#         self._func = func
+#         self.name = func.__name__ if name is None else name
+#         self._kwargs = kwargs
 
-    def __call__(self, collection: Array, **kwargs: Any) -> Array:
-        # overwrite any saved kwargs in self._kwargs
-        for k, v in kwargs.items():
-            self._kwargs[k] = v
-        try:
-            new_meta = self._func(collection._meta, **kwargs)
-        except NotImplementedError:
-            new_meta = None
-        return map_partitions(
-            self._func, collection, name=self.name, meta=new_meta, **self._kwargs
-        )
-
-
-def incompatible_partitions_msg(name: str, *args: Any) -> str:
-    msg = f"The inputs to {name} are incompatibly partitioned\n"
-    for i, arg in enumerate(args):
-        msg += f"- arg{i} divisions: {arg.divisions}\n"
-    return msg
+#     def __call__(self, collection: Array, **kwargs: Any) -> Array:
+#         # overwrite any saved kwargs in self._kwargs
+#         for k, v in kwargs.items():
+#             self._kwargs[k] = v
+#         try:
+#             new_meta = self._func(collection._meta, **kwargs)
+#         except NotImplementedError:
+#             new_meta = None
+#         return map_partitions(
+#             self._func, collection, name=self.name, meta=new_meta, **self._kwargs
+#         )
