@@ -13,3 +13,4 @@ exclude_lines =
     except ImportError:
     NotImplementedError
     DaskAwkwardNotImplemented
+    _ipython_key_completions_

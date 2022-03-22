@@ -17,9 +17,19 @@ from dask_awkward.core import Array, Record, typetracer_array
 from dask_awkward.io import from_awkward, from_json
 
 
-def assert_eq(a: Any, b: Any) -> None:
+def assert_eq(
+    a: Any,
+    b: Any,
+    check_forms: bool = True,
+    check_divisions: bool = True,
+) -> None:
     if isinstance(a, (Array, ak.Array)):
-        assert_eq_arrays(a, b)
+        assert_eq_arrays(
+            a,
+            b,
+            check_forms=check_forms,
+            check_divisions=check_divisions,
+        )
     elif isinstance(a, (Record, ak.Record)):
         assert_eq_records(a, b)
     else:
@@ -215,15 +225,6 @@ def load_records_eager(fn: str, n_times: int = 1) -> ak.Array:
         with fsspec.open(ff) as f:
             loaded += list(json.loads(line) for line in f)
     return ak.from_iter(loaded)
-
-
-def load_single_record_lazy(fn: str) -> Array:
-    return from_json(
-        fn,
-        delimiter=None,
-        blocksize=None,
-        one_obj_per_file=True,
-    )
 
 
 def load_single_record_eager(fn: str) -> ak.Array:

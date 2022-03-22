@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import io
-import os
 import warnings
 from math import ceil
 from typing import TYPE_CHECKING, Any
@@ -35,13 +34,6 @@ if TYPE_CHECKING:
     from dask_awkward.core import Array
 
 __all__ = ["from_json"]
-
-
-def is_file_path(source: Any) -> bool:
-    try:
-        return os.path.isfile(source)
-    except (ValueError, TypeError):
-        return False
 
 
 class FromJsonWrapper:
@@ -192,7 +184,6 @@ def from_json(
     ... )
 
     """
-    fs, fstoken, urlpath = fsspec.get_fs_token_paths(urlpath)
 
     # allow either blocksize or delimieter being not-None to trigger
     # line deliminated JSON reading.
@@ -205,15 +196,13 @@ def from_json(
     # read a single file or a list of files. The list of files are
     # expected to be line delimited (one JSON object per line)
     if delimiter is None and blocksize is None:
+        fs, fstoken, urlpath = fsspec.get_fs_token_paths(urlpath)
         if meta is None:
             meta_read_kwargs = derive_meta_kwargs or {}
             meta = derive_json_meta(fs, urlpath[0], **meta_read_kwargs)
 
         token = tokenize(fstoken, one_obj_per_file, compression, meta)
         name = f"from-json-{token}"
-
-        if is_file_path(urlpath):
-            urlpath = [urlpath]  # type: ignore
 
         if compression == "infer":
             compression = infer_compression(urlpath[0])
@@ -229,7 +218,7 @@ def from_json(
         dsk: dict[tuple[str, int], tuple[Any, ...]] = {
             (name, i): (f, s) for i, s in enumerate(urlpath)
         }
-        deps: set[Any] = set()
+        deps: set[Any] | list[Any] = set()
         n = len(dsk)
 
     # if a `delimiter` and `blocksize` are defined we use Dask's
@@ -248,11 +237,11 @@ def from_json(
             (name, i): (_from_json_bytes, delayed_chunk.key)
             for i, delayed_chunk in enumerate(flat_chunks)
         }
-        deps = set(flat_chunks)
+        deps = flat_chunks
         n = len(deps)
 
     else:
-        raise TypeError("Incompatible combination of arguments.")
+        raise TypeError("Incompatible combination of arguments.")  # pragma: no cover
 
     hlg = HighLevelGraph.from_collections(name, dsk, dependencies=deps)
     return new_array_object(hlg, name, meta=meta, npartitions=n)

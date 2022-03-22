@@ -247,11 +247,11 @@ def num(
             return new_known_scalar(array.divisions[-1], dtype=int)
         else:
             return pw_reduction_with_agg_to_scalar(
-                array,
-                ak.num,
+                func=ak.num,
+                agg=ak.sum,
+                array=array,
                 axis=0,
                 dtype=np.int64,
-                agg=ak.sum,
                 agg_kwargs={"axis": None},
                 highlevel=highlevel,
                 behavior=behavior,

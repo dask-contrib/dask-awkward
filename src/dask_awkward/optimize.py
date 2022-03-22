@@ -13,15 +13,17 @@ def optimize(
     **kwargs: Any,
 ) -> Mapping:
     if not isinstance(keys, (list, set)):
-        keys = [keys]
+        keys = [keys]  # pragma: no cover
     keys = list(flatten(keys))
 
     if not isinstance(dsk, HighLevelGraph):
         dsk = HighLevelGraph.from_collections(id(dsk), dsk, dependencies=())
-    else:
-        # Perform Blockwise optimizations for HLG input
-        dsk = optimize_blockwise(dsk, keys=keys)
-        dsk = fuse_roots(dsk, keys=keys)  # type: ignore
+
+    # Perform Blockwise optimizations for HLG input
+    dsk = optimize_blockwise(dsk, keys=keys)
+    # fuse nearby layers
+    dsk = fuse_roots(dsk, keys=keys)  # type: ignore
+    # cull unncessary tasks
     dsk = dsk.cull(set(keys))  # type: ignore
 
     return dsk

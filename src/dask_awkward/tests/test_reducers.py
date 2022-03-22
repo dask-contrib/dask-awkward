@@ -48,8 +48,8 @@ def test_argmax(daa, caa, axis) -> None:
 def test_argmin(daa, caa, axis) -> None:
     x1d = daa.analysis.x1
     x1c = caa.analysis.x1
-    dr = dak.argmax(x1d, axis=axis)
-    ar = ak.argmax(x1c, axis=axis)
+    dr = dak.argmin(x1d, axis=axis)
+    ar = ak.argmin(x1c, axis=axis)
     assert_eq(dr, ar)
 
 
