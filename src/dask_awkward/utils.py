@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
+import awkward._v2 as ak
 import numpy as np
 
 
@@ -19,9 +20,9 @@ def normalize_single_outer_inner_index(
 
     Returns
     -------
-    int
+    partition_index : int
         Which partition in the collection.
-    int
+    new_index : int
         Which inner index in the determined partition.
 
     Examples
@@ -46,6 +47,29 @@ def normalize_single_outer_inner_index(
 
 
 def is_empty_slice(s: Any) -> bool:
+    """Check if a slice is empty.
+
+    Parameters
+    ----------
+    s : Any
+        Slice of interest
+
+    Returns
+    -------
+    result : bool
+        True if the slice is empty
+
+    Examples
+    --------
+    >>> from dask_awkward.utils import is_empty_slice
+    >>> is_empty_slice(slice(1, 5, None))
+    False
+    >>> is_empty_slice(slice(None, None, 2))
+    False
+    >>> is_empty_slice(slice(None, None, None))
+    True
+
+    """
     if not isinstance(s, slice):
         return False
     if s.start is not None:
@@ -55,3 +79,18 @@ def is_empty_slice(s: Any) -> bool:
     if s.step is not None:
         return False
     return True
+
+
+def borrow_docstring(original: Callable) -> Callable:
+    def wrapper(method):
+        method.__doc__ = (
+            f"Partitioned version of ak.{original.__name__}\n" f"{original.__doc__}"
+        )
+        return method
+
+    return wrapper
+
+
+def empty_typetracer() -> ak.Array:
+    a = ak.Array([])
+    return ak.Array(a.layout.typetracer.forget_length())

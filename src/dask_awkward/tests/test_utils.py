@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..utils import normalize_single_outer_inner_index
+from dask_awkward.utils import is_empty_slice, normalize_single_outer_inner_index
 
 
 def test_normalize_single_outer_inner_index() -> None:
@@ -37,3 +37,12 @@ def test_normalize_single_outer_inner_index() -> None:
     for i, r in zip(indices, results):
         res = normalize_single_outer_inner_index(divisions, i)
         assert r == res
+
+
+def test_is_empty_slice() -> None:
+    assert is_empty_slice(slice(None, None, None))
+    assert not is_empty_slice(slice(0, 10, 2))
+    assert not is_empty_slice(slice(0, 10, None))
+    assert not is_empty_slice(slice(None, None, -1))
+    assert not is_empty_slice(slice(2, None, -1))
+    assert not is_empty_slice(slice(None, 5, -1))

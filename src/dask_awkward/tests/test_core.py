@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+import awkward._v2 as ak
+import dask.config
+import numpy as np
 import pytest
 
 import dask_awkward as dak
 import dask_awkward.core as dakc
-
-from .helpers import (  # noqa: F401
+from dask_awkward.testutils import (
+    _lazyjsonrecords,
     _lazyrecord,
     _lazyrecords,
     assert_eq,
-    line_delim_records_file,
     load_records_eager,
+    load_records_lazy,
 )
 
 
@@ -20,15 +23,16 @@ def test_clear_divisions() -> None:
     daa.clear_divisions()
     assert not daa.known_divisions
     assert len(daa.divisions) == daa.npartitions + 1
+    assert_eq(daa, daa)
 
 
-def test_dunder_str(line_delim_records_file) -> None:  # noqa: F811
+def test_dunder_str(line_delim_records_file) -> None:
     aa = load_records_eager(line_delim_records_file)
     daa = dak.from_awkward(aa, npartitions=6)
     assert str(daa) == "dask.awkward<from-awkward, npartitions=5>"
 
 
-def test_calculate_known_divisions(line_delim_records_file) -> None:  # noqa: F811
+def test_calculate_known_divisions(line_delim_records_file) -> None:
     daa = dak.from_json([line_delim_records_file] * 3)
     target = (0, 20, 40, 60)
     assert dakc.calculate_known_divisions(daa) == target
@@ -36,32 +40,33 @@ def test_calculate_known_divisions(line_delim_records_file) -> None:  # noqa: F8
     assert dakc.calculate_known_divisions(daa.analysis.x1) == target
     assert dakc.calculate_known_divisions(daa["analysis"][["x1", "x2"]]) == target
     daa = dak.from_json([line_delim_records_file] * 3)
-    daa._compute_divisions()
+    daa.eager_compute_divisions()
     assert daa.known_divisions
     assert dakc.calculate_known_divisions(daa) == target
 
 
-def test_fields(line_delim_records_file) -> None:  # noqa: F811
+def test_fields(line_delim_records_file) -> None:
     daa = dak.from_json(line_delim_records_file, blocksize=340)
     # records fields same as array of records fields
     assert daa[0].analysis.fields == daa.analysis.fields
     aa = daa.compute()
     assert daa.fields == aa.fields
-    assert dak.fields(daa) == aa.fields
-    daa.meta = None
-    assert daa.fields is None
-    assert dak.fields(daa) is None
+    daa.reset_meta()
+    assert daa.fields == []
 
 
-def test_form(line_delim_records_file) -> None:  # noqa: F811
+def test_form(line_delim_records_file) -> None:
     daa = dak.from_json(line_delim_records_file)
     assert daa.form
-    daa.meta = None
-    assert daa.form is None
+    daa.reset_meta()
+
+    from awkward._v2.forms.emptyform import EmptyForm
+
+    assert daa.form == EmptyForm()
 
 
 @pytest.mark.xfail
-def test_form_equality(line_delim_records_file) -> None:  # noqa: F811
+def test_form_equality(line_delim_records_file) -> None:
     # NOTE: forms come from meta which currently depends on partitioning
     daa = dak.from_json(line_delim_records_file)
     assert daa.form == daa.compute().layout.form
@@ -69,7 +74,7 @@ def test_form_equality(line_delim_records_file) -> None:  # noqa: F811
     assert daa.form == daa.compute().layout.form
 
 
-def test_from_awkward(line_delim_records_file) -> None:  # noqa: F811
+def test_from_awkward(line_delim_records_file) -> None:
     aa = load_records_eager(line_delim_records_file)
     daa = dak.from_awkward(aa, npartitions=4)
     assert_eq(aa, daa)
@@ -78,37 +83,36 @@ def test_from_awkward(line_delim_records_file) -> None:  # noqa: F811
 
 def test_get_typetracer() -> None:
     daa = _lazyrecords()
-    assert dakc._get_typetracer(daa) is daa.meta
+    assert dakc._get_typetracer(daa) is daa._meta
 
 
-def test_len(line_delim_records_file) -> None:  # noqa: F811
+def test_len(line_delim_records_file) -> None:
     daa = dak.from_json(line_delim_records_file)
     assert len(daa) == 20
 
 
-def test_meta_and_typetracer_exist(line_delim_records_file) -> None:  # noqa: F811
+def test_meta_and_typetracer_exist(line_delim_records_file) -> None:
     daa = dak.from_json(line_delim_records_file, blocksize=700)
-    assert daa.meta is not None
-    assert daa["analysis"]["x1"].meta is not None
-    assert daa.typetracer is daa.meta
+    assert daa._meta is not None
+    assert daa["analysis"]["x1"]._meta is not None
+    assert daa._typetracer is daa._meta
 
 
-def test_meta_raise(line_delim_records_file) -> None:  # noqa: F811
-    daa = dak.from_json(line_delim_records_file)
+def test_meta_raise(line_delim_records_file) -> None:
     with pytest.raises(
         TypeError, match="meta must be an instance of an Awkward Array."
     ):
-        daa.meta = "hello"
+        dak.from_json(line_delim_records_file, meta=5)
 
 
-def test_ndim(line_delim_records_file) -> None:  # noqa
+def test_ndim(line_delim_records_file) -> None:
     daa = dak.from_json(line_delim_records_file, blocksize=700)
     assert daa.ndim == daa.compute().ndim
-    daa.meta = None
+    daa._meta = None
     assert daa.ndim is None
 
 
-def test_new_array_object_raises(line_delim_records_file) -> None:  # noqa: F811
+def test_new_array_object_raises(line_delim_records_file) -> None:
     daa = dak.from_json(line_delim_records_file)
     name = daa.name
     hlg = daa.dask
@@ -126,10 +130,9 @@ def test_new_array_object_raises(line_delim_records_file) -> None:  # noqa: F811
 
 def test_partitions() -> None:
     daa = _lazyrecords()
-    lop = list(daa.partitions)
-    for part in lop:
+    for i in range(daa.npartitions):
+        part = daa.partitions[i]
         assert part.npartitions == 1
-    assert len(lop) == daa.npartitions
 
 
 def test_partitions_divisions() -> None:
@@ -144,12 +147,13 @@ def test_partitions_divisions() -> None:
 
 def test_raise_in_finalize() -> None:
     daa = _lazyrecords()
-    res = daa.map_partitions(str)
+    with dask.config.set({"awkward.compute-unknown-meta": False}):
+        res = daa.map_partitions(str)
     with pytest.raises(RuntimeError, match="type of first result: <class 'str'>"):
         res.compute()
 
 
-def test_rebuild(line_delim_records_file):  # noqa: F811
+def test_rebuild(line_delim_records_file):
     daa = dak.from_json(line_delim_records_file)
     x = daa.compute()
     daa = daa._rebuild(daa.dask)
@@ -157,11 +161,11 @@ def test_rebuild(line_delim_records_file):  # noqa: F811
     assert x.tolist() == y.tolist()
 
 
-def test_type(line_delim_records_file) -> None:  # noqa: F811
+def test_type(line_delim_records_file) -> None:
     daa = _lazyrecords()
     assert dak.type(daa) is not None
     daa = dak.from_json(line_delim_records_file)
-    daa.meta = None
+    daa._meta = None
     assert dak.type(daa) is None
 
 
@@ -185,7 +189,8 @@ def test_record_collection() -> None:
     daa = _lazyrecords()
     assert type(daa[0]) is dakc.Record
     aa = daa.compute()
-    assert daa[0].compute().tolist() == aa[0].tolist()
+    assert_eq(daa[0], aa[0])
+    # assert daa[0].compute().tolist() == aa[0].tolist()
 
 
 def test_scalar_collection() -> None:
@@ -199,16 +204,16 @@ def test_is_typetracer() -> None:
     assert not dakc.is_typetracer(daa[0])
     assert not dakc.is_typetracer(daa["analysis"])
     assert not dakc.is_typetracer(daa.compute())
-    assert dakc.is_typetracer(daa.meta)
-    assert dakc.is_typetracer(daa[0].meta)
-    assert dakc.is_typetracer(daa["analysis"].meta)
-    assert dakc.is_typetracer(daa["analysis"][0]["x1"][0].meta)
+    assert dakc.is_typetracer(daa._meta)
+    assert dakc.is_typetracer(daa[0]._meta)
+    assert dakc.is_typetracer(daa["analysis"]._meta)
+    assert dakc.is_typetracer(daa["analysis"][0]["x1"][0]._meta)
 
 
 def test_meta_or_identity() -> None:
     daa = _lazyrecords()
     assert dakc.is_typetracer(dakc.meta_or_identity(daa))
-    assert dakc.meta_or_identity(daa) is daa.meta
+    assert dakc.meta_or_identity(daa) is daa._meta
     assert dakc.meta_or_identity(5) == 5
 
 
@@ -216,10 +221,175 @@ def test_to_meta() -> None:
     daa = _lazyrecords()
     x1 = daa["analysis"]["x1"]
     x1_0 = x1[0]
-    metad = dakc.to_meta(x1, 5, "ok", x1_0)
+    metad = dakc.to_meta([x1, 5, "ok", x1_0])
     assert isinstance(metad, tuple)
-    for a, b in zip(metad, (x1.meta, 5, "ok", x1_0.meta)):
+    for a, b in zip(metad, (x1._meta, 5, "ok", x1_0._meta)):
         if dakc.is_typetracer(a):
             assert a is b
         else:
             assert a == b
+
+
+def test_record_str() -> None:
+    daa = _lazyrecords()
+    r = daa[0]
+    assert str(r) == "dask.awkward<getitem, type=Record>"
+
+
+def test_record_to_delayed() -> None:
+    daa = _lazyrecords()
+    r = daa[0]
+    d = r.to_delayed()
+    assert r.compute().tolist() == d.compute().tolist()
+
+
+def test_record_fields() -> None:
+    daa = _lazyrecords()
+    r = daa[0]
+    r._meta = None
+    assert r.fields is None
+
+
+def test_record_dir() -> None:
+    daa = _lazyrecords()
+    r = daa["analysis"][0]
+    d = dir(r)
+    for f in r.fields:
+        assert f in d
+
+
+def test_array_dir() -> None:
+    daa = _lazyrecords()
+    a = daa["analysis"]
+    d = dir(a)
+    for f in a.fields:
+        assert f in d
+
+
+def test_typetracer_function() -> None:
+    daa = _lazyrecords()
+    aa = daa.compute()
+    assert dakc.typetracer_array(daa) is not None
+    assert dakc.typetracer_array(daa) is daa._typetracer
+    tta = dakc.typetracer_array(aa)
+    assert tta is not None
+    assert tta.layout.form == aa.layout.form
+
+
+def test_single_partition(line_delim_records_file) -> None:
+    daa = load_records_lazy(line_delim_records_file, by_file=True, n_times=1)
+    caa = load_records_eager(line_delim_records_file)
+    assert daa.npartitions == 1
+    assert_eq(daa, caa)
+    assert_eq(caa, daa)
+
+
+def test_new_known_scalar() -> None:
+    s1 = 5
+    c = dakc.new_known_scalar(s1)
+    assert c.compute() == s1
+    assert c._meta is not None
+    s2 = 5.5
+    c = dakc.new_known_scalar(s2)
+    assert c.compute() == 5.5
+    assert c._meta is not None
+
+    c = dak.Scalar.from_known(s1)
+    assert c.known_value == s1
+    assert c.compute() == s1
+
+
+def test_scalar_dtype() -> None:
+    s = 2
+    c = dakc.new_known_scalar(s)
+    assert c.dtype == np.dtype(type(s))
+    c._meta = None
+    assert c.dtype is None
+
+
+def test_scalar_pickle() -> None:
+    import pickle
+
+    s = 2
+    c1 = dakc.new_known_scalar(s)
+    s_dumped = pickle.dumps(c1)
+    c2 = pickle.loads(s_dumped)
+    assert_eq(c1, c2)
+    daa = _lazyjsonrecords()
+    s1 = dak.sum(daa["analysis"]["x1"], axis=None)
+    s_dumped = pickle.dumps(s1)
+    s2 = pickle.loads(s_dumped)
+    assert_eq(s1, s2)
+
+    assert s1.known_value is None
+
+
+@pytest.mark.parametrize("optimize_graph", [True, False])
+def test_scalar_to_delayed(optimize_graph) -> None:
+    daa = _lazyjsonrecords()
+    s1 = dak.sum(daa["analysis"]["x1"], axis=None)
+    d1 = s1.to_delayed(optimize_graph=optimize_graph)
+    s1c = s1.compute()
+    assert d1.compute() == s1c  # type: ignore
+
+
+def test_compatible_partitions() -> None:
+    daa1 = _lazyjsonrecords()
+    daa2 = _lazyrecords()
+    assert dakc.compatible_partitions(daa1, daa1)
+    assert dakc.compatible_partitions(daa1, daa1, daa1)
+    assert not dakc.compatible_partitions(daa1, daa2)
+    daa1.eager_compute_divisions()
+    assert dakc.compatible_partitions(daa1, daa1)
+    x = ak.Array([[1, 2, 3], [1, 2, 3], [3, 4, 5]])
+    y = ak.Array([[1, 2, 3], [3, 4, 5]])
+    x = dak.from_awkward(x, npartitions=2)
+    y = dak.from_awkward(y, npartitions=2)
+    assert not dakc.compatible_partitions(x, y)
+    assert not dakc.compatible_partitions(x, x, y)
+    assert dakc.compatible_partitions(y, y)
+
+
+@pytest.mark.parametrize("meta", [5, False, [1, 2, 3]])
+def test_bad_meta_type(line_delim_records_file, meta) -> None:
+    with pytest.raises(TypeError, match="meta must be an instance of an Awkward Array"):
+        dak.from_json([line_delim_records_file] * 3, meta=meta)
+
+
+def test_to_dask_array(daa, caa) -> None:
+    from dask.array.utils import assert_eq as da_assert_eq
+
+    da = dak.to_dask_array(dak.flatten(daa.analysis.x1))
+    ca = ak.to_numpy(ak.flatten(caa.analysis.x1))
+    da_assert_eq(da, ca)
+    da = dak.flatten(daa.analysis.x1).to_dask_array()
+    da_assert_eq(da, ca)
+
+
+@pytest.mark.parametrize("optimize_graph", [True, False])
+def test_to_delayed(daa, caa, optimize_graph):
+    delayeds = dak.to_delayed(daa.analysis, optimize_graph=optimize_graph)
+    comped = ak.concatenate([d.compute() for d in delayeds])
+    assert caa.analysis.tolist() == comped.tolist()
+    delayeds = daa.analysis.to_delayed(optimize_graph=optimize_graph)
+    comped = ak.concatenate([d.compute() for d in delayeds])
+    assert caa.analysis.tolist() == comped.tolist()
+
+
+def test_scalar_repr(daa: dakc.Array) -> None:
+    s = dak.max(daa.analysis.x1)
+    sstr = str(s)
+    assert "type=Scalar" in sstr
+
+
+def test_array_persist(daa: dakc.Array) -> None:
+    daa2 = daa["analysis"]["x1"].persist()
+    assert_eq(daa["analysis"]["x1"], daa2)
+    daa2 = daa.persist()
+    assert_eq(daa2, daa)
+
+
+def test_scalar_persist(daa: dakc.Array) -> None:
+    coll = daa["analysis"]["x1"][0][0]
+    coll2 = coll.persist()
+    assert_eq(coll, coll2)

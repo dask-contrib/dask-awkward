@@ -11,7 +11,8 @@ build-backend = "setuptools.build_meta"
 write_to = "src/dask_awkward/_version.py"
 
 [tool.pytest.ini_options]
-addopts = "-v"
+testpaths = ["src/dask_awkward/tests"]
+addopts = ["-v", "-ra", "--showlocals", "--strict-markers", "--strict-config"]
 
 [tool.isort]
 profile = "black"
@@ -19,7 +20,7 @@ line_length = 88
 src_paths = ["src", "tests"]
 
 [tool.mypy]
-python_version = "3.7"
+python_version = "3.8"
 files = ["src"]
 warn_unused_configs = true
 
@@ -42,3 +43,7 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = ["ujson.*"]
 ignore_missing_imports = true
+
+[tool.pyright]
+include = ["src"]
+pythonVersion = "3.8"

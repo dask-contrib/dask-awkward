@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Union
-
 import awkward._v2 as ak
+import numpy as np
 
-from .core import TrivialPartitionwiseOp, pw_reduction_with_agg_to_scalar
-
-if TYPE_CHECKING:
-    from .core import Array, Scalar
-
-    LazyResult = Union[Array, Scalar]
-
+from dask_awkward.core import (
+    DaskAwkwardNotImplemented,
+    IncompatiblePartitions,
+    compatible_partitions,
+    map_partitions,
+    pw_reduction_with_agg_to_scalar,
+)
+from dask_awkward.utils import borrow_docstring
 
 __all__ = (
     "all",
@@ -34,29 +34,64 @@ __all__ = (
     "var",
 )
 
-_count_trivial = TrivialPartitionwiseOp(ak.count, axis=1)
-_count_nonzero_trivial = TrivialPartitionwiseOp(ak.count_nonzero, axis=1)
-_min_trivial = TrivialPartitionwiseOp(ak.min, axis=1)
-_max_trivial = TrivialPartitionwiseOp(ak.max, axis=1)
-_sum_trivial = TrivialPartitionwiseOp(ak.sum, axis=1)
 
-
+@borrow_docstring(ak.all)
 def all(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
-    NotImplementedError("TODO")
+    if axis and axis >= 1:
+        return map_partitions(
+            ak.all,
+            array,
+            axis=axis,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+            flatten_records=flatten_records,
+        )
+    raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
 
 
+@borrow_docstring(ak.any)
 def any(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
-    NotImplementedError("TODO")
+    if axis and axis >= 1:
+        return map_partitions(
+            ak.any,
+            array,
+            axis=axis,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+            flatten_records=flatten_records,
+        )
+    raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
 
 
+@borrow_docstring(ak.argmax)
 def argmax(array, axis=None, keepdims=False, mask_identity=True, flatten_records=False):
-    NotImplementedError("TODO")
+    if axis and axis >= 1:
+        return map_partitions(
+            ak.argmax,
+            array,
+            axis=axis,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+            flatten_records=flatten_records,
+        )
+    raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
 
 
+@borrow_docstring(ak.argmin)
 def argmin(array, axis=None, keepdims=False, mask_identity=True, flatten_records=False):
-    NotImplementedError("TODO")
+    if axis and axis >= 1:
+        return map_partitions(
+            ak.argmin,
+            array,
+            axis=axis,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+            flatten_records=flatten_records,
+        )
+    raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
 
 
+@borrow_docstring(ak.corr)
 def corr(
     x,
     y,
@@ -66,12 +101,16 @@ def corr(
     mask_identity=True,
     flatten_records=False,
 ):
-    NotImplementedError("TODO")
+    if not compatible_partitions(x, y):
+        raise IncompatiblePartitions("corr", x, y)
+    raise DaskAwkwardNotImplemented("TODO")
 
 
+@borrow_docstring(ak.count)
 def count(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
-    if axis == 1:
-        return _count_trivial(
+    if axis and axis >= 1:
+        return map_partitions(
+            ak.count,
             array,
             axis=axis,
             keepdims=keepdims,
@@ -79,7 +118,8 @@ def count(array, axis=None, keepdims=False, mask_identity=False, flatten_records
             flatten_records=flatten_records,
         )
     elif axis is None:
-        trivial_result = _count_trivial(
+        trivial_result = map_partitions(
+            ak.count,
             array,
             axis=1,
             keepdims=keepdims,
@@ -87,46 +127,56 @@ def count(array, axis=None, keepdims=False, mask_identity=False, flatten_records
             flatten_records=flatten_records,
         )
         return pw_reduction_with_agg_to_scalar(
+            ak.sum,
+            ak.sum,
             trivial_result,
-            ak.sum,
-            ak.sum,
+            dtype=np.int64,
         )
     elif axis == 0 or axis == -1 * array.ndim:
-        raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
+        raise DaskAwkwardNotImplemented(
+            f"axis={axis} is not supported for this array yet."
+        )
     else:
         raise ValueError("axis must be None or an integer.")
 
 
+@borrow_docstring(ak.count_nonzero)
 def count_nonzero(
     array, axis=None, keepdims=False, mask_identity=False, flatten_records=False
 ):
     if axis is not None and axis == 1:
-        return _count_nonzero_trivial(
+        return map_partitions(
+            ak.count_nonzero,
             array,
             axis=1,
-            keepdims=False,
-            mask_identity=False,
-            flatten_records=False,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+            flatten_records=flatten_records,
         )
     elif axis is None:
-        trivial_result = _count_nonzero_trivial(
+        trivial_result = map_partitions(
+            ak.count_nonzero,
             array,
             axis=1,
-            keepdims=False,
-            mask_identity=False,
-            flatten_records=False,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+            flatten_records=flatten_records,
         )
         return pw_reduction_with_agg_to_scalar(
+            ak.sum,
+            ak.sum,
             trivial_result,
-            ak.sum,
-            ak.sum,
+            dtype=np.int64,
         )
     elif axis == 0 or axis == -1 * array.ndim:
-        raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
+        raise DaskAwkwardNotImplemented(
+            f"axis={axis} is not supported for this array yet."
+        )
     else:
         raise ValueError("axis must be None or an integer.")
 
 
+@borrow_docstring(ak.covar)
 def covar(
     x,
     y,
@@ -136,9 +186,12 @@ def covar(
     mask_identity=True,
     flatten_records=False,
 ):
-    NotImplementedError("TODO")
+    if not compatible_partitions(x, y):
+        raise IncompatiblePartitions("covar", x, y)
+    raise DaskAwkwardNotImplemented("TODO")
 
 
+@borrow_docstring(ak.linear_fit)
 def linear_fit(
     x,
     y,
@@ -148,9 +201,12 @@ def linear_fit(
     mask_identity=True,
     flatten_records=False,
 ):
-    NotImplementedError("TODO")
+    if not compatible_partitions(x, y):
+        raise IncompatiblePartitions("linear_fit", x, y)
+    raise DaskAwkwardNotImplemented("TODO")
 
 
+@borrow_docstring(ak.max)
 def max(
     array,
     axis=None,
@@ -159,23 +215,50 @@ def max(
     mask_identity=True,
     flatten_records=False,
 ):
-    return _min_or_max(
-        ak.max,
-        array,
-        axis,
-        keepdims=keepdims,
-        initial=initial,
-        mask_identity=mask_identity,
-        flatten_records=flatten_records,
-    )
+    if axis and axis >= 1:
+        return map_partitions(
+            ak.max,
+            array,
+            axis=axis,
+            keepdims=keepdims,
+            initial=initial,
+            mask_identity=mask_identity,
+            flatten_records=flatten_records,
+        )
+    if axis is None:
+        return pw_reduction_with_agg_to_scalar(
+            ak.max,
+            ak.max,
+            array,
+            axis=1,
+            agg_kwargs={"axis": None},
+        )
+    else:
+        raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
 
 
+@borrow_docstring(ak.mean)
 def mean(
-    x, weight=None, axis=None, keepdims=False, mask_identity=True, flatten_records=False
+    array,
+    weight=None,
+    axis=None,
+    keepdims=False,
+    mask_identity=True,
+    flatten_records=False,
 ):
-    NotImplementedError("TODO")
+    if axis and axis >= 1:
+        return map_partitions(
+            ak.mean,
+            array,
+            axis=axis,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+            flatten_records=flatten_records,
+        )
+    raise DaskAwkwardNotImplemented("TODO")
 
 
+@borrow_docstring(ak.min)
 def min(
     array,
     axis=None,
@@ -184,17 +267,29 @@ def min(
     mask_identity=True,
     flatten_records=False,
 ):
-    return _min_or_max(
-        ak.min,
-        array,
-        axis,
-        keepdims=keepdims,
-        initial=initial,
-        mask_identity=mask_identity,
-        flatten_records=flatten_records,
-    )
+    if axis and axis >= 1:
+        return map_partitions(
+            ak.min,
+            array,
+            axis=axis,
+            keepdims=keepdims,
+            initial=initial,
+            mask_identity=mask_identity,
+            flatten_records=flatten_records,
+        )
+    if axis is None:
+        return pw_reduction_with_agg_to_scalar(
+            ak.min,
+            ak.min,
+            array,
+            axis=1,
+            agg_kwargs={"axis": None},
+        )
+    else:
+        raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
 
 
+@borrow_docstring(ak.moment)
 def moment(
     x,
     n,
@@ -204,21 +299,25 @@ def moment(
     mask_identity=True,
     flatten_records=False,
 ):
-    NotImplementedError("TODO")
+    raise DaskAwkwardNotImplemented("TODO")
 
 
+@borrow_docstring(ak.prod)
 def prod(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
-    NotImplementedError("TODO")
+    raise DaskAwkwardNotImplemented("TODO")
 
 
+@borrow_docstring(ak.ptp)
 def ptp(arr, axis=None, keepdims=False, mask_identity=True, flatten_records=False):
-    NotImplementedError("TODO")
+    raise DaskAwkwardNotImplemented("TODO")
 
 
+@borrow_docstring(ak.softmax)
 def softmax(x, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
-    NotImplementedError("TODO")
+    raise DaskAwkwardNotImplemented("TODO")
 
 
+@borrow_docstring(ak.std)
 def std(
     x,
     weight=None,
@@ -228,24 +327,47 @@ def std(
     mask_identity=True,
     flatten_records=False,
 ):
-    NotImplementedError("TODO")
+    if weight is not None:
+        raise DaskAwkwardNotImplemented("dak.std with weights is not supported yet.")
+
+    if axis == 1:
+        return map_partitions(
+            ak.std,
+            x,
+            weight=weight,
+            ddof=ddof,
+            axis=axis,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+            flatten_records=flatten_records,
+        )
+    raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
 
 
+@borrow_docstring(ak.sum)
 def sum(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
     if axis is not None and axis < 0:
         axis = array.ndim + axis + 1
     if axis == 1:
-        return _sum_trivial(
-            array, keepdims=False, mask_identity=False, flatten_records=False
+        return map_partitions(
+            ak.sum,
+            array,
+            axis=axis,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+            flatten_records=flatten_records,
         )
     elif axis is None:
-        return pw_reduction_with_agg_to_scalar(array, ak.sum, ak.sum)
+        return pw_reduction_with_agg_to_scalar(ak.sum, ak.sum, array)
     elif axis == 0:
-        raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
+        raise DaskAwkwardNotImplemented(
+            f"axis={axis} is not supported for this array yet."
+        )
     else:
         raise ValueError("axis must be none or an integer")
 
 
+@borrow_docstring(ak.var)
 def var(
     x,
     weight=None,
@@ -255,26 +377,4 @@ def var(
     mask_identity=True,
     flatten_records=False,
 ):
-    NotImplementedError("TODO")
-
-
-def _min_or_max(
-    f: Callable,
-    array: Array,
-    axis: int | None = None,
-    **kwargs: Any,
-) -> LazyResult:
-    # translate negative axis (array.ndim currently raises)
-    if axis is not None and axis < 0 and array.ndim is not None:
-        axis = array.ndim + axis + 1
-    # get the correct trivial callable
-    tf = _min_trivial if f == ak.min else _max_trivial
-    # generate collection based on axis
-    if axis == 1:
-        return tf(array, axis=axis, **kwargs)
-    elif axis is None:
-        return pw_reduction_with_agg_to_scalar(array, f, f, **kwargs)
-    elif array.ndim is not None and (axis == 0 or axis == -1 * array.ndim):
-        raise NotImplementedError(f"axis={axis} is not supported for this array yet.")
-    else:
-        raise ValueError("axis must be None or an integer.")
+    raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")

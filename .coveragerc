@@ -1,7 +1,6 @@
 [run]
 omit =
      src/dask_awkward/tests/test_*.py
-     src/dask_awkward/tests/helpers.py
      src/dask_awkward/tests/__init__.py
      src/dask_awkward/_version.py
 source =
@@ -13,3 +12,5 @@ exclude_lines =
     if TYPE_CHECKING:
     except ImportError:
     NotImplementedError
+    DaskAwkwardNotImplemented
+    _ipython_key_completions_
