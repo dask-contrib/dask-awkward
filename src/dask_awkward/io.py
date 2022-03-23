@@ -73,11 +73,16 @@ def derive_json_meta(
     sample_rows: int = 5,
     bytechunks: str | int = "16 KiB",
     force_by_lines: bool = False,
+    one_obj_per_file: bool = False,
 ) -> ak.Array:
     if compression == "infer":
         compression = infer_compression(source)
 
     bytechunks = parse_bytes(bytechunks)
+
+    if one_obj_per_file:
+        f = FromJsonSingleObjInFileWrapper(storage=storage, compression=compression)
+        return ak.Array(f(source).layout.typetracer.forget_length())
 
     # when the data is uncompressed we read `bytechunks` number of
     # bytes then split on a newline bytes, and use the first
@@ -204,7 +209,12 @@ def from_json(
         )
         if meta is None:
             meta_read_kwargs = derive_meta_kwargs or {}
-            meta = derive_json_meta(fs, urlpath[0], **meta_read_kwargs)
+            meta = derive_json_meta(
+                fs,
+                urlpath[0],
+                one_obj_per_file=one_obj_per_file,
+                **meta_read_kwargs,
+            )
 
         token = tokenize(fstoken, one_obj_per_file, compression, meta)
         name = f"from-json-{token}"
