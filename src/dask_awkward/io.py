@@ -309,7 +309,6 @@ def to_dask_array(array: Array) -> DaskArray:
 
     new = map_partitions(ak.to_numpy, array)
     graph = new.dask
-    keys = new.keys
     dtype = new._meta.dtype if new._meta is not None else None
 
     # TODO: define chunks if we can.
@@ -325,7 +324,7 @@ def to_dask_array(array: Array) -> DaskArray:
                 "only one dimensional arrays are supported."
             )
     return new_da_object(
-        new.__dask_optimize__(graph, keys),
+        graph,
         new.name,
         meta=None,
         chunks=chunks,
