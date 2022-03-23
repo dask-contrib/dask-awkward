@@ -82,8 +82,8 @@ def derive_json_meta(
     bytechunks = parse_bytes(bytechunks)
 
     if one_obj_per_file:
-        f = FromJsonSingleObjInFileWrapper(storage=storage, compression=compression)
-        return ak.Array(f(source).layout.typetracer.forget_length())
+        fn = FromJsonSingleObjInFileWrapper(storage=storage, compression=compression)
+        return ak.Array(fn(source).layout.typetracer.forget_length())
 
     # when the data is uncompressed we read `bytechunks` number of
     # bytes then split on a newline bytes, and use the first

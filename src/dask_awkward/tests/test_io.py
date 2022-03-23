@@ -57,3 +57,17 @@ def test_json_delim_defined(line_delim_records_file: str) -> None:
         daa["analysis"][["x1", "z2"]],
         caa["analysis"][["x1", "z2"]],
     )
+
+
+def test_to_and_from_dask_array(line_delim_records_file) -> None:
+    from dask.array.utils import assert_eq as da_assert_eq
+
+    daa = dak.from_json(line_delim_records_file)
+
+    computed = ak.flatten(daa.analysis.x1.compute())
+    x1 = dak.flatten(daa.analysis.x1)
+    daskarr = dak.to_dask_array(x1)
+    da_assert_eq(daskarr, computed.to_numpy())
+
+    back_to_dak = dak.from_dask_array(daskarr)
+    assert_eq(back_to_dak, computed)
