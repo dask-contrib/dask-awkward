@@ -162,6 +162,7 @@ def flatten(array, axis: int | None = 1, highlevel: bool = True, behavior=None):
     return map_partitions(
         ak.flatten,
         array,
+        constant_divisions=False,
         axis=axis,
         highlevel=highlevel,
         behavior=behavior,
@@ -240,7 +241,12 @@ def num(
 ) -> Any:
     if axis and axis >= 1:
         return map_partitions(
-            ak.num, array, axis=axis, highlevel=highlevel, behavior=behavior
+            ak.num,
+            array,
+            constant_divisions=False,
+            axis=axis,
+            highlevel=highlevel,
+            behavior=behavior,
         )
     if axis == 0:
         if array.known_divisions:

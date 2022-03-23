@@ -3,6 +3,7 @@ from __future__ import annotations
 import awkward._v2 as ak
 import fsspec
 import pytest
+from dask.array.utils import assert_eq as da_assert_eq
 
 try:
     import ujson as json
@@ -60,10 +61,7 @@ def test_json_delim_defined(line_delim_records_file: str) -> None:
 
 
 def test_to_and_from_dask_array(line_delim_records_file) -> None:
-    from dask.array.utils import assert_eq as da_assert_eq
-
-    daa = dak.from_json(line_delim_records_file)
-
+    daa = dak.from_json([line_delim_records_file] * 3)
     computed = ak.flatten(daa.analysis.x1.compute())
     x1 = dak.flatten(daa.analysis.x1)
     daskarr = dak.to_dask_array(x1)
@@ -71,3 +69,12 @@ def test_to_and_from_dask_array(line_delim_records_file) -> None:
 
     back_to_dak = dak.from_dask_array(daskarr)
     assert_eq(back_to_dak, computed)
+
+
+def test_from_dask_array() -> None:
+    from dask.array.wrap import ones
+
+    darr = ones(100, chunks=25)
+    daa = dak.from_dask_array(darr)
+    assert daa.known_divisions
+    assert_eq(daa, ak.from_numpy(darr.compute()))

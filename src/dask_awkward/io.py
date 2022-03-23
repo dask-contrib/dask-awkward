@@ -311,11 +311,14 @@ def to_dask_array(array: Array) -> DaskArray:
     graph = new.dask
     keys = new.keys
     dtype = new._meta.dtype if new._meta is not None else None
-    if array.known_divisions:
-        divs = np.array(array.divisions)
-        chunks = (tuple(divs[1:] - divs[:-1]),)
-    else:
-        chunks = ((np.nan,) * array.npartitions,)
+
+    # TODO: define chunks if we can.
+    #
+    # if array.known_divisions:
+    #     divs = np.array(array.divisions)
+    #     chunks = (tuple(divs[1:] - divs[:-1]),)
+
+    chunks = ((np.nan,) * array.npartitions,)
     if new._meta is not None:
         if new._meta.ndim > 1:
             raise DaskAwkwardNotImplemented(
