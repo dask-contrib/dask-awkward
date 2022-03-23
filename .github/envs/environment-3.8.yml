@@ -10,3 +10,4 @@ dependencies:
   - pip
   - pip:
     - awkward>=1.8.0
+    - awkward-datasets
