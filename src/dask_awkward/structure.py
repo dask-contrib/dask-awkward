@@ -240,7 +240,11 @@ def num(
 ) -> Any:
     if axis and axis >= 1:
         return map_partitions(
-            ak.num, array, axis=axis, highlevel=highlevel, behavior=behavior
+            ak.num,
+            array,
+            axis=axis,
+            highlevel=highlevel,
+            behavior=behavior,
         )
     if axis == 0:
         if array.known_divisions:

@@ -362,7 +362,10 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return Array(dsk, name, self._meta, divisions=self.divisions)
 
     def __len__(self) -> int:
-        self.eager_compute_divisions()
+        if self.known_divisions:
+            pass
+        else:
+            self.eager_compute_divisions()
         return self.divisions[-1]  # type: ignore
 
     def _shorttypestr(self, max: int = 10) -> str:
@@ -1019,11 +1022,19 @@ def map_partitions(
         dependencies=deps,  # type: ignore
     )
 
+    # if constant_divisions:
+    #     return new_array_object(
+    #         hlg,
+    #         name=name,
+    #         meta=meta,
+    #         divisions=args[0].divisions,
+    #     )
+
     return new_array_object(
         hlg,
         name=name,
         meta=meta,
-        divisions=args[0].divisions,
+        npartitions=args[0].npartitions,
     )
 
 
@@ -1094,10 +1105,6 @@ def calculate_known_divisions(array: Array) -> tuple[int, ...]:
         Locations (indices) of division boundaries.
 
     """
-    # if divisions are known, quick return
-    if array.known_divisions:
-        return array.divisions  # type: ignore
-
     with dask.config.set({"awkward.compute-unknown-meta": False}):
         # if more than 1 partition use cumulative sum
         if array.npartitions > 1:
