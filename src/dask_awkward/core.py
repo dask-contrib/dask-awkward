@@ -971,7 +971,6 @@ def map_partitions(
     *args: Any,
     name: str | None = None,
     meta: Any | None = None,
-    constant_divisions: bool = False,
     **kwargs: Any,
 ) -> Array:
     """Map a callable across all partitions of a collection.
@@ -1023,20 +1022,20 @@ def map_partitions(
         dependencies=deps,  # type: ignore
     )
 
-    if constant_divisions:
-        return new_array_object(
-            hlg,
-            name=name,
-            meta=meta,
-            divisions=args[0].divisions,
-        )
-    else:
-        return new_array_object(
-            hlg,
-            name=name,
-            meta=meta,
-            npartitions=args[0].npartitions,
-        )
+    # if constant_divisions:
+    #     return new_array_object(
+    #         hlg,
+    #         name=name,
+    #         meta=meta,
+    #         divisions=args[0].divisions,
+    #     )
+
+    return new_array_object(
+        hlg,
+        name=name,
+        meta=meta,
+        npartitions=args[0].npartitions,
+    )
 
 
 def pw_reduction_with_agg_to_scalar(
