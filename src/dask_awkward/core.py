@@ -542,30 +542,14 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     def _getitem_outer_boolean_lazy_array(self, where: Array | tuple[Any, ...]) -> Any:
         ba = where if isinstance(where, Array) else where[0]
-        if ba.known_divisions and self.known_divisions:
-            if ba.divisions != self.divisions:
-                raise ValueError(
-                    "The boolean array must be partitioned in the same way as this array."
-                )
-        else:
-            if ba.npartitions != self.npartitions:
-                raise ValueError(
-                    "The boolean array must be partitioned in the same way as this array."
-                )
+        if not compatible_partitions(self, ba):
+            raise IncompatiblePartitions("getitem", self, ba)
 
         new_meta: Any | None = None
         if self._meta is not None:
             if isinstance(where, tuple):
-                if not isinstance(where[0], Array):
-                    raise TypeError("Expected where[0] to be an Array collection.")
-                metad = to_meta(where)
-                new_meta = self._meta[metad]
-                rest = tuple(where[1:])
-                return self.map_partitions(
-                    operator.getitem,
-                    where[0],
-                    *rest,
-                    meta=new_meta,
+                raise DaskAwkwardNotImplemented(
+                    "tuple style input boolean selection is not supported."
                 )
             elif isinstance(where, Array):
                 new_meta = self._meta[where._meta]
