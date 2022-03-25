@@ -6,7 +6,12 @@
 dask-awkward
 ============
 
-Connecting Dask to Awkward Array.
+*Connecting Dask and Awkward Array.*
+
+.. warning::
+
+   dask-awkward is currently in alpha status: we welcome feedback but
+   please know that there is no guaranteed API stability.
 
 .. toctree::
    :maxdepth: 2

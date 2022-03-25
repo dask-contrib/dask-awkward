@@ -75,3 +75,5 @@ intersphinx_mapping = {
 }
 
 autodoc_typehints = "none"
+
+pygments_style = "default"
