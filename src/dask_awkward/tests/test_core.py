@@ -398,6 +398,8 @@ def test_scalar_persist(daa: dakc.Array) -> None:
 def test_output_divisions(daa: dakc.Array) -> None:
     assert dak.max(daa.analysis.x1, axis=1).divisions == daa.divisions
     assert dak.num(daa.analysis.x1, axis=1).divisions == (None,) * (daa.npartitions + 1)
+    assert daa["analysis"][["x1", "x2"]].divisions == daa.divisions
+    assert daa["analysis"].divisions == daa.divisions
 
 
 def test_record_npartitions(daa: dakc.Array) -> None:
