@@ -2,23 +2,23 @@ from __future__ import annotations
 
 import awkward._v2 as ak
 import dask.config
+import fsspec
 import numpy as np
 import pytest
 
+try:
+    import ujson as json
+except ImportError:
+    import json
+
 import dask_awkward as dak
 import dask_awkward.core as dakc
-from dask_awkward.testutils import (
-    _lazyjsonrecords,
-    _lazyrecord,
-    _lazyrecords,
-    assert_eq,
-    load_records_eager,
-    load_records_lazy,
-)
+from dask_awkward.testutils import assert_eq
 
 
-def test_clear_divisions() -> None:
-    daa = dak.from_awkward(_lazyrecords().compute(), npartitions=3)
+def test_clear_divisions(line_delim_records_file) -> None:
+    aa = dak.from_json(line_delim_records_file).compute()
+    daa = dak.from_awkward(aa, npartitions=3)
     assert daa.known_divisions
     daa.clear_divisions()
     assert not daa.known_divisions
@@ -27,9 +27,8 @@ def test_clear_divisions() -> None:
 
 
 def test_dunder_str(line_delim_records_file) -> None:
-    aa = load_records_eager(line_delim_records_file)
-    daa = dak.from_awkward(aa, npartitions=6)
-    assert str(daa) == "dask.awkward<from-awkward, npartitions=5>"
+    daa = dak.from_json([line_delim_records_file] * 3)
+    assert str(daa) == "dask.awkward<from-json, npartitions=3>"
 
 
 def test_calculate_known_divisions(line_delim_records_file) -> None:
@@ -68,21 +67,17 @@ def test_form(line_delim_records_file) -> None:
 @pytest.mark.xfail
 def test_form_equality(line_delim_records_file) -> None:
     # NOTE: forms come from meta which currently depends on partitioning
-    daa = dak.from_json(line_delim_records_file)
-    assert daa.form == daa.compute().layout.form
-    daa = _lazyrecords()
+    daa = dak.from_json([line_delim_records_file] * 3)
     assert daa.form == daa.compute().layout.form
 
 
-def test_from_awkward(line_delim_records_file) -> None:
-    aa = load_records_eager(line_delim_records_file)
-    daa = dak.from_awkward(aa, npartitions=4)
-    assert_eq(aa, daa)
+def test_from_awkward(caa) -> None:
+    daa = dak.from_awkward(caa, npartitions=4)
+    assert_eq(caa, daa)
     assert_eq(daa, daa)
 
 
-def test_get_typetracer() -> None:
-    daa = _lazyrecords()
+def test_get_typetracer(daa) -> None:
     assert dakc._get_typetracer(daa) is daa._meta
 
 
@@ -128,15 +123,16 @@ def test_new_array_object_raises(line_delim_records_file) -> None:
         )
 
 
-def test_partitions() -> None:
-    daa = _lazyrecords()
+def test_partitions(line_delim_records_file: str) -> None:
+    daa = dak.from_json([line_delim_records_file] * 4)
     for i in range(daa.npartitions):
         part = daa.partitions[i]
         assert part.npartitions == 1
 
 
-def test_partitions_divisions() -> None:
-    daa = _lazyrecords()
+def test_partitions_divisions(line_delim_records_file: str) -> None:
+    daa = dak.from_json([line_delim_records_file] * 3)
+    daa.eager_compute_divisions()
     divs = daa.divisions
     t1 = daa.partitions[1:3]
     assert not t1.known_divisions
@@ -145,8 +141,7 @@ def test_partitions_divisions() -> None:
     assert t2.divisions == (0, divs[2] - divs[1])  # type: ignore
 
 
-def test_raise_in_finalize() -> None:
-    daa = _lazyrecords()
+def test_raise_in_finalize(daa) -> None:
     with dask.config.set({"awkward.compute-unknown-meta": False}):
         res = daa.map_partitions(str)
     with pytest.raises(RuntimeError, match="type of first result: <class 'str'>"):
@@ -162,44 +157,36 @@ def test_rebuild(line_delim_records_file):
 
 
 def test_type(line_delim_records_file) -> None:
-    daa = _lazyrecords()
-    assert dak.type(daa) is not None
     daa = dak.from_json(line_delim_records_file)
+    assert dak.type(daa) is not None
     daa._meta = None
     assert dak.type(daa) is None
 
 
-def test_short_typestr() -> None:
-    daa = _lazyrecords()
+def test_short_typestr(daa) -> None:
     ts = daa._shorttypestr(max=12)
     assert len(ts) == 12
 
 
-def test_typestr() -> None:
-    daa = _lazyrecord()
+def test_typestr(daa) -> None:
     aa = daa.compute()
     assert str(aa.layout.form.type) in daa._typestr()
-    daa = _lazyrecords()
-    aa = daa.compute()
     extras = len("var *  ... }")
     assert len(daa._typestr(max=20)) == 20 + extras
 
 
-def test_record_collection() -> None:
-    daa = _lazyrecords()
+def test_record_collection(daa) -> None:
     assert type(daa[0]) is dakc.Record
     aa = daa.compute()
     assert_eq(daa[0], aa[0])
     # assert daa[0].compute().tolist() == aa[0].tolist()
 
 
-def test_scalar_collection() -> None:
-    daa = _lazyrecords()
+def test_scalar_collection(daa) -> None:
     assert type(daa["analysis"]["x1"][0][0]) is dakc.Scalar
 
 
-def test_is_typetracer() -> None:
-    daa = _lazyrecords()
+def test_is_typetracer(daa) -> None:
     assert not dakc.is_typetracer(daa)
     assert not dakc.is_typetracer(daa[0])
     assert not dakc.is_typetracer(daa["analysis"])
@@ -210,15 +197,13 @@ def test_is_typetracer() -> None:
     assert dakc.is_typetracer(daa["analysis"][0]["x1"][0]._meta)
 
 
-def test_meta_or_identity() -> None:
-    daa = _lazyrecords()
+def test_meta_or_identity(daa) -> None:
     assert dakc.is_typetracer(dakc.meta_or_identity(daa))
     assert dakc.meta_or_identity(daa) is daa._meta
     assert dakc.meta_or_identity(5) == 5
 
 
-def test_to_meta() -> None:
-    daa = _lazyrecords()
+def test_to_meta(daa) -> None:
     x1 = daa["analysis"]["x1"]
     x1_0 = x1[0]
     metad = dakc.to_meta([x1, 5, "ok", x1_0])
@@ -230,44 +215,38 @@ def test_to_meta() -> None:
             assert a == b
 
 
-def test_record_str() -> None:
-    daa = _lazyrecords()
+def test_record_str(daa) -> None:
     r = daa[0]
     assert str(r) == "dask.awkward<getitem, type=Record>"
 
 
-def test_record_to_delayed() -> None:
-    daa = _lazyrecords()
+def test_record_to_delayed(daa) -> None:
     r = daa[0]
     d = r.to_delayed()
     assert r.compute().tolist() == d.compute().tolist()
 
 
-def test_record_fields() -> None:
-    daa = _lazyrecords()
+def test_record_fields(daa) -> None:
     r = daa[0]
     r._meta = None
     assert r.fields is None
 
 
-def test_record_dir() -> None:
-    daa = _lazyrecords()
+def test_record_dir(daa) -> None:
     r = daa["analysis"][0]
     d = dir(r)
     for f in r.fields:
         assert f in d
 
 
-def test_array_dir() -> None:
-    daa = _lazyrecords()
+def test_array_dir(daa) -> None:
     a = daa["analysis"]
     d = dir(a)
     for f in a.fields:
         assert f in d
 
 
-def test_typetracer_function() -> None:
-    daa = _lazyrecords()
+def test_typetracer_function(daa) -> None:
     aa = daa.compute()
     assert dakc.typetracer_array(daa) is not None
     assert dakc.typetracer_array(daa) is daa._typetracer
@@ -277,8 +256,10 @@ def test_typetracer_function() -> None:
 
 
 def test_single_partition(line_delim_records_file) -> None:
-    daa = load_records_lazy(line_delim_records_file, by_file=True, n_times=1)
-    caa = load_records_eager(line_delim_records_file)
+    daa = dak.from_json(line_delim_records_file)
+    with fsspec.open(line_delim_records_file, "r") as f:
+        caa = ak.from_iter([json.loads(line) for line in f])
+
     assert daa.npartitions == 1
     assert_eq(daa, caa)
     assert_eq(caa, daa)
@@ -307,7 +288,7 @@ def test_scalar_dtype() -> None:
     assert c.dtype is None
 
 
-def test_scalar_pickle() -> None:
+def test_scalar_pickle(daa) -> None:
     import pickle
 
     s = 2
@@ -315,7 +296,6 @@ def test_scalar_pickle() -> None:
     s_dumped = pickle.dumps(c1)
     c2 = pickle.loads(s_dumped)
     assert_eq(c1, c2)
-    daa = _lazyjsonrecords()
     s1 = dak.sum(daa["analysis"]["x1"], axis=None)
     s_dumped = pickle.dumps(s1)
     s2 = pickle.loads(s_dumped)
@@ -325,17 +305,16 @@ def test_scalar_pickle() -> None:
 
 
 @pytest.mark.parametrize("optimize_graph", [True, False])
-def test_scalar_to_delayed(optimize_graph) -> None:
-    daa = _lazyjsonrecords()
+def test_scalar_to_delayed(daa, optimize_graph) -> None:
     s1 = dak.sum(daa["analysis"]["x1"], axis=None)
     d1 = s1.to_delayed(optimize_graph=optimize_graph)
     s1c = s1.compute()
     assert d1.compute() == s1c  # type: ignore
 
 
-def test_compatible_partitions() -> None:
-    daa1 = _lazyjsonrecords()
-    daa2 = _lazyrecords()
+def test_compatible_partitions(line_delim_records_file) -> None:
+    daa1 = dak.from_json([line_delim_records_file] * 5)
+    daa2 = dak.from_awkward(daa1.compute(), npartitions=4)
     assert dakc.compatible_partitions(daa1, daa1)
     assert dakc.compatible_partitions(daa1, daa1, daa1)
     assert not dakc.compatible_partitions(daa1, daa2)

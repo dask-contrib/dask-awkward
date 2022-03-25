@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-import tempfile
 from typing import Any
 
 import awkward._v2 as ak
@@ -11,10 +9,10 @@ from dask.base import is_dask_collection
 try:
     import ujson as json
 except ImportError:
-    import json  # type: ignore
+    import json
 
 from dask_awkward.core import Array, Record, typetracer_array
-from dask_awkward.io import from_awkward, from_json
+from dask_awkward.io import from_json
 
 
 def assert_eq(
@@ -114,65 +112,6 @@ def assert_eq_other(a: Any, b: Any) -> None:
     assert ares == bres
 
 
-# fmt: off
-MANY_RECORDS = \
-    """{"analysis":{"x1":[1,2,3],"y1":[2,3,4],"z1":[2,6,6],"t1":[7,8,9],"x2":[],"y2":[],"z2":[],"t2":[]}}
-{"analysis":{"x1":[1,2],"y1":[2,3],"z1":[3,4],"t1":[4,5],"x2":[2,9],"y2":[2,8],"z2":[2,7],"t2":[0,6]}}
-{"analysis":{"x1":[],"y1":[],"z1":[],"t1":[],"x2":[3,2,1],"y2":[4,3,2],"z2":[5,4,3],"t2":[6,5,4]}}
-{"analysis":{"x1":[],"y1":[],"z1":[],"t1":[],"x2":[1,2,3],"y2":[2,3,4],"z2":[2,6,6],"t2":[7,8,9]}}
-{"analysis":{"x1":[3,2,1],"y1":[4,3,2],"z1":[5,4,3],"t1":[6,5,4],"x2":[],"y2":[],"z2":[],"t2":[]}}
-{"analysis":{"x1":[],"y1":[],"z1":[],"t1":[],"x2":[1,2],"y2":[2,3],"z2":[2,6],"t2":[7,8]}}
-{"analysis":{"x1":[3,2,1,4],"y1":[4,3,2,5],"z1":[5,4,3,6],"t1":[6,5,4,7],"x2":[1,2],"y2":[3,4],"z2":[5,6],"t2":[7,8]}}
-{"analysis":{"x1":[1,2,3],"y1":[2,3,4],"z1":[2,6,6],"t1":[7,8,9],"x2":[],"y2":[],"z2":[],"t2":[]}}
-{"analysis":{"x1":[1,2],"y1":[2,3],"z1":[3,4],"t1":[4,5],"x2":[2,9],"y2":[2,8],"z2":[2,7],"t2":[0,6]}}
-{"analysis":{"x1":[],"y1":[],"z1":[],"t1":[],"x2":[3,2,1],"y2":[4,3,2],"z2":[5,4,3],"t2":[6,5,4]}}
-{"analysis":{"x1":[],"y1":[],"z1":[],"t1":[],"x2":[1,2,3],"y2":[2,3,4],"z2":[2,6,6],"t2":[7,8,9]}}
-{"analysis":{"x1":[3,2,1],"y1":[4,3,2],"z1":[5,4,3],"t1":[6,5,4],"x2":[],"y2":[],"z2":[],"t2":[]}}
-{"analysis":{"x1":[2,9],"y1":[2,8],"z1":[2,7],"t1":[0,6],"x2":[1,2],"y2":[2,3],"z2":[3,4],"t2":[4,5]}}
-{"analysis":{"x1":[],"y1":[],"z1":[],"t1":[],"x2":[3,2,1],"y2":[4,3,2],"z2":[5,4,3],"t2":[6,5,4]}}
-{"analysis":{"x1":[3,2,1],"y1":[4,3,2],"z1":[5,4,3],"t1":[6,5,4],"x2":[],"y2":[],"z2":[],"t2":[]}}
-{"analysis":{"x1":[2,9],"y1":[2,8],"z1":[2,7],"t1":[0,6],"x2":[1,2],"y2":[2,3],"z2":[3,4],"t2":[4,5]}}
-{"analysis":{"x1":[1,9,1],"y1":[1,8,2],"z1":[1,7,3],"t1":[1,6,4],"x2":[3,2,5],"y2":[3,3,6],"z2":[3,4,7],"t2":[3,5,8]}}
-{"analysis":{"x1":[],"y1":[],"z1":[],"t1":[],"x2":[1,2],"y2":[2,3],"z2":[2,6],"t2":[7,8]}}
-{"analysis":{"x1":[3,2,1,4],"y1":[4,3,2,5],"z1":[5,4,3,6],"t1":[6,5,4,7],"x2":[1,2],"y2":[3,4],"z2":[5,6],"t2":[7,8]}}
-{"analysis":{"x1":[1,2,3],"y1":[2,3,4],"z1":[2,6,6],"t1":[7,8,9],"x2":[],"y2":[],"z2":[],"t2":[]}}"""
-
-
-SINGLE_RECORD = """{"a":[1,2,3]}"""
-# fmt: on
-
-
-def records_from_temp_file(n_times: int = 1) -> ak.Array:
-    """Get a concrete Array of records from a temporary file.
-
-    Parameters
-    ----------
-    n_times : int
-        Number of times to parse the file file of records.
-
-    Returns
-    -------
-    Array
-        Resulting concrete Awkward Array.
-
-    """
-    with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
-        f.write(MANY_RECORDS)
-        name = f.name
-    x = load_records_eager(name, n_times=n_times)
-    os.remove(name)
-    return x
-
-
-def single_record_from_temp_file() -> ak.Array:
-    with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
-        f.write(SINGLE_RECORD)
-        name = f.name
-    x = load_single_record_eager(name)
-    os.remove(name)
-    return x
-
-
 def load_records_lazy(
     fn: str,
     blocksize: int | str = 700,
@@ -231,19 +170,3 @@ def load_single_record_eager(fn: str) -> ak.Array:
     with fsspec.open(fn) as f:
         d = json.load(f)
     return ak.Array([d])
-
-
-def _lazyrecords() -> Array:
-    return from_awkward(records_from_temp_file(), npartitions=5)
-
-
-def _lazyrecord() -> Array:
-    return from_awkward(single_record_from_temp_file(), npartitions=1)
-
-
-def _lazyjsonrecords() -> Array:
-    with tempfile.NamedTemporaryFile("w", delete=False) as fp:
-        name = fp.name
-        fp.write(MANY_RECORDS)
-    arr = from_json([name, name])
-    return arr
