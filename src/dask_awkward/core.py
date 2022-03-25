@@ -321,7 +321,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         self._name: str = name
         self._divisions = divisions
         if meta is None:
-            self._meta = empty_typetracer()
+            self._meta: ak.Array = empty_typetracer()
         elif not isinstance(meta, (ak.Array, TypeTracerArray)):
             raise TypeError("meta must be an instance of an Awkward Array.")
         self._meta = meta
@@ -538,7 +538,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             else:
                 m = to_meta([where])[0]
                 meta = self._meta[m]
-        return self.map_partitions(operator.getitem, where, meta=meta)
+        return self.map_partitions(
+            operator.getitem, where, meta=meta, output_divisions=1
+        )
 
     def _getitem_outer_boolean_lazy_array(self, where: Array | tuple[Any, ...]) -> Any:
         ba = where if isinstance(where, Array) else where[0]
@@ -782,7 +784,13 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         # compute new meta from inputs
         new_meta = ufunc(*inputs_meta)
 
-        return map_partitions(ufunc, *inputs, meta=new_meta, **kwargs)
+        return map_partitions(
+            ufunc,
+            *inputs,
+            meta=new_meta,
+            output_divisions=1,
+            **kwargs,
+        )
 
     def to_delayed(self, optimize_graph: bool = True) -> list[Delayed]:
         from dask_awkward.io import to_delayed
@@ -955,6 +963,7 @@ def map_partitions(
     *args: Any,
     name: str | None = None,
     meta: Any | None = None,
+    output_divisions: int | None = None,
     **kwargs: Any,
 ) -> Array:
     """Map a callable across all partitions of a collection.
@@ -972,6 +981,14 @@ def map_partitions(
         the name of the function will be used.
     meta : Any, optional
         Metadata (typetracer) information of the result (if known).
+    output_divisions : int, optional
+        If ``None`` (the default), the divisions of the output will be
+        assumed unknown. If defined, the output divisions will be
+        multiplied by a factor of `output_divisions`. A value of 1
+        means constant divisions (e.g. a string based slice). Any
+        value greater than 1 means the divisions were expanded by some
+        operation. This argument is mainly for internal library
+        function implementations.
     **kwargs : Any
         Additional keyword arguments passed to the `func`.
 
@@ -1006,20 +1023,26 @@ def map_partitions(
         dependencies=deps,  # type: ignore
     )
 
-    # if constant_divisions:
-    #     return new_array_object(
-    #         hlg,
-    #         name=name,
-    #         meta=meta,
-    #         divisions=args[0].divisions,
-    #     )
-
-    return new_array_object(
-        hlg,
-        name=name,
-        meta=meta,
-        npartitions=args[0].npartitions,
-    )
+    if output_divisions is not None:
+        if output_divisions == 1:
+            new_divisions = args[0].divisions
+        else:
+            new_divisions = tuple(
+                map(lambda x: x * output_divisions, args[0].divisions)
+            )
+        return new_array_object(
+            hlg,
+            name=name,
+            meta=meta,
+            divisions=new_divisions,
+        )
+    else:
+        return new_array_object(
+            hlg,
+            name=name,
+            meta=meta,
+            npartitions=args[0].npartitions,
+        )
 
 
 def pw_reduction_with_agg_to_scalar(

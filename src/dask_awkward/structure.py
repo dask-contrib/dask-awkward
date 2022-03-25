@@ -222,6 +222,7 @@ def nan_to_num(
     return map_partitions(
         ak.nan_to_num,
         array,
+        output_partitions=1,
         copy=copy,
         nan=nan,
         posinf=posinf,

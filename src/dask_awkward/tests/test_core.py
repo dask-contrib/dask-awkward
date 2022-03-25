@@ -393,3 +393,15 @@ def test_scalar_persist(daa: dakc.Array) -> None:
     coll = daa["analysis"]["x1"][0][0]
     coll2 = coll.persist()
     assert_eq(coll, coll2)
+
+
+def test_output_divisions(daa: dakc.Array) -> None:
+    assert dak.max(daa.analysis.x1, axis=1).divisions == daa.divisions
+    assert dak.num(daa.analysis.x1, axis=1).divisions == (None,) * (daa.npartitions + 1)
+    assert daa["analysis"][["x1", "x2"]].divisions == daa.divisions
+    assert daa["analysis"].divisions == daa.divisions
+
+
+def test_record_npartitions(daa: dakc.Array) -> None:
+    analysis0 = daa[0]
+    assert analysis0.npartitions == 1

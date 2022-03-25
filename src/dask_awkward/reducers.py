@@ -41,6 +41,7 @@ def all(array, axis=None, keepdims=False, mask_identity=False, flatten_records=F
         return map_partitions(
             ak.all,
             array,
+            output_divisions=1,
             axis=axis,
             keepdims=keepdims,
             mask_identity=mask_identity,
@@ -55,6 +56,7 @@ def any(array, axis=None, keepdims=False, mask_identity=False, flatten_records=F
         return map_partitions(
             ak.any,
             array,
+            output_divisions=1,
             axis=axis,
             keepdims=keepdims,
             mask_identity=mask_identity,
@@ -69,6 +71,7 @@ def argmax(array, axis=None, keepdims=False, mask_identity=True, flatten_records
         return map_partitions(
             ak.argmax,
             array,
+            output_divisions=1,
             axis=axis,
             keepdims=keepdims,
             mask_identity=mask_identity,
@@ -83,6 +86,7 @@ def argmin(array, axis=None, keepdims=False, mask_identity=True, flatten_records
         return map_partitions(
             ak.argmin,
             array,
+            output_divisions=1,
             axis=axis,
             keepdims=keepdims,
             mask_identity=mask_identity,
@@ -112,6 +116,7 @@ def count(array, axis=None, keepdims=False, mask_identity=False, flatten_records
         return map_partitions(
             ak.count,
             array,
+            output_divisions=1,
             axis=axis,
             keepdims=keepdims,
             mask_identity=mask_identity,
@@ -148,6 +153,7 @@ def count_nonzero(
         return map_partitions(
             ak.count_nonzero,
             array,
+            output_divisions=1,
             axis=1,
             keepdims=keepdims,
             mask_identity=mask_identity,
@@ -219,6 +225,7 @@ def max(
         return map_partitions(
             ak.max,
             array,
+            output_divisions=1,
             axis=axis,
             keepdims=keepdims,
             initial=initial,
@@ -250,6 +257,7 @@ def mean(
         return map_partitions(
             ak.mean,
             array,
+            output_divisions=1,
             axis=axis,
             keepdims=keepdims,
             mask_identity=mask_identity,
@@ -271,6 +279,7 @@ def min(
         return map_partitions(
             ak.min,
             array,
+            output_divisions=1,
             axis=axis,
             keepdims=keepdims,
             initial=initial,
@@ -334,6 +343,7 @@ def std(
         return map_partitions(
             ak.std,
             x,
+            output_divisions=1,
             weight=weight,
             ddof=ddof,
             axis=axis,
@@ -352,6 +362,7 @@ def sum(array, axis=None, keepdims=False, mask_identity=False, flatten_records=F
         return map_partitions(
             ak.sum,
             array,
+            output_divisions=1,
             axis=axis,
             keepdims=keepdims,
             mask_identity=mask_identity,
