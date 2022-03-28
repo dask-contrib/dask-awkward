@@ -43,5 +43,8 @@ with the same programming style; on the left we operate eagerly with
    dask-awkward depends on the in-development version 2 of awkward;
    which exists in the ``awkward._v2`` namespace.
 
+For example usage of dask-awkward, `we have a demo repository
+<https://github.com/douglasdavis/dask-awkward-demo>`__.
+
 .. _Awkward-Array: https://awkward-array.org/
 .. _Dask: https://dask.org/
