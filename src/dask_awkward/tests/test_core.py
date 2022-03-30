@@ -9,7 +9,7 @@ import pytest
 try:
     import ujson as json
 except ImportError:
-    import json
+    import json  # type: ignore
 
 import dask_awkward as dak
 import dask_awkward.core as dakc

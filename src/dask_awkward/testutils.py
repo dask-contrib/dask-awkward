@@ -9,7 +9,7 @@ from dask.base import is_dask_collection
 try:
     import ujson as json
 except ImportError:
-    import json
+    import json  # type: ignore
 
 from dask_awkward.core import Array, Record, typetracer_array
 from dask_awkward.io import from_json
