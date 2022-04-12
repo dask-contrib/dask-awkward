@@ -164,8 +164,19 @@ class Scalar(DaskMethodsMixin):
             pass
         return None
 
+    @property
+    def npartitions(self) -> int:
+        """Scalar and Records are unpartitioned by definition."""
+        return 1
+
+    @property
+    def divisions(self) -> tuple[None, None]:
+        """Scalar and Records do not have divisions by definition."""
+        return (None, None)
+
     @staticmethod
     def from_known(s: Any, dtype: DTypeLike | None = None) -> Scalar:
+        """Create a scalar from a known value."""
         return new_known_scalar(s, dtype=dtype)
 
     def __repr__(self) -> str:  # pragma: no cover
@@ -221,11 +232,6 @@ class Record(Scalar):
         if m is not None and not isinstance(m, ak.Record):
             raise TypeError(f"meta must be a Record typetracer object, not a {type(m)}")
         return m
-
-    @property
-    def npartitions(self):
-        """Records are unpartitioned by definition."""
-        return 1
 
     def __getitem__(self, key: str) -> Any:
         token = tokenize(self, key)
@@ -388,6 +394,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return self.__str__()
 
     def reset_meta(self) -> None:
+        """Assign an empty typetracer array as the collection metadata."""
         self._meta = empty_typetracer()
 
     # def _ipython_display_(self) -> None:
@@ -421,30 +428,37 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     @property
     def dask(self) -> HighLevelGraph:
+        """High level task graph associated with the collection."""
         return self._dask
 
     @property
     def keys(self) -> list[tuple[str, int]]:
+        """Task graph keys."""
         return self.__dask_keys__()
 
     @property
     def name(self) -> str:
+        """Name of the collection."""
         return self._name
 
     @property
     def ndim(self) -> int | None:
+        """Number of dimensions."""
         return ndim(self)
 
     @property
     def divisions(self) -> tuple[int | None, ...]:
+        """Location of the collections partition boundaries."""
         return self._divisions
 
     @property
     def known_divisions(self) -> bool:
+        """True of the divisions are known (absence of ``None`` in the tuple)."""
         return len(self.divisions) > 0 and None not in self.divisions
 
     @property
     def npartitions(self) -> int:
+        """Total number of partitions."""
         return len(self.divisions) - 1
 
     @property
@@ -459,6 +473,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     @property
     def fields(self) -> list[str]:
+        """Record field names (if any)."""
         return ak.fields(self._meta)
 
     @property
@@ -467,6 +482,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     @cached_property
     def keys_array(self) -> np.ndarray:
+        """NumPy array of task graph keys."""
         return np.array(self.__dask_keys__(), dtype=object)
 
     def _partitions(self, index: Any) -> Array:
@@ -755,6 +771,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return map_partitions(func, self, *args, **kwargs)
 
     def eager_compute_divisions(self) -> None:
+        """Force a comute of the divisions."""
         self._divisions = calculate_known_divisions(self)
 
     def clear_divisions(self) -> None:
@@ -793,6 +810,27 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         )
 
     def to_delayed(self, optimize_graph: bool = True) -> list[Delayed]:
+        """Convert the collection to a list of delayed objects.
+
+        One dask.delayed.Delayed object per partition.
+
+        Parameters
+        ----------
+        optimize_graph : bool
+            If True the task graph associated with the collection will
+            be optimized before conversion to the list of Delayed
+            objects.
+
+        See Also
+        --------
+        dask_awkward.to_delayed
+
+        Returns
+        -------
+        list[Delayed]
+            List of delayed objects (one per partition).
+
+        """
         from dask_awkward.io import to_delayed
 
         return to_delayed(self, optimize_graph=optimize_graph)

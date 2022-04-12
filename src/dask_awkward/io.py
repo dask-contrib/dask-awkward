@@ -292,6 +292,23 @@ def from_awkward(source: ak.Array, npartitions: int, name: str | None = None) ->
 
 
 def to_delayed(array: Array, optimize_graph: bool = True) -> list[Delayed]:
+    """Convert the collection to a list of delayed objects.
+
+    One dask.delayed.Delayed object per partition.
+
+    Parameters
+    ----------
+    optimize_graph : bool
+        If True the task graph associated with the collection will
+        be optimized before conversion to the list of Delayed
+        objects.
+
+    Returns
+    -------
+    list[Delayed]
+        List of delayed objects (one per partition).
+
+    """
     from dask.delayed import Delayed
 
     keys = array.__dask_keys__()
