@@ -1,4 +1,4 @@
-name: CodeCov
+name: Coverage
 
 on:
   push:
@@ -17,7 +17,7 @@ jobs:
       PYTHON: "3.9"
     steps:
     - name: Checkout
-      uses: checkout@v2
+      uses: actions/checkout@v2
     - name: Setup Python
       uses: actions/setup-python@v2
       with:
