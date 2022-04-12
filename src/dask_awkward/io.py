@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import warnings
 from math import ceil
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, Mapping
 
 try:
     import ujson as json
@@ -42,6 +42,9 @@ class FromJsonWrapper:
     def __init__(self, *, storage: AbstractFileSystem, compression: str | None = None):
         self.compression = compression
         self.storage = storage
+
+    def __call__(self, source: str) -> ak.Array:
+        raise NotImplementedError("Must be implemented by child class.")
 
 
 class FromJsonLineDelimitedWrapper(FromJsonWrapper):
@@ -234,7 +237,7 @@ def from_json(
 
         deps: set[Any] | list[Any] = set()
         n = len(urlpath)
-        dsk = AwkwardIOLayer(
+        dsk: Mapping = AwkwardIOLayer(
             name,
             urlpath,
             f,
