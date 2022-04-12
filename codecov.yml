@@ -13,5 +13,3 @@ coverage:
         threshold: 1%
     patch: no
     changes: no
-
-comment: off
