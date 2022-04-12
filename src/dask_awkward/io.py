@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import warnings
 from math import ceil
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 try:
     import ujson as json
@@ -14,6 +14,7 @@ import awkward._v2 as ak
 import fsspec
 import numpy as np
 from dask.base import tokenize
+from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
 from dask.bytes.core import read_bytes
 from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
@@ -231,11 +232,13 @@ def from_json(
         else:
             f = FromJsonLineDelimitedWrapper(storage=fs, compression=compression)
 
-        dsk: dict[tuple[str, int], tuple[Any, ...]] = {
-            (name, i): (f, s) for i, s in enumerate(urlpath)
-        }
         deps: set[Any] | list[Any] = set()
-        n = len(dsk)
+        n = len(urlpath)
+        dsk = AwkwardIOLayer(
+            name,
+            urlpath,
+            f,
+        )
 
     # if a `delimiter` and `blocksize` are defined we use Dask's
     # `read_bytes` function to get delayed chunks of bytes.
@@ -438,3 +441,38 @@ def from_dask_array(array: DaskArray) -> Array:
     else:
         divs = (0, *np.cumsum(array.chunks))
         return new_array_object(hlg, name, divisions=divs, meta=meta)
+
+
+class AwkwardIOLayer(Blockwise):
+    def __init__(
+        self,
+        name: str,
+        inputs: Any,
+        io_func: Callable,
+        label: str | None = None,
+        produces_tasks: bool = False,
+        creation_info: dict | None = None,
+        annotations: dict | None = None,
+    ):
+        self.name = name
+        self.inputs = inputs
+        self.io_func = io_func
+        self.label = label
+        self.produces_tasks = produces_tasks
+        self.annotations = annotations
+        self.creation_info = creation_info
+
+        io_arg_map = BlockwiseDepDict(
+            {(i,): inp for i, inp in enumerate(self.inputs)},
+            produces_tasks=self.produces_tasks,
+        )
+
+        dsk = {self.name: (io_func, blockwise_token(0))}
+        super().__init__(
+            output=self.name,
+            output_indices="i",
+            dsk=dsk,
+            indices=[(io_arg_map, "i")],
+            numblocks={},
+            annotations=annotations,
+        )
