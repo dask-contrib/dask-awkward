@@ -18,7 +18,7 @@ from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
 from dask.bytes.core import read_bytes
 from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
-from dask.utils import parse_bytes
+from dask.utils import funcname, parse_bytes
 from fsspec.utils import infer_compression
 
 from dask_awkward.core import (
@@ -235,13 +235,7 @@ def from_json(
         else:
             f = FromJsonLineDelimitedWrapper(storage=fs, compression=compression)
 
-        deps: set[Any] | list[Any] = set()
-        n = len(urlpath)
-        dsk: Mapping = AwkwardIOLayer(
-            name,
-            urlpath,
-            f,
-        )
+        return from_map(f, urlpath, label="from-json", meta=meta)
 
     # if a `delimiter` and `blocksize` are defined we use Dask's
     # `read_bytes` function to get delayed chunks of bytes.
@@ -466,7 +460,7 @@ class AwkwardIOLayer(Blockwise):
         self.creation_info = creation_info
 
         io_arg_map = BlockwiseDepDict(
-            {(i,): inp for i, inp in enumerate(self.inputs)},
+            mapping={(i,): inp for i, inp in enumerate(self.inputs)},
             produces_tasks=self.produces_tasks,
         )
 
@@ -479,3 +473,38 @@ class AwkwardIOLayer(Blockwise):
             numblocks={},
             annotations=annotations,
         )
+
+
+def from_map(
+    func: Callable,
+    inputs: list[str],
+    label: str | None = None,
+    token: str | None = None,
+    divisions: tuple[int, ...] | None = None,
+    meta: ak.Array | None = None,
+    **kwargs: Any,
+) -> Array:
+
+    # Define collection name
+    label = label or funcname(func)
+    token = token or tokenize(func, inputs, meta, **kwargs)
+    name = f"{label}-{token}"
+
+    # Check for `produces_tasks` and `creation_info`
+    produces_tasks = kwargs.pop("produces_tasks", False)
+    creation_info = kwargs.pop("creation_info", None)
+
+    deps: set[Any] | list[Any] = set()
+    dsk: Mapping = AwkwardIOLayer(
+        name,
+        inputs,
+        func,
+        produces_tasks=produces_tasks,
+        creation_info=creation_info,
+    )
+
+    hlg = HighLevelGraph.from_collections(name, dsk, dependencies=deps)
+    if divisions is not None:
+        return new_array_object(hlg, name, meta=meta, divisions=divisions)
+    else:
+        return new_array_object(hlg, name, meta=meta, npartitions=len(inputs))
