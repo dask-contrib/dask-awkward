@@ -368,9 +368,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return Array(dsk, name, self._meta, divisions=self.divisions)
 
     def __len__(self) -> int:
-        if self.known_divisions:
-            pass
-        else:
+        if not self.known_divisions:
             self.eager_compute_divisions()
         return self.divisions[-1]  # type: ignore
 
