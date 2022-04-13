@@ -384,3 +384,12 @@ def test_output_divisions(daa: dakc.Array) -> None:
 def test_record_npartitions(daa: dakc.Array) -> None:
     analysis0 = daa[0]
     assert analysis0.npartitions == 1
+
+
+def test_iter(daa: dakc.Array) -> None:
+    with pytest.raises(
+        NotImplementedError,
+        match="Iteration over a Dask Awkward collection is not supported",
+    ):
+        for a in daa:
+            pass

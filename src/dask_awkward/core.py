@@ -392,8 +392,11 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return self.__str__()
 
     def __iter__(self):
-        for i in range(len(self)):
-            yield self[i]
+        raise NotImplementedError(
+            "Iteration over a Dask Awkward collection is not supported.\n"
+            "A suggested alternative: define a function which iterates over\n"
+            "an awkward array and use that function with map_partitions."
+        )
 
     def reset_meta(self) -> None:
         """Assign an empty typetracer array as the collection metadata."""
