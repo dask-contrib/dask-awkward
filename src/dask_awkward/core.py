@@ -393,6 +393,10 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     def __repr__(self) -> str:  # pragma: no cover
         return self.__str__()
 
+    def __iter__(self):
+        for i in range(len(self)):
+            yield self[i]
+
     def reset_meta(self) -> None:
         """Assign an empty typetracer array as the collection metadata."""
         self._meta = empty_typetracer()
@@ -590,7 +594,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return self._getitem_trivial_map_partitions(where, meta=new_meta)
 
     def _getitem_outer_int(self, where: int | tuple[Any, ...]) -> Any:
-        self._divisions = calculate_known_divisions(self)
+        if not self.known_divisions:
+            self.eager_compute_divisions()
 
         new_meta: Any | None = None
         # multiple objects passed to getitem. collections passed in
@@ -1157,7 +1162,7 @@ def calculate_known_divisions(array: Array) -> tuple[int, ...]:
             cs = list(np.cumsum(nums))
             return tuple([0, *cs])
 
-        # if only 1 partition just get it's length
+        # if only 1 partition just get its length.
         return (0, array.map_partitions(len).compute())
 
 
