@@ -368,9 +368,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return Array(dsk, name, self._meta, divisions=self.divisions)
 
     def __len__(self) -> int:
-        if self.known_divisions:
-            pass
-        else:
+        if not self.known_divisions:
             self.eager_compute_divisions()
         return self.divisions[-1]  # type: ignore
 
@@ -392,6 +390,13 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     def __repr__(self) -> str:  # pragma: no cover
         return self.__str__()
+
+    def __iter__(self):
+        raise NotImplementedError(
+            "Iteration over a Dask Awkward collection is not supported.\n"
+            "A suggested alternative: define a function which iterates over\n"
+            "an awkward array and use that function with map_partitions."
+        )
 
     def reset_meta(self) -> None:
         """Assign an empty typetracer array as the collection metadata."""
@@ -590,7 +595,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return self._getitem_trivial_map_partitions(where, meta=new_meta)
 
     def _getitem_outer_int(self, where: int | tuple[Any, ...]) -> Any:
-        self._divisions = calculate_known_divisions(self)
+        if not self.known_divisions:
+            self.eager_compute_divisions()
 
         new_meta: Any | None = None
         # multiple objects passed to getitem. collections passed in
@@ -1157,7 +1163,7 @@ def calculate_known_divisions(array: Array) -> tuple[int, ...]:
             cs = list(np.cumsum(nums))
             return tuple([0, *cs])
 
-        # if only 1 partition just get it's length
+        # if only 1 partition just get its length.
         return (0, array.map_partitions(len).compute())
 
 
