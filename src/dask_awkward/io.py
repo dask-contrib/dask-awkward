@@ -294,7 +294,7 @@ def from_awkward(source: ak.Array, npartitions: int, name: str | None = None) ->
 def from_delayed(
     arrays: list[Delayed] | Delayed,
     meta: ak.Array | None = None,
-    divisions: tuple[int, ...] | None = None,
+    divisions: tuple[int | None, ...] | None = None,
     prefix: str = "from-delayed",
 ) -> Array:
     """Create a Dask Awkward Array from Dask Delayed objects.
@@ -326,7 +326,7 @@ def from_delayed(
     name = f"{prefix}-{tokenize(arrays)}"
     dsk = {(name, i): part.key for i, part in enumerate(parts)}
     if divisions is None:
-        divs = (None,) * (len(arrays) + 1)
+        divs: tuple[int | None, ...] = (None,) * (len(arrays) + 1)
     else:
         divs = tuple(divisions)
         if len(divs) != len(arrays) + 1:
