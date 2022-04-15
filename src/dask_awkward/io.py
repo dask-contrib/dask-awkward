@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import collections.abc
 import io
 import warnings
 from math import ceil
@@ -460,7 +461,7 @@ class AwkwardIOLayer(Blockwise):
         self.creation_info = creation_info
 
         io_arg_map = BlockwiseDepDict(
-            mapping={(i,): inp for i, inp in enumerate(self.inputs)},
+            mapping=LazyFilesDict(self.inputs),
             produces_tasks=self.produces_tasks,
         )
 
@@ -469,7 +470,7 @@ class AwkwardIOLayer(Blockwise):
             output=self.name,
             output_indices="i",
             dsk=dsk,
-            indices=[(io_arg_map, "i")],
+            indices=((io_arg_map, "i"),),
             numblocks={},
             annotations=annotations,
         )
@@ -508,3 +509,27 @@ def from_map(
         return new_array_object(hlg, name, meta=meta, divisions=divisions)
     else:
         return new_array_object(hlg, name, meta=meta, npartitions=len(inputs))
+
+
+class LazyFilesDict(collections.abc.Mapping):
+    def __init__(self, inputs, **kwargs):
+        self.inputs = inputs
+        self.kwargs = kwargs
+
+    def __len__(self):
+        return len(self.inputs)
+
+    def __iter__(self):
+        return (self[k] for k in self.keys())
+
+    def __getitem__(self, i):
+        return self.inputs[i[0]]
+
+    def __contains__(self, k):
+        if isinstance(k, tuple):
+            if isinstance(k[0], int):
+                return k[0] >= 0 and k[0] < len(self)
+        return False
+
+    def keys(self) -> list[tuple[int]]:
+        return ((i,) for i in range(len(self.inputs)))
