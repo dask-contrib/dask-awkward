@@ -291,6 +291,50 @@ def from_awkward(source: ak.Array, npartitions: int, name: str | None = None) ->
     )
 
 
+def from_delayed(
+    arrays: list[Delayed] | Delayed,
+    meta: ak.Array | None = None,
+    divisions: tuple[int, ...] | None = None,
+    prefix: str = "from-delayed",
+) -> Array:
+    """Create a Dask Awkward Array from Dask Delayed objects.
+
+    Parameters
+    ----------
+    arrays : list[Delayed] | Delayed
+        Iterable of ``dask.delayed.Delayed`` objects (or a single
+        object). Each Delayed object represents a single partition in
+        the resulting awkward array.
+    meta : ak.Array, optional
+        Metadata (typetracer array) if known, if ``None`` the first
+        partition (first element of the list of ``Delayed`` objects)
+        will be computed to determine the metadata.
+    divisions : tuple[int, ...], optional
+        Partition boundaries (if known).
+    prefix : str
+        Prefix for the keys in the task graph.
+
+    Returns
+    -------
+    Array
+        Resulting Array collection.
+
+    """
+    from dask.delayed import Delayed
+
+    parts = [arrays] if isinstance(arrays, Delayed) else arrays
+    name = f"{prefix}-{tokenize(arrays)}"
+    dsk = {(name, i): part.key for i, part in enumerate(parts)}
+    if divisions is None:
+        divs = (None,) * (len(arrays) + 1)
+    else:
+        divs = tuple(divisions)
+        if len(divs) != len(arrays) + 1:
+            raise ValueError("divisions must be a tuple of length len(arrays) + 1")
+    hlg = HighLevelGraph.from_collections(name, dsk, dependencies=arrays)
+    return new_array_object(hlg, name=name, meta=meta, divisions=divs)
+
+
 def to_delayed(array: Array, optimize_graph: bool = True) -> list[Delayed]:
     """Convert the collection to a list of delayed objects.
 
