@@ -309,7 +309,7 @@ def from_delayed(
         Metadata (typetracer array) if known, if ``None`` the first
         partition (first element of the list of ``Delayed`` objects)
         will be computed to determine the metadata.
-    divisions : tuple[int, ...], optional
+    divisions : tuple[int | None, ...], optional
         Partition boundaries (if known).
     prefix : str
         Prefix for the keys in the task graph.
