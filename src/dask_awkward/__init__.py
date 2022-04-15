@@ -8,6 +8,7 @@ from dask_awkward.describe import fields
 from dask_awkward.io import (
     from_awkward,
     from_dask_array,
+    from_delayed,
     from_json,
     to_dask_array,
     to_delayed,
