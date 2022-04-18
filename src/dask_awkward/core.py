@@ -15,6 +15,7 @@ from awkward._v2.highlevel import _dir_pattern
 from dask.base import DaskMethodsMixin
 from dask.base import compute as dask_compute
 from dask.base import dont_optimize, is_dask_collection, tokenize
+from dask.blockwise import BlockwiseDep
 from dask.blockwise import blockwise as dask_blockwise
 from dask.context import globalmethod
 from dask.highlevelgraph import HighLevelGraph
@@ -76,6 +77,8 @@ def _finalize_array(
         return results[0]
     elif all(isinstance(r, (int, np.integer)) for r in results):
         return ak.Array(results)
+    elif all(r is None for r in results):
+        return None
     else:
         msg = (
             "Unexpected results of a computation.\n "
@@ -985,6 +988,11 @@ def partitionwise_layer(
         if isinstance(arg, Array):
             pairs.extend([arg.name, "i"])
             numblocks[arg.name] = (arg.npartitions,)
+        elif isinstance(arg, BlockwiseDep):
+            if len(arg.numblocks) == 1:
+                pairs.extend([arg, "i"])
+            elif len(arg.numblocks) == 2:
+                pairs.extend([arg, "ij"])
         elif is_dask_collection(arg):
             raise DaskAwkwardNotImplemented(
                 "Use of Array with other Dask collections is currently unsupported."

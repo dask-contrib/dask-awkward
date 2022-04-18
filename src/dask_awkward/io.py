@@ -10,11 +10,13 @@ try:
 except ImportError:
     import json  # type: ignore
 
+import awkward as ak1
 import awkward._v2 as ak
 import fsspec
 import numpy as np
+from awkward._v2.tmp_for_testing import v2_to_v1
 from dask.base import tokenize
-from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
+from dask.blockwise import BlockIndex, Blockwise, BlockwiseDepDict, blockwise_token
 from dask.bytes.core import read_bytes
 from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
@@ -27,7 +29,7 @@ from dask_awkward.core import (
     new_array_object,
     typetracer_array,
 )
-from dask_awkward.utils import LazyFilesDict
+from dask_awkward.utils import LazyFilesDict, empty_typetracer
 
 if TYPE_CHECKING:
     from dask.array.core import Array as DaskArray
@@ -509,3 +511,34 @@ def from_map(
         return new_array_object(hlg, name, meta=meta, divisions=divisions)
     else:
         return new_array_object(hlg, name, meta=meta, npartitions=len(inputs))
+
+
+class ToParquetOnBlock:
+    def __init__(self, name: str, fs: AbstractFileSystem | None) -> None:
+        parts = name.split(".")
+        self.suffix = parts[-1]
+        self.name = "".join(parts[:-1])
+        self.fs = fs
+
+    def __call__(self, array: ak.Array, block_index: tuple[int]) -> None:
+        part = block_index[0]
+        name = f"{self.name}.part{part}.{self.suffix}"
+        ak1.to_parquet(ak1.Array(v2_to_v1(array.layout)), name)
+        return None
+
+
+def to_parquet(
+    array: Array,
+    where: str,
+    compute: bool = False,
+) -> Array | None:
+    res = map_partitions(
+        ToParquetOnBlock(where, None),
+        array,
+        BlockIndex((array.npartitions,)),
+        name="to-parquet",
+        meta=empty_typetracer(),
+    )
+    if compute:
+        return res.compute()
+    return res
