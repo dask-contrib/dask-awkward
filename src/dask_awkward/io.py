@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import collections.abc
 import io
 import warnings
 from math import ceil
@@ -28,6 +27,7 @@ from dask_awkward.core import (
     new_array_object,
     typetracer_array,
 )
+from dask_awkward.utils import LazyFilesDict
 
 if TYPE_CHECKING:
     from dask.array.core import Array as DaskArray
@@ -208,7 +208,7 @@ def from_json(
     # read a single file or a list of files. The list of files are
     # expected to be line delimited (one JSON object per line)
     if delimiter is None and blocksize is None:
-        fs, fstoken, urlpath = fsspec.get_fs_token_paths(
+        fs, fstoken, urlpaths = fsspec.get_fs_token_paths(
             urlpath,
             mode="rb",
             storage_options=storage_options,
@@ -217,7 +217,7 @@ def from_json(
             meta_read_kwargs = derive_meta_kwargs or {}
             meta = derive_json_meta(
                 fs,
-                urlpath[0],
+                urlpaths[0],
                 one_obj_per_file=one_obj_per_file,
                 **meta_read_kwargs,
             )
@@ -226,7 +226,7 @@ def from_json(
         name = f"from-json-{token}"
 
         if compression == "infer":
-            compression = infer_compression(urlpath[0])
+            compression = infer_compression(urlpaths[0])
 
         if one_obj_per_file:
             f: FromJsonWrapper = FromJsonSingleObjInFileWrapper(
@@ -236,7 +236,7 @@ def from_json(
         else:
             f = FromJsonLineDelimitedWrapper(storage=fs, compression=compression)
 
-        return from_map(f, urlpath, label="from-json", meta=meta)
+        return from_map(f, urlpaths, label="from-json", meta=meta)
 
     # if a `delimiter` and `blocksize` are defined we use Dask's
     # `read_bytes` function to get delayed chunks of bytes.
@@ -461,7 +461,7 @@ class AwkwardIOLayer(Blockwise):
         self.creation_info = creation_info
 
         io_arg_map = BlockwiseDepDict(
-            mapping=LazyFilesDict(self.inputs),
+            mapping=LazyFilesDict(self.inputs),  # type: ignore
             produces_tasks=self.produces_tasks,
         )
 
@@ -509,27 +509,3 @@ def from_map(
         return new_array_object(hlg, name, meta=meta, divisions=divisions)
     else:
         return new_array_object(hlg, name, meta=meta, npartitions=len(inputs))
-
-
-class LazyFilesDict(collections.abc.Mapping):
-    def __init__(self, inputs, **kwargs):
-        self.inputs = inputs
-        self.kwargs = kwargs
-
-    def __len__(self):
-        return len(self.inputs)
-
-    def __iter__(self):
-        return (self[k] for k in self.keys())
-
-    def __getitem__(self, i):
-        return self.inputs[i[0]]
-
-    def __contains__(self, k):
-        if isinstance(k, tuple):
-            if isinstance(k[0], int):
-                return k[0] >= 0 and k[0] < len(self)
-        return False
-
-    def keys(self):
-        return ((i,) for i in range(len(self.inputs)))

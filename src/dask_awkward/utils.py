@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import collections.abc
 from typing import Any, Callable
 
 import awkward._v2 as ak
@@ -94,3 +95,27 @@ def borrow_docstring(original: Callable) -> Callable:
 def empty_typetracer() -> ak.Array:
     a = ak.Array([])
     return ak.Array(a.layout.typetracer.forget_length())
+
+
+class LazyFilesDict(collections.abc.Mapping):
+    def __init__(self, inputs: list[str], **kwargs: Any) -> None:
+        self.inputs = inputs
+        self.kwargs = kwargs
+
+    def __len__(self):
+        return len(self.inputs)
+
+    def __iter__(self):
+        return (self[k] for k in self.keys())
+
+    def __getitem__(self, i: tuple[int]) -> str:
+        return self.inputs[i[0]]
+
+    def __contains__(self, k: Any):
+        if isinstance(k, tuple):
+            if isinstance(k[0], int):
+                return k[0] >= 0 and k[0] < len(self)
+        return False
+
+    def keys(self):
+        return ((i,) for i in range(len(self.inputs)))
