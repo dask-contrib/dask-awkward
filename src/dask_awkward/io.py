@@ -29,7 +29,7 @@ from dask_awkward.core import (
     new_array_object,
     typetracer_array,
 )
-from dask_awkward.utils import LazyFilesDict, empty_typetracer
+from dask_awkward.utils import LazyFilesDict
 
 if TYPE_CHECKING:
     from dask.array.core import Array as DaskArray
@@ -537,7 +537,7 @@ def to_parquet(
         array,
         BlockIndex((array.npartitions,)),
         name="to-parquet",
-        meta=empty_typetracer(),
+        meta=array.meta,
     )
     if compute:
         return res.compute()
