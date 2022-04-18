@@ -531,5 +531,5 @@ class LazyFilesDict(collections.abc.Mapping):
                 return k[0] >= 0 and k[0] < len(self)
         return False
 
-    def keys(self) -> list[tuple[int]]:
+    def keys(self):
         return ((i,) for i in range(len(self.inputs)))
