@@ -97,8 +97,8 @@ def empty_typetracer() -> ak.Array:
     return ak.Array(a.layout.typetracer.forget_length())
 
 
-class LazyFilesDict(collections.abc.Mapping):
-    def __init__(self, inputs: list[str], **kwargs: Any) -> None:
+class LazyInputsDict(collections.abc.Mapping):
+    def __init__(self, inputs: list[Any], **kwargs: Any) -> None:
         self.inputs = inputs
         self.kwargs = kwargs
 
@@ -108,7 +108,7 @@ class LazyFilesDict(collections.abc.Mapping):
     def __iter__(self):
         return (self[k] for k in self.keys())
 
-    def __getitem__(self, i: tuple[int]) -> str:
+    def __getitem__(self, i: tuple[int]) -> Any:
         return self.inputs[i[0]]
 
     def __contains__(self, k: Any):

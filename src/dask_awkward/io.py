@@ -29,7 +29,7 @@ from dask_awkward.core import (
     new_array_object,
     typetracer_array,
 )
-from dask_awkward.utils import LazyFilesDict
+from dask_awkward.utils import LazyInputsDict
 
 if TYPE_CHECKING:
     from dask.array.core import Array as DaskArray
@@ -463,7 +463,7 @@ class AwkwardIOLayer(Blockwise):
         self.creation_info = creation_info
 
         io_arg_map = BlockwiseDepDict(
-            mapping=LazyFilesDict(self.inputs),  # type: ignore
+            mapping=LazyInputsDict(self.inputs),  # type: ignore
             produces_tasks=self.produces_tasks,
         )
 

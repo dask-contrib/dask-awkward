@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dask_awkward.utils import (
-    LazyFilesDict,
+    LazyInputsDict,
     is_empty_slice,
     normalize_single_outer_inner_index,
 )
@@ -54,7 +54,7 @@ def test_is_empty_slice() -> None:
 
 def test_lazyfilesdict() -> None:
     inputs = ["f1.json", "f2.json"]
-    lfd = LazyFilesDict(inputs)
+    lfd = LazyInputsDict(inputs)
     assert len(lfd) == 2
     assert (0,) in lfd
     assert (1,) in lfd
