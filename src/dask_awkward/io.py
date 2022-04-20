@@ -537,7 +537,7 @@ def to_parquet(
         array,
         BlockIndex((array.npartitions,)),
         name="to-parquet",
-        meta=array.meta,
+        meta=array._meta,
     )
     if compute:
         return res.compute()
