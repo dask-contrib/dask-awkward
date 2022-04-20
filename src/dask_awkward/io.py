@@ -46,7 +46,7 @@ class FromJsonWrapper:
         self.compression = compression
         self.storage = storage
 
-    def __call__(self, source: str) -> ak.Array:
+    def __call__(self, source: tuple[Any, ...]) -> ak.Array:
         raise NotImplementedError("Must be implemented by child class.")
 
 
@@ -54,8 +54,9 @@ class FromJsonLineDelimitedWrapper(FromJsonWrapper):
     def __init__(self, *, storage: AbstractFileSystem, compression: str | None = None):
         super().__init__(storage=storage, compression=compression)
 
-    def __call__(self, source: str) -> ak.Array:
-        with self.storage.open(source, mode="rt", compression=self.compression) as f:
+    def __call__(self, source: tuple[Any, ...]) -> ak.Array:
+        (f,) = source
+        with self.storage.open(f, mode="rt", compression=self.compression) as f:
             return ak.from_iter(json.loads(line) for line in f)
 
 
@@ -63,8 +64,9 @@ class FromJsonSingleObjInFileWrapper(FromJsonWrapper):
     def __init__(self, *, storage: AbstractFileSystem, compression: str | None = None):
         super().__init__(storage=storage, compression=compression)
 
-    def __call__(self, source: str) -> ak.Array:
-        with self.storage.open(source, mode="r", compression=self.compression) as f:
+    def __call__(self, source: tuple[Any, ...]) -> ak.Array:
+        (f,) = source
+        with self.storage.open(f, mode="r", compression=self.compression) as f:
             return ak.Array([json.load(f)])
 
 
@@ -90,7 +92,7 @@ def derive_json_meta(
 
     if one_obj_per_file:
         fn = FromJsonSingleObjInFileWrapper(storage=storage, compression=compression)
-        return ak.Array(fn(source).layout.typetracer.forget_length())
+        return ak.Array(fn((source,)).layout.typetracer.forget_length())
 
     # when the data is uncompressed we read `bytechunks` number of
     # bytes then split on a newline bytes, and use the first
@@ -238,7 +240,8 @@ def from_json(
         else:
             f = FromJsonLineDelimitedWrapper(storage=fs, compression=compression)
 
-        return from_map(f, urlpaths, label="from-json", meta=meta)
+        parts = [(x,) for x in urlpaths]
+        return from_map(f, parts, label="from-json", meta=meta)
 
     # if a `delimiter` and `blocksize` are defined we use Dask's
     # `read_bytes` function to get delayed chunks of bytes.
@@ -260,6 +263,16 @@ def from_json(
         }
         deps = flat_chunks
         n = len(deps)
+
+        # doesn't work because flat_chunks elements are remaining delayed objects.
+        # return from_map(
+        #     _from_json_bytes,
+        #     flat_chunks,
+        #     label="from-json",
+        #     token=token,
+        #     produces_tasks=True,
+        #     deps=flat_chunks,
+        # )
 
     else:
         raise TypeError("Incompatible combination of arguments.")  # pragma: no cover
@@ -472,7 +485,7 @@ class AwkwardIOLayer(Blockwise):
             output=self.name,
             output_indices="i",
             dsk=dsk,
-            indices=((io_arg_map, "i"),),
+            indices=[(io_arg_map, "i")],
             numblocks={},
             annotations=annotations,
         )
