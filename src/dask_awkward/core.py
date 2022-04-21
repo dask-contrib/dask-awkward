@@ -840,12 +840,12 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             List of delayed objects (one per partition).
 
         """
-        from dask_awkward.io import to_delayed
+        from dask_awkward.io.io import to_delayed
 
         return to_delayed(self, optimize_graph=optimize_graph)
 
     def to_dask_array(self) -> DaskArray:
-        from dask_awkward.io import to_dask_array
+        from dask_awkward.io.io import to_dask_array
 
         return to_dask_array(self)
 
