@@ -1,3 +1,8 @@
+# Module that serves as a testing ground for IO things.
+# It has zero promised API stability
+# It is partially tested (at best)
+# It is not included in coverage
+
 from __future__ import annotations
 
 import math
