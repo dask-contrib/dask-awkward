@@ -26,10 +26,6 @@ warn_unused_configs = true
 show_error_codes = true
 
 [[tool.mypy.overrides]]
-module = ["dask.*"]
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
 module = ["awkward.*"]
 ignore_missing_imports = true
 

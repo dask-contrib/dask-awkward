@@ -3,7 +3,7 @@ from __future__ import annotations
 try:
     import ujson as json
 except ImportError:
-    import json
+    import json  # type: ignore
 
 import awkward._v2 as ak
 import awkward_datasets as akds

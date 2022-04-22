@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from math import ceil
 from typing import TYPE_CHECKING, Any, Callable, Hashable, Mapping
 
@@ -238,7 +239,7 @@ class AwkwardIOLayer(Blockwise):
 
 def from_map(
     func: Callable,
-    inputs: list[Hashable],
+    inputs: Sequence[Hashable],
     label: str | None = None,
     token: str | None = None,
     divisions: tuple[int, ...] | None = None,
