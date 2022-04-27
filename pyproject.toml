@@ -1,18 +1,18 @@
 [build-system]
 requires = [
-    "setuptools>=42",
-    "wheel",
-    "setuptools_scm[toml]>=3.4"
+    "setuptools>=45.0",
+    "setuptools_scm[toml]>=4.2.0"
 ]
-
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
 write_to = "src/dask_awkward/_version.py"
 
 [tool.pytest.ini_options]
+minversion = "6.0"
 testpaths = ["src/dask_awkward/tests"]
 addopts = ["-v", "-ra", "--showlocals", "--strict-markers", "--strict-config"]
+log_cli_level = "DEBUG"
 
 [tool.isort]
 profile = "black"
@@ -23,6 +23,7 @@ src_paths = ["src", "tests"]
 python_version = "3.8"
 files = ["src"]
 warn_unused_configs = true
+show_error_codes = true
 
 [[tool.mypy.overrides]]
 module = ["dask.*"]
@@ -47,3 +48,4 @@ ignore_missing_imports = true
 [tool.pyright]
 include = ["src"]
 pythonVersion = "3.8"
+reportPrivateImportUsage = false

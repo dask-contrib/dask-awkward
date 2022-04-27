@@ -21,9 +21,9 @@ def optimize(
 
     # Perform Blockwise optimizations for HLG input
     dsk = optimize_blockwise(dsk, keys=keys)
-    # fuse nearby layers
-    dsk = fuse_roots(dsk, keys=keys)  # type: ignore
     # cull unncessary tasks
     dsk = dsk.cull(set(keys))  # type: ignore
+    # fuse nearby layers
+    dsk = fuse_roots(dsk, keys=keys)  # type: ignore
 
     return dsk

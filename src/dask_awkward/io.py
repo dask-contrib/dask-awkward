@@ -24,6 +24,7 @@ from dask_awkward.core import (
     DaskAwkwardNotImplemented,
     map_partitions,
     new_array_object,
+    typetracer_array,
 )
 
 if TYPE_CHECKING:
@@ -73,11 +74,16 @@ def derive_json_meta(
     sample_rows: int = 5,
     bytechunks: str | int = "16 KiB",
     force_by_lines: bool = False,
+    one_obj_per_file: bool = False,
 ) -> ak.Array:
     if compression == "infer":
         compression = infer_compression(source)
 
     bytechunks = parse_bytes(bytechunks)
+
+    if one_obj_per_file:
+        fn = FromJsonSingleObjInFileWrapper(storage=storage, compression=compression)
+        return ak.Array(fn(source).layout.typetracer.forget_length())
 
     # when the data is uncompressed we read `bytechunks` number of
     # bytes then split on a newline bytes, and use the first
@@ -204,7 +210,12 @@ def from_json(
         )
         if meta is None:
             meta_read_kwargs = derive_meta_kwargs or {}
-            meta = derive_json_meta(fs, urlpath[0], **meta_read_kwargs)
+            meta = derive_json_meta(
+                fs,
+                urlpath[0],
+                one_obj_per_file=one_obj_per_file,
+                **meta_read_kwargs,
+            )
 
         token = tokenize(fstoken, one_obj_per_file, compression, meta)
         name = f"from-json-{token}"
@@ -280,7 +291,68 @@ def from_awkward(source: ak.Array, npartitions: int, name: str | None = None) ->
     )
 
 
+def from_delayed(
+    arrays: list[Delayed] | Delayed,
+    meta: ak.Array | None = None,
+    divisions: tuple[int | None, ...] | None = None,
+    prefix: str = "from-delayed",
+) -> Array:
+    """Create a Dask Awkward Array from Dask Delayed objects.
+
+    Parameters
+    ----------
+    arrays : list[Delayed] | Delayed
+        Iterable of ``dask.delayed.Delayed`` objects (or a single
+        object). Each Delayed object represents a single partition in
+        the resulting awkward array.
+    meta : ak.Array, optional
+        Metadata (typetracer array) if known, if ``None`` the first
+        partition (first element of the list of ``Delayed`` objects)
+        will be computed to determine the metadata.
+    divisions : tuple[int | None, ...], optional
+        Partition boundaries (if known).
+    prefix : str
+        Prefix for the keys in the task graph.
+
+    Returns
+    -------
+    Array
+        Resulting Array collection.
+
+    """
+    from dask.delayed import Delayed
+
+    parts = [arrays] if isinstance(arrays, Delayed) else arrays
+    name = f"{prefix}-{tokenize(arrays)}"
+    dsk = {(name, i): part.key for i, part in enumerate(parts)}
+    if divisions is None:
+        divs: tuple[int | None, ...] = (None,) * (len(arrays) + 1)
+    else:
+        divs = tuple(divisions)
+        if len(divs) != len(arrays) + 1:
+            raise ValueError("divisions must be a tuple of length len(arrays) + 1")
+    hlg = HighLevelGraph.from_collections(name, dsk, dependencies=arrays)
+    return new_array_object(hlg, name=name, meta=meta, divisions=divs)
+
+
 def to_delayed(array: Array, optimize_graph: bool = True) -> list[Delayed]:
+    """Convert the collection to a list of delayed objects.
+
+    One dask.delayed.Delayed object per partition.
+
+    Parameters
+    ----------
+    optimize_graph : bool
+        If True the task graph associated with the collection will
+        be optimized before conversion to the list of Delayed
+        objects.
+
+    Returns
+    -------
+    list[Delayed]
+        List of delayed objects (one per partition).
+
+    """
     from dask.delayed import Delayed
 
     keys = array.__dask_keys__()
@@ -298,8 +370,14 @@ def to_dask_array(array: Array) -> DaskArray:
 
     new = map_partitions(ak.to_numpy, array)
     graph = new.dask
-    keys = new.keys
     dtype = new._meta.dtype if new._meta is not None else None
+
+    # TODO: define chunks if we can.
+    #
+    # if array.known_divisions:
+    #     divs = np.array(array.divisions)
+    #     chunks = (tuple(divs[1:] - divs[:-1]),)
+
     chunks = ((np.nan,) * array.npartitions,)
     if new._meta is not None:
         if new._meta.ndim > 1:
@@ -307,9 +385,56 @@ def to_dask_array(array: Array) -> DaskArray:
                 "only one dimensional arrays are supported."
             )
     return new_da_object(
-        new.__dask_optimize__(graph, keys),
+        graph,
         new.name,
         meta=None,
         chunks=chunks,
         dtype=dtype,
     )
+
+
+def from_dask_array(array: DaskArray) -> Array:
+    """Convert a Dask Array collection to a Dask Awkard Array collection.
+
+    Parameters
+    ----------
+    array : dask.array.Array
+        Array to convert.
+
+    Returns
+    -------
+    Array
+        The Awkward Array Dask collection.
+
+    Examples
+    --------
+    >>> import dask.array as da
+    >>> import dask_awkward as dak
+    >>> x = da.ones(1000, chunks=250)
+    >>> y = dak.from_dask_array(x)
+    >>> y
+    dask.awkward<from-dask-array, npartitions=4>
+
+    """
+
+    from dask.blockwise import blockwise as dask_blockwise
+
+    token = tokenize(array)
+    name = f"from-dask-array-{token}"
+    meta = typetracer_array(ak.from_numpy(array._meta))
+    pairs = [array.name, "i"]
+    numblocks = {array.name: array.numblocks}
+    layer = dask_blockwise(
+        ak.from_numpy,
+        name,
+        "i",
+        *pairs,
+        numblocks=numblocks,
+        concatenate=True,
+    )
+    hlg = HighLevelGraph.from_collections(name, layer, dependencies=[array])
+    if np.any(np.isnan(array.chunks)):
+        return new_array_object(hlg, name, npartitions=array.npartitions, meta=meta)
+    else:
+        divs = (0, *np.cumsum(array.chunks))
+        return new_array_object(hlg, name, divisions=divs, meta=meta)

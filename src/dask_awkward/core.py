@@ -164,8 +164,19 @@ class Scalar(DaskMethodsMixin):
             pass
         return None
 
+    @property
+    def npartitions(self) -> int:
+        """Scalar and Records are unpartitioned by definition."""
+        return 1
+
+    @property
+    def divisions(self) -> tuple[None, None]:
+        """Scalar and Records do not have divisions by definition."""
+        return (None, None)
+
     @staticmethod
     def from_known(s: Any, dtype: DTypeLike | None = None) -> Scalar:
+        """Create a scalar from a known value."""
         return new_known_scalar(s, dtype=dtype)
 
     def __repr__(self) -> str:  # pragma: no cover
@@ -221,11 +232,6 @@ class Record(Scalar):
         if m is not None and not isinstance(m, ak.Record):
             raise TypeError(f"meta must be a Record typetracer object, not a {type(m)}")
         return m
-
-    @property
-    def npartitions(self):
-        """Records are unpartitioned by definition."""
-        return 1
 
     def __getitem__(self, key: str) -> Any:
         token = tokenize(self, key)
@@ -321,7 +327,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         self._name: str = name
         self._divisions = divisions
         if meta is None:
-            self._meta = empty_typetracer()
+            self._meta: ak.Array = empty_typetracer()
         elif not isinstance(meta, (ak.Array, TypeTracerArray)):
             raise TypeError("meta must be an instance of an Awkward Array.")
         self._meta = meta
@@ -362,7 +368,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return Array(dsk, name, self._meta, divisions=self.divisions)
 
     def __len__(self) -> int:
-        self.eager_compute_divisions()
+        if not self.known_divisions:
+            self.eager_compute_divisions()
         return self.divisions[-1]  # type: ignore
 
     def _shorttypestr(self, max: int = 10) -> str:
@@ -384,7 +391,15 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     def __repr__(self) -> str:  # pragma: no cover
         return self.__str__()
 
+    def __iter__(self):
+        raise NotImplementedError(
+            "Iteration over a Dask Awkward collection is not supported.\n"
+            "A suggested alternative: define a function which iterates over\n"
+            "an awkward array and use that function with map_partitions."
+        )
+
     def reset_meta(self) -> None:
+        """Assign an empty typetracer array as the collection metadata."""
         self._meta = empty_typetracer()
 
     # def _ipython_display_(self) -> None:
@@ -418,30 +433,37 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     @property
     def dask(self) -> HighLevelGraph:
+        """High level task graph associated with the collection."""
         return self._dask
 
     @property
     def keys(self) -> list[tuple[str, int]]:
+        """Task graph keys."""
         return self.__dask_keys__()
 
     @property
     def name(self) -> str:
+        """Name of the collection."""
         return self._name
 
     @property
     def ndim(self) -> int | None:
+        """Number of dimensions."""
         return ndim(self)
 
     @property
     def divisions(self) -> tuple[int | None, ...]:
+        """Location of the collections partition boundaries."""
         return self._divisions
 
     @property
     def known_divisions(self) -> bool:
+        """True of the divisions are known (absence of ``None`` in the tuple)."""
         return len(self.divisions) > 0 and None not in self.divisions
 
     @property
     def npartitions(self) -> int:
+        """Total number of partitions."""
         return len(self.divisions) - 1
 
     @property
@@ -456,6 +478,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     @property
     def fields(self) -> list[str]:
+        """Record field names (if any)."""
         return ak.fields(self._meta)
 
     @property
@@ -464,6 +487,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     @cached_property
     def keys_array(self) -> np.ndarray:
+        """NumPy array of task graph keys."""
         return np.array(self.__dask_keys__(), dtype=object)
 
     def _partitions(self, index: Any) -> Array:
@@ -535,34 +559,20 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             else:
                 m = to_meta([where])[0]
                 meta = self._meta[m]
-        return self.map_partitions(operator.getitem, where, meta=meta)
+        return self.map_partitions(
+            operator.getitem, where, meta=meta, output_divisions=1
+        )
 
     def _getitem_outer_boolean_lazy_array(self, where: Array | tuple[Any, ...]) -> Any:
         ba = where if isinstance(where, Array) else where[0]
-        if ba.known_divisions and self.known_divisions:
-            if ba.divisions != self.divisions:
-                raise ValueError(
-                    "The boolean array must be partitioned in the same way as this array."
-                )
-        else:
-            if ba.npartitions != self.npartitions:
-                raise ValueError(
-                    "The boolean array must be partitioned in the same way as this array."
-                )
+        if not compatible_partitions(self, ba):
+            raise IncompatiblePartitions("getitem", self, ba)
 
         new_meta: Any | None = None
         if self._meta is not None:
             if isinstance(where, tuple):
-                if not isinstance(where[0], Array):
-                    raise TypeError("Expected where[0] to be an Array collection.")
-                metad = to_meta(where)
-                new_meta = self._meta[metad]
-                rest = tuple(where[1:])
-                return self.map_partitions(
-                    operator.getitem,
-                    where[0],
-                    *rest,
-                    meta=new_meta,
+                raise DaskAwkwardNotImplemented(
+                    "tuple style input boolean selection is not supported."
                 )
             elif isinstance(where, Array):
                 new_meta = self._meta[where._meta]
@@ -585,7 +595,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return self._getitem_trivial_map_partitions(where, meta=new_meta)
 
     def _getitem_outer_int(self, where: int | tuple[Any, ...]) -> Any:
-        self._divisions = calculate_known_divisions(self)
+        if not self.known_divisions:
+            self.eager_compute_divisions()
 
         new_meta: Any | None = None
         # multiple objects passed to getitem. collections passed in
@@ -766,6 +777,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return map_partitions(func, self, *args, **kwargs)
 
     def eager_compute_divisions(self) -> None:
+        """Force a comute of the divisions."""
         self._divisions = calculate_known_divisions(self)
 
     def clear_divisions(self) -> None:
@@ -795,9 +807,36 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         # compute new meta from inputs
         new_meta = ufunc(*inputs_meta)
 
-        return map_partitions(ufunc, *inputs, meta=new_meta, **kwargs)
+        return map_partitions(
+            ufunc,
+            *inputs,
+            meta=new_meta,
+            output_divisions=1,
+            **kwargs,
+        )
 
     def to_delayed(self, optimize_graph: bool = True) -> list[Delayed]:
+        """Convert the collection to a list of delayed objects.
+
+        One dask.delayed.Delayed object per partition.
+
+        Parameters
+        ----------
+        optimize_graph : bool
+            If True the task graph associated with the collection will
+            be optimized before conversion to the list of Delayed
+            objects.
+
+        See Also
+        --------
+        dask_awkward.to_delayed
+
+        Returns
+        -------
+        list[Delayed]
+            List of delayed objects (one per partition).
+
+        """
         from dask_awkward.io import to_delayed
 
         return to_delayed(self, optimize_graph=optimize_graph)
@@ -973,6 +1012,7 @@ def map_partitions(
     *args: Any,
     name: str | None = None,
     meta: Any | None = None,
+    output_divisions: int | None = None,
     **kwargs: Any,
 ) -> Array:
     """Map a callable across all partitions of a collection.
@@ -990,6 +1030,14 @@ def map_partitions(
         the name of the function will be used.
     meta : Any, optional
         Metadata (typetracer) information of the result (if known).
+    output_divisions : int, optional
+        If ``None`` (the default), the divisions of the output will be
+        assumed unknown. If defined, the output divisions will be
+        multiplied by a factor of `output_divisions`. A value of 1
+        means constant divisions (e.g. a string based slice). Any
+        value greater than 1 means the divisions were expanded by some
+        operation. This argument is mainly for internal library
+        function implementations.
     **kwargs : Any
         Additional keyword arguments passed to the `func`.
 
@@ -1024,12 +1072,26 @@ def map_partitions(
         dependencies=deps,  # type: ignore
     )
 
-    return new_array_object(
-        hlg,
-        name=name,
-        meta=meta,
-        divisions=args[0].divisions,
-    )
+    if output_divisions is not None:
+        if output_divisions == 1:
+            new_divisions = args[0].divisions
+        else:
+            new_divisions = tuple(
+                map(lambda x: x * output_divisions, args[0].divisions)
+            )
+        return new_array_object(
+            hlg,
+            name=name,
+            meta=meta,
+            divisions=new_divisions,
+        )
+    else:
+        return new_array_object(
+            hlg,
+            name=name,
+            meta=meta,
+            npartitions=args[0].npartitions,
+        )
 
 
 def pw_reduction_with_agg_to_scalar(
@@ -1099,10 +1161,6 @@ def calculate_known_divisions(array: Array) -> tuple[int, ...]:
         Locations (indices) of division boundaries.
 
     """
-    # if divisions are known, quick return
-    if array.known_divisions:
-        return array.divisions  # type: ignore
-
     with dask.config.set({"awkward.compute-unknown-meta": False}):
         # if more than 1 partition use cumulative sum
         if array.npartitions > 1:
@@ -1110,7 +1168,7 @@ def calculate_known_divisions(array: Array) -> tuple[int, ...]:
             cs = list(np.cumsum(nums))
             return tuple([0, *cs])
 
-        # if only 1 partition just get it's length
+        # if only 1 partition just get its length.
         return (0, array.map_partitions(len).compute())
 
 

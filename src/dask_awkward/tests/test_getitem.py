@@ -6,6 +6,7 @@ import pytest
 
 import dask_awkward as dak
 import dask_awkward.core as dakc
+from dask_awkward.core import DaskAwkwardNotImplemented, IncompatiblePartitions
 from dask_awkward.testutils import assert_eq
 
 
@@ -82,3 +83,21 @@ def test_boolean_array(line_delim_records_file, op) -> None:
     dx1_p = dx1[dx1s]
     cx1_p = cx1[cx1s]
     assert_eq(dx1_p, cx1_p)
+
+
+def test_tuple_boolean_array_raise(line_delim_records_file) -> None:
+    daa = dak.from_json([line_delim_records_file] * 2)
+    sel = dak.num(daa.analysis.x1, axis=1) >= 2
+    with pytest.raises(
+        DaskAwkwardNotImplemented,
+        match="tuple style input boolean selection is not supported",
+    ):
+        daa[sel, "analysis"]
+
+
+def test_bad_partition_boolean_array(line_delim_records_file) -> None:
+    daa1 = dak.from_json([line_delim_records_file] * 2)
+    daa2 = dak.from_json([line_delim_records_file] * 3)
+    sel = dak.num(daa1.analysis.x1 > 2, axis=1) >= 2
+    with pytest.raises(IncompatiblePartitions):
+        daa2[sel]

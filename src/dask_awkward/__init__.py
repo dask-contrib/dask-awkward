@@ -1,10 +1,18 @@
 from dask_awkward import config  # isort:skip; load awkward config
 
-from dask_awkward._version import version
+from dask_awkward._version import version as __version__
 from dask_awkward.core import Array, Record, Scalar
 from dask_awkward.core import _type as type
+from dask_awkward.core import map_partitions
 from dask_awkward.describe import fields
-from dask_awkward.io import from_awkward, from_json, to_dask_array, to_delayed
+from dask_awkward.io import (
+    from_awkward,
+    from_dask_array,
+    from_delayed,
+    from_json,
+    to_dask_array,
+    to_delayed,
+)
 from dask_awkward.parquet import read_parquet, to_parquet
 from dask_awkward.reducers import (
     all,
@@ -67,5 +75,3 @@ from dask_awkward.structure import (
     zeros_like,
     zip,
 )
-
-__version__ = version

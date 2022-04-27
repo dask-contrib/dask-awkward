@@ -1,44 +1,30 @@
+import awkward._v2 as ak
+import awkward_datasets as akds
 import pytest
 
-from dask_awkward.testutils import (
-    MANY_RECORDS,
-    SINGLE_RECORD,
-    load_records_eager,
-    load_records_lazy,
-)
+from dask_awkward.core import Array
+from dask_awkward.testutils import load_records_eager, load_records_lazy
 
 
 @pytest.fixture(scope="session")
-def line_delim_records_file(tmpdir_factory):
+def line_delim_records_file() -> str:
     """Fixture providing a file name pointing to line deliminted JSON records."""
-    fn = tmpdir_factory.mktemp("data").join("records.json")
-    with open(fn, "w") as f:
-        f.write(MANY_RECORDS)
-    return str(fn)
+    return str(akds.line_delimited_records())
 
 
 @pytest.fixture(scope="session")
-def single_record_file(tmpdir_factory):
+def single_record_file() -> str:
     """Fixture providing file name pointing to a single JSON record."""
-    fn = tmpdir_factory.mktemp("data").join("single-record.json")
-    with open(fn, "w") as f:
-        f.write(SINGLE_RECORD)
-    return str(fn)
+    return str(akds.single_record())
 
 
 @pytest.fixture(scope="session")
-def daa(tmpdir_factory):
+def daa() -> Array:
     """Fixture providing a Dask Awkward Array collection."""
-    fn = tmpdir_factory.mktemp("data").join("records.json")
-    with open(fn, "w") as f:
-        f.write(MANY_RECORDS)
-    return load_records_lazy(fn)
+    return load_records_lazy(str(akds.line_delimited_records()))
 
 
 @pytest.fixture(scope="session")
-def caa(tmpdir_factory):
+def caa() -> ak.Array:
     """Fixture providing a concrete Awkward Array."""
-    fn = tmpdir_factory.mktemp("data").join("records.json")
-    with open(fn, "w") as f:
-        f.write(MANY_RECORDS)
-    return load_records_eager(fn)
+    return load_records_eager(str(akds.line_delimited_records()))
