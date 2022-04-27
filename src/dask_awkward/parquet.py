@@ -13,7 +13,7 @@ from dask.base import tokenize
 from dask.highlevelgraph import HighLevelGraph, MaterializedLayer
 from fsspec.core import get_fs_token_paths
 
-from .core import Scalar, new_array_object
+from dask_awkward.core import Scalar, new_array_object
 
 
 def _parquet_schema_to_form(schema):
