@@ -5,14 +5,14 @@ from dask_awkward.core import Array, Record, Scalar
 from dask_awkward.core import _type as type
 from dask_awkward.core import map_partitions
 from dask_awkward.describe import fields
-from dask_awkward.io import (
+from dask_awkward.io.io import (
     from_awkward,
     from_dask_array,
     from_delayed,
-    from_json,
     to_dask_array,
     to_delayed,
 )
+from dask_awkward.io.json import from_json
 from dask_awkward.parquet import read_parquet, to_parquet
 from dask_awkward.reducers import (
     all,

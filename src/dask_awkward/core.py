@@ -15,6 +15,7 @@ from awkward._v2.highlevel import _dir_pattern
 from dask.base import DaskMethodsMixin
 from dask.base import compute as dask_compute
 from dask.base import dont_optimize, is_dask_collection, tokenize
+from dask.blockwise import BlockwiseDep
 from dask.blockwise import blockwise as dask_blockwise
 from dask.context import globalmethod
 from dask.highlevelgraph import HighLevelGraph
@@ -76,6 +77,8 @@ def _finalize_array(
         return results[0]
     elif all(isinstance(r, (int, np.integer)) for r in results):
         return ak.Array(results)
+    elif all(r is None for r in results):
+        return None
     else:
         msg = (
             "Unexpected results of a computation.\n "
@@ -837,12 +840,12 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             List of delayed objects (one per partition).
 
         """
-        from dask_awkward.io import to_delayed
+        from dask_awkward.io.io import to_delayed
 
         return to_delayed(self, optimize_graph=optimize_graph)
 
     def to_dask_array(self) -> DaskArray:
-        from dask_awkward.io import to_dask_array
+        from dask_awkward.io.io import to_dask_array
 
         return to_dask_array(self)
 
@@ -990,6 +993,11 @@ def partitionwise_layer(
         if isinstance(arg, Array):
             pairs.extend([arg.name, "i"])
             numblocks[arg.name] = (arg.npartitions,)
+        elif isinstance(arg, BlockwiseDep):
+            if len(arg.numblocks) == 1:
+                pairs.extend([arg, "i"])
+            elif len(arg.numblocks) == 2:
+                pairs.extend([arg, "ij"])
         elif is_dask_collection(arg):
             raise DaskAwkwardNotImplemented(
                 "Use of Array with other Dask collections is currently unsupported."
@@ -1010,7 +1018,7 @@ def partitionwise_layer(
 def map_partitions(
     func: Callable,
     *args: Any,
-    name: str | None = None,
+    label: str | None = None,
     meta: Any | None = None,
     output_divisions: int | None = None,
     **kwargs: Any,
@@ -1025,8 +1033,8 @@ def map_partitions(
         Arguments passed to the function, if arguments are
         Array collections they must be compatibly
         partitioned.
-    name : str, optional
-        Name for the Dask graph layer; if left to ``None`` (default),
+    label : str, optional
+        Label for the Dask graph layer; if left to ``None`` (default),
         the name of the function will be used.
     meta : Any, optional
         Metadata (typetracer) information of the result (if known).
@@ -1048,8 +1056,8 @@ def map_partitions(
 
     """
     token = tokenize(func, *args, **kwargs)
-    name = name or funcname(func)
-    name = f"{name}-{token}"
+    label = label or funcname(func)
+    name = f"{label}-{token}"
     lay = partitionwise_layer(func, name, *args, **kwargs)
     deps = [a for a in args if is_dask_collection(a)] + [
         v for _, v in kwargs.items() if is_dask_collection(v)
