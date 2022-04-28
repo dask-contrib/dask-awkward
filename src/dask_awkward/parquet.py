@@ -1,4 +1,5 @@
 import itertools
+import math
 import operator
 
 import awkward._v2 as ak
@@ -10,10 +11,11 @@ import pyarrow.dataset as pa_ds
 import pyarrow.parquet as pq
 from awkward._v2.operations.convert import from_arrow, from_buffers, to_arrow_table
 from dask.base import tokenize
+from dask.blockwise import BlockIndex
 from dask.highlevelgraph import HighLevelGraph, MaterializedLayer
 from fsspec.core import get_fs_token_paths
 
-from dask_awkward.core import new_array_object, new_scalar_object
+from dask_awkward.core import map_partitions, new_array_object, new_scalar_object
 
 
 def _parquet_schema_to_form(schema):
@@ -375,6 +377,38 @@ def _write_partition(
         return []
 
 
+class WritePartitionWrapper:
+    def __init__(
+        self,
+        fs,
+        path,
+        return_metadata=False,
+        compression=None,
+        head=None,
+        npartitions=None,
+    ):
+        self.fs = fs
+        self.path = path
+        self.return_metadata = return_metadata
+        self.compression = compression
+        self.head = head
+        self.zfill = (
+            math.ceil(math.log(npartitions, 10)) if npartitions is not None else 1
+        )
+
+    def __call__(self, data, block_index):
+        filename = f"part{str(block_index[0]).zfill(self.zfill)}.parquet"
+        return _write_partition(
+            data,
+            self.path,
+            self.fs,
+            filename,
+            return_metadata=self.return_metadata,
+            compression=self.compression,
+            head=self.head,
+        )
+
+
 def to_parquet(data, path, storage_options=None, write_metadata=False, compute=True):
     """Write data to parquet format
 
@@ -403,19 +437,26 @@ def to_parquet(data, path, storage_options=None, write_metadata=False, compute=T
     #  - v2 data page (for possible later fastparquet implementation)
     #  - dict encoding always off
     fs, _ = fsspec.core.url_to_fs(path, **(storage_options or {}))
-    tok = tokenize(fs, data, path)
-    name = "write-parquet-" + tok
-    dsk = {
-        (name, i): (_write_partition, k, path, fs, f"part{i}.parquet", write_metadata)
-        for i, k in enumerate(data.__dask_keys__())
-    }
+    name = f"write-parquet-{tokenize(fs, data, path)}"
+
+    map_res = map_partitions(
+        WritePartitionWrapper(fs, path=path, npartitions=data.npartitions),
+        data,
+        BlockIndex((data.npartitions,)),
+        label="to-parquet",
+        meta=data._meta,
+    )
+
+    dsk = {}
     if write_metadata:
         final_name = name + "-metadata"
-        dsk[final_name] = (_metadata_file_from_metas, fs, path) + tuple(dsk)
+        dsk[final_name] = (_metadata_file_from_metas, fs, path) + tuple(
+            map_res.__dask_keys__()
+        )
     else:
         final_name = name + "-finalize"
-        dsk[final_name] = (lambda *_: None,) + tuple(dsk)
-    graph = HighLevelGraph.from_collections(final_name, dsk, dependencies=[data])
+        dsk[final_name] = (lambda *_: None, map_res.__dask_keys__())
+    graph = HighLevelGraph.from_collections(final_name, dsk, dependencies=[map_res])
     out = new_scalar_object(graph, final_name, meta=None)
     if compute:
         out.compute()
