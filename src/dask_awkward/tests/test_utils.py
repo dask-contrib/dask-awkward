@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from dask_awkward.utils import is_empty_slice, normalize_single_outer_inner_index
+from dask_awkward.utils import (
+    LazyInputsDict,
+    is_empty_slice,
+    normalize_single_outer_inner_index,
+)
 
 
 def test_normalize_single_outer_inner_index() -> None:
@@ -46,3 +50,17 @@ def test_is_empty_slice() -> None:
     assert not is_empty_slice(slice(None, None, -1))
     assert not is_empty_slice(slice(2, None, -1))
     assert not is_empty_slice(slice(None, 5, -1))
+
+
+def test_lazyfilesdict() -> None:
+    inputs = ["f1.json", "f2.json"]
+    lfd = LazyInputsDict(inputs)
+    assert len(lfd) == 2
+    assert (0,) in lfd
+    assert (1,) in lfd
+    assert (2,) not in lfd
+    assert lfd[(0,)] == "f1.json"
+    assert lfd[(1,)] == "f2.json"
+    assert list(lfd) == inputs
+    assert not (5,) in lfd
+    assert "a" not in lfd

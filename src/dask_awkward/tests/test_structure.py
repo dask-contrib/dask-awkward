@@ -4,7 +4,7 @@ import awkward._v2 as ak
 import pytest
 
 import dask_awkward as dak
-from dask_awkward.testutils import assert_eq, load_records_eager, load_records_lazy
+from dask_awkward.testutils import assert_eq
 
 
 @pytest.mark.parametrize("axis", [None, 0, 1])
@@ -22,9 +22,9 @@ def test_flatten(caa, daa, axis) -> None:
         1,
     ],
 )
-def test_num(line_delim_records_file, axis) -> None:
-    da = load_records_lazy(line_delim_records_file)["analysis"]
-    ca = load_records_eager(line_delim_records_file)["analysis"]
+def test_num(daa, caa, axis) -> None:
+    da = daa["analysis"]
+    ca = caa["analysis"]
 
     if axis == 0:
         assert_eq(dak.num(da.x1, axis=axis), ak.num(ca.x1, axis=axis))
