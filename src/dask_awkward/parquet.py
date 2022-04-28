@@ -13,7 +13,7 @@ from dask.base import tokenize
 from dask.highlevelgraph import HighLevelGraph, MaterializedLayer
 from fsspec.core import get_fs_token_paths
 
-from dask_awkward.core import Scalar, new_array_object
+from dask_awkward.core import new_array_object, new_scalar_object
 
 
 def _parquet_schema_to_form(schema):
@@ -416,7 +416,7 @@ def to_parquet(data, path, storage_options=None, write_metadata=False, compute=T
         final_name = name + "-finalize"
         dsk[final_name] = (lambda *_: None,) + tuple(dsk)
     graph = HighLevelGraph.from_collections(final_name, dsk, dependencies=[data])
-    out = Scalar(graph, final_name, "")
+    out = new_scalar_object(graph, final_name, meta=None)
     if compute:
         out.compute()
     else:
