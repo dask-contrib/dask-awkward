@@ -1013,7 +1013,7 @@ def partitionwise_layer(
 def map_partitions(
     func: Callable,
     *args: Any,
-    name: str | None = None,
+    label: str | None = None,
     meta: Any | None = None,
     output_divisions: int | None = None,
     **kwargs: Any,
@@ -1028,8 +1028,8 @@ def map_partitions(
         Arguments passed to the function, if arguments are
         Array collections they must be compatibly
         partitioned.
-    name : str, optional
-        Name for the Dask graph layer; if left to ``None`` (default),
+    label : str, optional
+        Label for the Dask graph layer; if left to ``None`` (default),
         the name of the function will be used.
     meta : Any, optional
         Metadata (typetracer) information of the result (if known).
@@ -1051,8 +1051,8 @@ def map_partitions(
 
     """
     token = tokenize(func, *args, **kwargs)
-    name = name or funcname(func)
-    name = f"{name}-{token}"
+    label = label or funcname(func)
+    name = f"{label}-{token}"
     lay = partitionwise_layer(func, name, *args, **kwargs)
     deps = [a for a in args if is_dask_collection(a)] + [
         v for _, v in kwargs.items() if is_dask_collection(v)

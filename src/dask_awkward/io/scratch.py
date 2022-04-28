@@ -8,60 +8,19 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, Any
 
-import awkward as ak1
 import awkward._v2 as ak
 import fsspec
-from awkward._v2.tmp_for_testing import v2_to_v1
 from dask.base import tokenize
 from dask.blockwise import BlockIndex
+from dask.highlevelgraph import HighLevelGraph
 
-from dask_awkward.core import map_partitions
+from dask_awkward.core import map_partitions, new_scalar_object
 from dask_awkward.io.io import from_map
 
 if TYPE_CHECKING:
     from fsspec.spec import AbstractFileSystem
 
-    from dask_awkward.core import Array
-
-
-class ToParquetOnBlock:
-    def __init__(
-        self,
-        name: str,
-        fs: AbstractFileSystem | None,
-        npartitions: int | None = None,
-    ) -> None:
-        parts = name.split(".")
-        self.suffix = parts[-1]
-        self.name = "".join(parts[:-1])
-        self.fs = fs
-        self.zfill = (
-            math.ceil(math.log(npartitions, 10)) if npartitions is not None else 1
-        )
-
-    def __call__(self, array: ak.Array, block_index: tuple[int]) -> None:
-        part = str(block_index[0]).zfill(self.zfill)
-        name = f"{self.name}.part-{part}.{self.suffix}"
-        ak1.to_parquet(ak1.Array(v2_to_v1(array.layout)), name)
-        return None
-
-
-def to_parquet(
-    array: Array,
-    where: str,
-    compute: bool = False,
-) -> Array | None:
-    nparts = array.npartitions
-    res = map_partitions(
-        ToParquetOnBlock(where, None, npartitions=nparts),
-        array,
-        BlockIndex((nparts,)),
-        name="to-parquet",
-        meta=array._meta,
-    )
-    if compute:
-        return res.compute()
-    return res
+    from dask_awkward.core import Array, Scalar
 
 
 class FromParquetWrapper:
@@ -89,3 +48,47 @@ def from_parquet(
         label="from-parquet",
         token=tokenize(urlpath, meta, token),
     )
+
+
+class ToParquetOnBlock:
+    def __init__(
+        self,
+        name: str,
+        fs: AbstractFileSystem | None,
+        npartitions: int | None = None,
+    ) -> None:
+        parts = name.split(".")
+        self.suffix = parts[-1]
+        self.name = "".join(parts[:-1])
+        self.fs = fs
+        self.zfill = (
+            math.ceil(math.log(npartitions, 10)) if npartitions is not None else 1
+        )
+
+    def __call__(self, array: ak.Array, block_index: tuple[int]) -> None:
+        part = str(block_index[0]).zfill(self.zfill)
+        name = f"{self.name}.{part}.{self.suffix}"
+        ak.to_parquet(array, name)
+        return None
+
+
+def to_parquet(
+    array: Array,
+    where: str,
+    compute: bool = False,
+) -> Scalar | None:
+    nparts = array.npartitions
+    write_res = map_partitions(
+        ToParquetOnBlock(where, None, npartitions=nparts),
+        array,
+        BlockIndex((nparts,)),
+        label="to-parquet",
+        meta=array._meta,
+    )
+    name = f"to-parquet-{tokenize(array, where)}"
+    dsk = {name: (lambda *_: None, write_res.__dask_keys__())}
+    graph = HighLevelGraph.from_collections(name, dsk, dependencies=(write_res,))
+    res = new_scalar_object(graph, name=name, meta=None)
+    if compute:
+        return res.compute()
+    return res
