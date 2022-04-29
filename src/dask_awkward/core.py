@@ -26,6 +26,7 @@ from numpy.lib.mixins import NDArrayOperatorsMixin
 from dask_awkward.optimize import optimize
 from dask_awkward.utils import (
     empty_typetracer,
+    hyphenize,
     is_empty_slice,
     normalize_single_outer_inner_index,
 )
@@ -434,6 +435,11 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             )
         )
 
+    def possible_behavior_methods(self) -> list[str]:
+        if self._meta is None:
+            return []
+        return list(set(dir(self._meta)) - set(dir(self)) - set(dir(ak.Array)))
+
     @property
     def dask(self) -> HighLevelGraph:
         """High level task graph associated with the collection."""
@@ -739,8 +745,28 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         return self._getitem_single(where)
 
+    def _call_behavior(self, method_name: str, *args: Any, **kwargs: Any) -> Any:
+        try:
+            getattr(self._meta, method_name)
+        except AttributeError:
+            raise ValueError(f"{method_name} is not available to this collection.")
+        return self.map_partitions(
+            BehaviorCall(method_name, **kwargs),
+            *args,
+            label=hyphenize(method_name),
+        )
+
     def __getattr__(self, attr: str) -> Any:
         if attr not in (self.fields or []):
+
+            # check for possible behavior method
+            if attr in self.possible_behavior_methods():
+
+                def wrapper(*args, **kwargs):
+                    return self._call_behavior(attr, *args, **kwargs)
+
+                return wrapper
+
             raise AttributeError(f"{attr} not in fields.")
         try:
             return self.__getitem__(attr)
@@ -1378,6 +1404,15 @@ def compatible_partitions(*args: Array) -> bool:
                     return False
 
     return True
+
+
+class BehaviorCall:
+    def __init__(self, attr: str, **kwargs: Any) -> None:
+        self.attr = attr
+        self.kwargs = kwargs
+
+    def __call__(self, coll: Array, *args: Any) -> Array:
+        return getattr(coll, self.attr)(*args, **self.kwargs)
 
 
 # class TrivialPartitionwiseOp:

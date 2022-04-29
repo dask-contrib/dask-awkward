@@ -119,3 +119,7 @@ class LazyInputsDict(collections.abc.Mapping):
 
     def keys(self):
         return ((i,) for i in range(len(self.inputs)))
+
+
+def hyphenize(x: str) -> str:
+    return x.replace("_", "-")
