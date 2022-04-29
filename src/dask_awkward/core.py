@@ -749,7 +749,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         try:
             getattr(self._meta, method_name)
         except AttributeError:
-            raise AttributeError(f"{method_name} is not available to this collection.")
+            raise AttributeError(
+                f"Method {method_name} is not available to this collection."
+            )
         return self.map_partitions(
             BehaviorCall(method_name, **kwargs),
             *args,
@@ -1404,6 +1406,17 @@ def compatible_partitions(*args: Array) -> bool:
                     return False
 
     return True
+
+
+def with_name(collection: Array, name: str) -> Array:
+    meta = ak.Array(collection._meta, with_name=name)
+    return map_partitions(
+        lambda x, n: ak.Array(x, with_name=n),
+        collection,
+        name,
+        label="with-name",
+        meta=meta,
+    )
 
 
 class BehaviorCall:
