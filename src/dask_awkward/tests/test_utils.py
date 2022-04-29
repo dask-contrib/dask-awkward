@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dask_awkward.utils import (
     LazyInputsDict,
+    hyphenize,
     is_empty_slice,
     normalize_single_outer_inner_index,
 )
@@ -64,3 +65,9 @@ def test_lazyfilesdict() -> None:
     assert list(lfd) == inputs
     assert not (5,) in lfd
     assert "a" not in lfd
+
+
+def test_hyphenize() -> None:
+    assert hyphenize("with_name") == "with-name"
+    assert hyphenize("with_a_name") == "with-a-name"
+    assert hyphenize("ok") == "ok"
