@@ -749,7 +749,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         try:
             getattr(self._meta, method_name)
         except AttributeError:
-            raise ValueError(f"{method_name} is not available to this collection.")
+            raise AttributeError(f"{method_name} is not available to this collection.")
         return self.map_partitions(
             BehaviorCall(method_name, **kwargs),
             *args,
