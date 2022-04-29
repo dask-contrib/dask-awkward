@@ -25,12 +25,12 @@ if TYPE_CHECKING:
 
 class FromParquetWrapper:
     def __init__(self, *, storage: AbstractFileSystem) -> None:
-        self.storage = storage
+        self.fs = storage
 
     def __call__(self, part: Any) -> ak.Array:
         source = part
-        source = fsspec.utils._unstrip_protocol(source, self.storage)
-        return ak.from_parquet(source)
+        source = fsspec.utils._unstrip_protocol(source, self.fs)
+        return ak.from_parquet(source, storage_options=self.fs.storage_options)
 
 
 def from_parquet(
