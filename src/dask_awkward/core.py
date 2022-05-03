@@ -745,32 +745,59 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         return self._getitem_single(where)
 
-    def _call_behavior(self, method_name: str, *args: Any, **kwargs: Any) -> Any:
-        try:
-            getattr(self._meta, method_name)
-        except AttributeError:
-            raise AttributeError(
-                f"Method {method_name} is not available to this collection."
+    def _call_behavior_method(self, method_name: str, *args: Any, **kwargs: Any) -> Any:
+        if hasattr(self._meta, method_name):
+            return self.map_partitions(
+                BehaviorMethodCall(method_name, **kwargs),
+                *args,
+                label=hyphenize(method_name),
             )
-        return self.map_partitions(
-            BehaviorCall(method_name, **kwargs),
-            *args,
-            label=hyphenize(method_name),
+        raise AttributeError(
+            f"Method {method_name} is not available to this collection."
         )
+
+    def _call_behavior_property(self, property_name: str) -> Any:
+        if hasattr(self._meta, property_name):
+            return self.map_partitions(
+                lambda c, n: getattr(c, n),
+                property_name,
+                label=hyphenize(property_name),
+            )
+        raise AttributeError(
+            f"Property {property_name} is not available to this collection."
+        )
+
+    def _maybe_behavior_method(self, attr: str) -> bool:
+        try:
+            res = getattr(self._meta, attr)
+            return callable(res)
+        except AttributeError:
+            return False
+
+    def _maybe_behavior_property(self, attr: str) -> bool:
+        try:
+            res = getattr(self._meta, attr)
+            return not callable(res)
+        except AttributeError:
+            return False
 
     def __getattr__(self, attr: str) -> Any:
         if attr not in (self.fields or []):
-
             # check for possible behavior method
-            if attr in self.possible_behavior_methods():
+            if self._maybe_behavior_method(attr):
 
                 def wrapper(*args, **kwargs):
-                    return self._call_behavior(attr, *args, **kwargs)
+                    return self._call_behavior_method(attr, *args, **kwargs)
 
                 return wrapper
+            # check for possible behavior property
+            elif self._maybe_behavior_property(attr):
+                return self._call_behavior_property(attr)
 
             raise AttributeError(f"{attr} not in fields.")
         try:
+            # at this point attr is either a field or we'll have to
+            # raise an exception.
             return self.__getitem__(attr)
         except (IndexError, KeyError):
             raise AttributeError(f"{attr} not in fields.")
@@ -1419,12 +1446,12 @@ def with_name(collection: Array, name: str) -> Array:
     )
 
 
-class BehaviorCall:
+class BehaviorMethodCall:
     def __init__(self, attr: str, **kwargs: Any) -> None:
         self.attr = attr
         self.kwargs = kwargs
 
-    def __call__(self, coll: Array, *args: Any) -> Array:
+    def __call__(self, coll: ak.Array, *args: Any) -> ak.Array:
         return getattr(coll, self.attr)(*args, **self.kwargs)
 
 

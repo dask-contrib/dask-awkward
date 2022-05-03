@@ -12,10 +12,18 @@ class Point(ak.Record):
     def distance(self, other):
         return np.sqrt((self.x - other.x) ** 2 + (self.y - other.y) ** 2)
 
+    @property
+    def x2(self):
+        return self.x * self.x
+
 
 class PointArray(ak.Array):
     def distance(self, other):
         return np.sqrt((self.x - other.x) ** 2 + (self.y - other.y) ** 2)
+
+    @property
+    def x2(self):
+        return self.x * self.x
 
 
 ak.behavior["point"] = Point
@@ -53,6 +61,11 @@ def test_distance_behavior() -> None:
     )
 
 
+def test_property_behavior() -> None:
+    onedak = dak.with_name(dak.from_awkward(one, npartitions=2), "point")
+    assert_eq(onedak.x2, ak.Array(one, with_name="point").x2)
+
+
 def test_nonexistent_behavior() -> None:
     onea = ak.Array(one, with_name="point")
     twoa = ak.Array(two)
@@ -63,7 +76,13 @@ def test_nonexistent_behavior() -> None:
         AttributeError,
         match="Method doesnotexist is not available to this collection",
     ):
-        onedak._call_behavior("doesnotexist", twodak)
+        onedak._call_behavior_method("doesnotexist", twodak)
+
+    with pytest.raises(
+        AttributeError,
+        match="Property doesnotexist is not available to this collection",
+    ):
+        onedak._call_behavior_property("doesnotexist")
 
     # in this case the field check is where we raise
     with pytest.raises(AttributeError, match="distance not in fields"):
