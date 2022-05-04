@@ -435,11 +435,6 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             )
         )
 
-    def possible_behavior_methods(self) -> list[str]:
-        if self._meta is None:
-            return []
-        return list(set(dir(self._meta)) - set(dir(self)) - set(dir(ak.Array)))
-
     @property
     def dask(self) -> HighLevelGraph:
         """High level task graph associated with the collection."""
