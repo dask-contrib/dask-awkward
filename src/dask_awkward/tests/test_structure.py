@@ -36,3 +36,14 @@ def test_num(daa, caa, axis) -> None:
         c1 = dak.num(da.x1, axis=axis) > 2
         c2 = ak.num(ca.x1, axis=axis) > 2
         assert_eq(da[c1], ca[c2])
+
+
+def test_zip(daa, caa) -> None:
+    da1 = daa["analysis"]["x1"]
+    da2 = daa["analysis"]["x1"]
+    ca1 = caa["analysis"]["x1"]
+    ca2 = caa["analysis"]["x1"]
+
+    da_z = dak.zip({"a": da1, "b": da2})
+    ca_z = ak.zip({"a": ca1, "b": ca2})
+    assert_eq(da_z, ca_z)
