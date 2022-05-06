@@ -5,7 +5,7 @@ import pyarrow.dataset as pad
 import pytest
 
 import dask_awkward as dak
-from dask_awkward.parquet import _metadata_file_from_data_files, to_parquet
+from dask_awkward.io.parquet import _metadata_file_from_data_files, to_parquet
 
 if pa.__version__.split(".") < ["6"]:
     pytest.skip("Needs pyarrow 6")
