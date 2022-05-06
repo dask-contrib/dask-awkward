@@ -198,10 +198,10 @@ def from_json(
 
     >>> a = dak.from_json("dataset*.json", blocksize="200 MB")
 
-    Same as previous call (explicit definition of the delimeter):
+    Same as previous call (explicit definition of the delimiter):
 
     >>> a = dak.from_json(
-    ...     "dataset*.json", blocksize="200 MB", delimeter=b"\\n",
+    ...     "dataset*.json", blocksize="200 MB", delimiter=b"\\n",
     ... )
 
     """
