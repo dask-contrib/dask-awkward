@@ -21,7 +21,7 @@ recommend installing from the `main` branch:
 pip install git+https://github.com/ContinuumIO/dask-awkward@main
 ```
 
-The [awkward-array](https://github.com/scikit-hep/awkward-1.0) project
+The [awkward-array](https://github.com/scikit-hep/awkward) project
 is working on version 2 of the core `awkward` Python library; `awkard`
 version 1.8 includes many components of what will be version 2, but in
 the `awkward._v2` module. Installing `dask-awkward` requires
@@ -31,7 +31,7 @@ It's recommended to have a bleeding edge version of `awkward`
 installed with:
 
 ```
-pip install git+https://github.com/scikit-hep/awkward-1.0@main
+pip install git+https://github.com/scikit-hep/awkward@main
 ```
 
 Since `dask-awkward` is designed for `awkward` version 2, the

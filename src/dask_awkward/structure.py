@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from typing import Any
+import builtins
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any, Sequence
 
 import awkward._v2 as ak
 import numpy as np
 
 from dask_awkward.core import (
+    Array,
     DaskAwkwardNotImplemented,
     IncompatiblePartitions,
     compatible_partitions,
@@ -14,6 +17,9 @@ from dask_awkward.core import (
     pw_reduction_with_agg_to_scalar,
 )
 from dask_awkward.utils import borrow_docstring
+
+if TYPE_CHECKING:
+    from awkward._v2.highlevel import Array as AwkwardArray
 
 __all__ = (
     "argcartesian",
@@ -363,14 +369,61 @@ def zeros_like(array, highlevel: bool = True, behavior=None, dtype=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
+class _ZipWrapper:
+    def __init__(self, keys: Sequence[str], **kwargs) -> None:
+        self.keys = keys
+        self.kwargs = kwargs
+
+    def __call__(self, *parts: Array) -> AwkwardArray:
+        return ak.zip(
+            {k: p for k, p in builtins.zip(self.keys, list(parts))},
+            **self.kwargs,
+        )
+
+
 @borrow_docstring(ak.zip)
 def zip(
-    arrays,
-    depth_limit=None,
-    parameters=None,
-    with_name=None,
+    arrays: dict[str, Array] | Iterable,
+    depth_limit: int | None = None,
+    parameters: dict | None = None,
+    with_name: str | None = None,
     highlevel: bool = True,
-    behavior=None,
-    right_broadcast=False,
+    behavior: dict | None = None,
+    right_broadcast: bool = False,
+    optiontype_outside_record: bool = False,
 ):
-    raise DaskAwkwardNotImplemented("TODO")
+    if not isinstance(arrays, dict):
+        raise DaskAwkwardNotImplemented("ak.zip only supports dictionary inputs.")
+
+    keys, colls, metadict = [], [], {}
+    for k, coll in arrays.items():
+        keys.append(k)
+        colls.append(coll)
+        metadict[k] = coll._meta
+
+    meta = ak.zip(
+        metadict,
+        depth_limit=depth_limit,
+        parameters=parameters,
+        with_name=with_name,
+        highlevel=highlevel,
+        behavior=behavior,
+        right_broadcast=right_broadcast,
+        optiontype_outside_record=optiontype_outside_record,
+    )
+
+    return map_partitions(
+        _ZipWrapper(
+            keys,
+            depth_limit=depth_limit,
+            parameters=parameters,
+            with_name=with_name,
+            highlevel=highlevel,
+            behavior=behavior,
+            right_broadcast=right_broadcast,
+            optiontype_outside_record=optiontype_outside_record,
+        ),
+        *colls,
+        label="zip",
+        meta=meta,
+    )

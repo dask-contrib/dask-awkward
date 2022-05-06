@@ -10,7 +10,7 @@ write_to = "src/dask_awkward/_version.py"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-testpaths = ["src/dask_awkward/tests"]
+testpaths = ["tests"]
 addopts = ["-v", "-ra", "--showlocals", "--strict-markers", "--strict-config"]
 log_cli_level = "DEBUG"
 

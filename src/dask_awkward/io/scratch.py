@@ -24,26 +24,33 @@ if TYPE_CHECKING:
 
 
 class FromParquetWrapper:
-    def __init__(self, *, storage: AbstractFileSystem) -> None:
-        self.storage = storage
+    def __init__(self, *, storage: AbstractFileSystem, **kwargs: Any) -> None:
+        self.fs = storage
+        self.kwargs = kwargs
 
     def __call__(self, part: Any) -> ak.Array:
         source = part
-        source = fsspec.utils._unstrip_protocol(source, self.storage)
-        return ak.from_parquet(source)
+        source = fsspec.utils._unstrip_protocol(source, self.fs)
+        print(self.kwargs)
+        return ak.from_parquet(
+            source,
+            storage_options=self.fs.storage_options,
+            **self.kwargs,
+        )
 
 
 def from_parquet(
     urlpath: str | list[str],
     meta: ak.Array | None = None,
     storage_options: dict[str, Any] | None = None,
+    **kwargs: Any,
 ):
     fs, token, paths = fsspec.get_fs_token_paths(
         urlpath,
         storage_options=storage_options,
     )
     return from_map(
-        FromParquetWrapper(storage=fs),
+        FromParquetWrapper(storage=fs, **kwargs),
         paths,
         label="from-parquet",
         token=tokenize(urlpath, meta, token),

@@ -93,11 +93,28 @@ def borrow_docstring(original: Callable) -> Callable:
 
 
 def empty_typetracer() -> ak.Array:
+    """Instantiate a typetracer array with unknown length.
+
+    Returns
+    -------
+    ak.Array
+        Length-less typetracer array (content-less array).
+
+    """
     a = ak.Array([])
     return ak.Array(a.layout.typetracer.forget_length())
 
 
 class LazyInputsDict(collections.abc.Mapping):
+    """Dictionary with lazy key value pairs
+
+    Parameters
+    ----------
+    inputs : list[Any]
+        The list of dicionary values.
+
+    """
+
     def __init__(self, inputs: list[Any], **kwargs: Any) -> None:
         self.inputs = inputs
         self.kwargs = kwargs
@@ -119,3 +136,15 @@ class LazyInputsDict(collections.abc.Mapping):
 
     def keys(self):
         return ((i,) for i in range(len(self.inputs)))
+
+
+def hyphenize(x: str) -> str:
+    """Replace underscores with hyphens.
+
+    Returns
+    -------
+    str
+        Resulting strings with hyphens replacing underscores.
+
+    """
+    return x.replace("_", "-")
