@@ -3,32 +3,11 @@ from __future__ import annotations
 import awkward._v2 as ak
 import numpy as np
 import pytest
+from awkward._v2.behaviors.mixins import mixin_class as ak_mixin_class
+from awkward._v2.behaviors.mixins import mixin_class_method as ak_mixin_class_method
 
 import dask_awkward as dak
 from dask_awkward.testutils import assert_eq
-
-
-class Point(ak.Record):
-    def distance(self, other):
-        return np.sqrt((self.x - other.x) ** 2 + (self.y - other.y) ** 2)
-
-    @property
-    def x2(self):
-        return self.x * self.x
-
-
-class PointArray(ak.Array):
-    def distance(self, other):
-        return np.sqrt((self.x - other.x) ** 2 + (self.y - other.y) ** 2)
-
-    @property
-    def x2(self):
-        return self.x * self.x
-
-
-ak.behavior["point"] = Point
-ak.behavior[".", "point"] = PointArray
-ak.behavior["*", "point"] = PointArray
 
 one = ak.Array(
     [
@@ -51,26 +30,57 @@ two = ak.Array(
 )
 
 
-def test_distance_behavior() -> None:
-    onedak = dak.with_name(dak.from_awkward(one, npartitions=2), "point")
-    twodak = dak.with_name(dak.from_awkward(two, npartitions=2), "point")
+behaviors = {}
 
-    assert_eq(
-        onedak.distance(twodak),
-        ak.Array(one, with_name="point").distance(ak.Array(two, with_name="point")),
+
+@ak_mixin_class(behaviors)
+class Point:
+    def distance(self, other):
+        return np.sqrt((self.x - other.x) ** 2 + (self.y - other.y) ** 2)
+
+    @property
+    def x2(self):
+        return self.x * self.x
+
+    @ak_mixin_class_method(np.abs)
+    def point_abs(self):
+        return np.sqrt(self.x**2 + self.y**2)
+
+
+def test_distance_behavior() -> None:
+    onedak = dak.with_name(
+        dak.from_awkward(one, npartitions=2),
+        name="Point",
+        behavior=behaviors,
     )
+    twodak = dak.with_name(
+        dak.from_awkward(two, npartitions=2),
+        name="Point",
+        behavior=behaviors,
+    )
+
+    onec = ak.Array(one, with_name="Point", behavior=behaviors)
+    twoc = ak.Array(two)
+
+    assert_eq(onedak.distance(twodak), onec.distance(twoc))
+    assert_eq(np.abs(onedak), np.abs(onec))
 
 
 def test_property_behavior() -> None:
-    onedak = dak.with_name(dak.from_awkward(one, npartitions=2), "point")
-    assert_eq(onedak.x2, ak.Array(one, with_name="point").x2)
+    onedak = dak.with_name(
+        dak.from_awkward(one, npartitions=2),
+        name="Point",
+        behavior=behaviors,
+    )
+    onec = ak.Array(one, with_name="Point", behavior=behaviors)
+    assert_eq(onedak.x2, onec.x2)
 
 
 def test_nonexistent_behavior() -> None:
-    onea = ak.Array(one, with_name="point")
-    twoa = ak.Array(two)
-    onedak = dak.from_awkward(onea, npartitions=2)
-    twodak = dak.from_awkward(twoa, npartitions=2)
+    onec = ak.Array(one, with_name="Point")
+    twoc = ak.Array(two)
+    onedak = dak.from_awkward(onec, npartitions=2)
+    twodak = dak.from_awkward(twoc, npartitions=2)
 
     with pytest.raises(
         AttributeError,
