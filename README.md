@@ -7,6 +7,7 @@ dask-awkward
 [![Tests](https://github.com/ContinuumIO/dask-awkward/actions/workflows/pypi-tests.yml/badge.svg)](https://github.com/ContinuumIO/dask-awkward/actions/workflows/pypi-tests.yml)
 [![Tests](https://github.com/ContinuumIO/dask-awkward/actions/workflows/conda-tests.yml/badge.svg)](https://github.com/ContinuumIO/dask-awkward/actions/workflows/conda-tests.yml)
 [![Documentation Status](https://readthedocs.org/projects/dask-awkward/badge/?version=latest)](https://dask-awkward.readthedocs.io/en/latest/?badge=latest)
+[![PyPI](https://img.shields.io/pypi/v/dask-awkward?color=blue)](https://pypi.org/project/dask-awkward)
 ![stability-alpha](https://img.shields.io/badge/stability-alpha-blue.svg)
 
 **This is alpha software** without any guaranteed API stability.
