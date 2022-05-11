@@ -203,39 +203,39 @@ def from_dask_array(array: DaskArray) -> Array:
         return new_array_object(hlg, name, divisions=divs, meta=meta)
 
 
-class AwkwardIOLayer(Blockwise):
-    def __init__(
-        self,
-        name: str,
-        inputs: Any,
-        io_func: Callable,
-        label: str | None = None,
-        produces_tasks: bool = False,
-        creation_info: dict | None = None,
-        annotations: dict | None = None,
-    ):
-        self.name = name
-        self.inputs = inputs
-        self.io_func = io_func
-        self.label = label
-        self.produces_tasks = produces_tasks
-        self.annotations = annotations
-        self.creation_info = creation_info
+# class AwkwardIOLayer(Blockwise):
+#     def __init__(
+#         self,
+#         name: str,
+#         inputs: Any,
+#         io_func: Callable,
+#         label: str | None = None,
+#         produces_tasks: bool = False,
+#         creation_info: dict | None = None,
+#         annotations: dict | None = None,
+#     ):
+#         self.name = name
+#         self.inputs = inputs
+#         self.io_func = io_func
+#         self.label = label
+#         self.produces_tasks = produces_tasks
+#         self.annotations = annotations
+#         self.creation_info = creation_info
 
-        io_arg_map = BlockwiseDepDict(
-            mapping=LazyInputsDict(self.inputs),  # type: ignore
-            produces_tasks=self.produces_tasks,
-        )
+#         io_arg_map = BlockwiseDepDict(
+#             mapping=LazyInputsDict(self.inputs),  # type: ignore
+#             produces_tasks=self.produces_tasks,
+#         )
 
-        dsk = {self.name: (io_func, blockwise_token(0))}
-        super().__init__(
-            output=self.name,
-            output_indices="i",
-            dsk=dsk,
-            indices=[(io_arg_map, "i")],
-            numblocks={},
-            annotations=annotations,
-        )
+#         dsk = {self.name: (io_func, blockwise_token(0))}
+#         super().__init__(
+#             output=self.name,
+#             output_indices="i",
+#             dsk=dsk,
+#             indices=[(io_arg_map, "i")],
+#             numblocks={},
+#             annotations=annotations,
+#         )
 
 
 def from_map(
@@ -284,8 +284,6 @@ def from_map(
 
     inputs = list(zip(*iterables))
 
-    deps: set[Any] | list[Any] = set()
-
     # dsk: Mapping = AwkwardIOLayer(
     #     name,
     #     inputs,
@@ -308,7 +306,7 @@ def from_map(
         annotations=None,
     )
 
-    hlg = HighLevelGraph.from_collections(name, dsk, dependencies=deps)
+    hlg = HighLevelGraph.from_collections(name, dsk)
     if divisions is not None:
         return new_array_object(hlg, name, meta=meta, divisions=divisions)
     else:
