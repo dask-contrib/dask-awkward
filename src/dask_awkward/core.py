@@ -1433,10 +1433,8 @@ def compatible_partitions(*args: Array) -> bool:
 def with_name(collection: Array, name: str, behavior: dict | None = None) -> Array:
     meta = ak.Array(collection._meta, with_name=name, behavior=behavior)
     return map_partitions(
-        lambda c, n, b: ak.Array(c, with_name=n, behavior=b),
+        lambda c: ak.Array(c, with_name=name, behavior=behavior),
         collection,
-        name,
-        behavior,
         label="with-name",
         meta=meta,
     )

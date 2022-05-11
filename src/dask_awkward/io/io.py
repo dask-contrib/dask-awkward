@@ -28,12 +28,12 @@ if TYPE_CHECKING:
 
 
 class FromAwkwardWrapper:
-    def __init__(self, array: ak.Array) -> None:
-        self.array = array
+    def __init__(self, arr: ak.Array) -> None:
+        self.arr = arr
 
     def __call__(self, source: tuple[Any, ...]) -> ak.Array:
         start, stop = source[0]
-        return copy.copy(self.array[start:stop])
+        return copy.copy(self.arr[start:stop])
 
 
 def from_awkward(source: ak.Array, npartitions: int, name: str | None = None) -> Array:
