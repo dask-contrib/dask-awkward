@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 from collections.abc import Sequence
 from math import ceil
 from typing import TYPE_CHECKING, Any, Callable
@@ -33,7 +32,7 @@ class FromAwkwardWrapper:
 
     def __call__(self, source: tuple[Any, ...]) -> ak.Array:
         start, stop = source[0]
-        return copy.copy(self.arr[start:stop])
+        return self.arr[start:stop]
 
 
 def from_awkward(source: ak.Array, npartitions: int, name: str | None = None) -> Array:
