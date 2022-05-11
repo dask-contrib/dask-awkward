@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import copy
 from collections.abc import Sequence
 from math import ceil
-from typing import TYPE_CHECKING, Any, Callable, Hashable, Mapping
+from typing import TYPE_CHECKING, Any, Callable
 
 import awkward._v2 as ak
 import numpy as np
@@ -27,12 +28,12 @@ if TYPE_CHECKING:
 
 
 class FromAwkwardWrapper:
-    def __init__(self, arr: ak.Array) -> None:
-        self.arr = arr
+    def __init__(self, array: ak.Array) -> None:
+        self.array = array
 
-    def __call__(self, source: tuple[int, int]) -> ak.Array:
-        start, stop = source
-        return self.arr[start:stop]
+    def __call__(self, source: tuple[Any, ...]) -> ak.Array:
+        start, stop = source[0]
+        return copy.copy(self.array[start:stop])
 
 
 def from_awkward(source: ak.Array, npartitions: int, name: str | None = None) -> Array:
@@ -41,11 +42,11 @@ def from_awkward(source: ak.Array, npartitions: int, name: str | None = None) ->
     nrows = len(source)
     chunksize = int(ceil(nrows / npartitions))
     locs = list(range(0, nrows, chunksize)) + [nrows]
-    inputs = list(zip(locs[:-1], locs[1:]))
+    startstops = list(zip(locs[:-1], locs[1:]))
     meta = typetracer_array(source)
     return from_map(
         FromAwkwardWrapper(source),
-        inputs,
+        startstops,
         label="from-awkward",
         token=tokenize(source, npartitions),
         divisions=tuple(locs),
@@ -239,30 +240,72 @@ class AwkwardIOLayer(Blockwise):
 
 def from_map(
     func: Callable,
-    inputs: Sequence[Hashable],
+    *iterables: Sequence,
     label: str | None = None,
     token: str | None = None,
     divisions: tuple[int, ...] | None = None,
     meta: ak.Array | None = None,
     **kwargs: Any,
 ) -> Array:
+    """
+    func : Callable
+        Function used to create each partition.
+    *iterables : Iterable objects
+        Iterable objects to map to each output partition. All iterables must
+        be the same length. This length determines the number of partitions
+        in the output collection (only one element of each iterable will
+        be passed to ``func`` for each partition).
+    label : str, optional
+        TODO
+    token : str, optional
+        TODO
+    divisions : int, optional
+        TODO
+    meta : ak.Array, optional
+        TODO
+    **kwargs : Any
+        TODO
+
+    Returns
+    -------
+    Array
+        Resulting collection.
+
+    """
 
     # Define collection name
     label = label or funcname(func)
-    token = token or tokenize(func, inputs, meta, **kwargs)
+    token = token or tokenize(func, iterables, meta, **kwargs)
     name = f"{label}-{token}"
 
     # Check for `produces_tasks` and `creation_info`
     produces_tasks = kwargs.pop("produces_tasks", False)
-    creation_info = kwargs.pop("creation_info", None)
+    # creation_info = kwargs.pop("creation_info", None)
+
+    inputs = list(zip(*iterables))
 
     deps: set[Any] | list[Any] = set()
-    dsk: Mapping = AwkwardIOLayer(
-        name,
-        inputs,
-        func,
+
+    # dsk: Mapping = AwkwardIOLayer(
+    #     name,
+    #     inputs,
+    #     func,
+    #     produces_tasks=produces_tasks,
+    #     creation_info=creation_info,
+    # )
+
+    io_arg_map = BlockwiseDepDict(
+        mapping=LazyInputsDict(inputs),  # type: ignore
         produces_tasks=produces_tasks,
-        creation_info=creation_info,
+    )
+
+    dsk = Blockwise(
+        output=name,
+        output_indices="i",
+        dsk={name: (func, blockwise_token(0))},
+        indices=[(io_arg_map, "i")],
+        numblocks={},
+        annotations=None,
     )
 
     hlg = HighLevelGraph.from_collections(name, dsk, dependencies=deps)

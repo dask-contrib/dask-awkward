@@ -245,8 +245,7 @@ def from_json(
         else:
             f = FromJsonLineDelimitedWrapper(storage=fs, compression=compression)
 
-        parts = [(x,) for x in urlpaths]
-        return from_map(f, parts, label="from-json", meta=meta)
+        return from_map(f, urlpaths, label="from-json", meta=meta)
 
     # if a `delimiter` and `blocksize` are defined we use Dask's
     # `read_bytes` function to get delayed chunks of bytes.
