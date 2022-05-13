@@ -56,7 +56,7 @@ class FromJsonLineDelimitedWrapper(FromJsonWrapper):
 
     def __call__(self, source: str, *args: Any, **kwargs: Any) -> ak.Array:
         with self.storage.open(source, mode="rt", compression=self.compression) as f:
-            return ak.from_iter(json.loads(line) for line in f)
+            return ak.from_json(f.read())
 
 
 class FromJsonSingleObjInFileWrapper(FromJsonWrapper):
