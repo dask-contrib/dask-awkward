@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import awkward._v2 as ak
 import fsspec
 import pytest
@@ -134,6 +136,20 @@ def test_from_map_with_args_kwargs() -> None:
     y = map(lambda x: x * n, y)
     y = ak.from_iter(y)
 
+    assert_eq(x, y)
+
+
+def test_from_map_pack_single_iterable(line_delim_records_file) -> None:
+    def g(fname, c=1):
+        return ak.from_json(Path(fname).read_text()).analysis.x1 * c
+
+    n = 3
+    c = 2
+
+    fmt = "{t}\n" * n
+    jsontext = fmt.format(t=Path(line_delim_records_file).read_text())
+    x = dak.from_map(g, [line_delim_records_file] * n, c=c)
+    y = ak.from_json(jsontext).analysis.x1 * c
     assert_eq(x, y)
 
 
