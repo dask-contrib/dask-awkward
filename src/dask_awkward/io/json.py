@@ -41,7 +41,7 @@ class FromJsonWrapper:
         self.compression = compression
         self.storage = storage
 
-    def __call__(self, source: tuple[Any, ...]) -> ak.Array:
+    def __call__(self, source: Any, *args: Any, **kwargs: Any) -> ak.Array:
         raise NotImplementedError("Must be implemented by child class.")
 
 
@@ -54,9 +54,8 @@ class FromJsonLineDelimitedWrapper(FromJsonWrapper):
     ) -> None:
         super().__init__(storage=storage, compression=compression)
 
-    def __call__(self, source: tuple[Any, ...]) -> ak.Array:
-        (f,) = source
-        with self.storage.open(f, mode="rt", compression=self.compression) as f:
+    def __call__(self, source: str, *args: Any, **kwargs: Any) -> ak.Array:
+        with self.storage.open(source, mode="rt", compression=self.compression) as f:
             return ak.from_iter(json.loads(line) for line in f)
 
 
@@ -69,9 +68,8 @@ class FromJsonSingleObjInFileWrapper(FromJsonWrapper):
     ) -> None:
         super().__init__(storage=storage, compression=compression)
 
-    def __call__(self, source: tuple[Any, ...]) -> ak.Array:
-        (f,) = source
-        with self.storage.open(f, mode="r", compression=self.compression) as f:
+    def __call__(self, source: str, *args: Any, **kwargs: Any) -> ak.Array:
+        with self.storage.open(source, mode="r", compression=self.compression) as f:
             return ak.Array([json.load(f)])
 
 
@@ -97,7 +95,7 @@ def derive_json_meta(
 
     if one_obj_per_file:
         fn = FromJsonSingleObjInFileWrapper(storage=storage, compression=compression)
-        return ak.Array(fn((source,)).layout.typetracer.forget_length())
+        return ak.Array(fn(source).layout.typetracer.forget_length())
 
     # when the data is uncompressed we read `bytechunks` number of
     # bytes then split on a newline bytes, and use the first
