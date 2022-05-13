@@ -343,6 +343,9 @@ def from_map(
         inputs = iterables[0]
         packed = False
     else:
+        # Structure inputs such that the tuple of arguments pair each 0th,
+        # 1st, 2nd, ... elements together; for example:
+        # from_map(f, [1, 2, 3], [4, 5, 6]) --> [f(1, 4), f(2, 5), f(3, 6)]
         inputs = list(zip(*iterables))
         packed = True
 
@@ -361,11 +364,6 @@ def from_map(
         )
     else:
         io_func = func
-
-    # Structure inputs such that the tuple of arguments pair each 0th,
-    # 1st, 2nd, ... elements together; for example:
-    # from_map(f, [1, 2, 3], [4, 5, 6]) --> [f(1, 4), f(2, 5), f(3, 6)]
-    # inputs = list(zip(*iterables))
 
     io_arg_map = BlockwiseDepDict(
         mapping=LazyInputsDict(inputs),  # type: ignore
