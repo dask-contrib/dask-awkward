@@ -153,6 +153,19 @@ def test_from_map_pack_single_iterable(line_delim_records_file) -> None:
     assert_eq(x, y)
 
 
+def test_from_map_enumerate() -> None:
+    def f(t):
+        i = t[0]
+        x = t[1]
+        return ak.Array([{"x": (i + 1) * x}])
+
+    x = [[1, 2, 3], [4, 5, 6]]
+
+    a1 = dak.from_map(f, enumerate(x))
+    a2 = ak.Array([{"x": [1, 2, 3]}, {"x": [4, 5, 6, 4, 5, 6]}])
+    assert_eq(a1, a2)
+
+
 def test_from_map_exceptions():
     def f(a, b):
         return ak.Array([a, b])

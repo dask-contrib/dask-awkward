@@ -311,6 +311,7 @@ def from_map(
     if not callable(func):
         raise ValueError("`func` argument must be `callable`")
     lengths = set()
+    iterables = list(iterables)
     for i, iterable in enumerate(iterables):
         if not isinstance(iterable, Iterable):
             raise ValueError(
@@ -318,7 +319,7 @@ def from_map(
             )
         try:
             lengths.add(len(iterable))
-        except AttributeError:
+        except (AttributeError, TypeError):
             iterables[i] = list(iterable)  # type: ignore
             lengths.add(len(iterables[i]))
     if len(lengths) == 0:
