@@ -5,8 +5,6 @@ import numpy as np
 
 from dask_awkward.core import (
     DaskAwkwardNotImplemented,
-    IncompatiblePartitions,
-    compatible_partitions,
     map_partitions,
     pw_reduction_with_agg_to_scalar,
 )
@@ -190,8 +188,6 @@ def covar(
     mask_identity=True,
     flatten_records=False,
 ):
-    if not compatible_partitions(x, y):
-        raise IncompatiblePartitions("covar", x, y)
     raise DaskAwkwardNotImplemented("TODO")
 
 
@@ -205,8 +201,6 @@ def linear_fit(
     mask_identity=True,
     flatten_records=False,
 ):
-    if not compatible_partitions(x, y):
-        raise IncompatiblePartitions("linear_fit", x, y)
     raise DaskAwkwardNotImplemented("TODO")
 
 

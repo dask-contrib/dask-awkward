@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from math import ceil
 from typing import TYPE_CHECKING, Any, Callable
 
@@ -269,7 +269,7 @@ class _PackedArgCallable:
 
 def from_map(
     func: Callable,
-    *iterables: Sequence,
+    *iterables: Iterable,
     args: tuple[Any, ...] | None = None,
     label: str | None = None,
     token: str | None = None,
@@ -304,24 +304,24 @@ def from_map(
     Returns
     -------
     Array
-        Resulting collection.
+        Array collection.
 
     """
 
     if not callable(func):
         raise ValueError("`func` argument must be `callable`")
     lengths = set()
-    iterables = list(iterables)
-    for i, iterable in enumerate(iterables):
+    iters: list[Iterable] = list(iterables)
+    for i, iterable in enumerate(iters):
         if not isinstance(iterable, Iterable):
             raise ValueError(
                 f"All elements of `iterables` must be Iterable, got {type(iterable)}"
             )
         try:
-            lengths.add(len(iterable))
+            lengths.add(len(iterable))  # type:ignore
         except (AttributeError, TypeError):
-            iterables[i] = list(iterable)  # type: ignore
-            lengths.add(len(iterables[i]))
+            iters[i] = list(iterable)
+            lengths.add(len(iters[i]))  # type: ignore
     if len(lengths) == 0:
         raise ValueError("`from_map` requires at least one Iterable input")
     elif len(lengths) > 1:
@@ -333,25 +333,25 @@ def from_map(
     produces_tasks = kwargs.pop("produces_tasks", False)
     # creation_info = kwargs.pop("creation_info", None)
 
-    if produces_tasks or len(iterables) == 1:
-        if len(iterables) > 1:
+    if produces_tasks or len(iters) == 1:
+        if len(iters) > 1:
             # Tasks are not detected correctly when they are "packed"
             # within an outer list/tuple
             raise ValueError(
                 "Multiple iterables not supported when produces_tasks=True"
             )
-        inputs = iterables[0]
+        inputs = list(iters[0])
         packed = False
     else:
         # Structure inputs such that the tuple of arguments pair each 0th,
         # 1st, 2nd, ... elements together; for example:
         # from_map(f, [1, 2, 3], [4, 5, 6]) --> [f(1, 4), f(2, 5), f(3, 6)]
-        inputs = list(zip(*iterables))
+        inputs = list(zip(*iters))
         packed = True
 
     # Define collection name
     label = label or funcname(func)
-    token = token or tokenize(func, iterables, meta, **kwargs)
+    token = token or tokenize(func, iters, meta, **kwargs)
     name = f"{label}-{token}"
 
     # Define io_func

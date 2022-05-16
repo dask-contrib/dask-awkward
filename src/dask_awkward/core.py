@@ -330,9 +330,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         self._dask: HighLevelGraph = dsk
         self._name: str = name
         self._divisions = divisions
-        if meta is None:
-            self._meta: ak.Array = empty_typetracer()
-        elif not isinstance(meta, (ak.Array, TypeTracerArray)):
+        if meta is not None and not isinstance(meta, (ak.Array, TypeTracerArray)):
             raise TypeError("meta must be an instance of an Awkward Array.")
         self._meta = meta
 
@@ -474,7 +472,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     def layout(self) -> Content:
         if self._meta is not None:
             return self._meta.layout
-        raise ValueError("This collections meta is None; unknown layout.")
+        raise ValueError("This collection's meta is None; unknown layout.")
 
     @property
     def _typetracer(self) -> ak.Array:
@@ -487,7 +485,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     @property
     def form(self) -> Form:
-        return self._meta.layout.form
+        if self._meta is not None:
+            return self._meta.layout.form
+        raise ValueError("This collection's meta is None; unknown form.")
 
     @cached_property
     def keys_array(self) -> np.ndarray:
@@ -916,11 +916,12 @@ def _first_partition(array: Array) -> ak.Array:
 
     """
     with dask.config.set({"awkward.compute-unknown-meta": False}):
+        scheduler = dask.config.get("awkward.first-partition-scheduler")
         (computed,) = dask_compute(
             array.partitions[0],
             traverse=False,
             optimize_graph=True,
-            scheduler="threads",
+            scheduler=scheduler,
         )
         return computed
 
@@ -990,7 +991,7 @@ def new_array_object(
 
     array = Array(dsk, name, meta, divisions)  # type: ignore
 
-    if meta is None:
+    if array._meta is None:
         if dask.config.get("awkward.compute-unknown-meta"):
             try:
                 array._meta = _get_typetracer(array)

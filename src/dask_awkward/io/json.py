@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import abc
 import io
 import warnings
 from typing import TYPE_CHECKING, Any
@@ -34,27 +35,32 @@ __all__ = ["from_json"]
 class FromJsonWrapper:
     def __init__(
         self,
-        *,
+        *args: Any,
         storage: AbstractFileSystem,
         compression: str | None = None,
+        **kwargs: Any,
     ) -> None:
         self.compression = compression
         self.storage = storage
+        self.args = args
+        self.kwargs = kwargs
 
-    def __call__(self, source: Any, *args: Any, **kwargs: Any) -> ak.Array:
-        raise NotImplementedError("Must be implemented by child class.")
+    @abc.abstractmethod
+    def __call__(self, source: Any) -> ak.Array:
+        pass  # pragma: no cover
 
 
 class FromJsonLineDelimitedWrapper(FromJsonWrapper):
     def __init__(
         self,
-        *,
+        *args: Any,
         storage: AbstractFileSystem,
         compression: str | None = None,
+        **kwargs: Any,
     ) -> None:
-        super().__init__(storage=storage, compression=compression)
+        super().__init__(*args, storage=storage, compression=compression, **kwargs)
 
-    def __call__(self, source: str, *args: Any, **kwargs: Any) -> ak.Array:
+    def __call__(self, source: str) -> ak.Array:
         with self.storage.open(source, mode="rt", compression=self.compression) as f:
             return ak.from_json(f.read())
 
@@ -62,13 +68,14 @@ class FromJsonLineDelimitedWrapper(FromJsonWrapper):
 class FromJsonSingleObjInFileWrapper(FromJsonWrapper):
     def __init__(
         self,
-        *,
+        *args: Any,
         storage: AbstractFileSystem,
         compression: str | None = None,
+        **kwargs: Any,
     ) -> None:
-        super().__init__(storage=storage, compression=compression)
+        super().__init__(*args, storage=storage, compression=compression, **kwargs)
 
-    def __call__(self, source: str, *args: Any, **kwargs: Any) -> ak.Array:
+    def __call__(self, source: str) -> ak.Array:
         with self.storage.open(source, mode="r", compression=self.compression) as f:
             return ak.Array([json.load(f)])
 
