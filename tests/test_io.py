@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import awkward._v2 as ak
 import fsspec
 import pytest
@@ -98,3 +100,87 @@ def test_to_and_from_delayed(
 
     with pytest.raises(ValueError, match="divisions must be a tuple of length"):
         dak.from_delayed(delayeds, divisions=(1, 5, 7, 9, 11))
+
+
+def test_from_map_with_args_kwargs() -> None:
+    import dask.core
+
+    def f(a, b, c, n, pad_zero=False):
+        if pad_zero:
+            return ak.Array([a * n, b * n, c * n, 0])
+        else:
+            return ak.Array([a * n, b * n, c * n])
+
+    a = [1, 2, 3]
+    b = [4, 5, 6]
+    c = [7, 8, 9]
+    n = 3
+
+    # dask version
+    x = dak.from_map(f, a, b, c, args=(n,))
+
+    # concrete version
+    y = list(zip(a, b, c))
+    y = dask.core.flatten(list(map(list, y)))
+    y = map(lambda x: x * n, y)
+    y = ak.from_iter(y)
+
+    assert_eq(x, y)
+
+    # dask version
+    x = dak.from_map(f, a, b, c, args=(n,), pad_zero=True)
+
+    # concrete version
+    y = list(zip(a, b, c, [0, 0, 0]))
+    y = dask.core.flatten(list(map(list, y)))
+    y = map(lambda x: x * n, y)
+    y = ak.from_iter(y)
+
+    assert_eq(x, y)
+
+
+def test_from_map_pack_single_iterable(line_delim_records_file) -> None:
+    def g(fname, c=1):
+        return ak.from_json(Path(fname).read_text()).analysis.x1 * c
+
+    n = 3
+    c = 2
+
+    fmt = "{t}\n" * n
+    jsontext = fmt.format(t=Path(line_delim_records_file).read_text())
+    x = dak.from_map(g, [line_delim_records_file] * n, c=c)
+    y = ak.from_json(jsontext).analysis.x1 * c
+    assert_eq(x, y)
+
+
+def test_from_map_enumerate() -> None:
+    def f(t):
+        i = t[0]
+        x = t[1]
+        return ak.Array([{"x": (i + 1) * x}])
+
+    x = [[1, 2, 3], [4, 5, 6]]
+
+    a1 = dak.from_map(f, enumerate(x))
+    a2 = ak.Array([{"x": [1, 2, 3]}, {"x": [4, 5, 6, 4, 5, 6]}])
+    assert_eq(a1, a2)
+
+
+def test_from_map_exceptions():
+    def f(a, b):
+        return ak.Array([a, b])
+
+    with pytest.raises(ValueError, match="same length"):
+        dak.from_map(f, [1, 2], [3, 4, 5])
+
+    with pytest.raises(ValueError, match="must be `callable`"):
+        dak.from_map(5, [1], [2])  # type: ignore
+
+    with pytest.raises(ValueError, match="must be Iterable"):
+        dak.from_map(f, 1, [1, 2])  # type: ignore
+
+    with pytest.raises(ValueError, match="non-zero length"):
+        dak.from_map(f, [], [], [])
+
+    with pytest.raises(ValueError, match="at least one Iterable input"):
+        dak.from_map(f, args=(5,))

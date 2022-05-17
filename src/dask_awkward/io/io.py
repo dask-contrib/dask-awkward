@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable
 from math import ceil
-from typing import TYPE_CHECKING, Any, Callable, Hashable, Mapping
+from typing import TYPE_CHECKING, Any, Callable
 
 import awkward._v2 as ak
 import numpy as np
@@ -30,8 +30,7 @@ class FromAwkwardWrapper:
     def __init__(self, arr: ak.Array) -> None:
         self.arr = arr
 
-    def __call__(self, source: tuple[int, int]) -> ak.Array:
-        start, stop = source
+    def __call__(self, start: int, stop: int) -> ak.Array:
         return self.arr[start:stop]
 
 
@@ -41,11 +40,13 @@ def from_awkward(source: ak.Array, npartitions: int, name: str | None = None) ->
     nrows = len(source)
     chunksize = int(ceil(nrows / npartitions))
     locs = list(range(0, nrows, chunksize)) + [nrows]
-    inputs = list(zip(locs[:-1], locs[1:]))
+    starts = locs[:-1]
+    stops = locs[1:]
     meta = typetracer_array(source)
     return from_map(
         FromAwkwardWrapper(source),
-        inputs,
+        starts,
+        stops,
         label="from-awkward",
         token=tokenize(source, npartitions),
         divisions=tuple(locs),
@@ -202,71 +203,186 @@ def from_dask_array(array: DaskArray) -> Array:
         return new_array_object(hlg, name, divisions=divs, meta=meta)
 
 
-class AwkwardIOLayer(Blockwise):
+# class AwkwardIOLayer(Blockwise):
+#     def __init__(
+#         self,
+#         name: str,
+#         inputs: Any,
+#         io_func: Callable,
+#         label: str | None = None,
+#         produces_tasks: bool = False,
+#         creation_info: dict | None = None,
+#         annotations: dict | None = None,
+#     ):
+#         self.name = name
+#         self.inputs = inputs
+#         self.io_func = io_func
+#         self.label = label
+#         self.produces_tasks = produces_tasks
+#         self.annotations = annotations
+#         self.creation_info = creation_info
+
+#         io_arg_map = BlockwiseDepDict(
+#             mapping=LazyInputsDict(self.inputs),  # type: ignore
+#             produces_tasks=self.produces_tasks,
+#         )
+
+#         dsk = {self.name: (io_func, blockwise_token(0))}
+#         super().__init__(
+#             output=self.name,
+#             output_indices="i",
+#             dsk=dsk,
+#             indices=[(io_arg_map, "i")],
+#             numblocks={},
+#             annotations=annotations,
+#         )
+
+
+class _PackedArgCallable:
+    """Wrap a callable such that packed arguments can be unrolled.
+
+    Inspired by dask.dataframe.io.io._PackedArgCallable.
+
+    """
+
     def __init__(
         self,
-        name: str,
-        inputs: Any,
-        io_func: Callable,
-        label: str | None = None,
-        produces_tasks: bool = False,
-        creation_info: dict | None = None,
-        annotations: dict | None = None,
+        func,
+        args=None,
+        kwargs=None,
+        packed=False,
     ):
-        self.name = name
-        self.inputs = inputs
-        self.io_func = io_func
-        self.label = label
-        self.produces_tasks = produces_tasks
-        self.annotations = annotations
-        self.creation_info = creation_info
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
+        self.packed = packed
 
-        io_arg_map = BlockwiseDepDict(
-            mapping=LazyInputsDict(self.inputs),  # type: ignore
-            produces_tasks=self.produces_tasks,
-        )
-
-        dsk = {self.name: (io_func, blockwise_token(0))}
-        super().__init__(
-            output=self.name,
-            output_indices="i",
-            dsk=dsk,
-            indices=[(io_arg_map, "i")],
-            numblocks={},
-            annotations=annotations,
+    def __call__(self, packed_arg):
+        if not self.packed:
+            packed_arg = [packed_arg]
+        return self.func(
+            *packed_arg,
+            *(self.args or []),
+            **(self.kwargs or {}),
         )
 
 
 def from_map(
     func: Callable,
-    inputs: Sequence[Hashable],
+    *iterables: Iterable,
+    args: tuple[Any, ...] | None = None,
     label: str | None = None,
     token: str | None = None,
     divisions: tuple[int, ...] | None = None,
     meta: ak.Array | None = None,
     **kwargs: Any,
 ) -> Array:
+    """Create an Array collection from a custom mapping.
 
-    # Define collection name
-    label = label or funcname(func)
-    token = token or tokenize(func, inputs, meta, **kwargs)
-    name = f"{label}-{token}"
+    Parameters
+    ----------
+    func : Callable
+        Function used to create each partition.
+    *iterables : Iterable objects
+        Iterable objects to map to each output partition. All iterables must
+        be the same length. This length determines the number of partitions
+        in the output collection (only one element of each iterable will
+        be passed to ``func`` for each partition).
+    label : str, optional
+        String to use as the function-name label in the output
+        collection-key names.
+    token : str, optional
+        String to use as the "token" in the output collection-key names.
+    divisions : tuple[int | None, ...], optional
+        Partition boundaries (if known).
+    meta : Array, optional
+        Collection metadata array, if known (the awkward-array type
+        tracer)
+    **kwargs : Any
+        Keyword arguments passed to `func`.
+
+    Returns
+    -------
+    Array
+        Array collection.
+
+    """
+
+    if not callable(func):
+        raise ValueError("`func` argument must be `callable`")
+    lengths = set()
+    iters: list[Iterable] = list(iterables)
+    for i, iterable in enumerate(iters):
+        if not isinstance(iterable, Iterable):
+            raise ValueError(
+                f"All elements of `iterables` must be Iterable, got {type(iterable)}"
+            )
+        try:
+            lengths.add(len(iterable))  # type:ignore
+        except (AttributeError, TypeError):
+            iters[i] = list(iterable)
+            lengths.add(len(iters[i]))  # type: ignore
+    if len(lengths) == 0:
+        raise ValueError("`from_map` requires at least one Iterable input")
+    elif len(lengths) > 1:
+        raise ValueError("All `iterables` must have the same length")
+    if lengths == {0}:
+        raise ValueError("All `iterables` must have a non-zero length")
 
     # Check for `produces_tasks` and `creation_info`
     produces_tasks = kwargs.pop("produces_tasks", False)
-    creation_info = kwargs.pop("creation_info", None)
+    # creation_info = kwargs.pop("creation_info", None)
 
-    deps: set[Any] | list[Any] = set()
-    dsk: Mapping = AwkwardIOLayer(
-        name,
-        inputs,
-        func,
+    if produces_tasks or len(iters) == 1:
+        if len(iters) > 1:
+            # Tasks are not detected correctly when they are "packed"
+            # within an outer list/tuple
+            raise ValueError(
+                "Multiple iterables not supported when produces_tasks=True"
+            )
+        inputs = list(iters[0])
+        packed = False
+    else:
+        # Structure inputs such that the tuple of arguments pair each 0th,
+        # 1st, 2nd, ... elements together; for example:
+        # from_map(f, [1, 2, 3], [4, 5, 6]) --> [f(1, 4), f(2, 5), f(3, 6)]
+        inputs = list(zip(*iters))
+        packed = True
+
+    # Define collection name
+    label = label or funcname(func)
+    token = token or tokenize(func, iters, meta, **kwargs)
+    name = f"{label}-{token}"
+
+    # Define io_func
+    if packed or args or kwargs:
+        io_func: Callable = _PackedArgCallable(
+            func,
+            args=args,
+            kwargs=kwargs,
+            packed=packed,
+        )
+    else:
+        io_func = func
+
+    io_arg_map = BlockwiseDepDict(
+        mapping=LazyInputsDict(inputs),  # type: ignore
         produces_tasks=produces_tasks,
-        creation_info=creation_info,
     )
 
-    hlg = HighLevelGraph.from_collections(name, dsk, dependencies=deps)
+    dsk = Blockwise(
+        output=name,
+        output_indices="i",
+        dsk={name: (io_func, blockwise_token(0))},
+        indices=[(io_arg_map, "i")],
+        numblocks={},
+        annotations=None,
+    )
+
+    hlg = HighLevelGraph.from_collections(name, dsk)
     if divisions is not None:
-        return new_array_object(hlg, name, meta=meta, divisions=divisions)
+        result = new_array_object(hlg, name, meta=meta, divisions=divisions)
     else:
-        return new_array_object(hlg, name, meta=meta, npartitions=len(inputs))
+        result = new_array_object(hlg, name, meta=meta, npartitions=len(inputs))
+
+    return result

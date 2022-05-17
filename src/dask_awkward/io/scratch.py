@@ -28,8 +28,7 @@ class FromParquetWrapper:
         self.fs = storage
         self.kwargs = kwargs
 
-    def __call__(self, part: Any) -> ak.Array:
-        source = part
+    def __call__(self, source: Any) -> ak.Array:
         source = fsspec.utils._unstrip_protocol(source, self.fs)
         return ak.from_parquet(
             source,
@@ -48,6 +47,7 @@ def from_parquet(
         urlpath,
         storage_options=storage_options,
     )
+
     return from_map(
         FromParquetWrapper(storage=fs, **kwargs),
         paths,

@@ -1,2 +1,15 @@
 awkward:
+
+  # This option is for cases where new array collections are created
+  # with unknown metadata. The default setting is to compute the first
+  # partition of the colleciton so that we can define the metadata. If
+  # this option is set to False then collections with unknown metadata
+  # will be instantiated with the `_meta` attribute set to `None`.
   compute-unknown-meta: True
+
+  # The scheduler to use when computing the first partition. The
+  # default setting (undefined, Python's `None`), will use Dask's
+  # current default global scheduler. That is, if you are using a
+  # distributed scheduler then that scheduler will be used. See the
+  # documentation for `dask.compute` for all options.
+  first-partition-scheduler: null
