@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from math import ceil
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 import awkward._v2 as ak
 import numpy as np
@@ -242,17 +242,17 @@ class _PackedArgCallable:
 
     def __init__(
         self,
-        func,
-        args=None,
-        kwargs=None,
-        packed=False,
+        func: Callable,
+        args: tuple[Any, ...] | None = None,
+        kwargs: dict[str, Any] | None = None,
+        packed: bool = False,
     ):
         self.func = func
         self.args = args
         self.kwargs = kwargs
         self.packed = packed
 
-    def __call__(self, packed_arg):
+    def __call__(self, packed_arg: Any):
         if not self.packed:
             packed_arg = [packed_arg]
         return self.func(
