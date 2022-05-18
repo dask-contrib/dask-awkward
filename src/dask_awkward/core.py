@@ -23,8 +23,10 @@ from dask.threaded import get as threaded_get
 from dask.utils import IndexCallable, funcname, key_split
 from numpy.lib.mixins import NDArrayOperatorsMixin
 
-from dask_awkward.optimize import optimize
+from dask_awkward.optimize import basic_optimize
 from dask_awkward.utils import (
+    DaskAwkwardNotImplemented,
+    IncompatiblePartitions,
     empty_typetracer,
     hyphenize,
     is_empty_slice,
@@ -42,31 +44,6 @@ if TYPE_CHECKING:
 
 
 T = TypeVar("T")
-
-
-class DaskAwkwardNotImplemented(NotImplementedError):
-    NOT_SUPPORTED_MSG = """
-
-If you would like this unsupported call to be supported by
-dask-awkward please open an issue at:
-https://github.com/ContinuumIO/dask-awkward."""
-
-    def __init__(self, msg: str | None = None) -> None:
-        msg = f"{msg or ''}{self.NOT_SUPPORTED_MSG}"
-        super().__init__(msg)
-
-
-class IncompatiblePartitions(ValueError):
-    def __init__(self, name, *args) -> None:
-        msg = self.divisions_msg(name, *args)
-        super().__init__(msg)
-
-    @staticmethod
-    def divisions_msg(name: str, *args: Any) -> str:
-        msg = f"The inputs to {name} are incompatibly partitioned\n"
-        for i, arg in enumerate(args):
-            msg += f"- arg{i} divisions: {arg.divisions}\n"
-        return msg
 
 
 def _finalize_array(
@@ -121,7 +98,7 @@ class Scalar(DaskMethodsMixin):
         return self.name
 
     __dask_optimize__ = globalmethod(
-        optimize, key="awkward_scalar_optimize", falsey=dont_optimize
+        basic_optimize, key="awkward_scalar_optimize", falsey=dont_optimize
     )
 
     __dask_scheduler__ = staticmethod(threaded_get)
@@ -353,7 +330,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return self._rebuild, ()
 
     __dask_optimize__ = globalmethod(
-        optimize, key="awkward_array_optimize", falsey=dont_optimize
+        basic_optimize, key="awkward_array_optimize", falsey=dont_optimize
     )
 
     __dask_scheduler__ = staticmethod(threaded_get)

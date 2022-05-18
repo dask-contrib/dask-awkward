@@ -3,12 +3,8 @@ from __future__ import annotations
 import awkward._v2 as ak
 import numpy as np
 
-from dask_awkward.core import (
-    DaskAwkwardNotImplemented,
-    map_partitions,
-    pw_reduction_with_agg_to_scalar,
-)
-from dask_awkward.utils import borrow_docstring
+from dask_awkward.core import map_partitions, pw_reduction_with_agg_to_scalar
+from dask_awkward.utils import DaskAwkwardNotImplemented, borrow_docstring
 
 __all__ = (
     "all",

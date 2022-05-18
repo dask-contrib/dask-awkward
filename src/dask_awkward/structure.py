@@ -9,12 +9,11 @@ import numpy as np
 
 from dask_awkward.core import (
     Array,
-    DaskAwkwardNotImplemented,
     map_partitions,
     new_known_scalar,
     pw_reduction_with_agg_to_scalar,
 )
-from dask_awkward.utils import borrow_docstring
+from dask_awkward.utils import DaskAwkwardNotImplemented, borrow_docstring
 
 if TYPE_CHECKING:
     from awkward._v2.highlevel import Array as AwkwardArray

@@ -11,13 +11,8 @@ from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
 from dask.highlevelgraph import HighLevelGraph
 from dask.utils import funcname
 
-from dask_awkward.core import (
-    DaskAwkwardNotImplemented,
-    map_partitions,
-    new_array_object,
-    typetracer_array,
-)
-from dask_awkward.utils import LazyInputsDict
+from dask_awkward.core import map_partitions, new_array_object, typetracer_array
+from dask_awkward.utils import DaskAwkwardNotImplemented, LazyInputsDict
 
 if TYPE_CHECKING:
     from dask.array.core import Array as DaskArray

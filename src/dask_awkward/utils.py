@@ -7,6 +7,31 @@ import awkward._v2 as ak
 import numpy as np
 
 
+class DaskAwkwardNotImplemented(NotImplementedError):
+    NOT_SUPPORTED_MSG = """
+
+If you would like this unsupported call to be supported by
+dask-awkward please open an issue at:
+https://github.com/ContinuumIO/dask-awkward."""
+
+    def __init__(self, msg: str | None = None) -> None:
+        msg = f"{msg or ''}{self.NOT_SUPPORTED_MSG}"
+        super().__init__(msg)
+
+
+class IncompatiblePartitions(ValueError):
+    def __init__(self, name, *args) -> None:
+        msg = self.divisions_msg(name, *args)
+        super().__init__(msg)
+
+    @staticmethod
+    def divisions_msg(name: str, *args: Any) -> str:
+        msg = f"The inputs to {name} are incompatibly partitioned\n"
+        for i, arg in enumerate(args):
+            msg += f"- arg{i} divisions: {arg.divisions}\n"
+        return msg
+
+
 def normalize_single_outer_inner_index(
     divisions: tuple[int, ...], index: int
 ) -> tuple[int, int]:
