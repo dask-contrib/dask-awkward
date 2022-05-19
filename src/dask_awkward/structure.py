@@ -9,14 +9,11 @@ import numpy as np
 
 from dask_awkward.core import (
     Array,
-    DaskAwkwardNotImplemented,
-    IncompatiblePartitions,
-    compatible_partitions,
     map_partitions,
     new_known_scalar,
     pw_reduction_with_agg_to_scalar,
 )
-from dask_awkward.utils import borrow_docstring
+from dask_awkward.utils import DaskAwkwardNotImplemented, borrow_docstring
 
 if TYPE_CHECKING:
     from awkward._v2.highlevel import Array as AwkwardArray
@@ -203,16 +200,17 @@ def local_index(array, axis=-1, highlevel: bool = True, behavior=None):
 
 @borrow_docstring(ak.mask)
 def mask(array, mask, valid_when=True, highlevel: bool = True, behavior=None):
-    if not compatible_partitions(array, mask):
-        raise IncompatiblePartitions("mask", array, mask)
-    return map_partitions(
-        ak.mask,
-        array,
-        mask,
-        valid_when=valid_when,
-        highlevel=highlevel,
-        behavior=behavior,
-    )
+    # if not compatible_partitions(array, mask):
+    #     raise IncompatiblePartitions("mask", array, mask)
+    # return map_partitions(
+    #     ak.mask,
+    #     array,
+    #     mask,
+    #     valid_when=valid_when,
+    #     highlevel=highlevel,
+    #     behavior=behavior,
+    # )
+    raise DaskAwkwardNotImplemented("TODO")
 
 
 @borrow_docstring(ak.nan_to_num)
@@ -225,17 +223,18 @@ def nan_to_num(
     highlevel: bool = True,
     behavior: Any | None = None,
 ):
-    return map_partitions(
-        ak.nan_to_num,
-        array,
-        output_partitions=1,
-        copy=copy,
-        nan=nan,
-        posinf=posinf,
-        neginf=neginf,
-        highlevel=highlevel,
-        behavior=behavior,
-    )
+    # return map_partitions(
+    #     ak.nan_to_num,
+    #     array,
+    #     output_partitions=1,
+    #     copy=copy,
+    #     nan=nan,
+    #     posinf=posinf,
+    #     neginf=neginf,
+    #     highlevel=highlevel,
+    #     behavior=behavior,
+    # )
+    raise DaskAwkwardNotImplemented("TODO")
 
 
 @borrow_docstring(ak.num)

@@ -3,14 +3,8 @@ from __future__ import annotations
 import awkward._v2 as ak
 import numpy as np
 
-from dask_awkward.core import (
-    DaskAwkwardNotImplemented,
-    IncompatiblePartitions,
-    compatible_partitions,
-    map_partitions,
-    pw_reduction_with_agg_to_scalar,
-)
-from dask_awkward.utils import borrow_docstring
+from dask_awkward.core import map_partitions, pw_reduction_with_agg_to_scalar
+from dask_awkward.utils import DaskAwkwardNotImplemented, borrow_docstring
 
 __all__ = (
     "all",
@@ -105,8 +99,6 @@ def corr(
     mask_identity=True,
     flatten_records=False,
 ):
-    if not compatible_partitions(x, y):
-        raise IncompatiblePartitions("corr", x, y)
     raise DaskAwkwardNotImplemented("TODO")
 
 
@@ -192,8 +184,6 @@ def covar(
     mask_identity=True,
     flatten_records=False,
 ):
-    if not compatible_partitions(x, y):
-        raise IncompatiblePartitions("covar", x, y)
     raise DaskAwkwardNotImplemented("TODO")
 
 
@@ -207,8 +197,6 @@ def linear_fit(
     mask_identity=True,
     flatten_records=False,
 ):
-    if not compatible_partitions(x, y):
-        raise IncompatiblePartitions("linear_fit", x, y)
     raise DaskAwkwardNotImplemented("TODO")
 
 
@@ -336,22 +324,7 @@ def std(
     mask_identity=True,
     flatten_records=False,
 ):
-    if weight is not None:
-        raise DaskAwkwardNotImplemented("dak.std with weights is not supported yet.")
-
-    if axis == 1:
-        return map_partitions(
-            ak.std,
-            x,
-            output_divisions=1,
-            weight=weight,
-            ddof=ddof,
-            axis=axis,
-            keepdims=keepdims,
-            mask_identity=mask_identity,
-            flatten_records=flatten_records,
-        )
-    raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
+    raise DaskAwkwardNotImplemented("TODO")
 
 
 @borrow_docstring(ak.sum)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import abc
 import io
 import warnings
 from typing import TYPE_CHECKING, Any
@@ -34,44 +35,48 @@ __all__ = ["from_json"]
 class FromJsonWrapper:
     def __init__(
         self,
-        *,
+        *args: Any,
         storage: AbstractFileSystem,
         compression: str | None = None,
+        **kwargs: Any,
     ) -> None:
         self.compression = compression
         self.storage = storage
+        self.args = args
+        self.kwargs = kwargs
 
-    def __call__(self, source: tuple[Any, ...]) -> ak.Array:
-        raise NotImplementedError("Must be implemented by child class.")
+    @abc.abstractmethod
+    def __call__(self, source: Any) -> ak.Array:
+        pass  # pragma: no cover
 
 
 class FromJsonLineDelimitedWrapper(FromJsonWrapper):
     def __init__(
         self,
-        *,
+        *args: Any,
         storage: AbstractFileSystem,
         compression: str | None = None,
+        **kwargs: Any,
     ) -> None:
-        super().__init__(storage=storage, compression=compression)
+        super().__init__(*args, storage=storage, compression=compression, **kwargs)
 
-    def __call__(self, source: tuple[Any, ...]) -> ak.Array:
-        (f,) = source
-        with self.storage.open(f, mode="rt", compression=self.compression) as f:
-            return ak.from_iter(json.loads(line) for line in f)
+    def __call__(self, source: str) -> ak.Array:
+        with self.storage.open(source, mode="rt", compression=self.compression) as f:
+            return ak.from_json(f.read())
 
 
 class FromJsonSingleObjInFileWrapper(FromJsonWrapper):
     def __init__(
         self,
-        *,
+        *args: Any,
         storage: AbstractFileSystem,
         compression: str | None = None,
+        **kwargs: Any,
     ) -> None:
-        super().__init__(storage=storage, compression=compression)
+        super().__init__(*args, storage=storage, compression=compression, **kwargs)
 
-    def __call__(self, source: tuple[Any, ...]) -> ak.Array:
-        (f,) = source
-        with self.storage.open(f, mode="r", compression=self.compression) as f:
+    def __call__(self, source: str) -> ak.Array:
+        with self.storage.open(source, mode="r", compression=self.compression) as f:
             return ak.Array([json.load(f)])
 
 
@@ -97,7 +102,7 @@ def derive_json_meta(
 
     if one_obj_per_file:
         fn = FromJsonSingleObjInFileWrapper(storage=storage, compression=compression)
-        return ak.Array(fn((source,)).layout.typetracer.forget_length())
+        return ak.Array(fn(source).layout.typetracer.forget_length())
 
     # when the data is uncompressed we read `bytechunks` number of
     # bytes then split on a newline bytes, and use the first
@@ -245,8 +250,7 @@ def from_json(
         else:
             f = FromJsonLineDelimitedWrapper(storage=fs, compression=compression)
 
-        parts = [(x,) for x in urlpaths]
-        return from_map(f, parts, label="from-json", meta=meta)
+        return from_map(f, urlpaths, label="from-json", meta=meta)
 
     # if a `delimiter` and `blocksize` are defined we use Dask's
     # `read_bytes` function to get delayed chunks of bytes.

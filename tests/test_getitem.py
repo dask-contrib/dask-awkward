@@ -85,6 +85,14 @@ def test_boolean_array(line_delim_records_file, op) -> None:
     assert_eq(dx1_p, cx1_p)
 
 
+def test_boolean_array_from_awkward(line_delim_records_file) -> None:
+    daa = dak.from_json([line_delim_records_file] * 3)
+    cx1_2 = daa.analysis.x1.compute()
+    dx1_2 = dak.from_awkward(cx1_2, npartitions=6)
+    dx1_2 = dx1_2[dx1_2 > 2]
+    assert_eq(dx1_2, cx1_2[cx1_2 > 2])
+
+
 def test_tuple_boolean_array_raise(line_delim_records_file) -> None:
     daa = dak.from_json([line_delim_records_file] * 2)
     sel = dak.num(daa.analysis.x1, axis=1) >= 2
