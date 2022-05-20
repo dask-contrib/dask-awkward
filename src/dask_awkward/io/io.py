@@ -318,10 +318,11 @@ def from_map(
     func : Callable
         Function used to create each partition.
     *iterables : Iterable
-        Iterable objects to map to each output partition. All iterables must
-        be the same length. This length determines the number of partitions
-        in the output collection (only one element of each iterable will
-        be passed to ``func`` for each partition).
+        Iterable objects to map to each output partition. All
+        iterables must be the same length. This length determines the
+        number of partitions in the output collection (only one
+        element of each iterable will be passed to `func` for each
+        partition).
     label : str, optional
         String to use as the function-name label in the output
         collection-key names.
