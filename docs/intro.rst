@@ -38,6 +38,11 @@ with the same programming style; on the left we operate eagerly with
    x = ak.from_json("data.00.json")        x = dak.from_json("data.*.json")
    x = x[ak.num(x.foo) > 2]                x = x[dak.num(x.foo).compute()
 
+.. note::
+
+   dask-awkward depends on the in-development version 2 of awkward;
+   which exists in the ``awkward._v2`` namespace.
+
 On the left (the eager version) the second line will immediately begin
 to read data from disk and decode the JSON. Sequentially after that,
 the selection step will execute.
@@ -50,10 +55,6 @@ of each file in parallel, and when each reading task is done, the
 selection tasks will follow. Dask will schedule the tasks itself (and
 it will attempt to optimize its work).
 
-.. note::
-
-   dask-awkward depends on the in-development version 2 of awkward;
-   which exists in the ``awkward._v2`` namespace.
 
 For example usage of dask-awkward, `we have a demo repository
 <https://github.com/douglasdavis/dask-awkward-demo>`__.
