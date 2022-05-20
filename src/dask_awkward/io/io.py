@@ -29,9 +29,33 @@ class FromAwkwardWrapper:
         return self.arr[start:stop]
 
 
-def from_awkward(source: ak.Array, npartitions: int, name: str | None = None) -> Array:
-    if name is None:
-        name = f"from-awkward-{tokenize(source, npartitions)}"
+def from_awkward(source: ak.Array, npartitions: int, label: str | None = None) -> Array:
+    """Create a Dask collection from a concrete awkward array.
+
+    Parameters
+    ----------
+    source : ak.Array
+        The concrete awkward array.
+    npartitions : int
+        The total number of partitions for the collection.
+    label : str, optional
+        Label for the task.
+
+    Returns
+    -------
+    Array
+        Resuling awkward array collection.
+
+    Examples
+    --------
+    >>> import dask_awkward as dak
+    >>> import awkward._v2 as ak
+    >>> a = ak.Array([[1, 2, 3], [4], [5, 6, 7, 8]])
+    >>> c = dak.from_awkward(a, npartitions=3)
+    >>> c.partitions[[0, 1]].compute()
+    <Array [[1, 2, 3], [4]] type='2 * var * int64'>
+
+    """
     nrows = len(source)
     chunksize = int(ceil(nrows / npartitions))
     locs = list(range(0, nrows, chunksize)) + [nrows]
@@ -42,7 +66,7 @@ def from_awkward(source: ak.Array, npartitions: int, name: str | None = None) ->
         FromAwkwardWrapper(source),
         starts,
         stops,
-        label="from-awkward",
+        label=label or "from-awkward",
         token=tokenize(source, npartitions),
         divisions=tuple(locs),
         meta=meta,
@@ -59,8 +83,8 @@ def from_delayed(
 
     Parameters
     ----------
-    arrays : list[Delayed] | Delayed
-        Iterable of ``dask.delayed.Delayed`` objects (or a single
+    arrays : list[dask.delayed.Delayed] | dask.delayed.Delayed
+        List of :py:class:`~dask.delayed.Delayed` objects (or a single
         object). Each Delayed object represents a single partition in
         the resulting awkward array.
     meta : ak.Array, optional
@@ -101,13 +125,12 @@ def to_delayed(array: Array, optimize_graph: bool = True) -> list[Delayed]:
     Parameters
     ----------
     optimize_graph : bool
-        If True the task graph associated with the collection will
-        be optimized before conversion to the list of Delayed
-        objects.
+        If ``True`` the task graph associated with the collection will
+        be optimized before conversion to the list of Delayed objects.
 
     Returns
     -------
-    list[Delayed]
+    list[dask.delayed.Delayed]
         List of delayed objects (one per partition).
 
     """
@@ -124,6 +147,22 @@ def to_delayed(array: Array, optimize_graph: bool = True) -> list[Delayed]:
 
 
 def to_dask_array(array: Array) -> DaskArray:
+    """Convert awkward array collection to a Dask array collection.
+
+    This conversion requires the awkward array to have a rectilinear
+    shape (that is, no lists of variable length lists).
+
+    Parameters
+    ----------
+    array : Array
+        The dask awkward array collection.
+
+    Returns
+    -------
+    dask.array.Array
+        The new :py:class:`dask.array.Array` collection.
+
+    """
     from dask.array.core import new_da_object
 
     new = map_partitions(ak.to_numpy, array)
@@ -278,7 +317,7 @@ def from_map(
     ----------
     func : Callable
         Function used to create each partition.
-    *iterables : Iterable objects
+    *iterables : Iterable
         Iterable objects to map to each output partition. All iterables must
         be the same length. This length determines the number of partitions
         in the output collection (only one element of each iterable will
