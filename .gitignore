@@ -4,6 +4,7 @@
 # default dask visualize() output
 mydask.png
 dask-hlg.svg
+test_cluster_dump
 
 # distributed
 dask-worker-space
