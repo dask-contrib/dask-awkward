@@ -7,24 +7,29 @@ from dask.base import is_dask_collection
 
 from dask_awkward.core import Array, Record, typetracer_array
 
+_DEFAULT_SCHEDULER: Any = "sync"
+
 
 def assert_eq(
     a: Any,
     b: Any,
     check_forms: bool = True,
     check_divisions: bool = True,
+    scheduler: Any | None = None,
 ) -> None:
+    scheduler = scheduler or _DEFAULT_SCHEDULER
     if isinstance(a, (Array, ak.Array)):
         assert_eq_arrays(
             a,
             b,
             check_forms=check_forms,
             check_divisions=check_divisions,
+            scheduler=scheduler,
         )
     elif isinstance(a, (Record, ak.Record)):
-        assert_eq_records(a, b)
+        assert_eq_records(a, b, scheduler=scheduler)
     else:
-        assert_eq_other(a, b)
+        assert_eq_other(a, b, scheduler=scheduler)
 
 
 def idempotent_concatenate(x: ak.Array) -> ak.Array:
@@ -32,15 +37,17 @@ def idempotent_concatenate(x: ak.Array) -> ak.Array:
 
 
 def assert_eq_arrays(
-    a: Any,
-    b: Any,
+    a: Array | ak.Array,
+    b: Array | ak.Array,
     check_forms: bool = True,
     check_divisions: bool = True,
+    scheduler: Any | None = None,
 ) -> None:
+    scheduler = scheduler or _DEFAULT_SCHEDULER
     a_is_coll = is_dask_collection(a)
     b_is_coll = is_dask_collection(b)
-    a_comp = a.compute() if a_is_coll else a
-    b_comp = b.compute() if b_is_coll else b
+    a_comp = a.compute(scheduler=scheduler) if a_is_coll else a
+    b_comp = b.compute(scheduler=scheduler) if b_is_coll else b
 
     if check_forms:
         a_tt = typetracer_array(a)
@@ -77,9 +84,15 @@ def assert_eq_arrays(
         # check the unconcatenated versions as well; a single
         # partition does not have the concatenation effect.
         if a_is_coll and not b_is_coll:
-            assert b_tt.layout.form == a.partitions[0].compute().layout.form
+            assert (
+                b_tt.layout.form
+                == a.partitions[0].compute(scheduler=scheduler).layout.form
+            )
         if not a_is_coll and b_is_coll:
-            assert a_tt.layout.form == b.partitions[0].compute().layout.form
+            assert (
+                a_tt.layout.form
+                == b.partitions[0].compute(scheduler=scheduler).layout.form
+            )
 
     if check_divisions:
         # check divisions if both collections
@@ -93,13 +106,23 @@ def assert_eq_arrays(
     assert a_comp.tolist() == b_comp.tolist()
 
 
-def assert_eq_records(a: Record | ak.Record, b: Record | ak.Record) -> None:
-    ares = a.compute() if is_dask_collection(a) else a
-    bres = b.compute() if is_dask_collection(b) else b
+def assert_eq_records(
+    a: Record | ak.Record,
+    b: Record | ak.Record,
+    scheduler: Any | None = None,
+) -> None:
+    scheduler = scheduler or _DEFAULT_SCHEDULER
+    ares = a.compute(scheduler=scheduler) if is_dask_collection(a) else a
+    bres = b.compute(scheduler=scheduler) if is_dask_collection(b) else b
     assert ares.tolist() == bres.tolist()
 
 
-def assert_eq_other(a: Any, b: Any) -> None:
-    ares = a.compute() if is_dask_collection(a) else a
-    bres = b.compute() if is_dask_collection(b) else b
+def assert_eq_other(
+    a: Any,
+    b: Any,
+    scheduler: Any | None = None,
+) -> None:
+    scheduler = scheduler or _DEFAULT_SCHEDULER
+    ares = a.compute(scheduler=scheduler) if is_dask_collection(a) else a
+    bres = b.compute(scheduler=scheduler) if is_dask_collection(b) else b
     assert ares == bres
