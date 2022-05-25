@@ -80,10 +80,11 @@ class FromJsonSingleObjInFileWrapper(FromJsonWrapper):
             return ak.Array([json.load(f)])
 
 
-def _from_json_bytes(source) -> ak.Array:
-    return ak.from_iter(
-        json.loads(ch) for ch in io.TextIOWrapper(io.BytesIO(source)) if ch
-    )
+class FromJsonBytesWrapper:
+    def __call__(self, source) -> ak.Array:
+        return ak.from_iter(
+            json.loads(ch) for ch in io.TextIOWrapper(io.BytesIO(source)) if ch
+        )
 
 
 def derive_json_meta(
@@ -132,6 +133,85 @@ def derive_json_meta(
             if i >= sample_rows:
                 break
         return ak.Array(ak.from_iter(lines).layout.typetracer.forget_length())
+
+
+def _from_json_files(
+    *,
+    urlpath: str | list[str],
+    one_obj_per_file: bool = False,
+    compression: str | None = "infer",
+    meta: ak.Array | None = None,
+    derive_meta_kwargs: dict[str, Any] | None = None,
+    storage_options: dict[str, Any] | None = None,
+) -> Array:
+    fs, fstoken, urlpaths = fsspec.get_fs_token_paths(
+        urlpath,
+        mode="rb",
+        storage_options=storage_options,
+    )
+    if meta is None:
+        meta_read_kwargs = derive_meta_kwargs or {}
+        meta = derive_json_meta(
+            fs,
+            urlpaths[0],
+            one_obj_per_file=one_obj_per_file,
+            **meta_read_kwargs,
+        )
+
+    token = tokenize(fstoken, one_obj_per_file, compression, meta)
+
+    if compression == "infer":
+        compression = infer_compression(urlpaths[0])
+
+    if one_obj_per_file:
+        f: FromJsonWrapper = FromJsonSingleObjInFileWrapper(
+            storage=fs,
+            compression=compression,
+        )
+    else:
+        f = FromJsonLineDelimitedWrapper(storage=fs, compression=compression)
+
+    return from_map(f, urlpaths, label="from-json", token=token, meta=meta)
+
+
+def _from_json_bytes(
+    *,
+    urlpath: str | list[str],
+    blocksize: int | str,
+    delimiter: Any,
+    meta: ak.Array | None,
+    storage_options: dict[str, Any] | None,
+) -> Array:
+    token = tokenize(urlpath, delimiter, blocksize, meta)
+    name = f"from-json-{token}"
+    storage_options = storage_options or {}
+    _, bytechunks = read_bytes(
+        urlpath,
+        delimiter=delimiter,
+        blocksize=blocksize,  # type: ignore
+        sample=None,  # type: ignore
+        **storage_options,
+    )
+    flat_chunks: list[Delayed] = list(flatten(bytechunks))
+    f = FromJsonBytesWrapper()
+    dsk = {
+        (name, i): (f, delayed_chunk.key) for i, delayed_chunk in enumerate(flat_chunks)
+    }
+    deps = flat_chunks
+    n = len(deps)
+
+    # doesn't work because flat_chunks elements are remaining delayed objects.
+    # return from_map(
+    #     _from_json_bytes,
+    #     flat_chunks,
+    #     label="from-json",
+    #     token=token,
+    #     produces_tasks=True,
+    #     deps=flat_chunks,
+    # )
+
+    hlg = HighLevelGraph.from_collections(name, dsk, dependencies=deps)
+    return new_array_object(hlg, name, meta=meta, npartitions=n)
 
 
 def from_json(
@@ -186,6 +266,8 @@ def from_json(
     derive_meta_kwargs : dict[str, Any], optional
         Dictionary of arguments to be passed to `derive_json_meta` for
         determining the collection metadata if `meta` is ``None``.
+    storage_options : dict[str, Any], optional
+        Storage options passed to fsspec.
 
     Returns
     -------
@@ -222,69 +304,26 @@ def from_json(
     # read a single file or a list of files. The list of files are
     # expected to be line delimited (one JSON object per line)
     if delimiter is None and blocksize is None:
-        fs, fstoken, urlpaths = fsspec.get_fs_token_paths(
-            urlpath,
-            mode="rb",
+        return _from_json_files(
+            urlpath=urlpath,
+            one_obj_per_file=one_obj_per_file,
+            compression=compression,
+            meta=meta,
+            derive_meta_kwargs=derive_meta_kwargs,
             storage_options=storage_options,
         )
-        if meta is None:
-            meta_read_kwargs = derive_meta_kwargs or {}
-            meta = derive_json_meta(
-                fs,
-                urlpaths[0],
-                one_obj_per_file=one_obj_per_file,
-                **meta_read_kwargs,
-            )
-
-        token = tokenize(fstoken, one_obj_per_file, compression, meta)
-        name = f"from-json-{token}"
-
-        if compression == "infer":
-            compression = infer_compression(urlpaths[0])
-
-        if one_obj_per_file:
-            f: FromJsonWrapper = FromJsonSingleObjInFileWrapper(
-                storage=fs,
-                compression=compression,
-            )
-        else:
-            f = FromJsonLineDelimitedWrapper(storage=fs, compression=compression)
-
-        return from_map(f, urlpaths, label="from-json", meta=meta)
 
     # if a `delimiter` and `blocksize` are defined we use Dask's
     # `read_bytes` function to get delayed chunks of bytes.
     elif delimiter is not None and blocksize is not None:
-        token = tokenize(urlpath, delimiter, blocksize, meta)
-        name = f"from-json-{token}"
-        storage_options = storage_options or {}
-        _, bytechunks = read_bytes(
-            urlpath,
+        return _from_json_bytes(
+            urlpath=urlpath,
             delimiter=delimiter,
-            blocksize=blocksize,  # type: ignore
-            sample=None,  # type: ignore
-            **storage_options,
+            blocksize=blocksize,
+            meta=meta,
+            storage_options=storage_options,
         )
-        flat_chunks: list[Delayed] = list(flatten(bytechunks))
-        dsk = {
-            (name, i): (_from_json_bytes, delayed_chunk.key)
-            for i, delayed_chunk in enumerate(flat_chunks)
-        }
-        deps = flat_chunks
-        n = len(deps)
 
-        # doesn't work because flat_chunks elements are remaining delayed objects.
-        # return from_map(
-        #     _from_json_bytes,
-        #     flat_chunks,
-        #     label="from-json",
-        #     token=token,
-        #     produces_tasks=True,
-        #     deps=flat_chunks,
-        # )
-
+    # otherwise the arguments are bad
     else:
         raise TypeError("Incompatible combination of arguments.")  # pragma: no cover
-
-    hlg = HighLevelGraph.from_collections(name, dsk, dependencies=deps)
-    return new_array_object(hlg, name, meta=meta, npartitions=n)
