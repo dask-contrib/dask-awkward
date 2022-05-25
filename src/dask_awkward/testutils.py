@@ -6,6 +6,33 @@ import awkward._v2 as ak
 from dask.base import is_dask_collection
 
 from dask_awkward.core import Array, Record, typetracer_array
+from dask_awkward.io.io import from_map
+
+ONE = [
+    [{"x": 1, "y": 1.1}, {"x": 2, "y": 2.2}, {"x": 3, "y": 3.3}],
+    [],
+    [{"x": 4, "y": 4.4}, {"x": 5, "y": 5.5}],
+    [{"x": 6, "y": 6.6}],
+    [{"x": 7, "y": 7.7}, {"x": 8, "y": 8.8}, {"x": 9, "y": 9.9}],
+]
+
+
+TWO = [
+    [{"x": 0.9, "y": 1}, {"x": 2, "y": 2.2}, {"x": 2.9, "y": 3}],
+    [],
+    [{"x": 3.9, "y": 4}, {"x": 5, "y": 5.5}],
+    [{"x": 5.9, "y": 6}],
+    [{"x": 6.9, "y": 7}, {"x": 8, "y": 8.8}, {"x": 8.9, "y": 9}],
+]
+
+
+def _list_to_array(obj):
+    return ak.Array(obj)
+
+
+def from_lists(*lists):
+    return from_map(_list_to_array, list(lists))
+
 
 _DEFAULT_SCHEDULER: Any = "sync"
 
@@ -55,14 +82,14 @@ def assert_eq_arrays(
         assert a_tt is not None
         assert b_tt is not None
 
-        # that that the idempotent concatation of the typetracers for
+        # note that the idempotent concatation of the typetracers for
         # both a and b yield the same form.
         a_concated_form = idempotent_concatenate(a_tt).layout.form
         b_concated_form = idempotent_concatenate(b_tt).layout.form
         assert a_concated_form == b_concated_form
 
         # if a is a collection with multiple partitions its computed
-        # from should be the same the concated version
+        # form should be the same the concated version
         if a_is_coll and a.npartitions > 1:
             assert a_comp.layout.form == a_concated_form
 
@@ -72,7 +99,7 @@ def assert_eq_arrays(
             assert a_comp.layout.form == a_tt.layout.form
 
         # if b is a collection with multiple partitions its computed
-        # from should be the same the concated version
+        # form should be the same the concated version
         if b_is_coll and b.npartitions > 1:
             assert b_comp.layout.form == b_concated_form
 
