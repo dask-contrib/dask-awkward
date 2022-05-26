@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 import awkward._v2 as ak
 from dask import persist
 from dask.delayed import delayed
-from distributed import wait
+from distributed.client import _wait
 from distributed.utils_test import cluster_fixture  # noqa
 from distributed.utils_test import loop  # noqa
 from distributed.utils_test import a, b  # noqa
@@ -33,11 +33,11 @@ def test_simple_compute(c) -> None:  # noqa
 
 
 @gen_cluster(client=True)
-async def test_persist(c, s, a, b) -> None:  # noqa
+async def test_persist(c: Client, s, a, b) -> None:  # noqa
     x1 = copy.copy(X)
     x2 = dak.from_awkward(x1, npartitions=3)
     (x3,) = persist(x2, scheduler=c)
-    await wait(x3)
+    await _wait(x3)
     assert x3.__dask_keys__()[0] in x2.__dask_keys__()
 
 
