@@ -43,6 +43,7 @@ def assert_eq(
     check_forms: bool = True,
     check_divisions: bool = True,
     scheduler: Any | None = None,
+    **kwargs: Any,
 ) -> None:
     scheduler = scheduler or _DEFAULT_SCHEDULER
     if isinstance(a, (Array, ak.Array)):
@@ -52,11 +53,12 @@ def assert_eq(
             check_forms=check_forms,
             check_divisions=check_divisions,
             scheduler=scheduler,
+            **kwargs,
         )
     elif isinstance(a, (Record, ak.Record)):
-        assert_eq_records(a, b, scheduler=scheduler)
+        assert_eq_records(a, b, scheduler=scheduler, **kwargs)
     else:
-        assert_eq_other(a, b, scheduler=scheduler)
+        assert_eq_other(a, b, scheduler=scheduler, **kwargs)
 
 
 def idempotent_concatenate(x: ak.Array) -> ak.Array:
@@ -67,6 +69,7 @@ def assert_eq_arrays(
     a: Array | ak.Array,
     b: Array | ak.Array,
     check_forms: bool = True,
+    check_unconcat_form: bool = True,
     check_divisions: bool = True,
     scheduler: Any | None = None,
 ) -> None:
@@ -76,9 +79,10 @@ def assert_eq_arrays(
     a_comp = a.compute(scheduler=scheduler) if a_is_coll else a
     b_comp = b.compute(scheduler=scheduler) if b_is_coll else b
 
+    a_tt = typetracer_array(a)
+    b_tt = typetracer_array(b)
+
     if check_forms:
-        a_tt = typetracer_array(a)
-        b_tt = typetracer_array(b)
         assert a_tt is not None
         assert b_tt is not None
 
@@ -108,6 +112,7 @@ def assert_eq_arrays(
         elif b_is_coll and b.npartitions == 1:
             assert b_comp.layout.form == b_tt.layout.form
 
+    if check_unconcat_form:
         # check the unconcatenated versions as well; a single
         # partition does not have the concatenation effect.
         if a_is_coll and not b_is_coll:

@@ -5,9 +5,11 @@ import pytest
 distributed = pytest.importorskip("distributed")
 
 import copy
+from typing import TYPE_CHECKING
 
 import awkward._v2 as ak
 from dask import persist
+from dask.delayed import delayed
 from distributed import wait
 from distributed.utils_test import cluster_fixture  # noqa
 from distributed.utils_test import loop  # noqa
@@ -17,6 +19,9 @@ from distributed.utils_test import cluster, gen_cluster, inc, s, varying  # noqa
 
 import dask_awkward as dak
 from dask_awkward.testutils import assert_eq
+
+if TYPE_CHECKING:
+    from distributed import Client
 
 X = ak.from_iter([[1, 2, 3], [4], [5, 6, 7]])
 
@@ -58,3 +63,15 @@ async def test_compute(
         optimize_graph=optimize_graph,
     )
     assert res.tolist() == ak.num(caa.analysis.x1, axis=1).tolist()
+
+
+def test_from_delayed(c: Client, line_delim_records_file: str) -> None:  # noqa
+    def make_a_concrete(file: str) -> ak.Array:
+        with open(file) as f:
+            return ak.from_json(f.read())
+
+    make_a_delayed = delayed(make_a_concrete, pure=True)
+
+    x = dak.from_delayed([make_a_delayed(f) for f in [line_delim_records_file] * 3])
+    y = ak.concatenate([make_a_concrete(f) for f in [line_delim_records_file] * 3])
+    assert_eq(x, y, scheduler=c, check_unconcat_form=False)
