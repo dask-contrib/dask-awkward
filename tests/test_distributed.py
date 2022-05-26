@@ -36,11 +36,8 @@ def test_simple_compute(c) -> None:  # noqa
 async def test_persist(c, s, a, b) -> None:  # noqa
     x1 = copy.copy(X)
     x2 = dak.from_awkward(x1, npartitions=3)
-
-    (x3,) = persist(x2)
-
+    (x3,) = persist(x2, scheduler=c)
     await wait(x3)
-
     assert x3.__dask_keys__()[0] in x2.__dask_keys__()
 
 
