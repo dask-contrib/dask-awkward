@@ -73,8 +73,45 @@ def from_awkward(source: ak.Array, npartitions: int, label: str | None = None) -
     )
 
 
+def from_lists(source: list[list[Any]]) -> Array:
+    """Create a Dask collection from a list of lists.
+
+    Parameters
+    ----------
+    source : list[list[Any]]
+        List of lists, each outer list will become a partition in the
+        collection.
+
+    Returns
+    -------
+    Array
+        Resulting Array collection.
+
+    Examples
+    --------
+    >>> import dask_awkward as dak
+    >>> a = [[1, 2, 3], [4]]
+    >>> b = [[5], [6, 7, 8]]
+    >>> c = dak.from_lists([a, b])
+    >>> c
+    dask.awkward<from-lists, npartitions=2>
+    >>> c.compute()
+    <Array [[1, 2, 3], [4], [5], [6, 7, 8]] type='4 * var * int64'>
+
+    """
+    lists = list(source)
+    divs = [0, *np.cumsum(list(map(len, lists)))]
+    return from_map(
+        lambda x: ak.Array(x),
+        lists,
+        meta=typetracer_array(ak.Array(lists[0])),
+        divisions=tuple(divs),
+        label="from-lists",
+    )
+
+
 def from_delayed(
-    arrays: list[Delayed] | Delayed,
+    source: list[Delayed] | Delayed,
     meta: ak.Array | None = None,
     divisions: tuple[int | None, ...] | None = None,
     prefix: str = "from-delayed",
@@ -83,7 +120,7 @@ def from_delayed(
 
     Parameters
     ----------
-    arrays : list[dask.delayed.Delayed] | dask.delayed.Delayed
+    source : list[dask.delayed.Delayed] | dask.delayed.Delayed
         List of :py:class:`~dask.delayed.Delayed` objects (or a single
         object). Each Delayed object represents a single partition in
         the resulting awkward array.
@@ -104,16 +141,16 @@ def from_delayed(
     """
     from dask.delayed import Delayed
 
-    parts = [arrays] if isinstance(arrays, Delayed) else arrays
-    name = f"{prefix}-{tokenize(arrays)}"
+    parts = [source] if isinstance(source, Delayed) else source
+    name = f"{prefix}-{tokenize(source)}"
     dsk = {(name, i): part.key for i, part in enumerate(parts)}
     if divisions is None:
-        divs: tuple[int | None, ...] = (None,) * (len(arrays) + 1)
+        divs: tuple[int | None, ...] = (None,) * (len(source) + 1)
     else:
         divs = tuple(divisions)
-        if len(divs) != len(arrays) + 1:
-            raise ValueError("divisions must be a tuple of length len(arrays) + 1")
-    hlg = HighLevelGraph.from_collections(name, dsk, dependencies=arrays)
+        if len(divs) != len(source) + 1:
+            raise ValueError("divisions must be a tuple of length len(source) + 1")
+    hlg = HighLevelGraph.from_collections(name, dsk, dependencies=source)
     return new_array_object(hlg, name=name, meta=meta, divisions=divs)
 
 

@@ -8,6 +8,7 @@ import copy
 from typing import TYPE_CHECKING
 
 import awkward._v2 as ak
+import numpy as np
 from dask import persist
 from dask.delayed import delayed
 from distributed.client import _wait
@@ -18,6 +19,7 @@ from distributed.utils_test import client as c  # noqa
 from distributed.utils_test import cluster, gen_cluster, inc, s, varying  # noqa
 
 import dask_awkward as dak
+import dask_awkward.testutils as daktu
 from dask_awkward.testutils import assert_eq
 
 if TYPE_CHECKING:
@@ -72,3 +74,40 @@ def test_from_delayed(c: Client, line_delim_records_file: str) -> None:  # noqa
     x = dak.from_delayed([make_a_delayed(f) for f in [line_delim_records_file] * 3])
     y = ak.concatenate([make_a_concrete(f) for f in [line_delim_records_file] * 3])
     assert_eq(x, y, scheduler=c, check_unconcat_form=False)
+
+
+def test_from_lists(c: Client) -> None:  # noqa
+
+    daa = dak.from_lists([daktu.A1, daktu.A2])
+    caa = ak.Array(daktu.A1 + daktu.A2)
+    assert_eq(daa, caa, scheduler=c)
+    assert_eq(daa.x, caa.x, scheduler=c)
+
+
+from awkward._v2.behaviors.mixins import mixin_class as ak_mixin_class
+from awkward._v2.behaviors.mixins import mixin_class_method as ak_mixin_class_method
+
+behaviors = {}
+
+
+@ak_mixin_class(behaviors)
+class Point:
+    def distance(self, other):
+        return np.sqrt((self.x - other.x) ** 2 + (self.y - other.y) ** 2)
+
+    @property
+    def x2(self):
+        return self.x * self.x
+
+    @ak_mixin_class_method(np.abs)
+    def point_abs(self):
+        return np.sqrt(self.x**2 + self.y**2)
+
+
+def test_from_list_behaviorized(c: Client) -> None:  # noqa
+    daa = dak.from_lists([daktu.A1, daktu.A2])
+    daa = dak.with_name(daa, name="Point", behavior=behaviors)
+    caa = ak.Array(daktu.A1 + daktu.A2, with_name="Point", behavior=behaviors)
+
+    assert_eq(daa.x2, caa.x2, scheduler=c)
+    assert_eq(daa.distance(daa), caa.distance(caa), scheduler=c)

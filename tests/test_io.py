@@ -13,6 +13,7 @@ except ImportError:
     import json  # type: ignore
 
 import dask_awkward as dak
+import dask_awkward.testutils as daktu
 from dask_awkward.testutils import assert_eq
 
 
@@ -166,7 +167,7 @@ def test_from_map_enumerate() -> None:
     assert_eq(a1, a2)
 
 
-def test_from_map_exceptions():
+def test_from_map_exceptions() -> None:
     def f(a, b):
         return ak.Array([a, b])
 
@@ -184,3 +185,9 @@ def test_from_map_exceptions():
 
     with pytest.raises(ValueError, match="at least one Iterable input"):
         dak.from_map(f, args=(5,))
+
+
+def test_from_lists() -> None:
+    daa = dak.from_lists([daktu.A1, daktu.A2])
+    caa = ak.Array(daktu.A1 + daktu.A2)
+    assert_eq(daa, caa)

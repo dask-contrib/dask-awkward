@@ -9,6 +9,7 @@ from dask_awkward.io.io import (
     from_awkward,
     from_dask_array,
     from_delayed,
+    from_lists,
     from_map,
     to_dask_array,
     to_delayed,
