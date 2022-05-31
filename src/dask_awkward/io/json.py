@@ -192,7 +192,7 @@ def _from_json_bytes(
         sample=None,  # type: ignore
         **storage_options,
     )
-    flat_chunks: list[Delayed] = list(flatten(bytechunks))
+    flat_chunks: list[Delayed] = list(flatten(bytechunks))  # type: ignore
     f = FromJsonBytesWrapper()
     dsk = {
         (name, i): (f, delayed_chunk.key) for i, delayed_chunk in enumerate(flat_chunks)
