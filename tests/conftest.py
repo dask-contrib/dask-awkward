@@ -75,6 +75,13 @@ def line_delim_records_file() -> str:
 
 
 @pytest.fixture(scope="session")
+def concrete_from_line_delim(line_delim_records_file) -> ak.Array:
+    """Fixture returning a concrete array from the line delim records file."""
+    with fsspec.open(line_delim_records_file, "rt") as f:
+        return ak.from_json(f.read())
+
+
+@pytest.fixture(scope="session")
 def single_record_file() -> str:
     """Fixture providing file name pointing to a single JSON record."""
     return str(akds.single_record())

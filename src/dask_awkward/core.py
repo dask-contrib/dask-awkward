@@ -1352,7 +1352,7 @@ def to_meta(objects: Sequence[Any]) -> tuple[Any, ...]:
     return tuple(map(meta_or_identity, objects))
 
 
-def typetracer_array(a: ak.Array | Array) -> ak.Array | None:
+def typetracer_array(a: ak.Array | Array) -> ak.Array:
     """Retrieve the typetracer Array from a concrete or lazy instance.
 
     Parameters
@@ -1362,7 +1362,7 @@ def typetracer_array(a: ak.Array | Array) -> ak.Array | None:
 
     Returns
     -------
-    ak.Array | None
+    ak.Array
         Typetracer array associated with `a`.
 
     """

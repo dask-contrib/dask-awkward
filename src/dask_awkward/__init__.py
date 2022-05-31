@@ -35,7 +35,7 @@ from dask_awkward.reducers import (
     sum,
     var,
 )
-from dask_awkward.structure import (  # with_name,
+from dask_awkward.structure import (
     argcartesian,
     argcombinations,
     argsort,
