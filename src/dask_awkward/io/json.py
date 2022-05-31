@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     from dask_awkward.core import Array
 
 
-__all__ = ["from_json"]
+__all__ = ("from_json",)
 
 
 class FromJsonWrapper:

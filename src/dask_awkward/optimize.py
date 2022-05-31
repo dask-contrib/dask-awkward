@@ -12,8 +12,8 @@ def basic_optimize(
     keys: Hashable | list[Hashable] | set[Hashable],
 ) -> Mapping:
     if not isinstance(keys, (list, set)):
-        keys = [keys]  # pragma: no cover
-    keys = list(flatten(keys))
+        keys = (keys,)  # pragma: no cover
+    keys = tuple(flatten(keys))
 
     if not isinstance(dsk, HighLevelGraph):
         dsk = HighLevelGraph.from_collections(id(dsk), dsk, dependencies=())

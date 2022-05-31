@@ -100,12 +100,12 @@ def from_lists(source: list[list[Any]]) -> Array:
 
     """
     lists = list(source)
-    divs = [0, *np.cumsum(list(map(len, lists)))]
+    divs = (0, *np.cumsum(list(map(len, lists))))
     return from_map(
         lambda x: ak.Array(x),
         lists,
         meta=typetracer_array(ak.Array(lists[0])),
-        divisions=tuple(divs),
+        divisions=divs,
         label="from-lists",
     )
 
@@ -256,7 +256,7 @@ def from_dask_array(array: DaskArray) -> Array:
     token = tokenize(array)
     name = f"from-dask-array-{token}"
     meta = typetracer_array(ak.from_numpy(array._meta))
-    pairs = [array.name, "i"]
+    pairs = (array.name, "i")
     numblocks = {array.name: array.numblocks}
     layer = dask_blockwise(
         ak.from_numpy,
@@ -330,7 +330,7 @@ class _PackedArgCallable:
 
     def __call__(self, packed_arg: Any):
         if not self.packed:
-            packed_arg = [packed_arg]
+            packed_arg = (packed_arg,)
         return self.func(
             *packed_arg,
             *(self.args or []),
@@ -390,7 +390,7 @@ def from_map(
                 f"All elements of `iterables` must be Iterable, got {type(iterable)}"
             )
         try:
-            lengths.add(len(iterable))  # type:ignore
+            lengths.add(len(iterable))  # type: ignore
         except (AttributeError, TypeError):
             iters[i] = list(iterable)
             lengths.add(len(iters[i]))  # type: ignore
