@@ -44,7 +44,7 @@ def from_awkward(source: ak.Array, npartitions: int, label: str | None = None) -
     Returns
     -------
     Array
-        Resuling awkward array collection.
+        Resulting awkward array collection.
 
     Examples
     --------
