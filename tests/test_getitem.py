@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import operator
+from collections.abc import Callable
 
+import awkward._v2 as ak
 import pytest
 
 import dask_awkward as dak
@@ -10,7 +12,7 @@ from dask_awkward.core import DaskAwkwardNotImplemented, IncompatiblePartitions
 from dask_awkward.testutils import assert_eq
 
 
-def test_getattr_raise(daa) -> None:
+def test_getattr_raise(daa: dak.Array) -> None:
     dar = daa[0]
     assert type(dar) is dakc.Record
     with pytest.raises(AttributeError, match="not in fields"):
@@ -19,18 +21,18 @@ def test_getattr_raise(daa) -> None:
         assert dar.x3
 
 
-def test_multi_string(daa, caa) -> None:
+def test_multi_string(daa: dak.Array, caa: ak.Array) -> None:
     assert_eq(
         daa["analysis"][["x1", "y2"]],
         caa["analysis"][["x1", "y2"]],
     )
 
 
-def test_single_string(daa, caa) -> None:
+def test_single_string(daa: dak.Array, caa: ak.Array) -> None:
     assert_eq(daa["analysis"], caa["analysis"])
 
 
-def test_layered_string(daa, caa) -> None:
+def test_layered_string(daa: dak.Array, caa: ak.Array) -> None:
     assert_eq(daa["analysis", "x1"], caa["analysis", "x1"])
     assert_eq(daa["analysis", "x1"], caa["analysis"]["x1"])
     assert_eq(caa["analysis", "x1"], daa["analysis"]["x1"])
@@ -38,32 +40,39 @@ def test_layered_string(daa, caa) -> None:
     assert_eq(daa["analysis", ["x1", "t1"]], caa["analysis", ["x1", "t1"]])
 
 
-def test_list_with_ints_raise(daa) -> None:
+def test_list_with_ints_raise(daa: dak.Array) -> None:
     with pytest.raises(RuntimeError, match="Lists containing integers"):
         assert daa[[1, 2]]
 
 
-def test_single_int(daa, caa) -> None:
+def test_single_int(daa: dak.Array, caa: ak.Array) -> None:
     total = len(daa)
+    assert daa.known_divisions
     for i in range(total):
-        assert_eq(daa["analysis"]["x1"][i], caa["analysis"]["x1"][i])
-        assert_eq(daa["analysis"]["y2"][-i], caa["analysis"]["y2"][-i])
-        assert_eq(daa[i, "analysis", "x1"], caa[i, "analysis", "x1"])
+        a = daa["analysis"]["x1"]
+        c = caa["analysis"]["x1"]
+        assert a.known_divisions
+        assert_eq(a[i], c[i])
+        assert_eq(a[-i], c[-i])
+        a = daa[i, "analysis", "x1"]
+        c = caa[i, "analysis", "x1"]
+        assert not a.known_divisions
+        assert_eq(a, c)
     for i in range(total):
         assert caa[i].tolist() == daa[i].compute().tolist()
         assert caa["analysis"][i].tolist() == daa["analysis"][i].compute().tolist()
 
 
-def test_single_ellipsis(daa, caa) -> None:
+def test_single_ellipsis(daa: dak.Array, caa: ak.Array) -> None:
     assert_eq(daa[...], caa[...])
 
 
-def test_empty_slice(daa, caa) -> None:
+def test_empty_slice(daa: dak.Array, caa: ak.Array) -> None:
     assert_eq(daa[:], caa[:])
     assert_eq(daa[:, "analysis"], caa[:, "analysis"])
 
 
-def test_record_getitem(daa, caa) -> None:
+def test_record_getitem(daa: dak.Array, caa: ak.Array) -> None:
     assert daa[0].compute().to_list() == caa[0].to_list()
     assert daa["analysis"]["x1"][0][0].compute() == caa["analysis"]["x1"][0][0]
     assert daa[0]["analysis"].compute().to_list() == caa[0]["analysis"].to_list()
@@ -73,7 +82,7 @@ def test_record_getitem(daa, caa) -> None:
 
 
 @pytest.mark.parametrize("op", [operator.gt, operator.ge, operator.le, operator.lt])
-def test_boolean_array(line_delim_records_file, op) -> None:
+def test_boolean_array(line_delim_records_file: str, op: Callable) -> None:
     daa = dak.from_json([line_delim_records_file] * 3)
     caa = daa.compute()
     dx1 = daa.analysis.x1
@@ -85,7 +94,7 @@ def test_boolean_array(line_delim_records_file, op) -> None:
     assert_eq(dx1_p, cx1_p)
 
 
-def test_boolean_array_from_awkward(line_delim_records_file) -> None:
+def test_boolean_array_from_awkward(line_delim_records_file: str) -> None:
     daa = dak.from_json([line_delim_records_file] * 3)
     cx1_2 = daa.analysis.x1.compute()
     dx1_2 = dak.from_awkward(cx1_2, npartitions=6)
@@ -93,7 +102,7 @@ def test_boolean_array_from_awkward(line_delim_records_file) -> None:
     assert_eq(dx1_2, cx1_2[cx1_2 > 2])
 
 
-def test_tuple_boolean_array_raise(line_delim_records_file) -> None:
+def test_tuple_boolean_array_raise(line_delim_records_file: str) -> None:
     daa = dak.from_json([line_delim_records_file] * 2)
     sel = dak.num(daa.analysis.x1, axis=1) >= 2
     with pytest.raises(
@@ -103,7 +112,7 @@ def test_tuple_boolean_array_raise(line_delim_records_file) -> None:
         daa[sel, "analysis"]
 
 
-def test_bad_partition_boolean_array(line_delim_records_file) -> None:
+def test_bad_partition_boolean_array(line_delim_records_file: str) -> None:
     daa1 = dak.from_json([line_delim_records_file] * 2)
     daa2 = dak.from_json([line_delim_records_file] * 3)
     sel = dak.num(daa1.analysis.x1 > 2, axis=1) >= 2
