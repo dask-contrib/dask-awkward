@@ -1445,28 +1445,3 @@ class BehaviorMethodCall:
 
     def __call__(self, coll: ak.Array, *args: Any) -> ak.Array:
         return getattr(coll, self.attr)(*args, **self.kwargs)
-
-
-# class TrivialPartitionwiseOp:
-#     def __init__(
-#         self,
-#         func: Callable,
-#         *,
-#         name: str | None = None,
-#         **kwargs: Any,
-#     ) -> None:
-#         self._func = func
-#         self.name = func.__name__ if name is None else name
-#         self._kwargs = kwargs
-
-#     def __call__(self, collection: Array, **kwargs: Any) -> Array:
-#         # overwrite any saved kwargs in self._kwargs
-#         for k, v in kwargs.items():
-#             self._kwargs[k] = v
-#         try:
-#             new_meta = self._func(collection._meta, **kwargs)
-#         except NotImplementedError:
-#             new_meta = None
-#         return map_partitions(
-#             self._func, collection, name=self.name, meta=new_meta, **self._kwargs
-#         )
