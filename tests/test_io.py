@@ -13,7 +13,6 @@ except ImportError:
     import json  # type: ignore
 
 import dask_awkward as dak
-import dask_awkward.testutils as daktu
 from dask_awkward.testutils import assert_eq
 
 
@@ -187,7 +186,10 @@ def test_from_map_exceptions() -> None:
         dak.from_map(f, args=(5,))
 
 
-def test_from_lists() -> None:
-    daa = dak.from_lists([daktu.A1, daktu.A2])
-    caa = ak.Array(daktu.A1 + daktu.A2)
+def test_from_lists(caa_p1) -> None:
+    listed = caa_p1.tolist()
+    one = listed[:5]
+    two = listed[5:]
+    daa = dak.from_lists([one, two])
+    caa = ak.Array(one + two)
     assert_eq(daa, caa)

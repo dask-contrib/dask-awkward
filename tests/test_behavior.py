@@ -3,7 +3,6 @@ from __future__ import annotations
 import awkward._v2 as ak
 import numpy as np
 import pytest
-from _pytest.config import create_terminal_writer
 from awkward._v2.behaviors.mixins import mixin_class as ak_mixin_class
 from awkward._v2.behaviors.mixins import mixin_class_method as ak_mixin_class_method
 

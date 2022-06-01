@@ -4,7 +4,6 @@ import pytest
 
 distributed = pytest.importorskip("distributed")
 
-import copy
 from typing import TYPE_CHECKING
 
 import awkward._v2 as ak
