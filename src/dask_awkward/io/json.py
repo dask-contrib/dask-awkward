@@ -19,7 +19,7 @@ from dask.highlevelgraph import HighLevelGraph
 from dask.utils import parse_bytes
 from fsspec.utils import infer_compression
 
-from dask_awkward.core import new_array_object
+from dask_awkward.core import new_array_object, typetracer_array
 from dask_awkward.io.io import from_map
 
 if TYPE_CHECKING:
@@ -103,7 +103,7 @@ def derive_json_meta(
 
     if one_obj_per_file:
         fn = FromJsonSingleObjInFileWrapper(storage=storage, compression=compression)
-        return ak.Array(fn(source).layout.typetracer.forget_length())
+        return typetracer_array(fn(source))
 
     # when the data is uncompressed we read `bytechunks` number of
     # bytes then split on a newline bytes, and use the first
@@ -112,7 +112,7 @@ def derive_json_meta(
         try:
             bytes = storage.cat(source, start=0, end=bytechunks)
             lines = [json.loads(ln) for ln in bytes.split(b"\n")[:sample_rows]]
-            return ak.Array(ak.from_iter(lines).layout.typetracer.forget_length())
+            return typetracer_array(ak.from_iter(lines))
         except ValueError:
             # we'll get a ValueError if we can't decode the JSON from
             # the bytes that we grabbed.
@@ -132,7 +132,7 @@ def derive_json_meta(
             lines.append(json.loads(line))
             if i >= sample_rows:
                 break
-        return ak.Array(ak.from_iter(lines).layout.typetracer.forget_length())
+        return typetracer_array(ak.from_iter(lines))
 
 
 def _from_json_files(

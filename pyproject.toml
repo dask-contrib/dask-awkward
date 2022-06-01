@@ -11,7 +11,13 @@ write_to = "src/dask_awkward/_version.py"
 [tool.pytest.ini_options]
 minversion = "6.0"
 testpaths = ["tests"]
-addopts = ["-v", "-ra", "--showlocals", "--strict-markers", "--strict-config"]
+addopts = [
+    "-v",
+    "-ra",
+    "--showlocals",
+    "--strict-markers",
+    "--strict-config",
+]
 log_cli_level = "DEBUG"
 filterwarnings = [
     # this warnings is associated with distributed triggering

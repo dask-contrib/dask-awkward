@@ -226,6 +226,7 @@ class Record(Scalar):
     used for creating new instances.
 
     """
+
     def __init__(self, dsk: HighLevelGraph, name: str, meta: Any | None = None) -> None:
         super().__init__(dsk, name, meta)
 
@@ -849,7 +850,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 inputs_meta.append(inp._meta)
             # if input is a concrete Awkward Array, grab it's typetracer
             elif isinstance(inp, ak.Array):
-                inputs_meta.append(ak.Array(inp.layout.typetracer.forget_length()))
+                inputs_meta.append(typetracer_array(inp))
             # otherwise pass along
             else:
                 inputs_meta.append(inp)
@@ -945,7 +946,7 @@ def _get_typetracer(array: Array) -> ak.Array:
     first_part = _first_partition(array)
     if not isinstance(first_part, ak.Array):
         raise TypeError(f"Should have an ak.Array type, got {type(first_part)}")
-    return ak.Array(first_part.layout.typetracer.forget_length())
+    return typetracer_array(first_part)
 
 
 def new_array_object(
@@ -1388,8 +1389,14 @@ def typetracer_array(a: ak.Array | Array) -> ak.Array:
     """
     if isinstance(a, Array):
         return a._typetracer
-    else:
+    elif isinstance(a, ak.Array):
         return ak.Array(a.layout.typetracer.forget_length())
+    else:
+        msg = (
+            "`a` should be an awkward array or a Dask awkward collection.\n"
+            f"Got type {type(a)}"
+        )
+        raise TypeError(msg)
 
 
 def compatible_partitions(*args: Array) -> bool:

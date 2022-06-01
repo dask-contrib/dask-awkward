@@ -64,13 +64,6 @@ def test_form(line_delim_records_file) -> None:
     assert daa.form == EmptyForm()
 
 
-@pytest.mark.xfail
-def test_form_equality(line_delim_records_file) -> None:
-    # NOTE: forms come from meta which currently depends on partitioning
-    daa = dak.from_json([line_delim_records_file] * 3)
-    assert daa.form == daa.compute().layout.form
-
-
 def test_from_awkward(caa) -> None:
     daa = dak.from_awkward(caa, npartitions=4)
     assert_eq(caa, daa)
@@ -253,6 +246,8 @@ def test_typetracer_function(daa) -> None:
     tta = dakc.typetracer_array(aa)
     assert tta is not None
     assert tta.layout.form == aa.layout.form
+    with pytest.raises(TypeError, match="Got type <class 'int'>"):
+        dakc.typetracer_array(3)
 
 
 def test_single_partition(line_delim_records_file) -> None:
