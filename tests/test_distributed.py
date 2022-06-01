@@ -25,6 +25,10 @@ from dask_awkward.testutils import assert_eq
 if TYPE_CHECKING:
     from distributed import Client
 
+if daktu.DAK_TEST_DISTRIBUTED:
+    pytest.skip("Skipping dedicated distributed tests.", allow_module_level=True)
+
+
 X = ak.from_iter([[1, 2, 3], [4], [5, 6, 7]])
 
 

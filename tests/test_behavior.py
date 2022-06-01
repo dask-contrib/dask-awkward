@@ -7,6 +7,7 @@ from awkward._v2.behaviors.mixins import mixin_class as ak_mixin_class
 from awkward._v2.behaviors.mixins import mixin_class_method as ak_mixin_class_method
 
 import dask_awkward as dak
+import dask_awkward.testutils as daktu
 from dask_awkward.testutils import assert_eq
 
 one = ak.Array(
@@ -47,6 +48,7 @@ class Point:
         return np.sqrt(self.x**2 + self.y**2)
 
 
+@pytest.mark.skipif(daktu.DAK_TEST_DISTRIBUTED, reason="distributed")
 def test_distance_behavior() -> None:
     onedak = dak.with_name(
         dak.from_awkward(one, npartitions=2),
@@ -66,6 +68,7 @@ def test_distance_behavior() -> None:
     assert_eq(np.abs(onedak), np.abs(onec))
 
 
+@pytest.mark.skipif(daktu.DAK_TEST_DISTRIBUTED, reason="distributed")
 def test_property_behavior() -> None:
     onedak = dak.with_name(
         dak.from_awkward(one, npartitions=2),
@@ -76,6 +79,7 @@ def test_property_behavior() -> None:
     assert_eq(onedak.x2, onec.x2)
 
 
+@pytest.mark.skipif(daktu.DAK_TEST_DISTRIBUTED, reason="distributed")
 def test_nonexistent_behavior() -> None:
     onec = ak.Array(one, with_name="Point")
     twoc = ak.Array(two)

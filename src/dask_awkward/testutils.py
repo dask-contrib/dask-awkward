@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any
 
 import awkward._v2 as ak
@@ -32,7 +33,13 @@ A3 = [
 ]
 
 
-_DEFAULT_SCHEDULER: Any = "sync"
+DEFAULT_SCHEDULER: Any = "sync"
+DAK_TEST_DISTRIBUTED: bool = "DAK_TEST_DISTRIBUTED" in os.environ
+if DAK_TEST_DISTRIBUTED:
+    from distributed import Client
+
+    client = Client()
+    DEFAULT_SCHEDULER = client
 
 
 def assert_eq(
@@ -43,7 +50,7 @@ def assert_eq(
     scheduler: Any | None = None,
     **kwargs: Any,
 ) -> None:
-    scheduler = scheduler or _DEFAULT_SCHEDULER
+    scheduler = scheduler or DEFAULT_SCHEDULER
     if isinstance(a, (Array, ak.Array)):
         assert_eq_arrays(
             a,
@@ -71,7 +78,7 @@ def assert_eq_arrays(
     check_divisions: bool = True,
     scheduler: Any | None = None,
 ) -> None:
-    scheduler = scheduler or _DEFAULT_SCHEDULER
+    scheduler = scheduler or DEFAULT_SCHEDULER
     a_is_coll = is_dask_collection(a)
     b_is_coll = is_dask_collection(b)
     a_comp = a.compute(scheduler=scheduler) if a_is_coll else a
@@ -141,7 +148,7 @@ def assert_eq_records(
     b: Record | ak.Record,
     scheduler: Any | None = None,
 ) -> None:
-    scheduler = scheduler or _DEFAULT_SCHEDULER
+    scheduler = scheduler or DEFAULT_SCHEDULER
     ares = a.compute(scheduler=scheduler) if is_dask_collection(a) else a
     bres = b.compute(scheduler=scheduler) if is_dask_collection(b) else b
     assert ares.tolist() == bres.tolist()
@@ -152,7 +159,7 @@ def assert_eq_other(
     b: Any,
     scheduler: Any | None = None,
 ) -> None:
-    scheduler = scheduler or _DEFAULT_SCHEDULER
+    scheduler = scheduler or DEFAULT_SCHEDULER
     ares = a.compute(scheduler=scheduler) if is_dask_collection(a) else a
     bres = b.compute(scheduler=scheduler) if is_dask_collection(b) else b
     assert ares == bres
