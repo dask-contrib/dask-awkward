@@ -71,6 +71,17 @@ def _finalize_scalar(results: Sequence[T]) -> T:
 
 
 class Scalar(DaskMethodsMixin):
+    """Single partition Dask collection representing a lazy Scalar.
+
+    The class constructor is not intended for users. Instances of this
+    class will be results from awkward operations.
+
+    Within dask-awkward the ``new_scalar_object`` and
+    ``new_known_scalar`` factory functions are used for creating new
+    instances.
+
+    """
+
     def __init__(
         self,
         dsk: HighLevelGraph,
@@ -206,6 +217,15 @@ def new_known_scalar(s: Any, dtype: DTypeLike | None = None) -> Scalar:
 
 
 class Record(Scalar):
+    """Single partition Dask collection representing a lazy Awkward Record.
+
+    The class constructor is not intended for users. Instances of this
+    class will be results from awkward operations.
+
+    Within dask-awkward the ``new_record_object`` factory function is
+    used for creating new instances.
+
+    """
     def __init__(self, dsk: HighLevelGraph, name: str, meta: Any | None = None) -> None:
         super().__init__(dsk, name, meta)
 
