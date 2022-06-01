@@ -9,7 +9,6 @@ from dask.base import is_dask_collection
 
 from dask_awkward.core import Array, Record, typetracer_array
 
-
 _RG = random.Random(414)
 
 

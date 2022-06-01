@@ -133,14 +133,14 @@ def daa_p2(points_ndjson_file2: str) -> dak.Array:
 
 @pytest.fixture(scope="session")
 def caa_p1(points_ndjson_file1: str) -> ak.Array:
-    with open(points_ndjson_file1, "r") as f:
+    with open(points_ndjson_file1) as f:
         lines = [json.loads(line) for line in f]
     return ak.Array(lines * 3)
 
 
 @pytest.fixture(scope="session")
 def caa_p2(points_ndjson_file2: str) -> ak.Array:
-    with open(points_ndjson_file2, "r") as f:
+    with open(points_ndjson_file2) as f:
         lines = [json.loads(line) for line in f]
     return ak.Array(lines * 3)
 
