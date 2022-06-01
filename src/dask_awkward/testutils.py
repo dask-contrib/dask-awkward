@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import random
 from typing import Any
 
 import awkward._v2 as ak
@@ -8,29 +9,8 @@ from dask.base import is_dask_collection
 
 from dask_awkward.core import Array, Record, typetracer_array
 
-A1 = [
-    [{"x": 1.0, "y": 1.1}, {"x": 2, "y": 2.2}, {"x": 3, "y": 3.3}],
-    [],
-    [{"x": 4.0, "y": 4.4}, {"x": 5, "y": 5.5}],
-    [{"x": 6.0, "y": 6.6}],
-    [{"x": 7.0, "y": 7.7}, {"x": 8, "y": 8.8}, {"x": 9, "y": 9.9}],
-]
 
-A2 = [
-    [{"x": 0.9, "y": 1.0}, {"x": 2, "y": 2.2}, {"x": 2.9, "y": 3}],
-    [],
-    [{"x": 3.9, "y": 4.0}, {"x": 5, "y": 5.5}],
-    [{"x": 5.9, "y": 6.0}],
-    [{"x": 6.9, "y": 7.0}, {"x": 8, "y": 8.8}, {"x": 8.9, "y": 9}],
-]
-
-A3 = [
-    [{"x": 1.9, "y": 9.0}, {"x": 2, "y": 8.2}, {"x": 9.9, "y": 9}],
-    [],
-    [{"x": 1.9, "y": 8.0}, {"x": 4, "y": 6.5}],
-    [{"x": 1.9, "y": 7.0}],
-    [{"x": 1.9, "y": 6.0}, {"x": 6, "y": 4.8}, {"x": 9.9, "y": 9}],
-]
+_RG = random.Random(414)
 
 
 DEFAULT_SCHEDULER: Any = "sync"
@@ -163,3 +143,17 @@ def assert_eq_other(
     ares = a.compute(scheduler=scheduler) if is_dask_collection(a) else a
     bres = b.compute(scheduler=scheduler) if is_dask_collection(b) else b
     assert ares == bres
+
+
+def make_xy_point() -> dict[str, int]:
+    return {"x": _RG.randint(0, 10), "y": _RG.randint(0, 10)}
+
+
+def list_of_xy_points(n: int) -> list[dict[str, int]]:
+    return [make_xy_point() for _ in range(n)]
+
+
+def awkward_xy_points(lengths: tuple[int, ...] | None = None):
+    if lengths is None:
+        lengths = (3, 0, 2, 1, 3)
+    return ak.Array([list_of_xy_points(n) for n in lengths])
