@@ -225,7 +225,7 @@ def max(
             ak.max,
             ak.max,
             array,
-            axis=1,
+            axis=None,
             agg_kwargs={"axis": None},
         )
     else:
@@ -279,7 +279,7 @@ def min(
             ak.min,
             ak.min,
             array,
-            axis=1,
+            axis=None,
             agg_kwargs={"axis": None},
         )
     else:
