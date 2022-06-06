@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import random
 from typing import Any
 
@@ -13,12 +12,6 @@ _RG = random.Random(414)
 
 
 DEFAULT_SCHEDULER: Any = "sync"
-DAK_TEST_DISTRIBUTED: bool = "DAK_TEST_DISTRIBUTED" in os.environ
-if DAK_TEST_DISTRIBUTED:
-    from distributed import Client
-
-    client = Client()
-    DEFAULT_SCHEDULER = client
 
 
 def assert_eq(

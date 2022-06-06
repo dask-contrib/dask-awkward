@@ -18,14 +18,10 @@ from distributed.utils_test import client as c  # noqa
 from distributed.utils_test import cluster, gen_cluster, s, varying  # noqa
 
 import dask_awkward as dak
-import dask_awkward.testutils as daktu
 from dask_awkward.testutils import assert_eq
 
 if TYPE_CHECKING:
     from distributed import Client
-
-if daktu.DAK_TEST_DISTRIBUTED:
-    pytest.skip("Skipping dedicated distributed tests.", allow_module_level=True)
 
 
 def test_simple_compute(c, daa_p1, caa_p1) -> None:  # noqa

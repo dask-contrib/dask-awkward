@@ -102,7 +102,7 @@ def caa() -> ak.Array:
 
 
 @pytest.fixture(scope="session")
-def points_ndjson_file1(tmpdir_factory) -> str:
+def ndjson_points1(tmpdir_factory) -> str:
     array = daktu.awkward_xy_points()
     fn = tmpdir_factory.mktemp("data").join("points_ndjson1.json")
     with fsspec.open(fn, "w") as f:
@@ -112,7 +112,7 @@ def points_ndjson_file1(tmpdir_factory) -> str:
 
 
 @pytest.fixture(scope="session")
-def points_ndjson_file2(tmpdir_factory) -> str:
+def ndjson_points2(tmpdir_factory) -> str:
     array = daktu.awkward_xy_points()
     fn = tmpdir_factory.mktemp("data").join("points_ndjson2.json")
     with fsspec.open(fn, "w") as f:
@@ -122,25 +122,25 @@ def points_ndjson_file2(tmpdir_factory) -> str:
 
 
 @pytest.fixture(scope="session")
-def daa_p1(points_ndjson_file1: str) -> dak.Array:
-    return dak.from_json([points_ndjson_file1] * 3)
+def daa_p1(ndjson_points1: str) -> dak.Array:
+    return dak.from_json([ndjson_points1] * 3)
 
 
 @pytest.fixture(scope="session")
-def daa_p2(points_ndjson_file2: str) -> dak.Array:
-    return dak.from_json([points_ndjson_file2] * 3)
+def daa_p2(ndjson_points2: str) -> dak.Array:
+    return dak.from_json([ndjson_points2] * 3)
 
 
 @pytest.fixture(scope="session")
-def caa_p1(points_ndjson_file1: str) -> ak.Array:
-    with open(points_ndjson_file1) as f:
+def caa_p1(ndjson_points1: str) -> ak.Array:
+    with open(ndjson_points1) as f:
         lines = [json.loads(line) for line in f]
     return ak.Array(lines * 3)
 
 
 @pytest.fixture(scope="session")
-def caa_p2(points_ndjson_file2: str) -> ak.Array:
-    with open(points_ndjson_file2) as f:
+def caa_p2(ndjson_points2: str) -> ak.Array:
+    with open(ndjson_points2) as f:
         lines = [json.loads(line) for line in f]
     return ak.Array(lines * 3)
 
