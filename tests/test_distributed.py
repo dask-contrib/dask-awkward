@@ -15,7 +15,7 @@ from distributed.utils_test import cluster_fixture  # noqa
 from distributed.utils_test import loop  # noqa
 from distributed.utils_test import a, b, cleanup  # noqa
 from distributed.utils_test import client as c  # noqa
-from distributed.utils_test import cluster, gen_cluster, inc, s, varying  # noqa
+from distributed.utils_test import cluster, gen_cluster, s, varying  # noqa
 
 import dask_awkward as dak
 import dask_awkward.testutils as daktu

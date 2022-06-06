@@ -473,10 +473,6 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         raise ValueError("This collection's meta is None; unknown layout.")
 
     @property
-    def _typetracer(self) -> ak.Array:
-        return self._meta
-
-    @property
     def fields(self) -> list[str]:
         """Record field names (if any)."""
         return ak.fields(self._meta)
@@ -1388,7 +1384,7 @@ def typetracer_array(a: ak.Array | Array) -> ak.Array:
 
     """
     if isinstance(a, Array):
-        return a._typetracer
+        return a._meta
     elif isinstance(a, ak.Array):
         return ak.Array(a.layout.typetracer.forget_length())
     else:

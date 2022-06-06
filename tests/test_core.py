@@ -79,11 +79,10 @@ def test_len(line_delim_records_file) -> None:
     assert len(daa) == 20
 
 
-def test_meta_and_typetracer_exist(line_delim_records_file) -> None:
+def test_meta_exists(line_delim_records_file) -> None:
     daa = dak.from_json(line_delim_records_file, blocksize=700)
     assert daa._meta is not None
     assert daa["analysis"]["x1"]._meta is not None
-    assert daa._typetracer is daa._meta
 
 
 def test_meta_raise(line_delim_records_file) -> None:
@@ -242,7 +241,7 @@ def test_array_dir(daa) -> None:
 def test_typetracer_function(daa) -> None:
     aa = daa.compute()
     assert dakc.typetracer_array(daa) is not None
-    assert dakc.typetracer_array(daa) is daa._typetracer
+    assert dakc.typetracer_array(daa) is daa._meta
     tta = dakc.typetracer_array(aa)
     assert tta is not None
     assert tta.layout.form == aa.layout.form

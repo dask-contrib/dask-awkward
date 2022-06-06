@@ -65,19 +65,18 @@ def assert_eq_arrays(
 
     a_tt = typetracer_array(a)
     b_tt = typetracer_array(b)
+    assert a_tt is not None
+    assert b_tt is not None
 
     if check_forms:
-        assert a_tt is not None
-        assert b_tt is not None
-
-        # note that the idempotent concatation of the typetracers for
-        # both a and b yield the same form.
+        # the idempotent concatenation of the typetracers for both a
+        # and b yield the same form.
         a_concated_form = idempotent_concatenate(a_tt).layout.form
         b_concated_form = idempotent_concatenate(b_tt).layout.form
         assert a_concated_form == b_concated_form
 
         # if a is a collection with multiple partitions its computed
-        # form should be the same the concated version
+        # form should be the same as the concated version
         if a_is_coll and a.npartitions > 1:
             assert a_comp.layout.form == a_concated_form
 
@@ -130,6 +129,7 @@ def assert_eq_records(
     scheduler = scheduler or DEFAULT_SCHEDULER
     ares = a.compute(scheduler=scheduler) if is_dask_collection(a) else a
     bres = b.compute(scheduler=scheduler) if is_dask_collection(b) else b
+
     assert ares.tolist() == bres.tolist()
 
 
