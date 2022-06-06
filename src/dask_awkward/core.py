@@ -824,7 +824,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return map_partitions(func, self, *args, **kwargs)
 
     def eager_compute_divisions(self) -> None:
-        """Force a comute of the divisions."""
+        """Force a compute of the divisions."""
         self._divisions = calculate_known_divisions(self)
 
     def clear_divisions(self) -> None:

@@ -16,12 +16,12 @@ import dask_awkward as dak
 from dask_awkward.testutils import assert_eq
 
 
-def test_force_by_lines_meta(line_delim_records_file: str) -> None:
+def test_force_by_lines_meta(ndjson_points_file: str) -> None:
     daa1 = dak.from_json(
-        [line_delim_records_file] * 5,
+        [ndjson_points_file] * 5,
         derive_meta_kwargs={"force_by_lines": True},
     )
-    daa2 = dak.from_json([line_delim_records_file, line_delim_records_file])
+    daa2 = dak.from_json([ndjson_points_file] * 3)
     assert daa1._meta is not None
     assert daa2._meta is not None
     f1 = daa1._meta.layout.form
@@ -29,9 +29,9 @@ def test_force_by_lines_meta(line_delim_records_file: str) -> None:
     assert f1 == f2
 
 
-def test_derive_json_meta_trigger_warning(line_delim_records_file: str) -> None:
+def test_derive_json_meta_trigger_warning(ndjson_points_file: str) -> None:
     with pytest.warns(UserWarning):
-        dak.from_json(line_delim_records_file, derive_meta_kwargs={"bytechunks": 64})
+        dak.from_json([ndjson_points_file], derive_meta_kwargs={"bytechunks": 64})
 
 
 def test_json_one_obj_per_file(single_record_file: str) -> None:
@@ -45,8 +45,8 @@ def test_json_one_obj_per_file(single_record_file: str) -> None:
     assert_eq(daa, caa)
 
 
-def test_json_delim_defined(line_delim_records_file: str) -> None:
-    source = [line_delim_records_file] * 6
+def test_json_delim_defined(ndjson_points_file: str) -> None:
+    source = [ndjson_points_file] * 6
     daa = dak.from_json(source, delimiter=b"\n")
 
     concretes = []
@@ -57,16 +57,15 @@ def test_json_delim_defined(line_delim_records_file: str) -> None:
     caa = ak.from_iter(concretes)
 
     assert_eq(
-        daa["analysis"][["x1", "z2"]],
-        caa["analysis"][["x1", "z2"]],
+        daa["points"][["x", "y"]],
+        caa["points"][["x", "y"]],
     )
 
 
-def test_to_and_from_dask_array(line_delim_records_file: str) -> None:
-    daa = dak.from_json([line_delim_records_file] * 3)
-    computed = ak.flatten(daa.analysis.x1.compute())
-    x1 = dak.flatten(daa.analysis.x1)
-    daskarr = dak.to_dask_array(x1)
+def test_to_and_from_dask_array(daa: dak.Array) -> None:
+    computed = ak.flatten(daa.points.x.compute())
+    x = dak.flatten(daa.points.x)
+    daskarr = dak.to_dask_array(x)
     da_assert_eq(daskarr, computed.to_numpy())
 
     back_to_dak = dak.from_dask_array(daskarr)
@@ -83,12 +82,8 @@ def test_from_dask_array() -> None:
 
 
 @pytest.mark.parametrize("optimize_graph", [True, False])
-def test_to_and_from_delayed(
-    line_delim_records_file: str,
-    optimize_graph: bool,
-) -> None:
-    daa = dak.from_json([line_delim_records_file] * 3)
-    daa = daa[dak.num(daa.analysis.x1, axis=1) > 2]
+def test_to_and_from_delayed(daa: dak.Array, optimize_graph: bool) -> None:
+    daa = daa[dak.num(daa.points.x, axis=1) > 2]
     delayeds = daa.to_delayed(optimize_graph=optimize_graph)
     daa2 = dak.from_delayed(delayeds)
     assert_eq(daa, daa2)
@@ -139,17 +134,17 @@ def test_from_map_with_args_kwargs() -> None:
     assert_eq(x, y)
 
 
-def test_from_map_pack_single_iterable(line_delim_records_file) -> None:
+def test_from_map_pack_single_iterable(ndjson_points_file) -> None:
     def g(fname, c=1):
-        return ak.from_json(Path(fname).read_text()).analysis.x1 * c
+        return ak.from_json(Path(fname).read_text()).points.x * c
 
     n = 3
     c = 2
 
     fmt = "{t}\n" * n
-    jsontext = fmt.format(t=Path(line_delim_records_file).read_text())
-    x = dak.from_map(g, [line_delim_records_file] * n, c=c)
-    y = ak.from_json(jsontext).analysis.x1 * c
+    jsontext = fmt.format(t=Path(ndjson_points_file).read_text())
+    x = dak.from_map(g, [ndjson_points_file] * n, c=c)
+    y = ak.from_json(jsontext).points.x * c
     assert_eq(x, y)
 
 
@@ -193,3 +188,23 @@ def test_from_lists(caa_p1) -> None:
     daa = dak.from_lists([one, two])
     caa = ak.Array(one + two)
     assert_eq(daa, caa)
+
+
+def test_to_dask_array(daa: dak.Array, caa: dak.Array) -> None:
+    from dask.array.utils import assert_eq as da_assert_eq
+
+    da = dak.to_dask_array(dak.flatten(daa.points.x))
+    ca = ak.to_numpy(ak.flatten(caa.points.x))
+    da_assert_eq(da, ca)
+    da = dak.flatten(daa.points.x).to_dask_array()
+    da_assert_eq(da, ca)
+
+
+@pytest.mark.parametrize("optimize_graph", [True, False])
+def test_to_delayed(daa, caa, optimize_graph):
+    delayeds = dak.to_delayed(daa.points, optimize_graph=optimize_graph)
+    comped = ak.concatenate([d.compute() for d in delayeds])
+    assert caa.points.tolist() == comped.tolist()
+    delayeds = daa.points.to_delayed(optimize_graph=optimize_graph)
+    comped = ak.concatenate([d.compute() for d in delayeds])
+    assert caa.points.tolist() == comped.tolist()

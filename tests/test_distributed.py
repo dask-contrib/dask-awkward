@@ -4,6 +4,7 @@ import pytest
 
 distributed = pytest.importorskip("distributed")
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import awkward._v2 as ak
@@ -42,29 +43,28 @@ async def test_compute(
     s,  # noqa
     a,  # noqa
     b,  # noqa
-    line_delim_records_file,
-    concrete_from_line_delim,
+    ndjson_points_file,
     optimize_graph,
 ) -> None:
-    files = [line_delim_records_file] * 3
+    files = [ndjson_points_file] * 3
     daa = dak.from_json(files)
-    caa = ak.concatenate([concrete_from_line_delim] * 3)
+    caa = ak.concatenate([ak.from_json(Path(f).read_text()) for f in files])
     res = await c.compute(
-        dak.num(daa.analysis.x1, axis=1),
+        dak.num(daa.points.x, axis=1),
         optimize_graph=optimize_graph,
     )
-    assert res.tolist() == ak.num(caa.analysis.x1, axis=1).tolist()
+    assert res.tolist() == ak.num(caa.points.x, axis=1).tolist()
 
 
-def test_from_delayed(c: Client, line_delim_records_file: str) -> None:  # noqa
+def test_from_delayed(c: Client, ndjson_points_file: str) -> None:  # noqa
     def make_a_concrete(file: str) -> ak.Array:
         with open(file) as f:
             return ak.from_json(f.read())
 
     make_a_delayed = delayed(make_a_concrete, pure=True)
 
-    x = dak.from_delayed([make_a_delayed(f) for f in [line_delim_records_file] * 3])
-    y = ak.concatenate([make_a_concrete(f) for f in [line_delim_records_file] * 3])
+    x = dak.from_delayed([make_a_delayed(f) for f in [ndjson_points_file] * 3])
+    y = ak.concatenate([make_a_concrete(f) for f in [ndjson_points_file] * 3])
     assert_eq(x, y, scheduler=c, check_unconcat_form=False)
 
 
