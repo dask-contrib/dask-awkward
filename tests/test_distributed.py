@@ -28,9 +28,6 @@ if daktu.DAK_TEST_DISTRIBUTED:
     pytest.skip("Skipping dedicated distributed tests.", allow_module_level=True)
 
 
-X = ak.from_iter([[1, 2, 3], [4], [5, 6, 7]])
-
-
 def test_simple_compute(c, daa_p1, caa_p1) -> None:  # noqa
     assert_eq(daa_p1.points.x, caa_p1.points.x, scheduler=c)
 
