@@ -13,7 +13,7 @@ from dask.delayed import delayed
 from distributed.client import _wait
 from distributed.utils_test import cluster_fixture  # noqa
 from distributed.utils_test import loop  # noqa
-from distributed.utils_test import a, b  # noqa
+from distributed.utils_test import a, b, cleanup  # noqa
 from distributed.utils_test import client as c  # noqa
 from distributed.utils_test import cluster, gen_cluster, inc, s, varying  # noqa
 
