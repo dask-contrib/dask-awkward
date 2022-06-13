@@ -5,40 +5,50 @@ import pytest
 distributed = pytest.importorskip("distributed")
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import awkward._v2 as ak
 import numpy as np
 from dask import persist
 from dask.delayed import delayed
+from distributed import Client
 from distributed.client import _wait
-from distributed.utils_test import cluster_fixture  # noqa
 from distributed.utils_test import loop  # noqa
-from distributed.utils_test import a, b, cleanup  # noqa
-from distributed.utils_test import client as c  # noqa
-from distributed.utils_test import cluster, gen_cluster, s, varying  # noqa
+from distributed.utils_test import cleanup, cluster, gen_cluster  # noqa
 
 import dask_awkward as dak
 from dask_awkward.testutils import assert_eq
 
-if TYPE_CHECKING:
-    from distributed import Client
+# @pytest.fixture(scope="session")
+# def small_cluster():
+#     with LocalCluster(n_workers=2, threads_per_worker=1) as cluster:
+#         yield cluster
 
 
-def test_simple_compute(c, daa_p1, caa_p1) -> None:  # noqa
-    assert_eq(daa_p1.points.x, caa_p1.points.x, scheduler=c)
+# @pytest.fixture
+# def simple_client(small_cluster):
+#     with Client(small_cluster) as client:
+#         yield client
+
+
+def test_compute(loop, ndjson_points_file: str) -> None:  # noqa
+    caa = ak.from_json(Path(ndjson_points_file).read_text())
+    with cluster() as (s, [a, b]):
+        with Client(s["address"], loop=loop) as client:
+            daa = dak.from_json([ndjson_points_file])
+            assert_eq(daa.points.x, caa.points.x, scheduler=client)
 
 
 @gen_cluster(client=True)
-async def test_persist(c: Client, s, a, b, daa_p1) -> None:  # noqa
-    (x1,) = persist(daa_p1, scheduler=c)
+async def test_persist(c, s, a, b, ndjson_points_file) -> None:  # noqa
+    daa = dak.from_json([ndjson_points_file])
+    (x1,) = persist(daa, scheduler=c)
     await _wait(x1)
-    assert x1.__dask_keys__()[0] in daa_p1.__dask_keys__()
+    assert x1.__dask_keys__()[0] in daa.__dask_keys__()
 
 
 @pytest.mark.parametrize("optimize_graph", [True, False])
 @gen_cluster(client=True)
-async def test_compute(
+async def test_compute_gen_cluster(
     c,  # noqa
     s,  # noqa
     a,  # noqa
@@ -56,16 +66,17 @@ async def test_compute(
     assert res.tolist() == ak.num(caa.points.x, axis=1).tolist()
 
 
-def test_from_delayed(c: Client, ndjson_points_file: str) -> None:  # noqa
+def test_from_delayed(loop, ndjson_points_file: str) -> None:  # noqa
     def make_a_concrete(file: str) -> ak.Array:
         with open(file) as f:
             return ak.from_json(f.read())
 
-    make_a_delayed = delayed(make_a_concrete, pure=True)
-
-    x = dak.from_delayed([make_a_delayed(f) for f in [ndjson_points_file] * 3])
-    y = ak.concatenate([make_a_concrete(f) for f in [ndjson_points_file] * 3])
-    assert_eq(x, y, scheduler=c, check_unconcat_form=False)
+    with cluster() as (s, [a, b]):
+        with Client(s["address"], loop=loop) as client:
+            make_a_delayed = delayed(make_a_concrete, pure=True)
+            x = dak.from_delayed([make_a_delayed(f) for f in [ndjson_points_file] * 3])
+            y = ak.concatenate([make_a_concrete(f) for f in [ndjson_points_file] * 3])
+            assert_eq(x, y, scheduler=client, check_unconcat_form=False)
 
 
 from awkward._v2.behaviors.mixins import mixin_class as ak_mixin_class
@@ -77,21 +88,34 @@ behaviors = {}
 @ak_mixin_class(behaviors)
 class Point:
     def distance(self, other):
-        return np.sqrt((self.x - other.x) ** 2 + (self.y - other.y) ** 2)
+        return np.sqrt((self.x - other.x) ** 2 + (self.y - other.y) ** 2)  # type: ignore
 
     @property
     def x2(self):
-        return self.x * self.x
+        return self.x * self.x  # type: ignore
 
     @ak_mixin_class_method(np.abs)
     def point_abs(self):
-        return np.sqrt(self.x**2 + self.y**2)
+        return np.sqrt(self.x**2 + self.y**2)  # type: ignore
 
 
-def test_from_list_behaviorized(c: Client, L1: list, L2: list) -> None:  # noqa
-    daa = dak.from_lists([L1, L2])
-    daa = dak.with_name(daa, name="Point", behavior=behaviors)
-    caa = ak.Array(L1 + L2, with_name="Point", behavior=behaviors)
+def test_from_list_behaviorized(loop, L1, L2) -> None:  # noqa
+    with cluster() as (s, [a, b]):
+        with Client(s["address"], loop=loop) as client:
 
-    assert_eq(daa.x2, caa.x2, scheduler=c)
-    assert_eq(daa.distance(daa), caa.distance(caa), scheduler=c)
+            daa = dak.from_lists([L1, L2])
+            daa = dak.with_name(daa, name="Point", behavior=behaviors)
+            caa = ak.Array(L1 + L2, with_name="Point", behavior=behaviors)
+
+            assert_eq(daa.x2, caa.x2, scheduler=client)
+            assert_eq(daa.distance(daa), caa.distance(caa), scheduler=client)
+
+
+# def test_from_list_behaviorized2(simple_client, L1, L2) -> None:  # noqa
+#     client = simple_client
+#     daa = dak.from_lists([L1, L2])
+#     daa = dak.with_name(daa, name="Point", behavior=behaviors)
+#     caa = ak.Array(L1 + L2, with_name="Point", behavior=behaviors)
+
+#     assert_eq(daa.x2, caa.x2, scheduler=client)
+#     assert_eq(daa.distance(daa), caa.distance(caa), scheduler=client)

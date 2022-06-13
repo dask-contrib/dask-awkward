@@ -202,8 +202,13 @@ def new_scalar_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Scalar:
     return Scalar(dsk, name, meta, known_value=None)
 
 
-def new_known_scalar(s: Any, dtype: DTypeLike | None = None) -> Scalar:
-    name = tokenize(s)
+def new_known_scalar(
+    s: Any,
+    dtype: DTypeLike | None = None,
+    label: str | None = None,
+) -> Scalar:
+    label = label or "known-scalar"
+    name = f"{label}-{tokenize(s)}"
     if dtype is None:
         if isinstance(s, (int, np.integer)):
             dtype = np.dtype(int)
@@ -593,7 +598,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return self._getitem_trivial_map_partitions(where, meta=new_meta)
 
     def _getitem_outer_int(self, where: int | tuple[Any, ...]) -> Any:
-        if not self.known_divisions:
+        if where == 0 or (isinstance(where, tuple) and where[0] == 0):
+            pass
+        elif not self.known_divisions:
             self.eager_compute_divisions()
 
         new_meta: Any | None = None
@@ -602,9 +609,12 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if isinstance(where, tuple):
             if not isinstance(where[0], int):
                 raise TypeError("Expected where[0] to be and integer.")
-            pidx, outer_where = normalize_single_outer_inner_index(
-                self.divisions, where[0]  # type: ignore
-            )
+            if where[0] == 0:
+                pidx, outer_where = 0, 0
+            else:
+                pidx, outer_where = normalize_single_outer_inner_index(
+                    self.divisions, where[0]  # type: ignore
+                )
             partition = self.partitions[pidx]
             rest = where[1:]
             where = (outer_where, *rest)
@@ -613,7 +623,10 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 new_meta = partition._meta[metad]
         # single object passed to getitem
         elif isinstance(where, int):
-            pidx, where = normalize_single_outer_inner_index(self.divisions, where)  # type: ignore
+            if where == 0:
+                pidx, where = 0, 0
+            else:
+                pidx, where = normalize_single_outer_inner_index(self.divisions, where)  # type: ignore
             partition = self.partitions[pidx]
             if partition._meta is not None:
                 new_meta = partition._meta[where]

@@ -22,6 +22,11 @@ if TYPE_CHECKING:
 
     from dask_awkward.core import Array, Scalar
 
+__all__ = (
+    "from_parquet",
+    "to_parquet",
+)
+
 
 class FromParquetWrapper:
     def __init__(self, *, storage: AbstractFileSystem, **kwargs: Any) -> None:
@@ -42,7 +47,7 @@ def from_parquet(
     meta: ak.Array | None = None,
     storage_options: dict[str, Any] | None = None,
     **kwargs: Any,
-):
+) -> Array:
     fs, token, paths = fsspec.get_fs_token_paths(
         urlpath,
         storage_options=storage_options,
@@ -82,13 +87,13 @@ def to_parquet(
     array: Array,
     where: str,
     compute: bool = False,
-) -> Scalar | None:
+) -> Scalar:
     nparts = array.npartitions
     write_res = map_partitions(
         ToParquetOnBlock(where, None, npartitions=nparts),
         array,
         BlockIndex((nparts,)),
-        label="to-parquet",
+        label="to-parquet-on-block",
         meta=array._meta,
     )
     name = f"to-parquet-{tokenize(array, where)}"
@@ -96,5 +101,5 @@ def to_parquet(
     graph = HighLevelGraph.from_collections(name, dsk, dependencies=(write_res,))
     res = new_scalar_object(graph, name=name, meta=None)
     if compute:
-        return res.compute()
+        res.compute()
     return res
