@@ -3,9 +3,10 @@ from __future__ import annotations
 import keyword
 import operator
 import warnings
+from collections.abc import Callable, Hashable, Mapping, Sequence
 from functools import cached_property, partial
 from numbers import Number
-from typing import TYPE_CHECKING, Any, Callable, Hashable, Mapping, Sequence, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import awkward._v2 as ak
 import dask.config
