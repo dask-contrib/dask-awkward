@@ -132,7 +132,7 @@ def cartesian(
             highlevel=highlevel,
             behavior=behavior,
         )
-        return map_partitions(fn, *arrays, label="cartesian")
+        return map_partitions(fn, *arrays, label="cartesian", output_divisions=1)
     raise DaskAwkwardNotImplemented("TODO")
 
 

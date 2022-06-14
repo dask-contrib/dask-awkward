@@ -159,7 +159,7 @@ def list1() -> list:
         [{"x": 4.0, "y": 4.4}, {"x": 5.0, "y": 5.5}],
         [{"x": 6.0, "y": 6.6}],
         [{"x": 7.0, "y": 7.7}, {"x": 8.0, "y": 8.8}, {"x": 9, "y": 9.9}],
-    ]
+    ]  # pragma: no cover
 
 
 def list2() -> list:
@@ -169,7 +169,7 @@ def list2() -> list:
         [{"x": 3.9, "y": 4.0}, {"x": 5.0, "y": 5.5}],
         [{"x": 5.9, "y": 6.0}],
         [{"x": 6.9, "y": 7.0}, {"x": 8.0, "y": 8.8}, {"x": 8.9, "y": 9.0}],
-    ]
+    ]  # pragma: no cover
 
 
 def list3() -> list:
@@ -179,8 +179,8 @@ def list3() -> list:
         [{"x": 1.9, "y": 8.0}, {"x": 4.0, "y": 6.5}],
         [{"x": 1.9, "y": 7.0}],
         [{"x": 1.9, "y": 6.0}, {"x": 6.0, "y": 4.8}, {"x": 9.9, "y": 9.0}],
-    ]
+    ]  # pragma: no cover
 
 
 def lists() -> ak.Array:
-    return from_lists([list1(), list2(), list3()])
+    return from_lists([list1(), list2(), list3()])  # pragma: no cover
