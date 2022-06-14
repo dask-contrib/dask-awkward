@@ -98,7 +98,7 @@ class Scalar(DaskMethodsMixin):
     def __dask_graph__(self) -> HighLevelGraph:
         return self._dask
 
-    def __dask_keys__(self) -> list[str]:
+    def __dask_keys__(self) -> list[Hashable]:
         return [self._name]
 
     def __dask_layers__(self) -> tuple[str, ...]:
@@ -349,7 +349,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     def __dask_graph__(self) -> HighLevelGraph:
         return self.dask
 
-    def __dask_keys__(self) -> list[tuple[str, int]]:
+    def __dask_keys__(self) -> list[Hashable]:
         return [(self.name, i) for i in range(self.npartitions)]
 
     def __dask_layers__(self) -> tuple[str]:
@@ -451,7 +451,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return self._dask
 
     @property
-    def keys(self) -> list[tuple[str, int]]:
+    def keys(self) -> list[Hashable]:
         """Task graph keys."""
         return self.__dask_keys__()
 

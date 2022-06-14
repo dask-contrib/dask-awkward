@@ -18,6 +18,8 @@ from dask_awkward.utils import DaskAwkwardNotImplemented, borrow_docstring
 if TYPE_CHECKING:
     from numpy.typing import DTypeLike
 
+    from dask_awkward.typing import AwkwardDaskCollection
+
 __all__ = (
     "argcartesian",
     "argcombinations",
@@ -187,7 +189,7 @@ def firsts(
     axis: int | None = 1,
     highlevel: bool = True,
     behavior: dict | None = None,
-) -> Array:
+) -> AwkwardDaskCollection:
     if axis == 1:
         return map_partitions(
             _FirstsFn(
