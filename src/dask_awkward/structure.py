@@ -179,7 +179,12 @@ def firsts(array, axis: int | None = 1, highlevel: bool = True, behavior=None):
 
 
 @borrow_docstring(ak.flatten)
-def flatten(array, axis: int | None = 1, highlevel: bool = True, behavior=None):
+def flatten(
+    array: Array,
+    axis: int | None = 1,
+    highlevel: bool = True,
+    behavior: dict | None = None,
+) -> Array:
     return map_partitions(
         ak.flatten,
         array,
@@ -288,8 +293,22 @@ def num(
 
 
 @borrow_docstring(ak.ones_like)
-def ones_like(array, highlevel: bool = True, behavior=None, dtype=None):
-    raise DaskAwkwardNotImplemented("TODO")
+def ones_like(
+    array: ak.Array,
+    highlevel: bool = True,
+    behavior: dict | None = None,
+    dtype=None,
+) -> Array:
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+    return map_partitions(
+        ak.ones_like,
+        array,
+        output_divisions=1,
+        label="ones-like",
+        behavior=behavior,
+        dtype=dtype,
+    )
 
 
 @borrow_docstring(ak.packed)
@@ -367,8 +386,21 @@ def with_field(base, what, where=None, highlevel: bool = True, behavior=None):
 
 
 @borrow_docstring(ak.with_name)
-def with_name(array, name, highlevel: bool = True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+def with_name(
+    array: Array,
+    name: str,
+    highlevel: bool = True,
+    behavior: dict | None = None,
+) -> Array:
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+    meta = ak.Array(array._meta, with_name=name, behavior=behavior)
+    return map_partitions(
+        lambda c: ak.Array(c, with_name=name, behavior=behavior),
+        array,
+        label="with-name",
+        meta=meta,
+    )
 
 
 @borrow_docstring(ak.with_parameter)

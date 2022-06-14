@@ -1444,16 +1444,6 @@ def compatible_partitions(*args: Array) -> bool:
     return True
 
 
-def with_name(collection: Array, name: str, behavior: dict | None = None) -> Array:
-    meta = ak.Array(collection._meta, with_name=name, behavior=behavior)
-    return map_partitions(
-        lambda c: ak.Array(c, with_name=name, behavior=behavior),
-        collection,
-        label="with-name",
-        meta=meta,
-    )
-
-
 class BehaviorMethodCall:
     def __init__(self, attr: str, **kwargs: Any) -> None:
         self.attr = attr
