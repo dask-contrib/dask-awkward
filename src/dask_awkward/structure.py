@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import builtins
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import Any, Sequence
 
 import awkward._v2 as ak
 import numpy as np
@@ -14,9 +14,6 @@ from dask_awkward.core import (
     pw_reduction_with_agg_to_scalar,
 )
 from dask_awkward.utils import DaskAwkwardNotImplemented, borrow_docstring
-
-if TYPE_CHECKING:
-    from awkward._v2.highlevel import Array as AwkwardArray
 
 __all__ = (
     "argcartesian",
@@ -430,7 +427,7 @@ class _ZipFn:
         self.keys = keys
         self.kwargs = kwargs
 
-    def __call__(self, *parts: Array) -> AwkwardArray:
+    def __call__(self, *parts: ak.Array) -> ak.Array:
         return ak.zip(
             {k: p for k, p in builtins.zip(self.keys, list(parts))},
             **self.kwargs,
