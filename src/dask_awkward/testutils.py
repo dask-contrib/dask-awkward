@@ -7,6 +7,7 @@ import awkward._v2 as ak
 from dask.base import is_dask_collection
 
 from dask_awkward.core import Array, Record, typetracer_array
+from dask_awkward.io.io import from_lists
 
 _RG = random.Random(414)
 
@@ -145,7 +146,41 @@ def list_of_xy_points(n: int) -> list[dict[str, int]]:
     return [make_xy_point() for _ in range(n)]
 
 
-def awkward_xy_points(lengths: tuple[int, ...] | None = None):
+def awkward_xy_points(lengths: tuple[int, ...] | None = None) -> ak.Array:
     if lengths is None:
         lengths = (3, 0, 2, 1, 3)
     return ak.Array([list_of_xy_points(n) for n in lengths])
+
+
+def list1() -> list:
+    return [
+        [{"x": 1.0, "y": 1.1}, {"x": 2.0, "y": 2.2}, {"x": 3, "y": 3.3}],
+        [],
+        [{"x": 4.0, "y": 4.4}, {"x": 5.0, "y": 5.5}],
+        [{"x": 6.0, "y": 6.6}],
+        [{"x": 7.0, "y": 7.7}, {"x": 8.0, "y": 8.8}, {"x": 9, "y": 9.9}],
+    ]
+
+
+def list2() -> list:
+    return [
+        [{"x": 0.9, "y": 1.0}, {"x": 2.0, "y": 2.2}, {"x": 2.9, "y": 3.0}],
+        [],
+        [{"x": 3.9, "y": 4.0}, {"x": 5.0, "y": 5.5}],
+        [{"x": 5.9, "y": 6.0}],
+        [{"x": 6.9, "y": 7.0}, {"x": 8.0, "y": 8.8}, {"x": 8.9, "y": 9.0}],
+    ]
+
+
+def list3() -> list:
+    return [
+        [{"x": 1.9, "y": 9.0}, {"x": 2.0, "y": 8.2}, {"x": 9.9, "y": 9.0}],
+        [],
+        [{"x": 1.9, "y": 8.0}, {"x": 4.0, "y": 6.5}],
+        [{"x": 1.9, "y": 7.0}],
+        [{"x": 1.9, "y": 6.0}, {"x": 6.0, "y": 4.8}, {"x": 9.9, "y": 9.0}],
+    ]
+
+
+def lists() -> ak.Array:
+    return from_lists([list1(), list2(), list3()])

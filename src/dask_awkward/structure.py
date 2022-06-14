@@ -105,6 +105,14 @@ def broadcast_arrays(*arrays, **kwargs):
     raise DaskAwkwardNotImplemented("TODO")
 
 
+class _CartesianWrapper:
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __call__(self, *arrays):
+        return ak.cartesian(list(arrays), **self.kwargs)
+
+
 @borrow_docstring(ak.cartesian)
 def cartesian(
     arrays,
@@ -115,6 +123,16 @@ def cartesian(
     highlevel: bool = True,
     behavior=None,
 ):
+    if axis == 1:
+        fn = _CartesianWrapper(
+            axis=axis,
+            nested=nested,
+            parameters=parameters,
+            with_name=with_name,
+            highlevel=highlevel,
+            behavior=behavior,
+        )
+        return map_partitions(fn, *arrays, label="cartesian")
     raise DaskAwkwardNotImplemented("TODO")
 
 
