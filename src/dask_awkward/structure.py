@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import builtins
-from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any, Sequence
+from collections.abc import Iterable, Sequence
+from typing import TYPE_CHECKING, Any
 
 import awkward._v2 as ak
 import numpy as np
