@@ -290,6 +290,12 @@ class Record(Scalar):
             return ak.fields(self._meta)
         return None
 
+    @property
+    def layout(self) -> Any:
+        if self._meta is not None:
+            return self._meta.layout
+        raise ValueError("This collection's meta is None; unknown layout.")
+
     def _ipython_key_completions_(self) -> list[str]:
         if self._meta is not None:
             return self._meta._ipython_key_completions_()

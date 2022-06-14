@@ -335,7 +335,7 @@ def num(
 
 @borrow_docstring(ak.ones_like)
 def ones_like(
-    array: ak.Array,
+    array: Array,
     highlevel: bool = True,
     behavior: dict | None = None,
     dtype: DTypeLike | None = None,
@@ -503,6 +503,9 @@ def zip(
     right_broadcast: bool = False,
     optiontype_outside_record: bool = False,
 ):
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
     if not isinstance(arrays, dict):
         raise DaskAwkwardNotImplemented("ak.zip only supports dictionary inputs.")
 
