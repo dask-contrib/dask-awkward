@@ -105,7 +105,7 @@ def broadcast_arrays(*arrays, **kwargs):
     raise DaskAwkwardNotImplemented("TODO")
 
 
-class _CartesianWrapper:
+class _CartesianFn:
     def __init__(self, **kwargs):
         self.kwargs = kwargs
 
@@ -124,7 +124,7 @@ def cartesian(
     behavior=None,
 ):
     if axis == 1:
-        fn = _CartesianWrapper(
+        fn = _CartesianFn(
             axis=axis,
             nested=nested,
             parameters=parameters,
@@ -385,6 +385,15 @@ def with_field(base, what, where=None, highlevel: bool = True, behavior=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
+class _WithNameFn:
+    def __init__(self, name: str, behavior: dict | None = None) -> None:
+        self.name = name
+        self.behavior = behavior
+
+    def __call__(self, array: ak.Array) -> ak.Array:
+        return ak.with_name(array, self.name, behavior=self.behavior)
+
+
 @borrow_docstring(ak.with_name)
 def with_name(
     array: Array,
@@ -394,12 +403,10 @@ def with_name(
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
-    meta = ak.Array(array._meta, with_name=name, behavior=behavior)
     return map_partitions(
-        lambda c: ak.Array(c, with_name=name, behavior=behavior),
+        _WithNameFn(name=name, behavior=behavior),
         array,
         label="with-name",
-        meta=meta,
     )
 
 
