@@ -176,7 +176,7 @@ class Scalar(DaskMethodsMixin):
         return self.__str__()
 
     def __str__(self) -> str:
-        dt = str(self.dtype) or "Unknown"
+        dt = self.dtype or "Unknown"
         if self.known_value is not None:
             return (
                 f"dask.awkward<{key_split(self.name)}, "
@@ -217,6 +217,8 @@ def new_known_scalar(
             dtype = np.dtype(float)
         else:
             dtype = np.dtype(type(s))
+    else:
+        dtype = np.dtype(dtype)
     llg = {name: s}
     hlg = HighLevelGraph.from_collections(name, llg, dependencies=())
     return Scalar(hlg, name, meta=UnknownScalar(dtype), known_value=s)
