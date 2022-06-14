@@ -173,8 +173,34 @@ def fill_none(array, value, axis=-1, highlevel: bool = True, behavior=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
+class _FirstsFn:
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __call__(self, array):
+        return ak.firsts(array, **self.kwargs)
+
+
 @borrow_docstring(ak.firsts)
-def firsts(array, axis: int | None = 1, highlevel: bool = True, behavior=None):
+def firsts(
+    array: Array,
+    axis: int | None = 1,
+    highlevel: bool = True,
+    behavior: dict | None = None,
+) -> Array:
+    if axis == 1:
+        return map_partitions(
+            _FirstsFn(
+                axis=axis,
+                highlevel=highlevel,
+                behavior=behavior,
+            ),
+            array,
+            label="firsts",
+            output_divisions=1,
+        )
+    elif axis == 0:
+        return array[0]
     raise DaskAwkwardNotImplemented("TODO")
 
 
@@ -193,6 +219,8 @@ def flatten(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
     return map_partitions(
         _FlattenFn(
             axis=axis,
@@ -278,6 +306,8 @@ def num(
     highlevel: bool = True,
     behavior: Any | None = None,
 ) -> Any:
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
     if axis and axis >= 1:
         return map_partitions(
             ak.num,
