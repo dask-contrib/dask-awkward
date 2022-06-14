@@ -425,7 +425,7 @@ def zeros_like(array, highlevel: bool = True, behavior=None, dtype=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
-class _ZipWrapper:
+class _ZipFn:
     def __init__(self, keys: Sequence[str], **kwargs) -> None:
         self.keys = keys
         self.kwargs = kwargs
@@ -469,7 +469,7 @@ def zip(
     )
 
     return map_partitions(
-        _ZipWrapper(
+        _ZipFn(
             keys,
             depth_limit=depth_limit,
             parameters=parameters,
