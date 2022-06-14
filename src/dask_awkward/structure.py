@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import builtins
 from collections.abc import Iterable
-from typing import Any, Sequence
+from typing import TYPE_CHECKING, Any, Sequence
 
 import awkward._v2 as ak
 import numpy as np
@@ -14,6 +14,9 @@ from dask_awkward.core import (
     pw_reduction_with_agg_to_scalar,
 )
 from dask_awkward.utils import DaskAwkwardNotImplemented, borrow_docstring
+
+if TYPE_CHECKING:
+    from numpy.typing import DTypeLike
 
 __all__ = (
     "argcartesian",
@@ -175,6 +178,14 @@ def firsts(array, axis: int | None = 1, highlevel: bool = True, behavior=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
+class _FlattenFn:
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __call__(self, array: ak.Array) -> ak.Array:
+        return ak.flatten(array, **self.kwargs)
+
+
 @borrow_docstring(ak.flatten)
 def flatten(
     array: Array,
@@ -183,11 +194,14 @@ def flatten(
     behavior: dict | None = None,
 ) -> Array:
     return map_partitions(
-        ak.flatten,
+        _FlattenFn(
+            axis=axis,
+            highlevel=highlevel,
+            behavior=behavior,
+        ),
         array,
-        axis=axis,
-        highlevel=highlevel,
-        behavior=behavior,
+        label="flatten",
+        output_divisions=None,
     )
 
 
@@ -294,7 +308,7 @@ def ones_like(
     array: ak.Array,
     highlevel: bool = True,
     behavior: dict | None = None,
-    dtype=None,
+    dtype: DTypeLike | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -418,8 +432,22 @@ def without_parameters(array, highlevel: bool = True, behavior=None):
 
 
 @borrow_docstring(ak.zeros_like)
-def zeros_like(array, highlevel: bool = True, behavior=None, dtype=None):
-    raise DaskAwkwardNotImplemented("TODO")
+def zeros_like(
+    array,
+    highlevel: bool = True,
+    behavior: dict | None = None,
+    dtype: DTypeLike | None = None,
+):
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+    return map_partitions(
+        ak.zeros_like,
+        array,
+        output_divisions=1,
+        label="zeros-like",
+        behavior=behavior,
+        dtype=dtype,
+    )
 
 
 class _ZipFn:
