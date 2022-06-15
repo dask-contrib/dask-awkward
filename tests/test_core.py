@@ -331,6 +331,16 @@ def test_scalar_repr(daa: dakc.Array) -> None:
     s = dak.max(daa.points.y)
     sstr = str(s)
     assert "type=Scalar" in sstr
+    s = dakc.new_known_scalar(5)
+    sstr = str(s)
+    assert (
+        sstr == r"dask.awkward<known-scalar, type=Scalar, dtype=int64, known_value=5>"
+    )
+
+
+def test_scalar_divisions(daa: dakc.Array) -> None:
+    s = dak.max(daa.points.x, axis=None)
+    assert s.divisions == (None, None)
 
 
 def test_array_persist(daa: dakc.Array) -> None:
@@ -339,11 +349,19 @@ def test_array_persist(daa: dakc.Array) -> None:
     daa2 = daa.persist()
     assert_eq(daa2, daa)
 
+    import dask
 
-def test_scalar_persist(daa: dakc.Array) -> None:
+    dask.persist
+
+
+def test_scalar_persist_and_rebuild(daa: dakc.Array) -> None:
     coll = daa["points"][0]["x"][0]
     coll2 = coll.persist()
     assert_eq(coll, coll2)
+
+    m = dak.max(daa.points.x, axis=None)
+    rebuilt = m._rebuild(m.dask, rename={m._name: "max2"})
+    assert "max2" == str(rebuilt.__dask_keys__()[0])
 
 
 def test_output_divisions(daa: dakc.Array) -> None:

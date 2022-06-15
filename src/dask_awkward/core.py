@@ -1078,28 +1078,35 @@ def partitionwise_layer(
 
 
 def map_partitions(
-    func: Callable,
+    fn: Callable,
     *args: Any,
     label: str | None = None,
     meta: Any | None = None,
     output_divisions: int | None = None,
     **kwargs: Any,
 ) -> Array:
-    """Map a callable across all partitions of a collection.
+    """Map a callable across all partitions of any number of collections.
 
     Parameters
     ----------
-    func : Callable
+    fn : Callable
         Function to apply on all partitions.
     *args : Collections and function arguments
-        Arguments passed to the function, if arguments are
-        Array collections they must be compatibly
+        Arguments passed to the function. Partitioned arguments (i.e.
+        Dask collections) will have `fn` applied to each partition.
+        Array collection arguments they must be compatibly
         partitioned.
     label : str, optional
         Label for the Dask graph layer; if left to ``None`` (default),
         the name of the function will be used.
     meta : Any, optional
-        Metadata (typetracer) information of the result (if known).
+        Metadata (typetracer) array for the result (if known). If
+        unknown, `fn` will be applied to the metadata of the `args`;
+        if that call fails, the first partition of the new collection
+        will be used to compute the new metadata **if** the
+        ``awkward.compute-known-meta`` configuration setting is
+        ``True``. If the configuration setting is ``False``, an empty
+        typetracer will be assigned as the metadata.
     output_divisions : int, optional
         If ``None`` (the default), the divisions of the output will be
         assumed unknown. If defined, the output divisions will be
@@ -1109,32 +1116,59 @@ def map_partitions(
         operation. This argument is mainly for internal library
         function implementations.
     **kwargs : Any
-        Additional keyword arguments passed to the `func`.
+        Additional keyword arguments passed to the `fn`.
 
     Returns
     -------
     dask_awkward.Array
         The new collection.
 
+    Examples
+    --------
+    >>> import dask_awkward as dak
+    >>> a = [[1, 2, 3], [4]]
+    >>> b = [[5, 6, 7], [8]]
+    >>> c = dak.from_lists([a, b])
+    >>> c
+    dask.awkward<from-lists, npartitions=2>
+    >>> c.compute()
+    <Array [[1, 2, 3], [4], [5, 6, 7], [8]] type='4 * var * int64'>
+    >>> c2 = dak.map_partitions(np.add, c, c)
+    >>> c2
+    dask.awkward<add, npartitions=2>
+    >>> c2.compute()
+    <Array [[2, 4, 6], [8], [10, 12, 14], [16]] type='4 * var * int64'>
+
+    Multiplying `c` (a Dask collection) with `a` (a regular Python
+    list object) will multiply each partition of `c` by `a`:
+
+    >>> d = dak.map_partitions(np.multiply, c, a)
+    dask.awkward<multiply, npartitions=2>
+    >>> d.compute()
+    <Array [[1, 4, 9], [16], [5, 12, 21], [32]] type='4 * var * int64'>
+
+    This is effectively the same as `d = c * a`
+
     """
-    token = tokenize(func, *args, **kwargs)
-    label = label or funcname(func)
+    token = tokenize(fn, *args, **kwargs)
+    label = label or funcname(fn)
     name = f"{label}-{token}"
-    lay = partitionwise_layer(func, name, *args, **kwargs)
+    lay = partitionwise_layer(fn, name, *args, **kwargs)
     deps = [a for a in args if is_dask_collection(a)] + [
         v for _, v in kwargs.items() if is_dask_collection(v)
     ]
 
     if meta is None:
-        if dask.config.get("awkward.compute-unknown-meta"):
-            metas = to_meta(args)
-            try:
-                meta = func(*metas, **kwargs)
-            except Exception:
+        metas = to_meta(args)
+        try:
+            meta = fn(*metas, **kwargs)
+        except Exception:
+            if dask.config.get("awkward.compute-unknown-meta"):
                 warnings.warn(
                     "metadata could not be determined; "
                     "a compute on the first partition will occur."
                 )
+            pass
 
     hlg = HighLevelGraph.from_collections(
         name,
