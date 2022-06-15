@@ -11,6 +11,8 @@ try:
 except ImportError:
     import json  # type: ignore
 
+import sys
+
 import dask_awkward as dak
 import dask_awkward.core as dakc
 from dask_awkward.testutils import assert_eq
@@ -327,6 +329,7 @@ def test_bad_meta_type(ndjson_points_file: str, meta) -> None:
         dak.from_json([ndjson_points_file] * 3, meta=meta)
 
 
+@pytest.mark.skipif(sys.platform.startswith("win"), reason="skip if windows")
 def test_scalar_repr(daa: dakc.Array) -> None:
     s = dak.max(daa.points.y)
     sstr = str(s)
