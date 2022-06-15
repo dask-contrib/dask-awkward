@@ -349,10 +349,6 @@ def test_array_persist(daa: dakc.Array) -> None:
     daa2 = daa.persist()
     assert_eq(daa2, daa)
 
-    import dask
-
-    dask.persist
-
 
 def test_scalar_persist_and_rebuild(daa: dakc.Array) -> None:
     coll = daa["points"][0]["x"][0]
