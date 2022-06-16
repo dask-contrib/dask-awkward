@@ -206,6 +206,20 @@ class Scalar(DaskMethodsMixin):
         return self._known_value
 
     def to_delayed(self, optimize_graph: bool = True) -> Delayed:
+        """Convert Scalar collection into a Delayed collection.
+
+        Parameters
+        ----------
+        optimize_graph : bool
+            If ``True`` optimize the existing task graph before
+            converting to delayed.
+
+        Returns
+        -------
+        Delayed
+            Resulting Delayed collection object.
+
+        """
         from dask.delayed import Delayed
 
         dsk = self.__dask_graph__()
@@ -215,6 +229,23 @@ class Scalar(DaskMethodsMixin):
 
 
 def new_scalar_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Scalar:
+    """Instantiate a new scalar collection.
+
+    Parameters
+    ----------
+    dsk : HighLevelGraph
+        Dask highlevel task graph.
+    name : str
+        Name for the collection.
+    meta : Any
+        Awkward typetracer metadata.
+
+    Returns
+    -------
+    Scalar
+        Resulting collection.
+
+    """
     if meta is None:
         meta = UnknownScalar(np.dtype(None))
     return Scalar(dsk, name, meta, known_value=None)
@@ -256,7 +287,7 @@ class Record(Scalar):
         super().__init__(dsk, name, meta)
 
     def _check_meta(self, m: Any | None) -> Any | None:
-        if m is not None and not isinstance(m, ak.Record):
+        if not isinstance(m, ak.Record):
             raise TypeError(f"meta must be a Record typetracer object, not a {type(m)}")
         return m
 
@@ -333,7 +364,28 @@ class Record(Scalar):
 
 
 def new_record_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Record:
+    """Instantiate a new record collection.
+
+    Parameters
+    ----------
+    dsk : HighLevelGraph
+        Dask high level graph.
+    name : str
+        Name for the collection.
+    meta : Any
+        Awkward typetracer as metadata
+
+    Returns
+    -------
+    Record
+        Resulting collection.
+
+    """
     return Record(dsk, name, meta)
+
+
+def _outer_int_getitem_fn(x: Any, gikey: str) -> Any:
+    return x[gikey]
 
 
 class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
@@ -671,7 +723,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         name = f"getitem-{token}"
         dsk = {
             name: (
-                lambda x, gikey: operator.getitem(x, gikey),
+                _outer_int_getitem_fn,
                 partition.__dask_keys__()[0],
                 where,
             )
@@ -775,7 +827,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     def _call_behavior_method(self, method_name: str, *args: Any, **kwargs: Any) -> Any:
         if hasattr(self._meta, method_name):
             return self.map_partitions(
-                BehaviorMethodCall(method_name, **kwargs),
+                _BehaviorMethodFn(method_name, **kwargs),
                 *args,
                 label=hyphenize(method_name),
             )
@@ -786,8 +838,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     def _call_behavior_property(self, property_name: str) -> Any:
         if hasattr(self._meta, property_name):
             return self.map_partitions(
-                lambda c, n: getattr(c, n),
-                property_name,
+                _BehaviorPropertyFn(property_name),
                 label=hyphenize(property_name),
             )
         raise AttributeError(
@@ -1503,10 +1554,18 @@ def compatible_partitions(*args: Array) -> bool:
     return True
 
 
-class BehaviorMethodCall:
+class _BehaviorMethodFn:
     def __init__(self, attr: str, **kwargs: Any) -> None:
         self.attr = attr
         self.kwargs = kwargs
 
     def __call__(self, coll: ak.Array, *args: Any) -> ak.Array:
         return getattr(coll, self.attr)(*args, **self.kwargs)
+
+
+class _BehaviorPropertyFn:
+    def __init__(self, attr: str) -> None:
+        self.attr = attr
+
+    def __call__(self, coll: ak.Array) -> ak.Array:
+        return getattr(coll, self.attr)

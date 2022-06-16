@@ -115,3 +115,12 @@ def test_bad_partition_boolean_array(ndjson_points_file: str) -> None:
     sel = dak.num(daa1.points.x > 2, axis=1) >= 2
     with pytest.raises(IncompatiblePartitions):
         daa2[sel]
+
+
+def test_record_getitem_scalar_results(daa, caa) -> None:
+    dr = daa["points"][0][0]
+    cr = caa["points"][0][0]
+    assert isinstance(dr._meta, ak.Record)
+    assert isinstance(cr, ak.Record)
+    assert_eq(dr["x"], cr["x"])
+    assert_eq(dr[["x", "y"]], cr[["x", "y"]])

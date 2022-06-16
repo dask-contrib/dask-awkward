@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from dask_awkward.core import Array
 
 
-class FromAwkwardWrapper:
+class _FromAwkwardFn:
     def __init__(self, arr: ak.Array) -> None:
         self.arr = arr
 
@@ -63,7 +63,7 @@ def from_awkward(source: ak.Array, npartitions: int, label: str | None = None) -
     stops = locs[1:]
     meta = typetracer_array(source)
     return from_map(
-        FromAwkwardWrapper(source),
+        _FromAwkwardFn(source),
         starts,
         stops,
         label=label or "from-awkward",
@@ -71,6 +71,14 @@ def from_awkward(source: ak.Array, npartitions: int, label: str | None = None) -
         divisions=tuple(locs),
         meta=meta,
     )
+
+
+class _FromListsFn:
+    def __init__(self):
+        pass
+
+    def __call__(self, x):
+        return ak.Array(x)
 
 
 def from_lists(source: list[list[Any]]) -> Array:
@@ -102,7 +110,7 @@ def from_lists(source: list[list[Any]]) -> Array:
     lists = list(source)
     divs = (0, *np.cumsum(list(map(len, lists))))
     return from_map(
-        lambda x: ak.Array(x),
+        _FromListsFn(),
         lists,
         meta=typetracer_array(ak.Array(lists[0])),
         divisions=divs,

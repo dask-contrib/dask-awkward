@@ -20,22 +20,22 @@ class AwkwardDaskCollection(HLGDaskCollection, Protocol):
     @property
     @abc.abstractmethod
     def fields(self) -> list[str]:
-        pass
+        """ """
 
     @property
     @abc.abstractmethod
     def layout(self) -> Any:
-        pass
+        """ """
 
     @property
     @abc.abstractmethod
     def npartitions(self) -> int:
-        pass
+        """ """
 
     @abc.abstractmethod
     def __getitem__(self, where: Any) -> AwkwardDaskCollection:
-        pass
+        """ """
 
     @abc.abstractmethod
     def __getattr__(self, attr: str) -> Any:
-        pass
+        """ """

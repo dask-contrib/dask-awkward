@@ -28,7 +28,7 @@ __all__ = (
 )
 
 
-class FromParquetWrapper:
+class _FromParquetFn:
     def __init__(self, *, storage: AbstractFileSystem, **kwargs: Any) -> None:
         self.fs = storage
         self.kwargs = kwargs
@@ -54,14 +54,14 @@ def from_parquet(
     )
 
     return from_map(
-        FromParquetWrapper(storage=fs, **kwargs),
+        _FromParquetFn(storage=fs, **kwargs),
         paths,
         label="from-parquet",
         token=tokenize(urlpath, meta, token),
     )
 
 
-class ToParquetOnBlock:
+class _ToParquetFn:
     def __init__(
         self,
         name: str,
@@ -90,7 +90,7 @@ def to_parquet(
 ) -> Scalar:
     nparts = array.npartitions
     write_res = map_partitions(
-        ToParquetOnBlock(where, None, npartitions=nparts),
+        _ToParquetFn(where, None, npartitions=nparts),
         array,
         BlockIndex((nparts,)),
         label="to-parquet-on-block",

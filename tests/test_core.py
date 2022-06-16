@@ -239,9 +239,17 @@ def test_record_dir(daa: dak.Array) -> None:
         assert f in d
 
 
+@pytest.mark.xfail(reason="ak.Record typetracer fails to pickle")
 def test_record_pickle(daa: dak.Array) -> None:
+    import pickle
+
     r = daa[0]
     assert type(r) == dak.Record
+    assert isinstance(r._meta, ak.Record)
+
+    dumped = pickle.dumps(r)
+    new = pickle.loads(dumped)
+    assert_eq(dumped, new)
 
 
 def test_array_dir(daa: dak.Array) -> None:
