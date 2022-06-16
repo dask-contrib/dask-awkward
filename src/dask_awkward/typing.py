@@ -14,6 +14,9 @@ except ImportError:
 
 @runtime_checkable
 class AwkwardDaskCollection(HLGDaskCollection, Protocol):
+
+    _meta: Any
+
     @property
     @abc.abstractmethod
     def fields(self) -> list[str]:
@@ -27,4 +30,12 @@ class AwkwardDaskCollection(HLGDaskCollection, Protocol):
     @property
     @abc.abstractmethod
     def npartitions(self) -> int:
+        pass
+
+    @abc.abstractmethod
+    def __getitem__(self, where: Any) -> AwkwardDaskCollection:
+        pass
+
+    @abc.abstractmethod
+    def __getattr__(self, attr: str) -> Any:
         pass

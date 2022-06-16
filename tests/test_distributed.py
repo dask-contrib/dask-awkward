@@ -82,7 +82,7 @@ def test_from_delayed(loop, ndjson_points_file: str) -> None:  # noqa
 from awkward._v2.behaviors.mixins import mixin_class as ak_mixin_class
 from awkward._v2.behaviors.mixins import mixin_class_method as ak_mixin_class_method
 
-behaviors = {}
+behaviors: dict = {}
 
 
 @ak_mixin_class(behaviors)

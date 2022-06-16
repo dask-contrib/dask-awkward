@@ -25,6 +25,7 @@ from dask.utils import IndexCallable, funcname, key_split
 from numpy.lib.mixins import NDArrayOperatorsMixin
 
 from dask_awkward.optimize import basic_optimize
+from dask_awkward.typing import AwkwardDaskCollection
 from dask_awkward.utils import (
     DaskAwkwardNotImplemented,
     IncompatiblePartitions,
@@ -87,12 +88,12 @@ class Scalar(DaskMethodsMixin):
         self,
         dsk: HighLevelGraph,
         name: str,
-        meta: Any | None = None,
+        meta: Any,
         known_value: Any | None = None,
     ) -> None:
         self._dask: HighLevelGraph = dsk
         self._name: str = name
-        self._meta: Any | None = self._check_meta(meta)
+        self._meta: Any = self._check_meta(meta)
         self._known_value: Any | None = known_value
 
     def __dask_graph__(self) -> HighLevelGraph:
@@ -129,7 +130,7 @@ class Scalar(DaskMethodsMixin):
     ) -> Any:
         name = self._name
         if rename:
-            name = rename.get(name, name)
+            raise ValueError("rename= unsupported in dask-awkward")
         return type(self)(dsk, name, self._meta, self.known_value)
 
     def __reduce__(self):
@@ -143,9 +144,9 @@ class Scalar(DaskMethodsMixin):
     def name(self) -> str:
         return self._name
 
-    def _check_meta(self, m: Any | None) -> Any | None:
-        if m is not None and not isinstance(m, (MaybeNone, UnknownScalar, OneOf)):
-            raise TypeError(f"meta must be a typetracer module object, not a {type(m)}")
+    def _check_meta(self, m: Any) -> Any | None:
+        if not isinstance(m, (MaybeNone, UnknownScalar, OneOf)):
+            raise TypeError(f"meta must be a typetracer object, not a {type(m)}")
         return m
 
     @property
@@ -161,6 +162,14 @@ class Scalar(DaskMethodsMixin):
     def npartitions(self) -> int:
         """Scalar and Records are unpartitioned by definition."""
         return 1
+
+    @property
+    def fields(self) -> list[str]:
+        return []
+
+    @property
+    def layout(self) -> Any:
+        raise TypeError("Scalars do not have a layout.")
 
     @property
     def divisions(self) -> tuple[None, None]:
@@ -186,6 +195,12 @@ class Scalar(DaskMethodsMixin):
             )
         return f"dask.awkward<{key_split(self.name)}, type=Scalar, dtype={dt}>"
 
+    def __getitem__(self, where):
+        raise RuntimeError("Scalars do not support __getitem__")
+
+    def __getattr__(self, attr: str) -> Any:
+        raise RuntimeError("Scalars do not support __getattr__")
+
     @property
     def known_value(self) -> Any | None:
         return self._known_value
@@ -200,6 +215,8 @@ class Scalar(DaskMethodsMixin):
 
 
 def new_scalar_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Scalar:
+    if meta is None:
+        meta = UnknownScalar(np.dtype(None))
     return Scalar(dsk, name, meta, known_value=None)
 
 
@@ -243,7 +260,8 @@ class Record(Scalar):
             raise TypeError(f"meta must be a Record typetracer object, not a {type(m)}")
         return m
 
-    def __getitem__(self, key: str) -> Any:
+    def __getitem__(self, where: str) -> AwkwardDaskCollection:
+        key = where
         token = tokenize(self, key)
         name = f"getitem-{token}"
         new_meta = self._meta[key]  # type: ignore
@@ -285,16 +303,14 @@ class Record(Scalar):
         return (Record, (self.dask, self.name, self._meta))
 
     @property
-    def fields(self) -> list[str] | None:
-        if self._meta is not None:
-            return ak.fields(self._meta)
-        return None
+    def fields(self) -> list[str]:
+        if self._meta is None:
+            raise TypeError("metadata is missing; cannot determine fields.")
+        return ak.fields(self._meta)
 
     @property
     def layout(self) -> Any:
-        if self._meta is not None:
-            return self._meta.layout
-        raise ValueError("This collection's meta is None; unknown layout.")
+        return self._meta.layout
 
     def _ipython_key_completions_(self) -> list[str]:
         if self._meta is not None:
@@ -378,7 +394,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     ) -> Array:
         name = self.name
         if rename:
-            name = rename.get(name, name)
+            raise ValueError("rename= unsupported in dask-awkward")
         return Array(dsk, name, self._meta, divisions=self.divisions)
 
     def __len__(self) -> int:
@@ -727,7 +743,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         raise DaskAwkwardNotImplemented(f"__getitem__ doesn't support where={where}.")
 
-    def __getitem__(self, where: Any) -> Any:
+    def __getitem__(self, where: Any) -> AwkwardDaskCollection:
         """Select items from the collection.
 
         Heavily under construction.
