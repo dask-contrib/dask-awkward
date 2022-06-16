@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import builtins
-from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any, Sequence
+from collections.abc import Iterable, Sequence
+from typing import TYPE_CHECKING, Any
 
 import awkward._v2 as ak
 import numpy as np
@@ -16,7 +16,9 @@ from dask_awkward.core import (
 from dask_awkward.utils import DaskAwkwardNotImplemented, borrow_docstring
 
 if TYPE_CHECKING:
-    from awkward._v2.highlevel import Array as AwkwardArray
+    from numpy.typing import DTypeLike
+
+    from dask_awkward.typing import AwkwardDaskCollection
 
 __all__ = (
     "argcartesian",
@@ -105,6 +107,14 @@ def broadcast_arrays(*arrays, **kwargs):
     raise DaskAwkwardNotImplemented("TODO")
 
 
+class _CartesianFn:
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __call__(self, *arrays):
+        return ak.cartesian(list(arrays), **self.kwargs)
+
+
 @borrow_docstring(ak.cartesian)
 def cartesian(
     arrays,
@@ -115,6 +125,16 @@ def cartesian(
     highlevel: bool = True,
     behavior=None,
 ):
+    if axis == 1:
+        fn = _CartesianFn(
+            axis=axis,
+            nested=nested,
+            parameters=parameters,
+            with_name=with_name,
+            highlevel=highlevel,
+            behavior=behavior,
+        )
+        return map_partitions(fn, *arrays, label="cartesian", output_divisions=1)
     raise DaskAwkwardNotImplemented("TODO")
 
 
@@ -155,19 +175,63 @@ def fill_none(array, value, axis=-1, highlevel: bool = True, behavior=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
+class _FirstsFn:
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __call__(self, array):
+        return ak.firsts(array, **self.kwargs)
+
+
 @borrow_docstring(ak.firsts)
-def firsts(array, axis: int | None = 1, highlevel: bool = True, behavior=None):
+def firsts(
+    array: Array,
+    axis: int | None = 1,
+    highlevel: bool = True,
+    behavior: dict | None = None,
+) -> AwkwardDaskCollection:
+    if axis == 1:
+        return map_partitions(
+            _FirstsFn(
+                axis=axis,
+                highlevel=highlevel,
+                behavior=behavior,
+            ),
+            array,
+            label="firsts",
+            output_divisions=1,
+        )
+    elif axis == 0:
+        return array[0]
     raise DaskAwkwardNotImplemented("TODO")
 
 
+class _FlattenFn:
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __call__(self, array: ak.Array) -> ak.Array:
+        return ak.flatten(array, **self.kwargs)
+
+
 @borrow_docstring(ak.flatten)
-def flatten(array, axis: int | None = 1, highlevel: bool = True, behavior=None):
+def flatten(
+    array: Array,
+    axis: int | None = 1,
+    highlevel: bool = True,
+    behavior: dict | None = None,
+) -> Array:
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
     return map_partitions(
-        ak.flatten,
+        _FlattenFn(
+            axis=axis,
+            highlevel=highlevel,
+            behavior=behavior,
+        ),
         array,
-        axis=axis,
-        highlevel=highlevel,
-        behavior=behavior,
+        label="flatten",
+        output_divisions=None,
     )
 
 
@@ -244,6 +308,8 @@ def num(
     highlevel: bool = True,
     behavior: Any | None = None,
 ) -> Any:
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
     if axis and axis >= 1:
         return map_partitions(
             ak.num,
@@ -270,8 +336,22 @@ def num(
 
 
 @borrow_docstring(ak.ones_like)
-def ones_like(array, highlevel: bool = True, behavior=None, dtype=None):
-    raise DaskAwkwardNotImplemented("TODO")
+def ones_like(
+    array: Array,
+    highlevel: bool = True,
+    behavior: dict | None = None,
+    dtype: DTypeLike | None = None,
+) -> Array:
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+    return map_partitions(
+        ak.ones_like,
+        array,
+        output_divisions=1,
+        label="ones-like",
+        behavior=behavior,
+        dtype=dtype,
+    )
 
 
 @borrow_docstring(ak.packed)
@@ -348,9 +428,29 @@ def with_field(base, what, where=None, highlevel: bool = True, behavior=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
+class _WithNameFn:
+    def __init__(self, name: str, behavior: dict | None = None) -> None:
+        self.name = name
+        self.behavior = behavior
+
+    def __call__(self, array: ak.Array) -> ak.Array:
+        return ak.with_name(array, self.name, behavior=self.behavior)
+
+
 @borrow_docstring(ak.with_name)
-def with_name(array, name, highlevel: bool = True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+def with_name(
+    array: Array,
+    name: str,
+    highlevel: bool = True,
+    behavior: dict | None = None,
+) -> Array:
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+    return map_partitions(
+        _WithNameFn(name=name, behavior=behavior),
+        array,
+        label="with-name",
+    )
 
 
 @borrow_docstring(ak.with_parameter)
@@ -364,16 +464,30 @@ def without_parameters(array, highlevel: bool = True, behavior=None):
 
 
 @borrow_docstring(ak.zeros_like)
-def zeros_like(array, highlevel: bool = True, behavior=None, dtype=None):
-    raise DaskAwkwardNotImplemented("TODO")
+def zeros_like(
+    array,
+    highlevel: bool = True,
+    behavior: dict | None = None,
+    dtype: DTypeLike | None = None,
+):
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+    return map_partitions(
+        ak.zeros_like,
+        array,
+        output_divisions=1,
+        label="zeros-like",
+        behavior=behavior,
+        dtype=dtype,
+    )
 
 
-class _ZipWrapper:
+class _ZipFn:
     def __init__(self, keys: Sequence[str], **kwargs) -> None:
         self.keys = keys
         self.kwargs = kwargs
 
-    def __call__(self, *parts: Array) -> AwkwardArray:
+    def __call__(self, *parts: ak.Array) -> ak.Array:
         return ak.zip(
             {k: p for k, p in builtins.zip(self.keys, list(parts))},
             **self.kwargs,
@@ -391,6 +505,9 @@ def zip(
     right_broadcast: bool = False,
     optiontype_outside_record: bool = False,
 ):
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
     if not isinstance(arrays, dict):
         raise DaskAwkwardNotImplemented("ak.zip only supports dictionary inputs.")
 
@@ -412,7 +529,7 @@ def zip(
     )
 
     return map_partitions(
-        _ZipWrapper(
+        _ZipFn(
             keys,
             depth_limit=depth_limit,
             parameters=parameters,

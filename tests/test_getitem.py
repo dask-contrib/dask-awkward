@@ -96,8 +96,8 @@ def test_boolean_array(daa: dak.Array, op: Callable) -> None:
 def test_boolean_array_from_awkward(daa: dak.Array) -> None:
     cx_2 = daa.points.x.compute()
     dx_2 = dak.from_awkward(cx_2, npartitions=6)
-    dx_2 = dx_2[dx_2 > 2]
-    assert_eq(dx_2, cx_2[cx_2 > 2])
+    dx_3 = dx_2[dx_2 > 2]
+    assert_eq(dx_3, cx_2[cx_2 > 2])
 
 
 def test_tuple_boolean_array_raise(daa: dak.Array) -> None:

@@ -32,7 +32,7 @@ src_paths = ["src", "tests"]
 
 [tool.mypy]
 python_version = "3.8"
-files = ["src"]
+files = ["src", "tests"]
 warn_unused_configs = true
 show_error_codes = true
 

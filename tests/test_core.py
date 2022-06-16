@@ -11,6 +11,8 @@ try:
 except ImportError:
     import json  # type: ignore
 
+import sys
+
 import dask_awkward as dak
 import dask_awkward.core as dakc
 from dask_awkward.testutils import assert_eq
@@ -36,7 +38,7 @@ def test_calculate_known_divisions(ndjson_points_file: str) -> None:
     assert dakc.calculate_known_divisions(daa) == target
     assert dakc.calculate_known_divisions(daa.points) == target
     assert dakc.calculate_known_divisions(daa.points.x) == target
-    assert dakc.calculate_known_divisions(daa["points"]["y"]) == target
+    assert dakc.calculate_known_divisions(daa["points"]["y"]) == target  # type: ignore
     daa = dak.from_json([ndjson_points_file] * 3)
     daa.eager_compute_divisions()
     assert daa.known_divisions
@@ -138,12 +140,15 @@ def test_raise_in_finalize(daa: dak.Array) -> None:
         res.compute()
 
 
-def test_rebuild(ndjson_points_file: str) -> None:
+def test_array_rebuild(ndjson_points_file: str) -> None:
     daa = dak.from_json([ndjson_points_file])
     x = daa.compute()
     daa = daa._rebuild(daa.dask)
     y = daa.compute()
     assert x.tolist() == y.tolist()
+
+    with pytest.raises(ValueError, match="rename= unsupported"):
+        daa._rebuild(daa.dask, rename={"x": "y"})
 
 
 def test_type(ndjson_points_file: str) -> None:
@@ -207,26 +212,36 @@ def test_to_meta(daa: dak.Array) -> None:
 
 def test_record_str(daa: dak.Array) -> None:
     r = daa[0]
+    assert type(r) == dak.Record
     assert str(r) == "dask.awkward<getitem, type=Record>"
 
 
 def test_record_to_delayed(daa: dak.Array) -> None:
     r = daa[0]
+    assert type(r) == dak.Record
     d = r.to_delayed()
     assert r.compute().tolist() == d.compute().tolist()
 
 
 def test_record_fields(daa: dak.Array) -> None:
     r = daa[0]
+    assert type(r) == dak.Record
     r._meta = None
-    assert r.fields is None
+    with pytest.raises(TypeError, match="metadata is missing"):
+        assert not r.fields
 
 
 def test_record_dir(daa: dak.Array) -> None:
-    r = daa["points"][0]
+    r = daa["points"][0][0]
+    assert type(r) == dak.Record
     d = dir(r)
     for f in r.fields:
         assert f in d
+
+
+def test_record_pickle(daa: dak.Array) -> None:
+    r = daa[0]
+    assert type(r) == dak.Record
 
 
 def test_array_dir(daa: dak.Array) -> None:
@@ -327,10 +342,21 @@ def test_bad_meta_type(ndjson_points_file: str, meta) -> None:
         dak.from_json([ndjson_points_file] * 3, meta=meta)
 
 
+@pytest.mark.skipif(sys.platform.startswith("win"), reason="skip if windows")
 def test_scalar_repr(daa: dakc.Array) -> None:
     s = dak.max(daa.points.y)
     sstr = str(s)
     assert "type=Scalar" in sstr
+    s = dakc.new_known_scalar(5)
+    sstr = str(s)
+    assert (
+        sstr == r"dask.awkward<known-scalar, type=Scalar, dtype=int64, known_value=5>"
+    )
+
+
+def test_scalar_divisions(daa: dakc.Array) -> None:
+    s = dak.max(daa.points.x, axis=None)
+    assert s.divisions == (None, None)
 
 
 def test_array_persist(daa: dakc.Array) -> None:
@@ -340,10 +366,14 @@ def test_array_persist(daa: dakc.Array) -> None:
     assert_eq(daa2, daa)
 
 
-def test_scalar_persist(daa: dakc.Array) -> None:
+def test_scalar_persist_and_rebuild(daa: dakc.Array) -> None:
     coll = daa["points"][0]["x"][0]
     coll2 = coll.persist()
     assert_eq(coll, coll2)
+
+    m = dak.max(daa.points.x, axis=None)
+    with pytest.raises(ValueError, match="rename= unsupported"):
+        m._rebuild(m.dask, rename={m._name: "max2"})
 
 
 def test_output_divisions(daa: dakc.Array) -> None:

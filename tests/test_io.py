@@ -83,7 +83,7 @@ def test_from_dask_array() -> None:
 
 @pytest.mark.parametrize("optimize_graph", [True, False])
 def test_to_and_from_delayed(daa: dak.Array, optimize_graph: bool) -> None:
-    daa = daa[dak.num(daa.points.x, axis=1) > 2]
+    daa = daa[dak.num(daa.points.x, axis=1) > 2]  # type: ignore
     delayeds = daa.to_delayed(optimize_graph=optimize_graph)
     daa2 = dak.from_delayed(delayeds)
     assert_eq(daa, daa2)
@@ -116,9 +116,9 @@ def test_from_map_with_args_kwargs() -> None:
 
     # concrete version
     y = list(zip(a, b, c))
-    y = dask.core.flatten(list(map(list, y)))
-    y = map(lambda x: x * n, y)
-    y = ak.from_iter(y)
+    y = dask.core.flatten(list(map(list, y)))  # type: ignore
+    y = map(lambda x: x * n, y)  # type: ignore
+    y = ak.from_iter(y)  # type: ignore
 
     assert_eq(x, y)
 
@@ -126,10 +126,10 @@ def test_from_map_with_args_kwargs() -> None:
     x = dak.from_map(f, a, b, c, args=(n,), pad_zero=True)
 
     # concrete version
-    y = list(zip(a, b, c, [0, 0, 0]))
-    y = dask.core.flatten(list(map(list, y)))
-    y = map(lambda x: x * n, y)
-    y = ak.from_iter(y)
+    y = list(zip(a, b, c, [0, 0, 0]))  # type: ignore
+    y = dask.core.flatten(list(map(list, y)))  # type: ignore
+    y = map(lambda x: x * n, y)  # type: ignore
+    y = ak.from_iter(y)  # type: ignore
 
     assert_eq(x, y)
 

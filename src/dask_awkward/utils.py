@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import collections.abc
-from typing import Any, Callable
+from collections.abc import Callable, Mapping
+from typing import Any
 
 import awkward._v2 as ak
 import numpy as np
@@ -32,7 +32,7 @@ class IncompatiblePartitions(ValueError):
         return msg
 
 
-class LazyInputsDict(collections.abc.Mapping):
+class LazyInputsDict(Mapping):
     """Dictionary with lazy key value pairs
 
     Parameters

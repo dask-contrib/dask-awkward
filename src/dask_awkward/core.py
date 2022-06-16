@@ -3,9 +3,10 @@ from __future__ import annotations
 import keyword
 import operator
 import warnings
+from collections.abc import Callable, Hashable, Mapping, Sequence
 from functools import cached_property, partial
 from numbers import Number
-from typing import TYPE_CHECKING, Any, Callable, Hashable, Mapping, Sequence, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import awkward._v2 as ak
 import dask.config
@@ -24,6 +25,7 @@ from dask.utils import IndexCallable, funcname, key_split
 from numpy.lib.mixins import NDArrayOperatorsMixin
 
 from dask_awkward.optimize import basic_optimize
+from dask_awkward.typing import AwkwardDaskCollection
 from dask_awkward.utils import (
     DaskAwkwardNotImplemented,
     IncompatiblePartitions,
@@ -86,18 +88,18 @@ class Scalar(DaskMethodsMixin):
         self,
         dsk: HighLevelGraph,
         name: str,
-        meta: Any | None = None,
+        meta: Any,
         known_value: Any | None = None,
     ) -> None:
         self._dask: HighLevelGraph = dsk
         self._name: str = name
-        self._meta: Any | None = self._check_meta(meta)
+        self._meta: Any = self._check_meta(meta)
         self._known_value: Any | None = known_value
 
     def __dask_graph__(self) -> HighLevelGraph:
         return self._dask
 
-    def __dask_keys__(self) -> list[str]:
+    def __dask_keys__(self) -> list[Hashable]:
         return [self._name]
 
     def __dask_layers__(self) -> tuple[str, ...]:
@@ -128,7 +130,7 @@ class Scalar(DaskMethodsMixin):
     ) -> Any:
         name = self._name
         if rename:
-            name = rename.get(name, name)
+            raise ValueError("rename= unsupported in dask-awkward")
         return type(self)(dsk, name, self._meta, self.known_value)
 
     def __reduce__(self):
@@ -142,9 +144,9 @@ class Scalar(DaskMethodsMixin):
     def name(self) -> str:
         return self._name
 
-    def _check_meta(self, m: Any | None) -> Any | None:
-        if m is not None and not isinstance(m, (MaybeNone, UnknownScalar, OneOf)):
-            raise TypeError(f"meta must be a typetracer module object, not a {type(m)}")
+    def _check_meta(self, m: Any) -> Any | None:
+        if not isinstance(m, (MaybeNone, UnknownScalar, OneOf)):
+            raise TypeError(f"meta must be a typetracer object, not a {type(m)}")
         return m
 
     @property
@@ -162,6 +164,14 @@ class Scalar(DaskMethodsMixin):
         return 1
 
     @property
+    def fields(self) -> list[str]:
+        return []
+
+    @property
+    def layout(self) -> Any:
+        raise TypeError("Scalars do not have a layout.")
+
+    @property
     def divisions(self) -> tuple[None, None]:
         """Scalar and Records do not have divisions by definition."""
         return (None, None)
@@ -175,7 +185,7 @@ class Scalar(DaskMethodsMixin):
         return self.__str__()
 
     def __str__(self) -> str:
-        dt = str(self.dtype) or "Unknown"
+        dt = self.dtype or "Unknown"
         if self.known_value is not None:
             return (
                 f"dask.awkward<{key_split(self.name)}, "
@@ -184,6 +194,12 @@ class Scalar(DaskMethodsMixin):
                 f"known_value={self.known_value}>"
             )
         return f"dask.awkward<{key_split(self.name)}, type=Scalar, dtype={dt}>"
+
+    def __getitem__(self, where):
+        raise RuntimeError("Scalars do not support __getitem__")
+
+    def __getattr__(self, attr: str) -> Any:
+        raise RuntimeError("Scalars do not support __getattr__")
 
     @property
     def known_value(self) -> Any | None:
@@ -199,6 +215,8 @@ class Scalar(DaskMethodsMixin):
 
 
 def new_scalar_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Scalar:
+    if meta is None:
+        meta = UnknownScalar(np.dtype(None))
     return Scalar(dsk, name, meta, known_value=None)
 
 
@@ -216,6 +234,8 @@ def new_known_scalar(
             dtype = np.dtype(float)
         else:
             dtype = np.dtype(type(s))
+    else:
+        dtype = np.dtype(dtype)
     llg = {name: s}
     hlg = HighLevelGraph.from_collections(name, llg, dependencies=())
     return Scalar(hlg, name, meta=UnknownScalar(dtype), known_value=s)
@@ -240,7 +260,8 @@ class Record(Scalar):
             raise TypeError(f"meta must be a Record typetracer object, not a {type(m)}")
         return m
 
-    def __getitem__(self, key: str) -> Any:
+    def __getitem__(self, where: str) -> AwkwardDaskCollection:
+        key = where
         token = tokenize(self, key)
         name = f"getitem-{token}"
         new_meta = self._meta[key]  # type: ignore
@@ -282,10 +303,14 @@ class Record(Scalar):
         return (Record, (self.dask, self.name, self._meta))
 
     @property
-    def fields(self) -> list[str] | None:
-        if self._meta is not None:
-            return ak.fields(self._meta)
-        return None
+    def fields(self) -> list[str]:
+        if self._meta is None:
+            raise TypeError("metadata is missing; cannot determine fields.")
+        return ak.fields(self._meta)
+
+    @property
+    def layout(self) -> Any:
+        return self._meta.layout
 
     def _ipython_key_completions_(self) -> list[str]:
         if self._meta is not None:
@@ -340,7 +365,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     def __dask_graph__(self) -> HighLevelGraph:
         return self.dask
 
-    def __dask_keys__(self) -> list[tuple[str, int]]:
+    def __dask_keys__(self) -> list[Hashable]:
         return [(self.name, i) for i in range(self.npartitions)]
 
     def __dask_layers__(self) -> tuple[str]:
@@ -369,7 +394,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     ) -> Array:
         name = self.name
         if rename:
-            name = rename.get(name, name)
+            raise ValueError("rename= unsupported in dask-awkward")
         return Array(dsk, name, self._meta, divisions=self.divisions)
 
     def __len__(self) -> int:
@@ -442,7 +467,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return self._dask
 
     @property
-    def keys(self) -> list[tuple[str, int]]:
+    def keys(self) -> list[Hashable]:
         """Task graph keys."""
         return self.__dask_keys__()
 
@@ -718,7 +743,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         raise DaskAwkwardNotImplemented(f"__getitem__ doesn't support where={where}.")
 
-    def __getitem__(self, where: Any) -> Any:
+    def __getitem__(self, where: Any) -> AwkwardDaskCollection:
         """Select items from the collection.
 
         Heavily under construction.
@@ -1069,28 +1094,35 @@ def partitionwise_layer(
 
 
 def map_partitions(
-    func: Callable,
+    fn: Callable,
     *args: Any,
     label: str | None = None,
     meta: Any | None = None,
     output_divisions: int | None = None,
     **kwargs: Any,
 ) -> Array:
-    """Map a callable across all partitions of a collection.
+    """Map a callable across all partitions of any number of collections.
 
     Parameters
     ----------
-    func : Callable
+    fn : Callable
         Function to apply on all partitions.
     *args : Collections and function arguments
-        Arguments passed to the function, if arguments are
-        Array collections they must be compatibly
+        Arguments passed to the function. Partitioned arguments (i.e.
+        Dask collections) will have `fn` applied to each partition.
+        Array collection arguments they must be compatibly
         partitioned.
     label : str, optional
         Label for the Dask graph layer; if left to ``None`` (default),
         the name of the function will be used.
     meta : Any, optional
-        Metadata (typetracer) information of the result (if known).
+        Metadata (typetracer) array for the result (if known). If
+        unknown, `fn` will be applied to the metadata of the `args`;
+        if that call fails, the first partition of the new collection
+        will be used to compute the new metadata **if** the
+        ``awkward.compute-known-meta`` configuration setting is
+        ``True``. If the configuration setting is ``False``, an empty
+        typetracer will be assigned as the metadata.
     output_divisions : int, optional
         If ``None`` (the default), the divisions of the output will be
         assumed unknown. If defined, the output divisions will be
@@ -1100,32 +1132,59 @@ def map_partitions(
         operation. This argument is mainly for internal library
         function implementations.
     **kwargs : Any
-        Additional keyword arguments passed to the `func`.
+        Additional keyword arguments passed to the `fn`.
 
     Returns
     -------
     dask_awkward.Array
         The new collection.
 
+    Examples
+    --------
+    >>> import dask_awkward as dak
+    >>> a = [[1, 2, 3], [4]]
+    >>> b = [[5, 6, 7], [8]]
+    >>> c = dak.from_lists([a, b])
+    >>> c
+    dask.awkward<from-lists, npartitions=2>
+    >>> c.compute()
+    <Array [[1, 2, 3], [4], [5, 6, 7], [8]] type='4 * var * int64'>
+    >>> c2 = dak.map_partitions(np.add, c, c)
+    >>> c2
+    dask.awkward<add, npartitions=2>
+    >>> c2.compute()
+    <Array [[2, 4, 6], [8], [10, 12, 14], [16]] type='4 * var * int64'>
+
+    Multiplying `c` (a Dask collection) with `a` (a regular Python
+    list object) will multiply each partition of `c` by `a`:
+
+    >>> d = dak.map_partitions(np.multiply, c, a)
+    dask.awkward<multiply, npartitions=2>
+    >>> d.compute()
+    <Array [[1, 4, 9], [16], [5, 12, 21], [32]] type='4 * var * int64'>
+
+    This is effectively the same as `d = c * a`
+
     """
-    token = tokenize(func, *args, **kwargs)
-    label = label or funcname(func)
+    token = tokenize(fn, *args, **kwargs)
+    label = label or funcname(fn)
     name = f"{label}-{token}"
-    lay = partitionwise_layer(func, name, *args, **kwargs)
+    lay = partitionwise_layer(fn, name, *args, **kwargs)
     deps = [a for a in args if is_dask_collection(a)] + [
         v for _, v in kwargs.items() if is_dask_collection(v)
     ]
 
     if meta is None:
-        if dask.config.get("awkward.compute-unknown-meta"):
-            metas = to_meta(args)
-            try:
-                meta = func(*metas, **kwargs)
-            except Exception:
+        metas = to_meta(args)
+        try:
+            meta = fn(*metas, **kwargs)
+        except Exception:
+            if dask.config.get("awkward.compute-unknown-meta"):
                 warnings.warn(
                     "metadata could not be determined; "
                     "a compute on the first partition will occur."
                 )
+            pass
 
     hlg = HighLevelGraph.from_collections(
         name,
@@ -1442,16 +1501,6 @@ def compatible_partitions(*args: Array) -> bool:
                     return False
 
     return True
-
-
-def with_name(collection: Array, name: str, behavior: dict | None = None) -> Array:
-    meta = ak.Array(collection._meta, with_name=name, behavior=behavior)
-    return map_partitions(
-        lambda c: ak.Array(c, with_name=name, behavior=behavior),
-        collection,
-        label="with-name",
-        meta=meta,
-    )
 
 
 class BehaviorMethodCall:

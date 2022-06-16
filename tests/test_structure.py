@@ -47,3 +47,14 @@ def test_zip(daa, caa) -> None:
     da_z = dak.zip({"a": da1, "b": da2})
     ca_z = ak.zip({"a": ca1, "b": ca2})
     assert_eq(da_z, ca_z)
+
+
+def test_cartesian(daa, caa) -> None:
+    da1 = daa["points", "x"]
+    da2 = daa["points", "y"]
+    ca1 = caa["points", "x"]
+    ca2 = caa["points", "y"]
+
+    dz = dak.cartesian([da1, da2], axis=1)
+    cz = ak.cartesian([ca1, ca2], axis=1)
+    assert_eq(dz, cz)
