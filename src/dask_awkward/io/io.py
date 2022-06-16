@@ -12,7 +12,11 @@ from dask.highlevelgraph import HighLevelGraph
 from dask.utils import funcname
 
 from dask_awkward.core import map_partitions, new_array_object, typetracer_array
-from dask_awkward.utils import DaskAwkwardNotImplemented, LazyInputsDict
+from dask_awkward.utils import (
+    DaskAwkwardNotImplemented,
+    LazyInputsDict,
+    empty_typetracer,
+)
 
 if TYPE_CHECKING:
     from dask.array.core import Array as DaskArray
@@ -210,9 +214,11 @@ def to_dask_array(array: Array) -> DaskArray:
     """
     from dask.array.core import new_da_object
 
-    new = map_partitions(ak.to_numpy, array)
+    new = map_partitions(ak.to_numpy, array, meta=empty_typetracer())
     graph = new.dask
-    dtype = new._meta.dtype if new._meta is not None else None
+    if array._meta is None:
+        raise TypeError("Array metadata required for determining dtype")
+    dtype = np.dtype(array._meta.type.content.primitive)
 
     # TODO: define chunks if we can.
     #
