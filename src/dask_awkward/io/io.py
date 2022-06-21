@@ -217,7 +217,7 @@ def to_dask_array(array: Array) -> DaskArray:
     new = map_partitions(ak.to_numpy, array, meta=empty_typetracer())
     graph = new.dask
     if array._meta is None:
-        raise TypeError("Array metadata required for determining dtype")
+        raise ValueError("Array metadata required for determining dtype")
     dtype = np.dtype(array._meta.type.content.primitive)
 
     # TODO: define chunks if we can.

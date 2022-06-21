@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 __all__ = ("from_json",)
 
 
-class FromJsonWrapper:
+class _FromJsonFn:
     def __init__(
         self,
         *args: Any,
@@ -50,7 +50,7 @@ class FromJsonWrapper:
         pass  # pragma: no cover
 
 
-class FromJsonLineDelimitedWrapper(FromJsonWrapper):
+class _FromJsonLineDelimitedFn(_FromJsonFn):
     def __init__(
         self,
         *args: Any,
@@ -65,7 +65,7 @@ class FromJsonLineDelimitedWrapper(FromJsonWrapper):
             return ak.from_json(f.read())
 
 
-class FromJsonSingleObjInFileWrapper(FromJsonWrapper):
+class _FromJsonSingleObjInFileFn(_FromJsonFn):
     def __init__(
         self,
         *args: Any,
@@ -80,7 +80,7 @@ class FromJsonSingleObjInFileWrapper(FromJsonWrapper):
             return ak.Array([json.load(f)])
 
 
-class FromJsonBytesWrapper:
+class _FromJsonBytesFn:
     def __call__(self, source) -> ak.Array:
         return ak.from_iter(
             json.loads(ch) for ch in io.TextIOWrapper(io.BytesIO(source)) if ch
@@ -102,7 +102,7 @@ def derive_json_meta(
     bytechunks = parse_bytes(bytechunks)
 
     if one_obj_per_file:
-        fn = FromJsonSingleObjInFileWrapper(storage=storage, compression=compression)
+        fn = _FromJsonSingleObjInFileFn(storage=storage, compression=compression)
         return typetracer_array(fn(source))
 
     # when the data is uncompressed we read `bytechunks` number of
@@ -164,12 +164,12 @@ def _from_json_files(
         compression = infer_compression(urlpaths[0])
 
     if one_obj_per_file:
-        f: FromJsonWrapper = FromJsonSingleObjInFileWrapper(
+        f: _FromJsonFn = _FromJsonSingleObjInFileFn(
             storage=fs,
             compression=compression,
         )
     else:
-        f = FromJsonLineDelimitedWrapper(storage=fs, compression=compression)
+        f = _FromJsonLineDelimitedFn(storage=fs, compression=compression)
 
     return from_map(f, urlpaths, label="from-json", token=token, meta=meta)
 
@@ -193,7 +193,7 @@ def _from_json_bytes(
         **storage_options,
     )
     flat_chunks: list[Delayed] = list(flatten(bytechunks))  # type: ignore
-    f = FromJsonBytesWrapper()
+    f = _FromJsonBytesFn()
     dsk = {
         (name, i): (f, delayed_chunk.key) for i, delayed_chunk in enumerate(flat_chunks)
     }

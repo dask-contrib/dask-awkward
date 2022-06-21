@@ -55,11 +55,42 @@ def test_json_delim_defined(ndjson_points_file: str) -> None:
             for line in f:
                 concretes.append(json.loads(line))
     caa = ak.from_iter(concretes)
-
     assert_eq(
         daa["points"][["x", "y"]],
         caa["points"][["x", "y"]],
     )
+
+
+def test_json_sample_rows_true(ndjson_points_file: str) -> None:
+    source = [ndjson_points_file] * 5
+
+    daa = dak.from_json(
+        source,
+        derive_meta_kwargs={"force_by_lines": True, "sample_rows": 2},
+    )
+
+    concretes = []
+    for s in source:
+        with open(s) as f:
+            for line in f:
+                concretes.append(json.loads(line))
+    caa = ak.from_iter(concretes)
+
+    assert_eq(daa, caa)
+
+
+def test_json_bytes_no_delim_defined(ndjson_points_file: str) -> None:
+    source = [ndjson_points_file] * 7
+    daa = dak.from_json(source, blocksize=650, delimiter=None)
+
+    concretes = []
+    for s in source:
+        with open(s) as f:
+            for line in f:
+                concretes.append(json.loads(line))
+
+    caa = ak.from_iter(concretes)
+    assert_eq(daa, caa)
 
 
 def test_to_and_from_dask_array(daa: dak.Array) -> None:
@@ -70,6 +101,11 @@ def test_to_and_from_dask_array(daa: dak.Array) -> None:
 
     back_to_dak = dak.from_dask_array(daskarr)
     assert_eq(back_to_dak, computed)
+
+    a = dak.from_lists([[1, 2, 3], [4, 5, 6]])
+    a._meta = None
+    with pytest.raises(ValueError, match="metadata required"):
+        dak.to_dask_array(a)
 
 
 def test_from_dask_array() -> None:
@@ -179,6 +215,14 @@ def test_from_map_exceptions() -> None:
 
     with pytest.raises(ValueError, match="at least one Iterable input"):
         dak.from_map(f, args=(5,))
+
+
+def test_from_map_raise_produces_tasks() -> None:
+    def f(a, b):
+        return ak.Array([a, b])
+
+    with pytest.raises(ValueError, match="Multiple iterables not supported"):
+        dak.from_map(f, [1, 2, 3], [4, 5, 6], produces_tasks=True)
 
 
 def test_from_lists(caa_p1) -> None:
