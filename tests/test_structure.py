@@ -58,3 +58,15 @@ def test_cartesian(daa, caa) -> None:
     dz = dak.cartesian([da1, da2], axis=1)
     cz = ak.cartesian([ca1, ca2], axis=1)
     assert_eq(dz, cz)
+
+
+def test_ones_like(daa, caa) -> None:
+    da1 = dak.ones_like(daa.points.x)
+    ca1 = ak.ones_like(caa["points", "x"])
+    assert_eq(da1, ca1)
+
+
+def test_zeros_like(daa, caa) -> None:
+    da1 = dak.zeros_like(daa["points", "x"])
+    ca1 = ak.zeros_like(caa.points.x)
+    assert_eq(da1, ca1)
