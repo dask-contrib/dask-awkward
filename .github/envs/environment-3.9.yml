@@ -9,5 +9,4 @@ dependencies:
   - pyarrow
   - pip
   - pip:
-    - awkward>=1.9.0rc4
-    - awkward-datasets
+    - awkward>=1.9.0rc5
