@@ -29,7 +29,7 @@ class UprootReadIndivFileFn:
         self.tree_name = tree_name
         self.branches = branches
 
-    def __call__(self, file_name: str):
+    def __call__(self, file_name: str) -> ak.Array:
         tree = uproot.open(file_name)[self.tree_name]
         return ak.Array(v1_to_v2(tree.arrays(self.branches).layout))
 
