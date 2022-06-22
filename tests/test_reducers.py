@@ -11,7 +11,14 @@ from dask_awkward.testutils import assert_eq
 @pytest.mark.parametrize("keepdims", [True, False])
 @pytest.mark.parametrize("mask_identity", [True, False])
 @pytest.mark.parametrize("testval", [-1, 3, 100])
-def test_all(daa, caa, axis, keepdims, mask_identity, testval) -> None:
+def test_all(
+    daa: dak.Array,
+    caa: ak.Array,
+    axis: int | None,
+    keepdims: bool,
+    mask_identity: bool,
+    testval: int,
+) -> None:
     xd = daa.points.x
     xc = caa.points.x
     maskd = xd > testval
@@ -25,7 +32,14 @@ def test_all(daa, caa, axis, keepdims, mask_identity, testval) -> None:
 @pytest.mark.parametrize("keepdims", [True, False])
 @pytest.mark.parametrize("mask_identity", [True, False])
 @pytest.mark.parametrize("testval", [-1, 3, 100])
-def test_any(daa, caa, axis, keepdims, mask_identity, testval) -> None:
+def test_any(
+    daa: dak.Array,
+    caa: ak.Array,
+    axis: int | None,
+    keepdims: bool,
+    mask_identity: bool,
+    testval: int,
+) -> None:
     xd = daa.points.x
     xc = caa.points.x
     maskd = xd > testval
@@ -36,7 +50,7 @@ def test_any(daa, caa, axis, keepdims, mask_identity, testval) -> None:
 
 
 @pytest.mark.parametrize("axis", [1])
-def test_argmax(daa, caa, axis) -> None:
+def test_argmax(daa: dak.Array, caa: ak.Array, axis: int) -> None:
     xd = daa.points.x
     xc = caa.points.x
     dr = dak.argmax(xd, axis=axis)
@@ -45,7 +59,7 @@ def test_argmax(daa, caa, axis) -> None:
 
 
 @pytest.mark.parametrize("axis", [1])
-def test_argmin(daa, caa, axis) -> None:
+def test_argmin(daa: dak.Array, caa: ak.Array, axis: int) -> None:
     xd = daa.points.x
     xc = caa.points.x
     dr = dak.argmin(xd, axis=axis)
@@ -54,14 +68,14 @@ def test_argmin(daa, caa, axis) -> None:
 
 
 @pytest.mark.parametrize("axis", [None, 1, pytest.param(-1, marks=pytest.mark.xfail)])
-def test_count(daa, caa, axis) -> None:
+def test_count(daa: dak.Array, caa: ak.Array, axis: int | None) -> None:
     ar = ak.count(caa["points"]["x"], axis=axis)
     dr = dak.count(daa["points"]["x"], axis=axis)
     assert_eq(ar, dr)
 
 
 @pytest.mark.parametrize("axis", [None, 1, pytest.param(-1, marks=pytest.mark.xfail)])
-def test_count_nonzero(daa, caa, axis) -> None:
+def test_count_nonzero(daa: dak.Array, caa: ak.Array, axis: int | None) -> None:
     ar = ak.count_nonzero(caa["points", "x"], axis=axis)
     dr = dak.count_nonzero(daa["points"]["x"], axis=axis)
     assert_eq(ar, dr)
@@ -69,7 +83,7 @@ def test_count_nonzero(daa, caa, axis) -> None:
 
 @pytest.mark.parametrize("axis", [None, 1, pytest.param(-1, marks=pytest.mark.xfail)])
 @pytest.mark.parametrize("attr", ["x", "y"])
-def test_max(daa, caa, axis, attr) -> None:
+def test_max(daa: dak.Array, caa: ak.Array, axis: int | None, attr: str) -> None:
     ar = ak.max(caa.points[attr], axis=axis)
     dr = dak.max(daa.points[attr], axis=axis)
     assert_eq(ar, dr)
@@ -77,7 +91,7 @@ def test_max(daa, caa, axis, attr) -> None:
 
 @pytest.mark.parametrize("axis", [1])
 @pytest.mark.parametrize("attr", ["y", "x"])
-def test_mean(daa, caa, axis, attr) -> None:
+def test_mean(daa: dak.Array, caa: ak.Array, axis: int | None, attr: str) -> None:
     ar = ak.mean(caa.points[attr], axis=axis)
     dr = dak.mean(daa.points[attr], axis=axis)
     assert_eq(ar, dr)
@@ -85,7 +99,7 @@ def test_mean(daa, caa, axis, attr) -> None:
 
 @pytest.mark.parametrize("axis", [None, 1, pytest.param(-1, marks=pytest.mark.xfail)])
 @pytest.mark.parametrize("attr", ["x", "y"])
-def test_min(daa, caa, axis, attr) -> None:
+def test_min(daa: dak.Array, caa: ak.Array, axis: int | None, attr: str) -> None:
     ar = ak.min(caa.points[attr], axis=axis)
     dr = dak.min(daa["points", attr], axis=axis)
     assert_eq(ar, dr)
@@ -93,7 +107,7 @@ def test_min(daa, caa, axis, attr) -> None:
 
 @pytest.mark.parametrize("axis", [None, 1, pytest.param(-1, marks=pytest.mark.xfail)])
 @pytest.mark.parametrize("attr", ["x", "y"])
-def test_sum(daa, caa, axis, attr) -> None:
+def test_sum(daa: dak.Array, caa: ak.Array, axis: int | None, attr: str) -> None:
     ar = ak.sum(caa.points[attr], axis=axis)
     dr = dak.sum(daa.points[attr], axis=axis)
     assert_eq(ar, dr)

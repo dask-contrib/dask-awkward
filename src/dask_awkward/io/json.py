@@ -81,7 +81,7 @@ class _FromJsonSingleObjInFileFn(_FromJsonFn):
 
 
 class _FromJsonBytesFn:
-    def __call__(self, source) -> ak.Array:
+    def __call__(self, source: bytes) -> ak.Array:
         return ak.from_iter(
             json.loads(ch) for ch in io.TextIOWrapper(io.BytesIO(source)) if ch
         )
@@ -188,11 +188,11 @@ def _from_json_bytes(
     _, bytechunks = read_bytes(
         urlpath,
         delimiter=delimiter,
-        blocksize=blocksize,  # type: ignore
-        sample=None,  # type: ignore
+        blocksize=blocksize,
+        sample=None,
         **storage_options,
     )
-    flat_chunks: list[Delayed] = list(flatten(bytechunks))  # type: ignore
+    flat_chunks: list[Delayed] = list(flatten(bytechunks))
     f = _FromJsonBytesFn()
     dsk = {
         (name, i): (f, delayed_chunk.key) for i, delayed_chunk in enumerate(flat_chunks)

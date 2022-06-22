@@ -117,7 +117,7 @@ def test_bad_partition_boolean_array(ndjson_points_file: str) -> None:
         daa2[sel]
 
 
-def test_record_getitem_scalar_results(daa, caa) -> None:
+def test_record_getitem_scalar_results(daa: dak.Array, caa: ak.Array) -> None:
     dr = daa["points"][0][0]
     cr = caa["points"][0][0]
     assert isinstance(dr._meta, ak.Record)

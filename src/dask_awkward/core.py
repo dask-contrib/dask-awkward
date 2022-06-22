@@ -295,7 +295,7 @@ class Record(Scalar):
         key = where
         token = tokenize(self, key)
         name = f"getitem-{token}"
-        new_meta = self._meta[key]  # type: ignore
+        new_meta = self._meta[key]
 
         # first check for array type return
         if isinstance(new_meta, ak.Array):
@@ -303,7 +303,7 @@ class Record(Scalar):
             hlg = HighLevelGraph.from_collections(
                 name,
                 graphlayer,
-                dependencies=[self],  # type: ignore
+                dependencies=[self],
             )
             return new_array_object(hlg, name, meta=new_meta, npartitions=1)
 
@@ -312,7 +312,7 @@ class Record(Scalar):
         hlg = HighLevelGraph.from_collections(
             name,
             graphlayer,
-            dependencies=[self],  # type: ignore
+            dependencies=[self],
         )
         if isinstance(new_meta, ak.Record):
             return new_record_object(hlg, name, meta=new_meta)
@@ -584,11 +584,11 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         graph = HighLevelGraph.from_collections(
             name,
             dsk,
-            dependencies=[self],  # type: ignore
+            dependencies=[self],
         )
 
         # if a single partition was requested we trivially know the new divisions.
-        if len(raw) == 1 and isinstance(raw[0], int) and self.known_divisions:  # type: ignore
+        if len(raw) == 1 and isinstance(raw[0], int) and self.known_divisions:
             new_divisions = (
                 0,
                 self.divisions[raw[0] + 1] - self.divisions[raw[0]],  # type: ignore
@@ -731,7 +731,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         hlg = HighLevelGraph.from_collections(
             name,
             dsk,
-            dependencies=[partition],  # type: ignore
+            dependencies=[partition],
         )
         if isinstance(new_meta, ak.Record):
             return new_record_object(hlg, name, meta=new_meta)
@@ -950,6 +950,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             output_divisions=1,
             **kwargs,
         )
+
+    def __array__(self, *args, **kwargs):
+        raise NotImplementedError
 
     def to_delayed(self, optimize_graph: bool = True) -> list[Delayed]:
         """Convert the collection to a list of delayed objects.
@@ -1240,7 +1243,7 @@ def map_partitions(
     hlg = HighLevelGraph.from_collections(
         name,
         lay,
-        dependencies=deps,  # type: ignore
+        dependencies=deps,
     )
 
     if output_divisions is not None:
@@ -1310,7 +1313,7 @@ def pw_reduction_with_agg_to_scalar(
     hlg = HighLevelGraph.from_collections(
         nameagg,
         dsk,
-        dependencies=[array],  # type: ignore
+        dependencies=[array],
     )
     meta = UnknownScalar(np.dtype(dtype)) if dtype is not None else None
     return new_scalar_object(hlg, name=nameagg, meta=meta)

@@ -65,11 +65,11 @@ __all__ = (
 @borrow_docstring(ak.argcartesian)
 def argcartesian(
     arrays,
-    axis: int | None = 1,
+    axis=1,
     nested=None,
     parameters=None,
     with_name=None,
-    highlevel: bool = True,
+    highlevel=True,
     behavior=None,
 ):
     raise DaskAwkwardNotImplemented("TODO")
@@ -80,11 +80,11 @@ def argcombinations(
     array,
     n,
     replacement=False,
-    axis: int | None = 1,
+    axis=1,
     fields=None,
     parameters=None,
     with_name=None,
-    highlevel: bool = True,
+    highlevel=True,
     behavior=None,
 ):
     raise DaskAwkwardNotImplemented("TODO")
@@ -93,10 +93,10 @@ def argcombinations(
 @borrow_docstring(ak.argsort)
 def argsort(
     array,
-    axis: int | None = -1,
-    ascending: bool = True,
-    stable: bool = True,
-    highlevel: bool = True,
+    axis=-1,
+    ascending=True,
+    stable=True,
+    highlevel=True,
     behavior=None,
 ):
     raise DaskAwkwardNotImplemented("TODO")
@@ -118,11 +118,11 @@ class _CartesianFn:
 @borrow_docstring(ak.cartesian)
 def cartesian(
     arrays,
-    axis: int | None = 1,
+    axis=1,
     nested=None,
     parameters=None,
     with_name=None,
-    highlevel: bool = True,
+    highlevel=True,
     behavior=None,
 ):
     if axis == 1:
@@ -142,12 +142,12 @@ def cartesian(
 def combinations(
     array,
     n,
-    replacement: bool = False,
-    axis: int | None = 1,
+    replacement=False,
+    axis=1,
     fields=None,
     parameters=None,
     with_name=None,
-    highlevel: bool = True,
+    highlevel=True,
     behavior=None,
 ):
     raise DaskAwkwardNotImplemented("TODO")
@@ -156,10 +156,10 @@ def combinations(
 @borrow_docstring(ak.concatenate)
 def concatenate(
     arrays,
-    axis: int | None = 0,
-    merge: bool = True,
-    mergebool: bool = True,
-    highlevel: bool = True,
+    axis=0,
+    merge=True,
+    mergebool=True,
+    highlevel=True,
     behavior=None,
 ):
     raise DaskAwkwardNotImplemented("TODO")
@@ -171,7 +171,7 @@ def copy(array):
 
 
 @borrow_docstring(ak.fill_none)
-def fill_none(array, value, axis=-1, highlevel: bool = True, behavior=None):
+def fill_none(array, value, axis=-1, highlevel=True, behavior=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
@@ -186,7 +186,7 @@ class _FirstsFn:
 @borrow_docstring(ak.firsts)
 def firsts(
     array: Array,
-    axis: int | None = 1,
+    axis: int = 1,
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> AwkwardDaskCollection:
@@ -236,34 +236,34 @@ def flatten(
 
 
 @borrow_docstring(ak.from_regular)
-def from_regular(array, axis: int | None = 1, highlevel: bool = True, behavior=None):
+def from_regular(array, axis=1, highlevel=True, behavior=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
 @borrow_docstring(ak.full_like)
-def full_like(array, fill_value, highlevel: bool = True, behavior=None, dtype=None):
+def full_like(array, fill_value, highlevel=True, behavior=None, dtype=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
 @borrow_docstring(ak.isclose)
 def isclose(
-    a, b, rtol=1e-05, atol=1e-08, equal_nan=False, highlevel: bool = True, behavior=None
+    a, b, rtol=1e-05, atol=1e-08, equal_nan=False, highlevel=True, behavior=None
 ):
     raise DaskAwkwardNotImplemented("TODO")
 
 
 @borrow_docstring(ak.is_none)
-def is_none(array, axis=0, highlevel: bool = True, behavior=None):
+def is_none(array, axis=0, highlevel=True, behavior=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
 @borrow_docstring(ak.local_index)
-def local_index(array, axis=-1, highlevel: bool = True, behavior=None):
+def local_index(array, axis=-1, highlevel=True, behavior=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
 @borrow_docstring(ak.mask)
-def mask(array, mask, valid_when=True, highlevel: bool = True, behavior=None):
+def mask(array, mask, valid_when=True, highlevel=True, behavior=None):
     # if not compatible_partitions(array, mask):
     #     raise IncompatiblePartitions("mask", array, mask)
     # return map_partitions(
@@ -279,14 +279,14 @@ def mask(array, mask, valid_when=True, highlevel: bool = True, behavior=None):
 
 @borrow_docstring(ak.nan_to_num)
 def nan_to_num(
-    array,
+    array: Array,
     copy: bool = True,
     nan: float = 0.0,
     posinf: Any | None = None,
     neginf: Any | None = None,
     highlevel: bool = True,
     behavior: Any | None = None,
-):
+) -> Array:
     # return map_partitions(
     #     ak.nan_to_num,
     #     array,
@@ -304,9 +304,9 @@ def nan_to_num(
 @borrow_docstring(ak.num)
 def num(
     array: Any,
-    axis: int | None = 1,
+    axis: int = 1,
     highlevel: bool = True,
-    behavior: Any | None = None,
+    behavior: dict | None = None,
 ) -> Any:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -355,7 +355,7 @@ def ones_like(
 
 
 @borrow_docstring(ak.packed)
-def packed(array, highlevel: bool = True, behavior=None):
+def packed(array, highlevel=True, behavior=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
@@ -363,58 +363,56 @@ def packed(array, highlevel: bool = True, behavior=None):
 def pad_none(
     array,
     target,
-    axis: int | None = 1,
+    axis=1,
     clip=False,
-    highlevel: bool = True,
+    highlevel=True,
     behavior=None,
 ):
     raise DaskAwkwardNotImplemented("TODO")
 
 
 @borrow_docstring(ak.ravel)
-def ravel(array, highlevel: bool = True, behavior=None):
+def ravel(array, highlevel=True, behavior=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
 @borrow_docstring(ak.run_lengths)
-def run_lengths(array, highlevel: bool = True, behavior=None):
+def run_lengths(array, highlevel=True, behavior=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
 @borrow_docstring(ak.singletons)
-def singletons(array, highlevel: bool = True, behavior=None):
+def singletons(array, highlevel=True, behavior=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
 @borrow_docstring(ak.sort)
-def sort(
-    array, axis=-1, ascending=True, stable=True, highlevel: bool = True, behavior=None
-):
+def sort(array, axis=-1, ascending=True, stable=True, highlevel=True, behavior=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
 @borrow_docstring(ak.strings_astype)
-def strings_astype(array, to, highlevel: bool = True, behavior=None):
+def strings_astype(array, to, highlevel=True, behavior=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
 @borrow_docstring(ak.to_regular)
-def to_regular(array, axis: int | None = 1, highlevel: bool = True, behavior=None):
+def to_regular(array, axis=1, highlevel=True, behavior=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
 @borrow_docstring(ak.unflatten)
-def unflatten(array, counts, axis=0, highlevel: bool = True, behavior=None):
+def unflatten(array, counts, axis=0, highlevel=True, behavior=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
 @borrow_docstring(ak.unzip)
-def unzip(array, highlevel: bool = True, behavior=None):
+def unzip(array, highlevel=True, behavior=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
 @borrow_docstring(ak.values_astype)
-def values_astype(array, to, highlevel: bool = True, behavior=None):
+def values_astype(array, to, highlevel=True, behavior=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
@@ -424,7 +422,7 @@ def where(condition, *args, **kwargs):
 
 
 @borrow_docstring(ak.with_field)
-def with_field(base, what, where=None, highlevel: bool = True, behavior=None):
+def with_field(base, what, where=None, highlevel=True, behavior=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
@@ -454,22 +452,22 @@ def with_name(
 
 
 @borrow_docstring(ak.with_parameter)
-def with_parameter(array, parameter, value, highlevel: bool = True, behavior=None):
+def with_parameter(array, parameter, value, highlevel=True, behavior=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
 @borrow_docstring(ak.without_parameters)
-def without_parameters(array, highlevel: bool = True, behavior=None):
+def without_parameters(array, highlevel=True, behavior=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
 @borrow_docstring(ak.zeros_like)
 def zeros_like(
-    array,
+    array: Array,
     highlevel: bool = True,
     behavior: dict | None = None,
     dtype: DTypeLike | None = None,
-):
+) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
     return map_partitions(
@@ -483,7 +481,7 @@ def zeros_like(
 
 
 class _ZipFn:
-    def __init__(self, keys: Sequence[str], **kwargs) -> None:
+    def __init__(self, keys: Sequence[str], **kwargs: Any) -> None:
         self.keys = keys
         self.kwargs = kwargs
 
@@ -504,7 +502,7 @@ def zip(
     behavior: dict | None = None,
     right_broadcast: bool = False,
     optiontype_outside_record: bool = False,
-):
+) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import awkward._v2 as ak
 import dask.config
 import fsspec
@@ -23,12 +25,11 @@ def test_clear_divisions(ndjson_points_file: str) -> None:
     daa.eager_compute_divisions()
     assert daa.known_divisions
     daa.clear_divisions()
-    assert not daa.known_divisions
     assert len(daa.divisions) == daa.npartitions + 1
-    assert_eq(daa, daa)
+    assert not daa.known_divisions
 
 
-def test_dunder_str(daa) -> None:
+def test_dunder_str(daa: dak.Array) -> None:
     assert str(daa) == "dask.awkward<from-json, npartitions=3>"
 
 
@@ -71,7 +72,7 @@ def test_from_awkward(caa: ak.Array) -> None:
     assert_eq(daa, daa)
 
 
-def test_get_typetracer(daa) -> None:
+def test_get_typetracer(daa: dak.Array) -> None:
     assert dakc._get_typetracer(daa) is daa._meta
 
 
@@ -320,11 +321,11 @@ def test_scalar_pickle(daa: dak.Array) -> None:
 
 
 @pytest.mark.parametrize("optimize_graph", [True, False])
-def test_scalar_to_delayed(daa, optimize_graph) -> None:
+def test_scalar_to_delayed(daa: dak.Array, optimize_graph: bool) -> None:
     s1 = dak.sum(daa["points", "x"], axis=None)
     d1 = s1.to_delayed(optimize_graph=optimize_graph)
     s1c = s1.compute()
-    assert d1.compute() == s1c  # type: ignore
+    assert d1.compute() == s1c
 
 
 def test_compatible_partitions(ndjson_points_file: str) -> None:
@@ -345,7 +346,7 @@ def test_compatible_partitions(ndjson_points_file: str) -> None:
 
 
 @pytest.mark.parametrize("meta", [5, False, [1, 2, 3]])
-def test_bad_meta_type(ndjson_points_file: str, meta) -> None:
+def test_bad_meta_type(ndjson_points_file: str, meta: Any) -> None:
     with pytest.raises(TypeError, match="meta must be an instance of an Awkward Array"):
         dak.from_json([ndjson_points_file] * 3, meta=meta)
 
