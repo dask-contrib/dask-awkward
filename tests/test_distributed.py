@@ -30,7 +30,7 @@ from dask_awkward.testutils import assert_eq
 #         yield client
 
 
-def test_compute(loop, ndjson_points_file: str) -> None:  # noqa
+def test_compute(loop, ndjson_points_file):  # noqa
     caa = ak.from_json(Path(ndjson_points_file).read_text())
     with cluster() as (s, [a, b]):
         with Client(s["address"], loop=loop) as client:
@@ -39,7 +39,7 @@ def test_compute(loop, ndjson_points_file: str) -> None:  # noqa
 
 
 @gen_cluster(client=True)
-async def test_persist(c, s, a, b, ndjson_points_file) -> None:  # noqa
+async def test_persist(c, s, a, b, ndjson_points_file):  # noqa
     daa = dak.from_json([ndjson_points_file])
     (x1,) = persist(daa, scheduler=c)
     await _wait(x1)
@@ -55,7 +55,7 @@ async def test_compute_gen_cluster(
     b,  # noqa
     ndjson_points_file,
     optimize_graph,
-) -> None:
+):
     files = [ndjson_points_file] * 3
     daa = dak.from_json(files)
     caa = ak.concatenate([ak.from_json(Path(f).read_text()) for f in files])
@@ -66,7 +66,7 @@ async def test_compute_gen_cluster(
     assert res.tolist() == ak.num(caa.points.x, axis=1).tolist()
 
 
-def test_from_delayed(loop, ndjson_points_file: str) -> None:  # noqa
+def test_from_delayed(loop, ndjson_points_file):  # noqa
     def make_a_concrete(file: str) -> ak.Array:
         with open(file) as f:
             return ak.from_json(f.read())
@@ -88,18 +88,18 @@ behaviors: dict = {}
 @ak_mixin_class(behaviors)
 class Point:
     def distance(self, other):
-        return np.sqrt((self.x - other.x) ** 2 + (self.y - other.y) ** 2)  # type: ignore
+        return np.sqrt((self.x - other.x) ** 2 + (self.y - other.y) ** 2)
 
     @property
     def x2(self):
-        return self.x * self.x  # type: ignore
+        return self.x * self.x
 
     @ak_mixin_class_method(np.abs)
     def point_abs(self):
-        return np.sqrt(self.x**2 + self.y**2)  # type: ignore
+        return np.sqrt(self.x**2 + self.y**2)
 
 
-def test_from_list_behaviorized(loop, L1, L2) -> None:  # noqa
+def test_from_list_behaviorized(loop, L1, L2):  # noqa
     with cluster() as (s, [a, b]):
         with Client(s["address"], loop=loop) as client:
 

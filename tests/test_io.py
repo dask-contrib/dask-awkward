@@ -154,7 +154,7 @@ def test_from_map_with_args_kwargs() -> None:
     y = list(zip(a, b, c))
     y = dask.core.flatten(list(map(list, y)))  # type: ignore
     y = map(lambda x: x * n, y)  # type: ignore
-    y = ak.from_iter(y)  # type: ignore
+    y = ak.from_iter(y)
 
     assert_eq(x, y)
 
@@ -165,12 +165,12 @@ def test_from_map_with_args_kwargs() -> None:
     y = list(zip(a, b, c, [0, 0, 0]))  # type: ignore
     y = dask.core.flatten(list(map(list, y)))  # type: ignore
     y = map(lambda x: x * n, y)  # type: ignore
-    y = ak.from_iter(y)  # type: ignore
+    y = ak.from_iter(y)
 
     assert_eq(x, y)
 
 
-def test_from_map_pack_single_iterable(ndjson_points_file) -> None:
+def test_from_map_pack_single_iterable(ndjson_points_file: str) -> None:
     def g(fname, c=1):
         return ak.from_json(Path(fname).read_text()).points.x * c
 
@@ -225,7 +225,7 @@ def test_from_map_raise_produces_tasks() -> None:
         dak.from_map(f, [1, 2, 3], [4, 5, 6], produces_tasks=True)
 
 
-def test_from_lists(caa_p1) -> None:
+def test_from_lists(caa_p1: ak.Array) -> None:
     listed = caa_p1.tolist()
     one = listed[:5]
     two = listed[5:]

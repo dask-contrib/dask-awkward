@@ -33,7 +33,7 @@ def assert_eq(
             scheduler=scheduler,
             **kwargs,
         )
-    elif isinstance(a, (Record, ak.Record)):
+    elif isinstance(a, (Record, ak.Record)):  # type: ignore
         assert_eq_records(a, b, scheduler=scheduler, **kwargs)
     else:
         assert_eq_other(a, b, scheduler=scheduler, **kwargs)

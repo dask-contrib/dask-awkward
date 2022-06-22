@@ -342,7 +342,7 @@ class _PackedArgCallable:
         self.kwargs = kwargs
         self.packed = packed
 
-    def __call__(self, packed_arg: Any):
+    def __call__(self, packed_arg):
         if not self.packed:
             packed_arg = (packed_arg,)
         return self.func(

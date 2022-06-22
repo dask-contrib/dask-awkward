@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+import dask_awkward
+
 # Configuration file for the Sphinx documentation builder.
 #
 # This file only contains a selection of the most common options. For a full
@@ -14,7 +18,6 @@
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
-import dask_awkward
 
 # -- Project information -----------------------------------------------------
 
@@ -60,7 +63,7 @@ html_theme = "dask_sphinx_theme"
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = []  # ["_static"]
+html_static_path: list[str] = []  # ["_static"]
 
 # html_theme_options = {
 #     "display_version": True,

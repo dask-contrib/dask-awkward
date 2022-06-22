@@ -8,7 +8,7 @@ from dask_awkward.testutils import assert_eq
 
 
 @pytest.mark.parametrize("axis", [None, 0, 1])
-def test_flatten(caa, daa, axis) -> None:
+def test_flatten(caa: ak.Array, daa: dak.Array, axis: int | None) -> None:
     cr = ak.flatten(caa.points.x, axis=axis)
     dr = dak.flatten(daa.points.x, axis=axis)
     assert_eq(cr, dr)
@@ -22,7 +22,7 @@ def test_flatten(caa, daa, axis) -> None:
         1,
     ],
 )
-def test_num(daa, caa, axis) -> None:
+def test_num(caa: ak.Array, daa: dak.Array, axis: int | None) -> None:
     da = daa["points"]
     ca = caa["points"]
 
@@ -38,7 +38,7 @@ def test_num(daa, caa, axis) -> None:
         assert_eq(da[c1], ca[c2])
 
 
-def test_zip(daa, caa) -> None:
+def test_zip(caa: ak.Array, daa: dak.Array) -> None:
     da1 = daa["points"]["x"]
     da2 = daa["points"]["x"]
     ca1 = caa["points"]["x"]
@@ -49,7 +49,7 @@ def test_zip(daa, caa) -> None:
     assert_eq(da_z, ca_z)
 
 
-def test_cartesian(daa, caa) -> None:
+def test_cartesian(caa: ak.Array, daa: dak.Array) -> None:
     da1 = daa["points", "x"]
     da2 = daa["points", "y"]
     ca1 = caa["points", "x"]
@@ -60,13 +60,13 @@ def test_cartesian(daa, caa) -> None:
     assert_eq(dz, cz)
 
 
-def test_ones_like(daa, caa) -> None:
+def test_ones_like(caa: ak.Array, daa: dak.Array) -> None:
     da1 = dak.ones_like(daa.points.x)
     ca1 = ak.ones_like(caa["points", "x"])
     assert_eq(da1, ca1)
 
 
-def test_zeros_like(daa, caa) -> None:
+def test_zeros_like(caa: ak.Array, daa: dak.Array) -> None:
     da1 = dak.zeros_like(daa["points", "x"])
     ca1 = ak.zeros_like(caa.points.x)
     assert_eq(da1, ca1)
