@@ -420,6 +420,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         name: str,
     ) -> ak.Array:
         if meta is not None:
+            if not isinstance(meta, ak.Array):
+                raise TypeError("meta must be an instance of an Awkward Array.")
             return meta
         if dask.config.get("awkward.compute-unknown-meta"):
             key = (name, 0)
