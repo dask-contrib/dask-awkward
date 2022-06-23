@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 import awkward._v2 as ak
 import dask.config
 import numpy as np
-from awkward._v2._typetracer import MaybeNone, OneOf, TypeTracerArray, UnknownScalar
+from awkward._v2._typetracer import MaybeNone, OneOf, UnknownScalar
 from awkward._v2.highlevel import _dir_pattern
 from dask.base import DaskMethodsMixin
 from dask.base import compute as dask_compute
@@ -20,6 +20,7 @@ from dask.blockwise import BlockwiseDep
 from dask.blockwise import blockwise as dask_blockwise
 from dask.context import globalmethod
 from dask.highlevelgraph import HighLevelGraph
+from dask.optimization import cull as dask_cull
 from dask.threaded import get as threaded_get
 from dask.utils import IndexCallable, funcname, key_split
 from numpy.lib.mixins import NDArrayOperatorsMixin
@@ -409,10 +410,22 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     ) -> None:
         self._dask: HighLevelGraph = dsk
         self._name: str = name
-        self._divisions = divisions
-        if meta is not None and not isinstance(meta, (ak.Array, TypeTracerArray)):
-            raise TypeError("meta must be an instance of an Awkward Array.")
-        self._meta = meta
+        self._divisions: tuple[int | None, ...] = divisions
+        self._meta: ak.Array = self._determine_meta(meta, dsk, name)
+
+    @staticmethod
+    def _determine_meta(
+        meta: ak.Array | None,
+        dsk: HighLevelGraph,
+        name: str,
+    ) -> ak.Array:
+        if meta is not None:
+            return meta
+        if dask.config.get("awkward.compute-unknown-meta"):
+            key = (name, 0)
+            new_graph, _ = dask_cull(dsk, key)
+            return typetracer_array(dask.get(new_graph, key))
+        return empty_typetracer()
 
     def __dask_graph__(self) -> HighLevelGraph:
         return self.dask
@@ -529,9 +542,10 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return self._name
 
     @property
-    def ndim(self) -> int | None:
+    def ndim(self) -> int:
         """Number of dimensions."""
-        return ndim(self)
+        assert self._meta is not None
+        return self._meta.ndim
 
     @property
     def divisions(self) -> tuple[int | None, ...]:
@@ -1077,20 +1091,6 @@ def new_array_object(
 
     array = Array(dsk, name, meta, divisions)  # type: ignore
 
-    if array._meta is None:
-        if dask.config.get("awkward.compute-unknown-meta"):
-            try:
-                array._meta = _get_typetracer(array)
-            except (AttributeError, AssertionError, TypeError):
-                array._meta = empty_typetracer()
-    else:
-        if not isinstance(meta, (ak.Array, TypeTracerArray)):
-            msg = (
-                "meta should be an awkward Array or TypeTracerArray object.\n"
-                f"got: {type(meta)}"
-            )
-            raise ValueError(msg)
-
     return array
 
 
@@ -1366,7 +1366,7 @@ def _type(array: Array) -> Type | None:
     return None
 
 
-def ndim(array: Array) -> int | None:
+def ndim(array: Array) -> int:
     """Number of dimensions before reaching a numeric type or a record.
 
     Parameters
@@ -1381,9 +1381,7 @@ def ndim(array: Array) -> int | None:
         collection does not contain metadata.
 
     """
-    if array._meta is not None:
-        return array._meta.ndim
-    return None
+    return array.ndim
 
 
 def is_awkward_collection(obj: Any) -> bool:

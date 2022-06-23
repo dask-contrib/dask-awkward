@@ -6,17 +6,14 @@ from typing import TYPE_CHECKING, Any
 
 import awkward._v2 as ak
 import numpy as np
-from dask.base import tokenize
+from awkward._v2.types.numpytype import primitive_to_dtype
+from dask.base import flatten, tokenize
 from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
 from dask.highlevelgraph import HighLevelGraph
 from dask.utils import funcname
 
 from dask_awkward.core import map_partitions, new_array_object, typetracer_array
-from dask_awkward.utils import (
-    DaskAwkwardNotImplemented,
-    LazyInputsDict,
-    empty_typetracer,
-)
+from dask_awkward.utils import LazyInputsDict, empty_typetracer
 
 if TYPE_CHECKING:
     from dask.array.core import Array as DaskArray
@@ -214,31 +211,46 @@ def to_dask_array(array: Array) -> DaskArray:
     """
     from dask.array.core import new_da_object
 
-    new = map_partitions(ak.to_numpy, array, meta=empty_typetracer())
-    graph = new.dask
     if array._meta is None:
         raise ValueError("Array metadata required for determining dtype")
-    dtype = np.dtype(array._meta.type.content.primitive)
 
-    # TODO: define chunks if we can.
-    #
-    # if array.known_divisions:
-    #     divs = np.array(array.divisions)
-    #     chunks = (tuple(divs[1:] - divs[:-1]),)
+    ndim = array.ndim
 
-    chunks = ((np.nan,) * array.npartitions,)
-    if new._meta is not None:
-        if new._meta.ndim > 1:
-            raise DaskAwkwardNotImplemented(
-                "only one dimensional arrays are supported."
-            )
-    return new_da_object(
-        graph,
-        new.name,
-        meta=None,
-        chunks=chunks,
-        dtype=dtype,
-    )
+    if ndim == 1:
+        new = map_partitions(ak.to_numpy, array, meta=empty_typetracer())
+        graph = new.dask
+        dtype = primitive_to_dtype(array._meta.layout.form.type.primitive)
+        chunks: tuple[tuple[float, ...], ...] = ((np.nan,) * array.npartitions,)
+        return new_da_object(
+            graph,
+            new.name,
+            meta=None,
+            chunks=chunks,
+            dtype=dtype,
+        )
+
+    else:
+        # assert ndim > 1
+        content = array._meta.layout.form.type.content
+        no_primitive = not hasattr(content, "primitive")
+        while no_primitive:
+            content = content.content
+            no_primitive = not hasattr(content, "primitive")
+        dtype = primitive_to_dtype(content.primitive)
+
+        name = f"to-dask-array-{tokenize(array)}"
+        nan_tuples_innerdims = ((np.nan,),) * (ndim - 1)
+        chunks = ((np.nan,) * array.npartitions, *nan_tuples_innerdims)
+        zeros = (0,) * (ndim - 1)
+
+        # eventually convert to HLG (if possible)
+        llg = {
+            (name, i, *zeros): (ak.to_numpy, k)
+            for i, k in enumerate(flatten(array.__dask_keys__()))
+        }
+
+        graph = HighLevelGraph.from_collections(name, llg, dependencies=[array])
+        return new_da_object(graph, name, meta=None, chunks=chunks, dtype=dtype)
 
 
 def from_dask_array(array: DaskArray) -> Array:
