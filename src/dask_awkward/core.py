@@ -20,7 +20,6 @@ from dask.blockwise import BlockwiseDep
 from dask.blockwise import blockwise as dask_blockwise
 from dask.context import globalmethod
 from dask.highlevelgraph import HighLevelGraph
-from dask.optimization import cull as dask_cull
 from dask.threaded import get as threaded_get
 from dask.utils import IndexCallable, funcname, key_split
 from numpy.lib.mixins import NDArrayOperatorsMixin
@@ -425,7 +424,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             return meta
         if dask.config.get("awkward.compute-unknown-meta"):
             key = (name, 0)
-            new_graph, _ = dask_cull(dsk, key)
+            new_graph = dsk.cull({key})
             return typetracer_array(dask.get(new_graph, key))
         return empty_typetracer()
 
