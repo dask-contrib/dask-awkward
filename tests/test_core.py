@@ -96,8 +96,6 @@ def test_meta_raise(ndjson_points_file: str) -> None:
 def test_ndim(ndjson_points_file: str) -> None:
     daa = dak.from_json([ndjson_points_file] * 2)
     assert daa.ndim == daa.compute().ndim
-    daa._meta = None
-    assert daa.ndim is None
 
 
 def test_new_array_object_raises(ndjson_points_file: str) -> None:

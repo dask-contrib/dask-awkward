@@ -84,7 +84,7 @@ def caa_p2(ndjson_points2: str) -> ak.Array:
 
 
 @pytest.fixture(scope="session")
-def L1() -> list:
+def L1() -> list[list[dict[str, float]]]:
     return [
         [{"x": 1.0, "y": 1.1}, {"x": 2.0, "y": 2.2}, {"x": 3, "y": 3.3}],
         [],
@@ -95,7 +95,7 @@ def L1() -> list:
 
 
 @pytest.fixture(scope="session")
-def L2() -> list:
+def L2() -> list[list[dict[str, float]]]:
     return [
         [{"x": 0.9, "y": 1.0}, {"x": 2.0, "y": 2.2}, {"x": 2.9, "y": 3.0}],
         [],
@@ -106,7 +106,7 @@ def L2() -> list:
 
 
 @pytest.fixture(scope="session")
-def L3() -> list:
+def L3() -> list[list[dict[str, float]]]:
     return [
         [{"x": 1.9, "y": 9.0}, {"x": 2.0, "y": 8.2}, {"x": 9.9, "y": 9.0}],
         [],

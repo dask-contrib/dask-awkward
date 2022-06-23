@@ -119,15 +119,15 @@ def test_from_dask_array() -> None:
 
 @pytest.mark.parametrize("optimize_graph", [True, False])
 def test_to_and_from_delayed(daa: dak.Array, optimize_graph: bool) -> None:
-    daa = daa[dak.num(daa.points.x, axis=1) > 2]  # type: ignore
-    delayeds = daa.to_delayed(optimize_graph=optimize_graph)
+    daa1 = daa[dak.num(daa.points.x, axis=1) > 2]
+    delayeds = daa1.to_delayed(optimize_graph=optimize_graph)
     daa2 = dak.from_delayed(delayeds)
-    assert_eq(daa, daa2)
-    for i in range(daa.npartitions):
-        assert_eq(daa.partitions[i], delayeds[i].compute())
+    assert_eq(daa1, daa2)
+    for i in range(daa1.npartitions):
+        assert_eq(daa1.partitions[i], delayeds[i].compute())
 
     daa2 = dak.from_delayed(delayeds, divisions=daa.divisions)
-    assert_eq(daa, daa2)
+    assert_eq(daa1, daa2)
 
     with pytest.raises(ValueError, match="divisions must be a tuple of length"):
         dak.from_delayed(delayeds, divisions=(1, 5, 7, 9, 11))
@@ -242,6 +242,13 @@ def test_to_dask_array(daa: dak.Array, caa: dak.Array) -> None:
     da_assert_eq(da, ca)
     da = dak.flatten(daa.points.x).to_dask_array()
     da_assert_eq(da, ca)
+
+
+def test_to_dask_array_multidim() -> None:
+    c = ak.Array([[[1, 2, 3]], [[4, 5, 6]]])
+    a = dak.from_awkward(c, npartitions=2)
+    d = dak.to_dask_array(a)
+    da_assert_eq(d, ak.to_numpy(c))
 
 
 @pytest.mark.parametrize("optimize_graph", [True, False])
