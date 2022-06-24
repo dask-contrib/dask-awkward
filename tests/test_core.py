@@ -72,8 +72,12 @@ def test_from_awkward(caa: ak.Array) -> None:
     assert_eq(daa, daa)
 
 
-def test_get_typetracer(daa: dak.Array) -> None:
-    assert dakc._get_typetracer(daa) is daa._meta
+def test_compute_typetracer(daa: dak.Array) -> None:
+    from dask_awkward.core import new_array_object
+
+    tt = dakc.compute_typetracer(daa.dask, daa.name)
+    daa2 = new_array_object(daa.dask, daa.name, meta=tt, divisions=daa.divisions)
+    assert_eq(daa, daa2)
 
 
 def test_len(ndjson_points_file: str) -> None:
@@ -107,7 +111,7 @@ def test_new_array_object_raises(ndjson_points_file: str) -> None:
     ):
         dakc.new_array_object(hlg, name, meta=None, npartitions=None, divisions=None)
     with pytest.raises(
-        ValueError, match="Only one of either divisions or npartitions must be defined."
+        ValueError, match="Only one of either divisions or npartitions can be defined."
     ):
         dakc.new_array_object(
             hlg, name, meta=None, npartitions=3, divisions=(0, 2, 4, 7)
