@@ -13,12 +13,11 @@ import dask.config
 import numpy as np
 from awkward._v2._typetracer import MaybeNone, OneOf, UnknownScalar
 from awkward._v2.highlevel import _dir_pattern
-from dask.base import DaskMethodsMixin
-from dask.base import compute as dask_compute
-from dask.base import dont_optimize, is_dask_collection, tokenize
+from dask.base import DaskMethodsMixin, dont_optimize, is_dask_collection, tokenize
 from dask.blockwise import BlockwiseDep
 from dask.blockwise import blockwise as dask_blockwise
 from dask.context import globalmethod
+from dask.delayed import Delayed
 from dask.highlevelgraph import HighLevelGraph
 from dask.threaded import get as threaded_get
 from dask.utils import IndexCallable, funcname, key_split
@@ -41,16 +40,13 @@ if TYPE_CHECKING:
     from awkward._v2.types.type import Type
     from dask.array.core import Array as DaskArray
     from dask.blockwise import Blockwise
-    from dask.delayed import Delayed
     from numpy.typing import DTypeLike
 
 
 T = TypeVar("T")
 
 
-def _finalize_array(
-    results: Sequence[Number | ak.Array | ak.Record],
-) -> Number | ak.Array:
+def _finalize_array(results: Sequence[Any]) -> Any:
     if any(isinstance(r, ak.Array) for r in results):
         return ak.concatenate(results)
     elif len(results) == 1 and isinstance(results[0], int):
@@ -220,8 +216,6 @@ class Scalar(DaskMethodsMixin):
             Resulting Delayed collection object.
 
         """
-        from dask.delayed import Delayed
-
         dsk = self.__dask_graph__()
         if optimize_graph:
             dsk = self.__dask_optimize__(dsk, self.__dask_keys__())
@@ -256,6 +250,34 @@ def new_known_scalar(
     dtype: DTypeLike | None = None,
     label: str | None = None,
 ) -> Scalar:
+    """Instantiate a Scalar with a known value.
+
+    Parameters
+    ----------
+    s : Any
+        Python object.
+    dtype : DTypeLike, optional
+        NumPy dtype associated with the object, if undefined the dtype
+        will be assigned via NumPy's interpretation of the object.
+    label : str, optional
+        Label for the task graph; if undefined "known-scalar" will be
+        used.
+
+    Returns
+    -------
+    Scalar
+        Resulting collection.
+
+    Examples
+    --------
+    >>> from dask_awkward.core import new_known_scalar
+    >>> a = new_known_scalar(5, label="five")
+    >>> a
+    dask.awkward<five, type=Scalar, dtype=int64, known_value=5>
+    >>> a.compute()
+    5
+
+    """
     label = label or "known-scalar"
     name = f"{label}-{tokenize(s)}"
     if dtype is None:
@@ -404,29 +426,13 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         self,
         dsk: HighLevelGraph,
         name: str,
-        meta: ak.Array | None,
+        meta: ak.Array,
         divisions: tuple[int | None, ...],
     ) -> None:
         self._dask: HighLevelGraph = dsk
         self._name: str = name
         self._divisions: tuple[int | None, ...] = divisions
-        self._meta: ak.Array = self._determine_meta(meta, dsk, name)
-
-    @staticmethod
-    def _determine_meta(
-        meta: ak.Array | None,
-        dsk: HighLevelGraph,
-        name: str,
-    ) -> ak.Array:
-        if meta is not None:
-            if not isinstance(meta, ak.Array):
-                raise TypeError("meta must be an instance of an Awkward Array.")
-            return meta
-        if dask.config.get("awkward.compute-unknown-meta"):
-            key = (name, 0)
-            new_graph = dsk.cull({key})
-            return typetracer_array(dask.get(new_graph, key))
-        return empty_typetracer()
+        self._meta: ak.Array = meta
 
     def __dask_graph__(self) -> HighLevelGraph:
         return self.dask
@@ -1001,55 +1007,13 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return to_dask_array(self)
 
 
-def _first_partition(array: Array) -> ak.Array:
-    """Compute the first partition of an Array collection.
-
-    Parameters
-    ----------
-    array : dask_awkward.Array
-        Awkward collection.
-
-    Returns
-    -------
-    ak.Array
-        Concrete awkward array for the first partition of the Dask
-        awkward array.
-
-    """
-    with dask.config.set({"awkward.compute-unknown-meta": False}):
-        scheduler = dask.config.get("awkward.first-partition-scheduler")
-        (computed,) = dask_compute(
-            array.partitions[0],
-            traverse=False,
-            optimize_graph=True,
-            scheduler=scheduler,
-        )
-        return computed
-
-
-def _get_typetracer(array: Array) -> ak.Array:
-    """Obtain the awkward type tracer associated with an array.
-
-    This will compute the first partition of the array collection if
-    necessary.
-
-    Parameters
-    ----------
-    array : dask_awkward.Array
-        The collection.
-
-    Returns
-    -------
-    Array
-        Awkward high level array wrapping the typetracer (metadata).
-
-    """
-    if array._meta is not None:
-        return array._meta
-    first_part = _first_partition(array)
-    if not isinstance(first_part, ak.Array):
-        raise TypeError(f"Should have an ak.Array type, got {type(first_part)}")
-    return typetracer_array(first_part)
+def compute_typetracer(dsk: HighLevelGraph, name: str) -> ak.Array:
+    if dask.config.get("awkward.compute-unknown-meta"):
+        key = (name, 0)
+        dsk = dsk.cull({key})
+        layer = name
+        return typetracer_array(Delayed(key, dsk.cull({key}), layer=layer).compute())
+    return empty_typetracer()
 
 
 def new_array_object(
@@ -1083,16 +1047,26 @@ def new_array_object(
         Resulting collection.
 
     """
-    if divisions is None and npartitions is not None:
-        divisions = (None,) * (npartitions + 1)
-    elif divisions is not None and npartitions is not None:
-        raise ValueError("Only one of either divisions or npartitions must be defined.")
-    elif divisions is None and npartitions is None:
-        raise ValueError("One of either divisions or npartitions must be defined.")
+    if divisions is None:
+        if npartitions is not None:
+            divs: tuple[int | None, ...] = (None,) * (npartitions + 1)
+        else:
+            raise ValueError("One of either divisions or npartitions must be defined.")
+    else:
+        if npartitions is not None:
+            raise ValueError(
+                "Only one of either divisions or npartitions can be defined."
+            )
+        divs = divisions
 
-    array = Array(dsk, name, meta, divisions)  # type: ignore
+    if meta is None:
+        actual_meta = compute_typetracer(dsk, name)
+    else:
+        if not isinstance(meta, ak.Array):
+            raise TypeError("meta must be an instance of an Awkward Array.")
+        actual_meta = meta
 
-    return array
+    return Array(dsk, name, actual_meta, divs)
 
 
 def partitionwise_layer(
