@@ -12,7 +12,7 @@ from dask_awkward.core import Array
 from dask_awkward.io.io import from_map
 
 
-class UprootReadStartStopFn:
+class _UprootReadStartStopFn:
     def __init__(self, source: str, tree_name: str, branches: list[str] | None) -> None:
         self.branches = branches
         self.tree = uproot.open(source)[tree_name]
@@ -24,7 +24,7 @@ class UprootReadStartStopFn:
         return ak.Array(v1_to_v2(arr.layout))
 
 
-class UprootReadIndivFileFn:
+class _UprootReadIndivFileFn:
     def __init__(self, tree_name: str, branches: list[str] | None):
         self.tree_name = tree_name
         self.branches = branches
@@ -34,7 +34,7 @@ class UprootReadIndivFileFn:
         return ak.Array(v1_to_v2(tree.arrays(self.branches).layout))
 
 
-def from_uproot(
+def from_root(
     source: str,
     tree_name: str,
     npartitions: int,
@@ -54,7 +54,7 @@ def from_uproot(
     meta = ak.Array(v2first5.layout.typetracer.forget_length())
 
     return from_map(
-        UprootReadStartStopFn(source, tree_name, branches),
+        _UprootReadStartStopFn(source, tree_name, branches),
         start_stop_pairs,
         label="from-root",
         token=token,
@@ -62,7 +62,7 @@ def from_uproot(
     )
 
 
-def from_uproot_files(
+def from_root_files(
     files: list[str] | str,
     tree_name: str,
     branches: list[str] | None = None,
@@ -78,7 +78,7 @@ def from_uproot_files(
     meta = ak.Array(v2first5.layout.typetracer.forget_length())
 
     return from_map(
-        UprootReadIndivFileFn(tree_name, branches),
+        _UprootReadIndivFileFn(tree_name, branches),
         paths,
         label="from-root",
         token=token,
