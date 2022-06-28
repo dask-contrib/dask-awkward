@@ -1010,9 +1010,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 def compute_typetracer(dsk: HighLevelGraph, name: str) -> ak.Array:
     if dask.config.get("awkward.compute-unknown-meta"):
         key = (name, 0)
-        dsk = dsk.cull({key})
-        layer = name
-        return typetracer_array(Delayed(key, dsk.cull({key}), layer=layer).compute())
+        return typetracer_array(Delayed(key, dsk.cull({key}), layer=name).compute())
     return empty_typetracer()
 
 
@@ -1033,7 +1031,12 @@ def new_array_object(
     name : str
         Unique name for the collection.
     meta : Array, optional
-        Collection metadata; this is an awkward-array type tracer.
+        Collection metadata; this is an awkward-array type tracer. If
+        `meta` is ``None``, the first partition of the task graph
+        (`dsk`) will be computed by default to determine the
+        typetracer for the new Array. If the configuration option
+        ``awkward.compute-unknown-meta`` is set to ``False``,
+        undefined `meta` will be assigned an empty typetracer.
     npartitions : int, optional
         Total number of partitions; if used `divisions` will be a
         tuple of length `npartitions` + 1 with all elements``None``.
