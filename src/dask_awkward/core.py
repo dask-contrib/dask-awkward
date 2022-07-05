@@ -1246,6 +1246,64 @@ def map_partitions(
         )
 
 
+def _identity(x: T) -> T:
+    return x
+
+
+def total_reduction(
+    func: Callable,
+    array: Array,
+    split_every: int | None = None,
+    label: str | None = None,
+    meta: Any | None = None,
+) -> Scalar:
+    from dask.bag.core import empty_safe_aggregate, empty_safe_apply
+    from tlz import partition_all
+
+    splitev: int = split_every or 8
+    npartitions = array.npartitions
+    is_last = npartitions == 1
+
+    token = tokenize(func, array, splitev)
+    label = label or funcname(func)
+
+    a_name = f"{label}-part-{token}"
+
+    dsk: dict[Any, Any] = {
+        (a_name, i): (empty_safe_apply, func, (array.name, i), is_last)
+        for i in range(npartitions)
+    }
+
+    b_name = a_name
+    k = npartitions
+    fmt_name = f"{label}-aggregate-{token}"
+    depth = 0
+
+    while k > splitev:
+        c_name = f"{fmt_name}{depth}"
+        for i, inds in enumerate(partition_all(splitev, range(k))):
+            dsk[(c_name, i)] = (
+                empty_safe_aggregate,
+                func,
+                [(b_name, j) for j in inds],
+                False,
+            )
+        k = i + 1
+        b_name = c_name
+        depth += 1
+
+    dsk[(fmt_name, 0)] = (
+        empty_safe_aggregate,
+        func,
+        [(b_name, j) for j in range(k)],
+        True,
+    )
+    dsk[fmt_name] = dsk.pop((fmt_name, 0))
+
+    graph = HighLevelGraph.from_collections(fmt_name, dsk, dependencies=[array])
+    return new_scalar_object(graph, fmt_name, meta=meta or UnknownScalar(None))
+
+
 def pw_reduction_with_agg_to_scalar(
     func: Callable,
     agg: Callable,
