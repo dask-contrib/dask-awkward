@@ -12,6 +12,10 @@ dask-awkward
 
 **This is alpha software** without any guaranteed API stability.
 
+The dask-awkward project is affiliated with awkward-array's v1 to v2
+transition. [Read more about that
+here](https://github.com/scikit-hep/awkward/wiki).
+
 Installing
 ----------
 
