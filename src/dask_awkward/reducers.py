@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 import awkward._v2 as ak
 import numpy as np
 
 from dask_awkward.core import map_partitions, pw_reduction_with_agg_to_scalar
 from dask_awkward.utils import DaskAwkwardNotImplemented, borrow_docstring
+
+if TYPE_CHECKING:
+    from dask_awkward.core import Array
 
 __all__ = (
     "all",
@@ -30,8 +35,14 @@ __all__ = (
 
 
 @borrow_docstring(ak.all)
-def all(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
-    if axis and axis >= 1:
+def all(
+    array: Array,
+    axis: int | None = None,
+    keepdims: bool = False,
+    mask_identity: bool = False,
+    flatten_records: bool = False,
+) -> Any:
+    if axis and axis != 0:
         return map_partitions(
             ak.all,
             array,
@@ -45,8 +56,14 @@ def all(array, axis=None, keepdims=False, mask_identity=False, flatten_records=F
 
 
 @borrow_docstring(ak.any)
-def any(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
-    if axis and axis >= 1:
+def any(
+    array: Array,
+    axis: int | None = None,
+    keepdims: bool = False,
+    mask_identity: bool = False,
+    flatten_records: bool = False,
+) -> Any:
+    if axis and axis != 0:
         return map_partitions(
             ak.any,
             array,
@@ -60,7 +77,13 @@ def any(array, axis=None, keepdims=False, mask_identity=False, flatten_records=F
 
 
 @borrow_docstring(ak.argmax)
-def argmax(array, axis=None, keepdims=False, mask_identity=True, flatten_records=False):
+def argmax(
+    array: Array,
+    axis: int | None = None,
+    keepdims: bool = False,
+    mask_identity: bool = True,
+    flatten_records: bool = False,
+) -> Any:
     if axis and axis >= 1:
         return map_partitions(
             ak.argmax,
@@ -75,7 +98,13 @@ def argmax(array, axis=None, keepdims=False, mask_identity=True, flatten_records
 
 
 @borrow_docstring(ak.argmin)
-def argmin(array, axis=None, keepdims=False, mask_identity=True, flatten_records=False):
+def argmin(
+    array: Array,
+    axis: int | None = None,
+    keepdims: bool = False,
+    mask_identity: bool = True,
+    flatten_records: bool = False,
+) -> Any:
     if axis and axis >= 1:
         return map_partitions(
             ak.argmin,
@@ -103,8 +132,18 @@ def corr(
 
 
 @borrow_docstring(ak.count)
-def count(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
-    if axis and axis >= 1:
+def count(
+    array: Array,
+    axis: int | None = None,
+    keepdims: bool = False,
+    mask_identity: bool = False,
+    flatten_records: bool = False,
+) -> Any:
+    if axis == 0 or axis == -1 * array.ndim:
+        raise DaskAwkwardNotImplemented(
+            f"axis={axis} is not supported for this array yet."
+        )
+    if axis and axis != 0:
         return map_partitions(
             ak.count,
             array,
@@ -129,19 +168,23 @@ def count(array, axis=None, keepdims=False, mask_identity=False, flatten_records
             trivial_result,
             dtype=np.int64,
         )
-    elif axis == 0 or axis == -1 * array.ndim:
-        raise DaskAwkwardNotImplemented(
-            f"axis={axis} is not supported for this array yet."
-        )
     else:
         raise ValueError("axis must be None or an integer.")
 
 
 @borrow_docstring(ak.count_nonzero)
 def count_nonzero(
-    array, axis=None, keepdims=False, mask_identity=False, flatten_records=False
-):
-    if axis is not None and axis == 1:
+    array: Array,
+    axis: int | None = None,
+    keepdims: bool = False,
+    mask_identity: bool = False,
+    flatten_records: bool = False,
+) -> Any:
+    if axis == 0 or axis == -1 * array.ndim:
+        raise DaskAwkwardNotImplemented(
+            f"axis={axis} is not supported for this array yet."
+        )
+    if axis and axis != 0:
         return map_partitions(
             ak.count_nonzero,
             array,
@@ -165,10 +208,6 @@ def count_nonzero(
             ak.sum,
             trivial_result,
             dtype=np.int64,
-        )
-    elif axis == 0 or axis == -1 * array.ndim:
-        raise DaskAwkwardNotImplemented(
-            f"axis={axis} is not supported for this array yet."
         )
     else:
         raise ValueError("axis must be None or an integer.")
@@ -202,14 +241,18 @@ def linear_fit(
 
 @borrow_docstring(ak.max)
 def max(
-    array,
-    axis=None,
-    keepdims=False,
-    initial=None,
-    mask_identity=True,
-    flatten_records=False,
-):
-    if axis and axis >= 1:
+    array: Array,
+    axis: int | None = None,
+    keepdims: bool = False,
+    initial: float | None = None,
+    mask_identity: bool = True,
+    flatten_records: bool = False,
+) -> Any:
+    if axis == 0 or axis == -1 * array.ndim:
+        raise DaskAwkwardNotImplemented(
+            f"axis={axis} is not supported for this array yet."
+        )
+    if axis and axis != 0:
         return map_partitions(
             ak.max,
             array,
@@ -241,7 +284,11 @@ def mean(
     mask_identity=True,
     flatten_records=False,
 ):
-    if axis and axis >= 1:
+    if axis == 0 or axis == -1 * array.ndim:
+        raise DaskAwkwardNotImplemented(
+            f"axis={axis} is not supported for this array yet."
+        )
+    if axis and axis != 0:
         return map_partitions(
             ak.mean,
             array,
@@ -256,14 +303,18 @@ def mean(
 
 @borrow_docstring(ak.min)
 def min(
-    array,
-    axis=None,
-    keepdims=False,
-    initial=None,
-    mask_identity=True,
-    flatten_records=False,
-):
-    if axis and axis >= 1:
+    array: Array,
+    axis: int | None = None,
+    keepdims: bool = False,
+    initial: float | None = None,
+    mask_identity: bool = True,
+    flatten_records: bool = False,
+) -> Any:
+    if axis == 0 or axis == -1 * array.ndim:
+        raise DaskAwkwardNotImplemented(
+            f"axis={axis} is not supported for this array yet."
+        )
+    if axis and axis != 0:
         return map_partitions(
             ak.min,
             array,
@@ -328,10 +379,18 @@ def std(
 
 
 @borrow_docstring(ak.sum)
-def sum(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
-    if axis is not None and axis < 0:
-        axis = array.ndim + axis + 1
-    if axis == 1:
+def sum(
+    array: Array,
+    axis: int | None = None,
+    keepdims: bool = False,
+    mask_identity: bool = False,
+    flatten_records: bool = False,
+) -> Any:
+    if axis == 0 or axis == -1 * array.ndim:
+        raise DaskAwkwardNotImplemented(
+            f"axis={axis} is not supported for this array yet."
+        )
+    if axis and axis != 0:
         return map_partitions(
             ak.sum,
             array,
