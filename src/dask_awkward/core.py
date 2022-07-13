@@ -316,7 +316,7 @@ class Record(Scalar):
     def __getitem__(self, where: str) -> AwkwardDaskCollection:
         key = where
         token = tokenize(self, key)
-        name = f"getitem-{token}"
+        name = f"{where}-{token}"
         new_meta = self._meta[key]
 
         # first check for array type return
@@ -652,6 +652,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         self,
         where: Any,
         meta: Any | None = None,
+        label: str | None = None,
     ) -> Any:
         if meta is None and self._meta is not None:
             if isinstance(where, tuple):
@@ -661,7 +662,11 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 m = to_meta([where])[0]
                 meta = self._meta[m]
         return self.map_partitions(
-            operator.getitem, where, meta=meta, output_divisions=1
+            operator.getitem,
+            where,
+            meta=meta,
+            output_divisions=1,
+            label=label,
         )
 
     def _getitem_outer_boolean_lazy_array(self, where: Array | tuple[Any, ...]) -> Any:
@@ -683,7 +688,11 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                     meta=new_meta,
                 )
 
-    def _getitem_outer_str_or_list(self, where: str | list | tuple[Any, ...]) -> Any:
+    def _getitem_outer_str_or_list(
+        self,
+        where: str | list | tuple[Any, ...],
+        label: str | None = None,
+    ) -> Any:
         new_meta: Any | None = None
         if self._meta is not None:
             if isinstance(where, tuple):
@@ -693,7 +702,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 new_meta = self._meta[metad]
             elif isinstance(where, (str, list)):
                 new_meta = self._meta[where]
-        return self._getitem_trivial_map_partitions(where, meta=new_meta)
+        return self._getitem_trivial_map_partitions(where, meta=new_meta, label=label)
 
     def _getitem_outer_int(self, where: int | tuple[Any, ...]) -> Any:
         if where == 0 or (isinstance(where, tuple) and where[0] == 0):
@@ -789,7 +798,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         # a single string
         if isinstance(where, str):
-            return self._getitem_outer_str_or_list(where)
+            return self._getitem_outer_str_or_list(where, label=str)
 
         elif isinstance(where, list):
             return self._getitem_outer_str_or_list(where)
@@ -1246,10 +1255,6 @@ def map_partitions(
         )
 
 
-def _identity(x: T) -> T:
-    return x
-
-
 def total_reduction(
     func: Callable,
     array: Array,
@@ -1281,13 +1286,15 @@ def total_reduction(
 
     while k > splitev:
         c_name = f"{fmt_name}{depth}"
-        for i, inds in enumerate(partition_all(splitev, range(k))):
+        i = 0
+        for indices in partition_all(splitev, range(k)):
             dsk[(c_name, i)] = (
                 empty_safe_aggregate,
                 func,
-                [(b_name, j) for j in inds],
+                [(b_name, j) for j in indices],
                 False,
             )
+            i += 1
         k = i + 1
         b_name = c_name
         depth += 1
