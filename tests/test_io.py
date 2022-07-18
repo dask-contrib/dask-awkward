@@ -6,6 +6,7 @@ import awkward._v2 as ak
 import fsspec
 import pytest
 from dask.array.utils import assert_eq as da_assert_eq
+from dask.delayed import delayed
 
 try:
     import ujson as json
@@ -131,6 +132,15 @@ def test_to_and_from_delayed(daa: dak.Array, optimize_graph: bool) -> None:
 
     with pytest.raises(ValueError, match="divisions must be a tuple of length"):
         dak.from_delayed(delayeds, divisions=(1, 5, 7, 9, 11))
+
+
+def test_delayed_single_node():
+    a = ak.Array([1, 2, 3])
+    b = delayed(a)
+    c = dak.from_delayed(b)
+    assert c.npartitions == 1
+    assert c.divisions == (None, None)
+    assert_eq(c, a)
 
 
 def test_from_map_with_args_kwargs() -> None:

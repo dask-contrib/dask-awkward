@@ -151,15 +151,15 @@ def from_delayed(
     from dask.delayed import Delayed
 
     parts = [source] if isinstance(source, Delayed) else source
-    name = f"{prefix}-{tokenize(source)}"
+    name = f"{prefix}-{tokenize(parts)}"
     dsk = {(name, i): part.key for i, part in enumerate(parts)}
     if divisions is None:
-        divs: tuple[int | None, ...] = (None,) * (len(source) + 1)
+        divs: tuple[int | None, ...] = (None,) * (len(parts) + 1)
     else:
         divs = tuple(divisions)
-        if len(divs) != len(source) + 1:
+        if len(divs) != len(parts) + 1:
             raise ValueError("divisions must be a tuple of length len(source) + 1")
-    hlg = HighLevelGraph.from_collections(name, dsk, dependencies=source)
+    hlg = HighLevelGraph.from_collections(name, dsk, dependencies=parts)
     return new_array_object(hlg, name=name, meta=meta, divisions=divs)
 
 
