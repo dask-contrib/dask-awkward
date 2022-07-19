@@ -310,7 +310,7 @@ def num(
 ) -> Any:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
-    if axis and axis >= 1:
+    if axis and axis != 0:
         return map_partitions(
             ak.num,
             array,

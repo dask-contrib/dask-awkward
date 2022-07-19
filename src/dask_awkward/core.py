@@ -39,6 +39,7 @@ if TYPE_CHECKING:
     from awkward._v2.forms.form import Form
     from awkward._v2.types.type import Type
     from dask.array.core import Array as DaskArray
+    from dask.bag.core import Bag as DaskBag
     from dask.blockwise import Blockwise
     from numpy.typing import DTypeLike
 
@@ -96,7 +97,7 @@ class Scalar(DaskMethodsMixin):
         return self._dask
 
     def __dask_keys__(self) -> list[Hashable]:
-        return [self._name]
+        return [self.key]
 
     def __dask_layers__(self) -> tuple[str, ...]:
         if isinstance(self._dask, HighLevelGraph) and len(self._dask.layers) == 1:
@@ -139,6 +140,10 @@ class Scalar(DaskMethodsMixin):
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def key(self) -> Hashable:
+        return (self.name, 0)
 
     def _check_meta(self, m: Any) -> Any | None:
         if not isinstance(m, (MaybeNone, UnknownScalar, OneOf)):
@@ -191,7 +196,7 @@ class Scalar(DaskMethodsMixin):
             )
         return f"dask.awkward<{key_split(self.name)}, type=Scalar, dtype={dt}>"
 
-    def __getitem__(self, where):
+    def __getitem__(self, where: Any) -> Any:
         raise RuntimeError("Scalars do not support __getitem__")
 
     def __getattr__(self, attr: str) -> Any:
@@ -217,9 +222,12 @@ class Scalar(DaskMethodsMixin):
 
         """
         dsk = self.__dask_graph__()
+        layer = self.__dask_layers__()[0]
         if optimize_graph:
             dsk = self.__dask_optimize__(dsk, self.__dask_keys__())
-        return Delayed(self.name, dsk)
+            layer = f"delayed-{self.name}"
+            dsk = HighLevelGraph.from_collections(layer, dsk, dependencies=())
+        return Delayed(self.key, dsk, layer=layer)
 
 
 def new_scalar_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Scalar:
@@ -289,7 +297,7 @@ def new_known_scalar(
             dtype = np.dtype(type(s))
     else:
         dtype = np.dtype(dtype)
-    llg = {name: s}
+    llg = {(name, 0): s}
     hlg = HighLevelGraph.from_collections(name, llg, dependencies=())
     return Scalar(hlg, name, meta=UnknownScalar(dtype), known_value=s)
 
@@ -321,7 +329,7 @@ class Record(Scalar):
 
         # first check for array type return
         if isinstance(new_meta, ak.Array):
-            graphlayer = {(name, 0): (operator.getitem, self.name, key)}
+            graphlayer = {(name, 0): (operator.getitem, (self.name, 0), key)}
             hlg = HighLevelGraph.from_collections(
                 name,
                 graphlayer,
@@ -330,7 +338,7 @@ class Record(Scalar):
             return new_array_object(hlg, name, meta=new_meta, npartitions=1)
 
         # then check for scalar (or record) type
-        graphlayer = {name: (operator.getitem, self.name, key)}  # type: ignore
+        graphlayer = {(name, 0): (operator.getitem, (self.name, 0), key)}  # type: ignore
         hlg = HighLevelGraph.from_collections(
             name,
             graphlayer,
@@ -752,7 +760,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         token = tokenize(partition, where)
         name = f"getitem-{token}"
         dsk = {
-            name: (
+            (name, 0): (
                 _outer_int_getitem_fn,
                 partition.__dask_keys__()[0],
                 where,
@@ -798,7 +806,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         # a single string
         if isinstance(where, str):
-            return self._getitem_outer_str_or_list(where, label=str)
+            return self._getitem_outer_str_or_list(where, label=where)
 
         elif isinstance(where, list):
             return self._getitem_outer_str_or_list(where)
@@ -1014,6 +1022,11 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         from dask_awkward.io.io import to_dask_array
 
         return to_dask_array(self)
+
+    def to_dask_bag(self) -> DaskBag:
+        from dask_awkward.io.io import to_dask_bag
+
+        return to_dask_bag(self)
 
 
 def compute_typetracer(dsk: HighLevelGraph, name: str) -> ak.Array:
@@ -1305,10 +1318,97 @@ def total_reduction(
         [(b_name, j) for j in range(k)],
         True,
     )
-    dsk[fmt_name] = dsk.pop((fmt_name, 0))
+    # dsk[fmt_name] = dsk.pop((fmt_name, 0))
 
     graph = HighLevelGraph.from_collections(fmt_name, dsk, dependencies=[array])
     return new_scalar_object(graph, fmt_name, meta=meta or UnknownScalar(None))
+
+
+def _max_or_ident(a):
+    if isinstance(a, (list, tuple)):
+        print("list/tuple:", a)
+        ak.max(ak.Array(a), axis=None)
+    elif isinstance(a, ak.Array):
+        print("ak.Array", a)
+        return a
+    else:
+        print("idk:", type(a), a)
+        return a
+
+
+def _reduction_partition(x: Any, fn: Callable, **kwargs: Any) -> Any:
+    output = fn(x, **kwargs)
+    return output
+
+
+def _reduction_combine(x: Any, fn: Callable, **kwargs: Any) -> Any:
+    if isinstance(x, list):
+        x = ak.Array(x)
+    output = fn(x, **kwargs)
+    return output
+
+
+def _reduction_aggregate(x: Any, fn: Callable, **kwargs: Any) -> Any:
+    if isinstance(x, list):
+        x = ak.Array(x)
+    output = fn(x, **kwargs)
+    return output
+
+
+def reduction_to_scalar(
+    array: Array,
+    fn_per_partition: Callable,
+    fn_combine: Callable | None = None,
+    fn_aggregate: Callable | None = None,
+    split_every: int | None = 8,
+    per_partition_kwargs: dict[str, Any] | None = None,
+    combine_kwargs: dict[str, Any] | None = None,
+    aggregate_kwargs: dict[str, Any] | None = None,
+    meta: Any | None = None,
+    label: str | None = None,
+    token: str | None = None,
+) -> Scalar:
+
+    if fn_aggregate is None:
+        fn_aggregate = fn_per_partition
+
+    if fn_combine is None:
+        fn_combine = fn_aggregate
+
+    per_partition_kwargs = per_partition_kwargs.copy() if per_partition_kwargs else {}
+    per_partition_kwargs["fn"] = fn_per_partition
+
+    combine_kwargs = combine_kwargs.copy() if combine_kwargs else {}
+    combine_kwargs["fn"] = fn_combine
+
+    aggregate_kwargs = aggregate_kwargs.copy() if aggregate_kwargs else {}
+    aggregate_kwargs["fn"] = fn_aggregate
+
+    token = tokenize(
+        token or (fn_per_partition, fn_aggregate),
+    )
+
+    chunked_result = map_partitions(fn_per_partition, array, meta=empty_typetracer())
+
+    from dask.layers import DataFrameTreeReduction
+
+    if split_every is None:
+        split_every = 8
+
+    label = label or funcname(fn_per_partition)
+
+    dftr = DataFrameTreeReduction(
+        name,
+        chunked_result.name,
+        chunked_result.npartitions,
+        fnagg,
+        _max_or_ident,
+        split_every=split_every,
+        tree_node_name=f"reduce-{token}",
+    )
+
+    graph = HighLevelGraph.from_collections(name, dftr, dependencies=(chunked_result,))
+    return new_scalar_object(graph, name, meta=meta or UnknownScalar(None))
 
 
 def pw_reduction_with_agg_to_scalar(
@@ -1352,11 +1452,11 @@ def pw_reduction_with_agg_to_scalar(
     func = partial(func, **kwargs)
     agg = partial(agg, **agg_kwargs)
     dsk = {(namefunc, i): (func, k) for i, k in enumerate(array.__dask_keys__())}
-    dsk[nameagg] = (agg, list(dsk.keys()))  # type: ignore
+    dsk[(nameagg, 0)] = (agg, list(dsk.keys()))  # type: ignore
     hlg = HighLevelGraph.from_collections(
         nameagg,
         dsk,
-        dependencies=[array],
+        dependencies=(array,),
     )
     meta = UnknownScalar(np.dtype(dtype)) if dtype is not None else None
     return new_scalar_object(hlg, name=nameagg, meta=meta)

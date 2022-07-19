@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Iterable
-from math import ceil
 from typing import TYPE_CHECKING, Any
 
 import awkward._v2 as ak
@@ -17,6 +17,7 @@ from dask_awkward.utils import LazyInputsDict, empty_typetracer
 
 if TYPE_CHECKING:
     from dask.array.core import Array as DaskArray
+    from dask.bag.core import Bag as DaskBag
     from dask.delayed import Delayed
 
     from dask_awkward.core import Array
@@ -58,7 +59,7 @@ def from_awkward(source: ak.Array, npartitions: int, label: str | None = None) -
 
     """
     nrows = len(source)
-    chunksize = int(ceil(nrows / npartitions))
+    chunksize = int(math.ceil(nrows / npartitions))
     locs = list(range(0, nrows, chunksize)) + [nrows]
     starts = locs[:-1]
     stops = locs[1:]
@@ -190,6 +191,12 @@ def to_delayed(array: Array, optimize_graph: bool = True) -> list[Delayed]:
         layer = f"delayed-{array.name}"
         graph = HighLevelGraph.from_collections(layer, graph, dependencies=())
     return [Delayed(k, graph, layer=layer) for k in keys]
+
+
+def to_dask_bag(array: Array) -> DaskBag:
+    from dask.bag.core import Bag
+
+    return Bag(array.dask, array.name, array.npartitions)
 
 
 def to_dask_array(array: Array) -> DaskArray:

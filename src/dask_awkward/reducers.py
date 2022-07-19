@@ -269,7 +269,8 @@ def max(
             ak.max,
             array,
             axis=None,
-            agg_kwargs={"axis": None},
+            flatten_records=flatten_records,
+            agg_kwargs={"axis": None, "flatten_records": flatten_records},
         )
     else:
         raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
