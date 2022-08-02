@@ -22,6 +22,7 @@ from dask.highlevelgraph import HighLevelGraph
 from dask.threaded import get as threaded_get
 from dask.utils import IndexCallable, funcname, key_split
 from numpy.lib.mixins import NDArrayOperatorsMixin
+from tlz import first
 
 from dask_awkward.optimize import basic_optimize
 from dask_awkward.typing import AwkwardDaskCollection
@@ -65,10 +66,6 @@ def _finalize_array(results: Sequence[Any]) -> Any:
         raise RuntimeError(msg)
 
 
-def _finalize_scalar(results: Sequence[T]) -> T:
-    return results[0]
-
-
 class Scalar(DaskMethodsMixin):
     """Single partition Dask collection representing a lazy Scalar.
 
@@ -88,6 +85,8 @@ class Scalar(DaskMethodsMixin):
         meta: Any,
         known_value: Any | None = None,
     ) -> None:
+        if not isinstance(dsk, HighLevelGraph):
+            dsk = HighLevelGraph.from_collections(name, dsk, dependencies=())  # type: ignore
         self._dask: HighLevelGraph = dsk
         self._name: str = name
         self._meta: Any = self._check_meta(meta)
@@ -100,8 +99,6 @@ class Scalar(DaskMethodsMixin):
         return [self.key]
 
     def __dask_layers__(self) -> tuple[str, ...]:
-        if isinstance(self._dask, HighLevelGraph) and len(self._dask.layers) == 1:
-            return tuple(self._dask.layers)
         return (self.name,)
 
     def __dask_tokenize__(self) -> Hashable:
@@ -114,7 +111,7 @@ class Scalar(DaskMethodsMixin):
     __dask_scheduler__ = staticmethod(threaded_get)
 
     def __dask_postcompute__(self) -> tuple[Callable, tuple]:
-        return _finalize_scalar, ()
+        return first, ()
 
     def __dask_postpersist__(self) -> tuple[Callable, tuple]:
         return self._rebuild, ()
@@ -143,7 +140,7 @@ class Scalar(DaskMethodsMixin):
 
     @property
     def key(self) -> Hashable:
-        return (self.name, 0)
+        return (self._name, 0)
 
     def _check_meta(self, m: Any) -> Any | None:
         if not isinstance(m, (MaybeNone, UnknownScalar, OneOf)):
@@ -224,8 +221,8 @@ class Scalar(DaskMethodsMixin):
         dsk = self.__dask_graph__()
         layer = self.__dask_layers__()[0]
         if optimize_graph:
-            dsk = self.__dask_optimize__(dsk, self.__dask_keys__())
             layer = f"delayed-{self.name}"
+            dsk = self.__dask_optimize__(dsk, self.__dask_keys__())
             dsk = HighLevelGraph.from_collections(layer, dsk, dependencies=())
         return Delayed(self.key, dsk, layer=layer)
 
@@ -322,32 +319,31 @@ class Record(Scalar):
         return m
 
     def __getitem__(self, where: str) -> AwkwardDaskCollection:
-        key = where
-        token = tokenize(self, key)
-        name = f"{where}-{token}"
-        new_meta = self._meta[key]
+        token = tokenize(self, where)
+        new_name = f"{where}-{token}"
+        new_meta = self._meta[where]
 
         # first check for array type return
         if isinstance(new_meta, ak.Array):
-            graphlayer = {(name, 0): (operator.getitem, (self.name, 0), key)}
+            graphlayer = {(new_name, 0): (operator.getitem, self.key, where)}
             hlg = HighLevelGraph.from_collections(
-                name,
+                new_name,
                 graphlayer,
                 dependencies=[self],
             )
-            return new_array_object(hlg, name, meta=new_meta, npartitions=1)
+            return new_array_object(hlg, new_name, meta=new_meta, npartitions=1)
 
         # then check for scalar (or record) type
-        graphlayer = {(name, 0): (operator.getitem, (self.name, 0), key)}  # type: ignore
+        graphlayer = {(new_name, 0): (operator.getitem, self.key, where)}
         hlg = HighLevelGraph.from_collections(
-            name,
+            new_name,
             graphlayer,
             dependencies=[self],
         )
         if isinstance(new_meta, ak.Record):
-            return new_record_object(hlg, name, meta=new_meta)
+            return new_record_object(hlg, new_name, meta=new_meta)
         else:
-            return new_scalar_object(hlg, name, meta=new_meta)
+            return new_scalar_object(hlg, new_name, meta=new_meta)
 
     def __getattr__(self, attr: str) -> Any:
         if attr not in (self.fields or []):
@@ -1448,7 +1444,7 @@ def pw_reduction_with_agg_to_scalar(
     namefunc = func.__name__
     nameagg = agg.__name__
     namefunc = f"{namefunc}-{token}"
-    nameagg = f"{nameagg}-{token}"
+    nameagg = f"{nameagg}-agg-{token}"
     func = partial(func, **kwargs)
     agg = partial(agg, **agg_kwargs)
     dsk = {(namefunc, i): (func, k) for i, k in enumerate(array.__dask_keys__())}
