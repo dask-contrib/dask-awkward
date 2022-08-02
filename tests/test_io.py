@@ -272,6 +272,6 @@ def test_to_delayed(daa, caa, optimize_graph):
 
 
 def test_to_bag(daa, caa):
-    a = dak.to_dask_bag(daa)
+    a = daa.to_dask_bag()
     for comprec, entry in zip(a.compute(), caa):
         assert comprec.tolist() == entry.tolist()
