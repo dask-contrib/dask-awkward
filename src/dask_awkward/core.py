@@ -1351,60 +1351,60 @@ def _reduction_aggregate(x: Any, fn: Callable, **kwargs: Any) -> Any:
     return output
 
 
-def reduction_to_scalar(
-    array: Array,
-    fn_per_partition: Callable,
-    fn_combine: Callable | None = None,
-    fn_aggregate: Callable | None = None,
-    split_every: int | None = 8,
-    per_partition_kwargs: dict[str, Any] | None = None,
-    combine_kwargs: dict[str, Any] | None = None,
-    aggregate_kwargs: dict[str, Any] | None = None,
-    meta: Any | None = None,
-    label: str | None = None,
-    token: str | None = None,
-) -> Scalar:
+# def reduction_to_scalar(
+#     array: Array,
+#     fn_per_partition: Callable,
+#     fn_combine: Callable | None = None,
+#     fn_aggregate: Callable | None = None,
+#     split_every: int | None = 8,
+#     per_partition_kwargs: dict[str, Any] | None = None,
+#     combine_kwargs: dict[str, Any] | None = None,
+#     aggregate_kwargs: dict[str, Any] | None = None,
+#     meta: Any | None = None,
+#     label: str | None = None,
+#     token: str | None = None,
+# ) -> Scalar:
 
-    if fn_aggregate is None:
-        fn_aggregate = fn_per_partition
+#     if fn_aggregate is None:
+#         fn_aggregate = fn_per_partition
 
-    if fn_combine is None:
-        fn_combine = fn_aggregate
+#     if fn_combine is None:
+#         fn_combine = fn_aggregate
 
-    per_partition_kwargs = per_partition_kwargs.copy() if per_partition_kwargs else {}
-    per_partition_kwargs["fn"] = fn_per_partition
+#     per_partition_kwargs = per_partition_kwargs.copy() if per_partition_kwargs else {}
+#     per_partition_kwargs["fn"] = fn_per_partition
 
-    combine_kwargs = combine_kwargs.copy() if combine_kwargs else {}
-    combine_kwargs["fn"] = fn_combine
+#     combine_kwargs = combine_kwargs.copy() if combine_kwargs else {}
+#     combine_kwargs["fn"] = fn_combine
 
-    aggregate_kwargs = aggregate_kwargs.copy() if aggregate_kwargs else {}
-    aggregate_kwargs["fn"] = fn_aggregate
+#     aggregate_kwargs = aggregate_kwargs.copy() if aggregate_kwargs else {}
+#     aggregate_kwargs["fn"] = fn_aggregate
 
-    token = tokenize(
-        token or (fn_per_partition, fn_aggregate),
-    )
+#     token = tokenize(
+#         token or (fn_per_partition, fn_aggregate),
+#     )
 
-    chunked_result = map_partitions(fn_per_partition, array, meta=empty_typetracer())
+#     chunked_result = map_partitions(fn_per_partition, array, meta=empty_typetracer())
 
-    from dask.layers import DataFrameTreeReduction
+#     from dask.layers import DataFrameTreeReduction
 
-    if split_every is None:
-        split_every = 8
+#     if split_every is None:
+#         split_every = 8
 
-    label = label or funcname(fn_per_partition)
+#     label = label or funcname(fn_per_partition)
 
-    dftr = DataFrameTreeReduction(
-        name,
-        chunked_result.name,
-        chunked_result.npartitions,
-        fnagg,
-        _max_or_ident,
-        split_every=split_every,
-        tree_node_name=f"reduce-{token}",
-    )
+#     dftr = DataFrameTreeReduction(
+#         name,
+#         chunked_result.name,
+#         chunked_result.npartitions,
+#         fnagg,
+#         _max_or_ident,
+#         split_every=split_every,
+#         tree_node_name=f"reduce-{token}",
+#     )
 
-    graph = HighLevelGraph.from_collections(name, dftr, dependencies=(chunked_result,))
-    return new_scalar_object(graph, name, meta=meta or UnknownScalar(None))
+#     graph = HighLevelGraph.from_collections(name, dftr, dependencies=(chunked_result,))
+#     return new_scalar_object(graph, name, meta=meta or UnknownScalar(None))
 
 
 def pw_reduction_with_agg_to_scalar(
