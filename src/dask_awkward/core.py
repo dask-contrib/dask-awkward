@@ -96,7 +96,7 @@ class Scalar(DaskMethodsMixin):
         return self._dask
 
     def __dask_keys__(self) -> list[Hashable]:
-        return [self._name]
+        return [self.key]
 
     def __dask_layers__(self) -> tuple[str, ...]:
         if isinstance(self._dask, HighLevelGraph) and len(self._dask.layers) == 1:
@@ -139,6 +139,10 @@ class Scalar(DaskMethodsMixin):
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def key(self) -> Hashable:
+        return (self.name, 0)
 
     def _check_meta(self, m: Any) -> Any | None:
         if not isinstance(m, (MaybeNone, UnknownScalar, OneOf)):
@@ -217,9 +221,12 @@ class Scalar(DaskMethodsMixin):
 
         """
         dsk = self.__dask_graph__()
+        layer = self.__dask_layers__()[0]
         if optimize_graph:
+            layer = f"delayed-{self.name}"
             dsk = self.__dask_optimize__(dsk, self.__dask_keys__())
-        return Delayed(self.name, dsk)
+            dsk = HighLevelGraph.from_collections(layer, dsk, dependencies=())
+        return Delayed(self.key, dsk, layer=layer)
 
 
 def new_scalar_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Scalar:
@@ -289,7 +296,7 @@ def new_known_scalar(
             dtype = np.dtype(type(s))
     else:
         dtype = np.dtype(dtype)
-    llg = {name: s}
+    llg = {(name, 0): s}
     hlg = HighLevelGraph.from_collections(name, llg, dependencies=())
     return Scalar(hlg, name, meta=UnknownScalar(dtype), known_value=s)
 
@@ -321,7 +328,7 @@ class Record(Scalar):
 
         # first check for array type return
         if isinstance(new_meta, ak.Array):
-            graphlayer = {(name, 0): (operator.getitem, self.name, key)}
+            graphlayer = {(name, 0): (operator.getitem, (self.name, 0), key)}
             hlg = HighLevelGraph.from_collections(
                 name,
                 graphlayer,
@@ -330,7 +337,7 @@ class Record(Scalar):
             return new_array_object(hlg, name, meta=new_meta, npartitions=1)
 
         # then check for scalar (or record) type
-        graphlayer = {name: (operator.getitem, self.name, key)}  # type: ignore
+        graphlayer = {(name, 0): (operator.getitem, (self.name, 0), key)}  # type: ignore
         hlg = HighLevelGraph.from_collections(
             name,
             graphlayer,
@@ -652,6 +659,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         self,
         where: Any,
         meta: Any | None = None,
+        label: str | None = None,
     ) -> Any:
         if meta is None and self._meta is not None:
             if isinstance(where, tuple):
@@ -661,7 +669,11 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 m = to_meta([where])[0]
                 meta = self._meta[m]
         return self.map_partitions(
-            operator.getitem, where, meta=meta, output_divisions=1
+            operator.getitem,
+            where,
+            meta=meta,
+            output_divisions=1,
+            label=label,
         )
 
     def _getitem_outer_boolean_lazy_array(self, where: Array | tuple[Any, ...]) -> Any:
@@ -683,7 +695,11 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                     meta=new_meta,
                 )
 
-    def _getitem_outer_str_or_list(self, where: str | list | tuple[Any, ...]) -> Any:
+    def _getitem_outer_str_or_list(
+        self,
+        where: str | list | tuple[Any, ...],
+        label: str | None = None,
+    ) -> Any:
         new_meta: Any | None = None
         if self._meta is not None:
             if isinstance(where, tuple):
@@ -693,7 +709,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 new_meta = self._meta[metad]
             elif isinstance(where, (str, list)):
                 new_meta = self._meta[where]
-        return self._getitem_trivial_map_partitions(where, meta=new_meta)
+        return self._getitem_trivial_map_partitions(where, meta=new_meta, label=label)
 
     def _getitem_outer_int(self, where: int | tuple[Any, ...]) -> Any:
         if where == 0 or (isinstance(where, tuple) and where[0] == 0):
@@ -743,7 +759,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         token = tokenize(partition, where)
         name = f"getitem-{token}"
         dsk = {
-            name: (
+            (name, 0): (
                 _outer_int_getitem_fn,
                 partition.__dask_keys__()[0],
                 where,
@@ -789,7 +805,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         # a single string
         if isinstance(where, str):
-            return self._getitem_outer_str_or_list(where)
+            return self._getitem_outer_str_or_list(where, label=where)
 
         elif isinstance(where, list):
             return self._getitem_outer_str_or_list(where)
@@ -1283,15 +1299,15 @@ def pw_reduction_with_agg_to_scalar(
     namefunc = func.__name__
     nameagg = agg.__name__
     namefunc = f"{namefunc}-{token}"
-    nameagg = f"{nameagg}-{token}"
+    nameagg = f"{nameagg}-agg-{token}"
     func = partial(func, **kwargs)
     agg = partial(agg, **agg_kwargs)
     dsk = {(namefunc, i): (func, k) for i, k in enumerate(array.__dask_keys__())}
-    dsk[nameagg] = (agg, list(dsk.keys()))  # type: ignore
+    dsk[(nameagg, 0)] = (agg, list(dsk.keys()))  # type: ignore
     hlg = HighLevelGraph.from_collections(
         nameagg,
         dsk,
-        dependencies=[array],
+        dependencies=(array,),
     )
     meta = UnknownScalar(np.dtype(dtype)) if dtype is not None else None
     return new_scalar_object(hlg, name=nameagg, meta=meta)
