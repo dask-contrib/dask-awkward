@@ -337,7 +337,7 @@ class Record(Scalar):
             return new_array_object(hlg, name, meta=new_meta, npartitions=1)
 
         # then check for scalar (or record) type
-        graphlayer = {(name, 0): (operator.getitem, (self.name, 0), key)}  # type: ignore
+        graphlayer = {(name, 0): (operator.getitem, (self.name, 0), key)}
         hlg = HighLevelGraph.from_collections(
             name,
             graphlayer,
