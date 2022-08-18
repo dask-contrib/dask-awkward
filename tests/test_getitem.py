@@ -124,3 +124,7 @@ def test_record_getitem_scalar_results(daa: dak.Array, caa: ak.Array) -> None:
     assert isinstance(cr, ak.Record)
     assert_eq(dr["x"], cr["x"])
     assert_eq(dr[["x", "y"]], cr[["x", "y"]])
+
+
+def test_single_partition(daa: dak.Array, caa: ak.Array) -> None:
+    assert_eq(daa["points"]["x"][-1][3:], caa["points"]["x"][-1][3:])
