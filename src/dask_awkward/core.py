@@ -825,7 +825,10 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         # a single ellipsis
         elif where is Ellipsis:
-            return self._getitem_trivial_map_partitions(where)
+            return self
+
+        elif self.npartitions == 1:
+            return self.map_partitions(operator.getitem, where)
 
         raise DaskAwkwardNotImplemented(f"__getitem__ doesn't support where={where}.")
 
