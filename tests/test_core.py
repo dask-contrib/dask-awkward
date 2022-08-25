@@ -66,10 +66,11 @@ def test_form(ndjson_points_file: str) -> None:
     assert daa.form == EmptyForm()
 
 
-def test_from_awkward(caa: ak.Array) -> None:
-    daa = dak.from_awkward(caa, npartitions=4)
-    assert_eq(caa, daa)
-    assert_eq(daa, daa)
+@pytest.mark.parametrize("nparts", [2, 3, 4])
+def test_from_awkward(caa: ak.Array, nparts: int) -> None:
+    daa = dak.from_awkward(caa, npartitions=nparts)
+    assert_eq(caa, daa, check_forms=False)
+    assert_eq(daa, daa, check_forms=False)
 
 
 def test_compute_typetracer(daa: dak.Array) -> None:

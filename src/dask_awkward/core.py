@@ -52,8 +52,10 @@ def _finalize_array(results: Sequence[Any]) -> Any:
         return ak.concatenate(results)
     elif len(results) == 1 and isinstance(results[0], int):
         return results[0]
-    elif all(isinstance(r, (int, np.integer)) for r in results):
-        return ak.Array(results)
+    elif isinstance(results, tuple) and all(
+        isinstance(r, (int, np.integer)) for r in results
+    ):
+        return ak.Array(list(results))
     elif all(r is None for r in results):
         return None
     else:
@@ -1331,7 +1333,7 @@ def calculate_known_divisions(array: Array) -> tuple[int, ...]:
     with dask.config.set({"awkward.compute-unknown-meta": False}):
         # if more than 1 partition use cumulative sum
         if array.npartitions > 1:
-            nums = array.map_partitions(len).compute()
+            nums = np.array(array.map_partitions(len).compute())
             cs = list(np.cumsum(nums))
             return tuple([0, *cs])
 

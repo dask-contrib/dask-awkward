@@ -63,7 +63,7 @@ class _FromJsonLineDelimitedFn(_FromJsonFn):
 
     def __call__(self, source: str) -> ak.Array:
         with self.storage.open(source, mode="rt", compression=self.compression) as f:
-            return ak.from_json(f.read())
+            return ak.from_json(f.read(), line_delimited=True)
 
 
 class _FromJsonSingleObjInFileFn(_FromJsonFn):
