@@ -1,6 +1,5 @@
 from dask_awkward import config  # isort:skip; load awkward config
 
-from dask_awkward._version import version as __version__
 from dask_awkward.core import Array, Record, Scalar
 from dask_awkward.core import _type as type
 from dask_awkward.core import map_partitions
@@ -77,3 +76,4 @@ from dask_awkward.structure import (
     zeros_like,
     zip,
 )
+from dask_awkward.version import version as __version__  # noqa
