@@ -252,7 +252,7 @@ def read_parquet(
             itertools.accumulate([rg.num_rows for rg in rgs], operator.add)
         )
     arr = new_array_object(
-        HighLevelGraph.from_collections("read-parquet", MaterializedLayer(dsk)),
+        HighLevelGraph.from_collections(name, MaterializedLayer(dsk)),
         name=name,
         meta=ak.Array(meta.layout.typetracer),
         divisions=divisions,
@@ -450,12 +450,12 @@ def to_parquet(data, path, storage_options=None, write_metadata=False, compute=T
     dsk = {}
     if write_metadata:
         final_name = name + "-metadata"
-        dsk[final_name] = (_metadata_file_from_metas, fs, path) + tuple(
+        dsk[(final_name, 0)] = (_metadata_file_from_metas, fs, path) + tuple(
             map_res.__dask_keys__()
         )
     else:
         final_name = name + "-finalize"
-        dsk[final_name] = (lambda *_: None, map_res.__dask_keys__())
+        dsk[(final_name, 0)] = (lambda *_: None, map_res.__dask_keys__())
     graph = HighLevelGraph.from_collections(final_name, dsk, dependencies=[map_res])
     out = new_scalar_object(graph, final_name, meta=None)
     if compute:
