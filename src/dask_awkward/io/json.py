@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import abc
-import io
 import warnings
 from typing import TYPE_CHECKING, Any
 
@@ -21,10 +20,8 @@ from fsspec.utils import infer_compression
 
 from dask_awkward.core import new_array_object, typetracer_array
 from dask_awkward.io.io import from_map
-from dask_awkward.utils import empty_typetracer
 
 if TYPE_CHECKING:
-    from dask.delayed import Delayed
     from fsspec.spec import AbstractFileSystem
 
     from dask_awkward.core import Array
@@ -48,7 +45,7 @@ class _FromJsonFn:
 
     @abc.abstractmethod
     def __call__(self, source: Any) -> ak.Array:
-        pass  # pragma: no cover
+        ...
 
 
 class _FromJsonLineDelimitedFn(_FromJsonFn):
@@ -77,15 +74,13 @@ class _FromJsonSingleObjInFileFn(_FromJsonFn):
         super().__init__(*args, storage=storage, compression=compression, **kwargs)
 
     def __call__(self, source: str) -> ak.Array:
-        with self.storage.open(source, mode="r", compression=self.compression) as f:
-            return ak.Array([json.load(f)])
+        with self.storage.open(source, mode="rb", compression=self.compression) as f:
+            return ak.from_json(f)
 
 
 class _FromJsonBytesFn:
     def __call__(self, source: bytes) -> ak.Array:
-        return ak.from_iter(
-            json.loads(ch) for ch in io.TextIOWrapper(io.BytesIO(source)) if ch
-        )
+        return ak.from_json(source, line_delimited=True)
 
 
 def derive_json_meta(
@@ -190,10 +185,10 @@ def _from_json_bytes(
         urlpath,
         delimiter=delimiter,
         blocksize=blocksize,
-        sample=None,
+        sample="0",
         **storage_options,
     )
-    flat_chunks: list[Delayed] = list(flatten(bytechunks))
+    flat_chunks = list(flatten(bytechunks))
     f = _FromJsonBytesFn()
     dsk = {
         (name, i): (f, delayed_chunk.key) for i, delayed_chunk in enumerate(flat_chunks)
@@ -217,6 +212,18 @@ def _from_json_bytes(
 
 def from_json(
     urlpath: str | list[str],
+    # line_delimited: bool = False,
+    # schema: Any | None = None,
+    # nan_string: str | None = None,
+    # posinf_string: str | None = None,
+    # neginf_string: str | None = None,
+    # complex_record_fields: tuple[str, str] | None = None,
+    # buffersize: int = 65536,
+    # initial: int = 1024,
+    # resize: float = 1.5,
+    highlevel: bool = True,
+    behavior: dict | None = None,
+    *,
     blocksize: int | str | None = None,
     delimiter: bytes | None = None,
     one_obj_per_file: bool = False,
@@ -294,6 +301,9 @@ def from_json(
 
     """
 
+    if not highlevel:
+        raise ValueError("dask-awkward only supports highlevel awkward Arrays.")
+
     # allow either blocksize or delimieter being not-None to trigger
     # line deliminated JSON reading.
     if blocksize is not None and delimiter is None:
@@ -328,65 +338,3 @@ def from_json(
     # otherwise the arguments are bad
     else:
         raise TypeError("Incompatible combination of arguments.")  # pragma: no cover
-
-
-class _FromJsonNewFn:
-    def __init__(self, storage, compression, **kwargs):
-        self.storage = storage
-        self.compression = compression
-        self.kwargs = kwargs
-
-    def __call__(self, *args):
-        (source, i) = args
-        print(source)
-        with self.storage.open(source, mode="rb", compression=self.compression) as f:
-            return ak.from_json(f, **self.kwargs)
-
-
-def from_json_new(
-    source: Any,
-    line_delimited: bool = False,
-    schema: Any | None = None,
-    nan_string: str | None = None,
-    posinf_string: str | None = None,
-    neginf_string: str | None = None,
-    complex_record_fields: tuple[str, str] | None = None,
-    buffersize: int = 65536,
-    initial: int = 1024,
-    resize: float = 1.5,
-    highlevel: bool = True,
-    behavior: dict | None = None,
-    *,
-    compression: str | None = "infer",
-    storage_options: dict[str, Any] | None = None,
-) -> Array:
-    fs, fstoken, urlpaths = fsspec.get_fs_token_paths(
-        source,
-        mode="rb",
-        storage_options=storage_options,
-    )
-
-    f = _FromJsonNewFn(
-        storage=fs,
-        compression=compression,
-        line_delimited=line_delimited,
-        schema=schema,
-        nan_string=nan_string,
-        posinf_string=posinf_string,
-        neginf_string=neginf_string,
-        complex_record_fields=complex_record_fields,
-        buffersize=buffersize,
-        initial=initial,
-        resize=resize,
-        highlevel=highlevel,
-        behavior=behavior,
-    )
-
-    return from_map(
-        f,
-        urlpaths,
-        [1, 2],
-        label="from-json",
-        token="abc",
-        meta=empty_typetracer(),
-    )
