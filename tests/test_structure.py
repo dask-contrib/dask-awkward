@@ -7,21 +7,14 @@ import dask_awkward as dak
 from dask_awkward.testutils import assert_eq
 
 
-@pytest.mark.parametrize("axis", [None, 0, 1])
+@pytest.mark.parametrize("axis", [None, 0, 1, -1])
 def test_flatten(caa: ak.Array, daa: dak.Array, axis: int | None) -> None:
     cr = ak.flatten(caa.points.x, axis=axis)
     dr = dak.flatten(daa.points.x, axis=axis)
     assert_eq(cr, dr)
 
 
-@pytest.mark.parametrize(
-    "axis",
-    [
-        pytest.param(None, marks=pytest.mark.xfail),
-        0,
-        1,
-    ],
-)
+@pytest.mark.parametrize("axis", [0, 1, -1])
 def test_num(caa: ak.Array, daa: dak.Array, axis: int | None) -> None:
     da = daa["points"]
     ca = caa["points"]

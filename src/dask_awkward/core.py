@@ -40,6 +40,7 @@ if TYPE_CHECKING:
     from awkward._v2.forms.form import Form
     from awkward._v2.types.type import Type
     from dask.array.core import Array as DaskArray
+    from dask.bag.core import Bag as DaskBag
     from dask.blockwise import Blockwise
     from numpy.typing import DTypeLike
 
@@ -192,7 +193,7 @@ class Scalar(DaskMethodsMixin):
             )
         return f"dask.awkward<{key_split(self.name)}, type=Scalar, dtype={dt}>"
 
-    def __getitem__(self, where):
+    def __getitem__(self, where: Any) -> Any:
         raise RuntimeError("Scalars do not support __getitem__")
 
     def __getattr__(self, attr: str) -> Any:
@@ -1021,6 +1022,11 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         return to_dask_array(self)
 
+    def to_dask_bag(self) -> DaskBag:
+        from dask_awkward.io.io import to_dask_bag
+
+        return to_dask_bag(self)
+
 
 def compute_typetracer(dsk: HighLevelGraph, name: str) -> ak.Array:
     if dask.config.get("awkward.compute-unknown-meta"):
@@ -1259,6 +1265,149 @@ def map_partitions(
             meta=meta,
             npartitions=args[0].npartitions,
         )
+
+
+def total_reduction(
+    func: Callable,
+    array: Array,
+    split_every: int | None = None,
+    label: str | None = None,
+    meta: Any | None = None,
+) -> Scalar:
+    from dask.bag.core import empty_safe_aggregate, empty_safe_apply
+    from tlz import partition_all
+
+    splitev: int = split_every or 8
+    npartitions = array.npartitions
+    is_last = npartitions == 1
+
+    token = tokenize(func, array, splitev)
+    label = label or funcname(func)
+
+    a_name = f"{label}-part-{token}"
+
+    dsk: dict[Any, Any] = {
+        (a_name, i): (empty_safe_apply, func, (array.name, i), is_last)
+        for i in range(npartitions)
+    }
+
+    b_name = a_name
+    k = npartitions
+    fmt_name = f"{label}-aggregate-{token}"
+    depth = 0
+
+    while k > splitev:
+        c_name = f"{fmt_name}{depth}"
+        i = 0
+        for indices in partition_all(splitev, range(k)):
+            dsk[(c_name, i)] = (
+                empty_safe_aggregate,
+                func,
+                [(b_name, j) for j in indices],
+                False,
+            )
+            i += 1
+        k = i + 1
+        b_name = c_name
+        depth += 1
+
+    dsk[(fmt_name, 0)] = (
+        empty_safe_aggregate,
+        func,
+        [(b_name, j) for j in range(k)],
+        True,
+    )
+    # dsk[fmt_name] = dsk.pop((fmt_name, 0))
+
+    graph = HighLevelGraph.from_collections(fmt_name, dsk, dependencies=[array])
+    return new_scalar_object(graph, fmt_name, meta=meta or UnknownScalar(None))
+
+
+def _max_or_ident(a):
+    if isinstance(a, (list, tuple)):
+        print("list/tuple:", a)
+        ak.max(ak.Array(a), axis=None)
+    elif isinstance(a, ak.Array):
+        print("ak.Array", a)
+        return a
+    else:
+        print("idk:", type(a), a)
+        return a
+
+
+def _reduction_partition(x: Any, fn: Callable, **kwargs: Any) -> Any:
+    output = fn(x, **kwargs)
+    return output
+
+
+def _reduction_combine(x: Any, fn: Callable, **kwargs: Any) -> Any:
+    if isinstance(x, list):
+        x = ak.Array(x)
+    output = fn(x, **kwargs)
+    return output
+
+
+def _reduction_aggregate(x: Any, fn: Callable, **kwargs: Any) -> Any:
+    if isinstance(x, list):
+        x = ak.Array(x)
+    output = fn(x, **kwargs)
+    return output
+
+
+# def reduction_to_scalar(
+#     array: Array,
+#     fn_per_partition: Callable,
+#     fn_combine: Callable | None = None,
+#     fn_aggregate: Callable | None = None,
+#     split_every: int | None = 8,
+#     per_partition_kwargs: dict[str, Any] | None = None,
+#     combine_kwargs: dict[str, Any] | None = None,
+#     aggregate_kwargs: dict[str, Any] | None = None,
+#     meta: Any | None = None,
+#     label: str | None = None,
+#     token: str | None = None,
+# ) -> Scalar:
+
+#     if fn_aggregate is None:
+#         fn_aggregate = fn_per_partition
+
+#     if fn_combine is None:
+#         fn_combine = fn_aggregate
+
+#     per_partition_kwargs = per_partition_kwargs.copy() if per_partition_kwargs else {}
+#     per_partition_kwargs["fn"] = fn_per_partition
+
+#     combine_kwargs = combine_kwargs.copy() if combine_kwargs else {}
+#     combine_kwargs["fn"] = fn_combine
+
+#     aggregate_kwargs = aggregate_kwargs.copy() if aggregate_kwargs else {}
+#     aggregate_kwargs["fn"] = fn_aggregate
+
+#     token = tokenize(
+#         token or (fn_per_partition, fn_aggregate),
+#     )
+
+#     chunked_result = map_partitions(fn_per_partition, array, meta=empty_typetracer())
+
+#     from dask.layers import DataFrameTreeReduction
+
+#     if split_every is None:
+#         split_every = 8
+
+#     label = label or funcname(fn_per_partition)
+
+#     dftr = DataFrameTreeReduction(
+#         name,
+#         chunked_result.name,
+#         chunked_result.npartitions,
+#         fnagg,
+#         _max_or_ident,
+#         split_every=split_every,
+#         tree_node_name=f"reduce-{token}",
+#     )
+
+#     graph = HighLevelGraph.from_collections(name, dftr, dependencies=(chunked_result,))
+#     return new_scalar_object(graph, name, meta=meta or UnknownScalar(None))
 
 
 def pw_reduction_with_agg_to_scalar(

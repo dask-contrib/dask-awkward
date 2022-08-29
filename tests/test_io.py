@@ -269,3 +269,9 @@ def test_to_delayed(daa, caa, optimize_graph):
     delayeds = daa.points.to_delayed(optimize_graph=optimize_graph)
     comped = ak.concatenate([d.compute() for d in delayeds])
     assert caa.points.tolist() == comped.tolist()
+
+
+def test_to_bag(daa, caa):
+    a = daa.to_dask_bag()
+    for comprec, entry in zip(a.compute(), caa):
+        assert comprec.tolist() == entry.tolist()
