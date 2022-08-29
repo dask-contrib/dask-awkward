@@ -241,7 +241,7 @@ def from_json(
        This method assumes newline characters are not embedded in JSON
        values.
     2. Single JSON object per file (this requires `one_obj_per_file`
-       to be set to ``True``.
+       to be set to ``True``. These objects *must* be arrays.
     3. Reading some number of bytes at a time. If at least one of
        `blocksize` or `delimiter` are defined, Dask's
        :py:func:`~dask.bytes.read_bytes` function will be used to
