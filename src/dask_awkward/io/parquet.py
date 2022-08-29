@@ -354,7 +354,14 @@ def _write_partition(
     head=False,  # is this the first piece
     # custom_metadata=None,
 ):
-    t = to_arrow_table(data)
+    t = to_arrow_table(
+        data,
+        list_to32=True,
+        string_to32=True,
+        bytestring_to32=True,
+        categorical_as_dictionary=True,
+        extensionarray=False,
+    )
     md_list = []
     with fs.open(fs.sep.join([path, filename]), "wb") as fil:
         pq.write_table(

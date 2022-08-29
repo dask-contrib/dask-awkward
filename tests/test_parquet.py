@@ -97,8 +97,11 @@ def test_write_simple(tmpdir):
         "part0.parquet",
         "part1.parquet",
     ]
-    t = pq.read_table(tmpdir)
-    assert t.to_pydict()["data"] == data
+    t = pq.read_table(tmpdir).to_pydict()
+    if "data" in t:
+        assert t["data"] == data
+    else:
+        assert t[""] == data
 
 
 def test_write_roundtrip(tmpdir):
