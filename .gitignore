@@ -4,6 +4,7 @@
 # default dask visualize() output
 mydask.png
 dask-hlg.svg
+test_cluster_dump
 
 # distributed
 dask-worker-space
@@ -13,7 +14,7 @@ dask-worker-space
 */**/Untitled.ipynb
 
 # setuptools_scm generated
-src/dask_awkward/_version.py
+src/dask_awkward/version.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

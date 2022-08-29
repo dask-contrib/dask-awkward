@@ -9,28 +9,7 @@ from awkward._v2.behaviors.mixins import mixin_class_method as ak_mixin_class_me
 import dask_awkward as dak
 from dask_awkward.testutils import assert_eq
 
-one = ak.Array(
-    [
-        [{"x": 1, "y": 1.1}, {"x": 2, "y": 2.2}, {"x": 3, "y": 3.3}],
-        [],
-        [{"x": 4, "y": 4.4}, {"x": 5, "y": 5.5}],
-        [{"x": 6, "y": 6.6}],
-        [{"x": 7, "y": 7.7}, {"x": 8, "y": 8.8}, {"x": 9, "y": 9.9}],
-    ],
-)
-
-two = ak.Array(
-    [
-        [{"x": 0.9, "y": 1}, {"x": 2, "y": 2.2}, {"x": 2.9, "y": 3}],
-        [],
-        [{"x": 3.9, "y": 4}, {"x": 5, "y": 5.5}],
-        [{"x": 5.9, "y": 6}],
-        [{"x": 6.9, "y": 7}, {"x": 8, "y": 8.8}, {"x": 8.9, "y": 9}],
-    ],
-)
-
-
-behaviors = {}
+behaviors: dict = {}
 
 
 @ak_mixin_class(behaviors)
@@ -47,53 +26,42 @@ class Point:
         return np.sqrt(self.x**2 + self.y**2)
 
 
-def test_distance_behavior() -> None:
-    onedak = dak.with_name(
-        dak.from_awkward(one, npartitions=2),
-        name="Point",
-        behavior=behaviors,
-    )
-    twodak = dak.with_name(
-        dak.from_awkward(two, npartitions=2),
-        name="Point",
-        behavior=behaviors,
-    )
-
-    onec = ak.Array(one, with_name="Point", behavior=behaviors)
-    twoc = ak.Array(two)
-
-    assert_eq(onedak.distance(twodak), onec.distance(twoc))
-    assert_eq(np.abs(onedak), np.abs(onec))
+def test_distance_behavior(
+    daa_p1: dak.Array,
+    daa_p2: dak.Array,
+    caa_p1: ak.Array,
+    caa_p2: ak.Array,
+) -> None:
+    daa1 = dak.with_name(daa_p1.points, name="Point", behavior=behaviors)
+    daa2 = dak.with_name(daa_p2.points, name="Point", behavior=behaviors)
+    caa1 = ak.Array(caa_p1.points, with_name="Point", behavior=behaviors)
+    caa2 = ak.Array(caa_p2.points)
+    assert_eq(daa1.distance(daa2), caa1.distance(caa2))
+    assert_eq(np.abs(daa1), np.abs(caa1))
 
 
-def test_property_behavior() -> None:
-    onedak = dak.with_name(
-        dak.from_awkward(one, npartitions=2),
-        name="Point",
-        behavior=behaviors,
-    )
-    onec = ak.Array(one, with_name="Point", behavior=behaviors)
-    assert_eq(onedak.x2, onec.x2)
+def test_property_behavior(daa_p1: dak.Array, caa_p1: ak.Array) -> None:
+    daa = dak.with_name(daa_p1.points, name="Point", behavior=behaviors)
+    caa = ak.Array(caa_p1.points, with_name="Point", behavior=behaviors)
+    assert_eq(daa.x2, caa.x2)
 
 
-def test_nonexistent_behavior() -> None:
-    onec = ak.Array(one, with_name="Point")
-    twoc = ak.Array(two)
-    onedak = dak.from_awkward(onec, npartitions=2)
-    twodak = dak.from_awkward(twoc, npartitions=2)
+def test_nonexistent_behavior(daa_p1: dak.Array, daa_p2: dak.Array) -> None:
+    daa1 = dak.with_name(daa_p1["points"], "Point", behavior=behaviors)
+    daa2 = daa_p2
 
     with pytest.raises(
         AttributeError,
         match="Method doesnotexist is not available to this collection",
     ):
-        onedak._call_behavior_method("doesnotexist", twodak)
+        daa1._call_behavior_method("doesnotexist", daa2)
 
     with pytest.raises(
         AttributeError,
         match="Property doesnotexist is not available to this collection",
     ):
-        onedak._call_behavior_property("doesnotexist")
+        daa1._call_behavior_property("doesnotexist")
 
     # in this case the field check is where we raise
     with pytest.raises(AttributeError, match="distance not in fields"):
-        twodak.distance(onedak)
+        daa2.distance(daa1)

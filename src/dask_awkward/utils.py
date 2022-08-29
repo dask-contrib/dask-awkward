@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import collections.abc
-from typing import Any, Callable
+from collections.abc import Callable, Mapping
+from typing import Any
 
 import awkward._v2 as ak
 import numpy as np
@@ -20,7 +20,7 @@ https://github.com/ContinuumIO/dask-awkward."""
 
 
 class IncompatiblePartitions(ValueError):
-    def __init__(self, name, *args) -> None:
+    def __init__(self, name, *args):
         msg = self.divisions_msg(name, *args)
         super().__init__(msg)
 
@@ -32,7 +32,7 @@ class IncompatiblePartitions(ValueError):
         return msg
 
 
-class LazyInputsDict(collections.abc.Mapping):
+class LazyInputsDict(Mapping):
     """Dictionary with lazy key value pairs
 
     Parameters
@@ -55,7 +55,7 @@ class LazyInputsDict(collections.abc.Mapping):
     def __getitem__(self, i: tuple[int]) -> Any:
         return self.inputs[i[0]]
 
-    def __contains__(self, k: Any):
+    def __contains__(self, k: Any) -> bool:
         if isinstance(k, tuple):
             if isinstance(k[0], int):
                 return k[0] >= 0 and k[0] < len(self)

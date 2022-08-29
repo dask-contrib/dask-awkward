@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import abc
-import io
 import warnings
 from typing import TYPE_CHECKING, Any
 
@@ -19,20 +18,19 @@ from dask.highlevelgraph import HighLevelGraph
 from dask.utils import parse_bytes
 from fsspec.utils import infer_compression
 
-from dask_awkward.core import new_array_object
+from dask_awkward.core import new_array_object, typetracer_array
 from dask_awkward.io.io import from_map
 
 if TYPE_CHECKING:
-    from dask.delayed import Delayed
     from fsspec.spec import AbstractFileSystem
 
     from dask_awkward.core import Array
 
 
-__all__ = ["from_json"]
+__all__ = ("from_json",)
 
 
-class FromJsonWrapper:
+class _FromJsonFn:
     def __init__(
         self,
         *args: Any,
@@ -47,10 +45,10 @@ class FromJsonWrapper:
 
     @abc.abstractmethod
     def __call__(self, source: Any) -> ak.Array:
-        pass  # pragma: no cover
+        ...
 
 
-class FromJsonLineDelimitedWrapper(FromJsonWrapper):
+class _FromJsonLineDelimitedFn(_FromJsonFn):
     def __init__(
         self,
         *args: Any,
@@ -62,10 +60,10 @@ class FromJsonLineDelimitedWrapper(FromJsonWrapper):
 
     def __call__(self, source: str) -> ak.Array:
         with self.storage.open(source, mode="rt", compression=self.compression) as f:
-            return ak.from_json(f.read())
+            return ak.from_json(f.read(), line_delimited=True)
 
 
-class FromJsonSingleObjInFileWrapper(FromJsonWrapper):
+class _FromJsonSingleObjInFileFn(_FromJsonFn):
     def __init__(
         self,
         *args: Any,
@@ -76,14 +74,13 @@ class FromJsonSingleObjInFileWrapper(FromJsonWrapper):
         super().__init__(*args, storage=storage, compression=compression, **kwargs)
 
     def __call__(self, source: str) -> ak.Array:
-        with self.storage.open(source, mode="r", compression=self.compression) as f:
-            return ak.Array([json.load(f)])
+        with self.storage.open(source, mode="rb", compression=self.compression) as f:
+            return ak.from_json(f)
 
 
-def _from_json_bytes(source) -> ak.Array:
-    return ak.from_iter(
-        json.loads(ch) for ch in io.TextIOWrapper(io.BytesIO(source)) if ch
-    )
+class _FromJsonBytesFn:
+    def __call__(self, source: bytes) -> ak.Array:
+        return ak.from_json(source, line_delimited=True)
 
 
 def derive_json_meta(
@@ -101,8 +98,8 @@ def derive_json_meta(
     bytechunks = parse_bytes(bytechunks)
 
     if one_obj_per_file:
-        fn = FromJsonSingleObjInFileWrapper(storage=storage, compression=compression)
-        return ak.Array(fn(source).layout.typetracer.forget_length())
+        fn = _FromJsonSingleObjInFileFn(storage=storage, compression=compression)
+        return typetracer_array(fn(source))
 
     # when the data is uncompressed we read `bytechunks` number of
     # bytes then split on a newline bytes, and use the first
@@ -111,7 +108,7 @@ def derive_json_meta(
         try:
             bytes = storage.cat(source, start=0, end=bytechunks)
             lines = [json.loads(ln) for ln in bytes.split(b"\n")[:sample_rows]]
-            return ak.Array(ak.from_iter(lines).layout.typetracer.forget_length())
+            return typetracer_array(ak.from_iter(lines))
         except ValueError:
             # we'll get a ValueError if we can't decode the JSON from
             # the bytes that we grabbed.
@@ -131,11 +128,102 @@ def derive_json_meta(
             lines.append(json.loads(line))
             if i >= sample_rows:
                 break
-        return ak.Array(ak.from_iter(lines).layout.typetracer.forget_length())
+        return typetracer_array(ak.from_iter(lines))
+
+
+def _from_json_files(
+    *,
+    urlpath: str | list[str],
+    one_obj_per_file: bool = False,
+    compression: str | None = "infer",
+    meta: ak.Array | None = None,
+    derive_meta_kwargs: dict[str, Any] | None = None,
+    storage_options: dict[str, Any] | None = None,
+) -> Array:
+    fs, fstoken, urlpaths = fsspec.get_fs_token_paths(
+        urlpath,
+        mode="rb",
+        storage_options=storage_options,
+    )
+    if meta is None:
+        meta_read_kwargs = derive_meta_kwargs or {}
+        meta = derive_json_meta(
+            fs,
+            urlpaths[0],
+            one_obj_per_file=one_obj_per_file,
+            **meta_read_kwargs,
+        )
+
+    token = tokenize(fstoken, one_obj_per_file, compression, meta)
+
+    if compression == "infer":
+        compression = infer_compression(urlpaths[0])
+
+    if one_obj_per_file:
+        f: _FromJsonFn = _FromJsonSingleObjInFileFn(
+            storage=fs,
+            compression=compression,
+        )
+    else:
+        f = _FromJsonLineDelimitedFn(storage=fs, compression=compression)
+
+    return from_map(f, urlpaths, label="from-json", token=token, meta=meta)
+
+
+def _from_json_bytes(
+    *,
+    urlpath: str | list[str],
+    blocksize: int | str,
+    delimiter: Any,
+    meta: ak.Array | None,
+    storage_options: dict[str, Any] | None,
+) -> Array:
+    token = tokenize(urlpath, delimiter, blocksize, meta)
+    name = f"from-json-{token}"
+    storage_options = storage_options or {}
+    _, bytechunks = read_bytes(
+        urlpath,
+        delimiter=delimiter,
+        blocksize=blocksize,
+        sample="0",
+        **storage_options,
+    )
+    flat_chunks = list(flatten(bytechunks))
+    f = _FromJsonBytesFn()
+    dsk = {
+        (name, i): (f, delayed_chunk.key) for i, delayed_chunk in enumerate(flat_chunks)
+    }
+    deps = flat_chunks
+    n = len(deps)
+
+    # doesn't work because flat_chunks elements are remaining delayed objects.
+    # return from_map(
+    #     _from_json_bytes,
+    #     flat_chunks,
+    #     label="from-json",
+    #     token=token,
+    #     produces_tasks=True,
+    #     deps=flat_chunks,
+    # )
+
+    hlg = HighLevelGraph.from_collections(name, dsk, dependencies=deps)
+    return new_array_object(hlg, name, meta=meta, npartitions=n)
 
 
 def from_json(
     urlpath: str | list[str],
+    # line_delimited: bool = False,
+    # schema: Any | None = None,
+    # nan_string: str | None = None,
+    # posinf_string: str | None = None,
+    # neginf_string: str | None = None,
+    # complex_record_fields: tuple[str, str] | None = None,
+    # buffersize: int = 65536,
+    # initial: int = 1024,
+    # resize: float = 1.5,
+    highlevel: bool = True,
+    behavior: dict | None = None,
+    *,
     blocksize: int | str | None = None,
     delimiter: bytes | None = None,
     one_obj_per_file: bool = False,
@@ -153,7 +241,7 @@ def from_json(
        This method assumes newline characters are not embedded in JSON
        values.
     2. Single JSON object per file (this requires `one_obj_per_file`
-       to be set to ``True``.
+       to be set to ``True``. These objects *must* be arrays.
     3. Reading some number of bytes at a time. If at least one of
        `blocksize` or `delimiter` are defined, Dask's
        :py:func:`~dask.bytes.read_bytes` function will be used to
@@ -186,6 +274,8 @@ def from_json(
     derive_meta_kwargs : dict[str, Any], optional
         Dictionary of arguments to be passed to `derive_json_meta` for
         determining the collection metadata if `meta` is ``None``.
+    storage_options : dict[str, Any], optional
+        Storage options passed to fsspec.
 
     Returns
     -------
@@ -211,6 +301,9 @@ def from_json(
 
     """
 
+    if not highlevel:
+        raise ValueError("dask-awkward only supports highlevel awkward Arrays.")
+
     # allow either blocksize or delimieter being not-None to trigger
     # line deliminated JSON reading.
     if blocksize is not None and delimiter is None:
@@ -222,69 +315,26 @@ def from_json(
     # read a single file or a list of files. The list of files are
     # expected to be line delimited (one JSON object per line)
     if delimiter is None and blocksize is None:
-        fs, fstoken, urlpaths = fsspec.get_fs_token_paths(
-            urlpath,
-            mode="rb",
+        return _from_json_files(
+            urlpath=urlpath,
+            one_obj_per_file=one_obj_per_file,
+            compression=compression,
+            meta=meta,
+            derive_meta_kwargs=derive_meta_kwargs,
             storage_options=storage_options,
         )
-        if meta is None:
-            meta_read_kwargs = derive_meta_kwargs or {}
-            meta = derive_json_meta(
-                fs,
-                urlpaths[0],
-                one_obj_per_file=one_obj_per_file,
-                **meta_read_kwargs,
-            )
-
-        token = tokenize(fstoken, one_obj_per_file, compression, meta)
-        name = f"from-json-{token}"
-
-        if compression == "infer":
-            compression = infer_compression(urlpaths[0])
-
-        if one_obj_per_file:
-            f: FromJsonWrapper = FromJsonSingleObjInFileWrapper(
-                storage=fs,
-                compression=compression,
-            )
-        else:
-            f = FromJsonLineDelimitedWrapper(storage=fs, compression=compression)
-
-        return from_map(f, urlpaths, label="from-json", meta=meta)
 
     # if a `delimiter` and `blocksize` are defined we use Dask's
     # `read_bytes` function to get delayed chunks of bytes.
     elif delimiter is not None and blocksize is not None:
-        token = tokenize(urlpath, delimiter, blocksize, meta)
-        name = f"from-json-{token}"
-        storage_options = storage_options or {}
-        _, bytechunks = read_bytes(
-            urlpath,
+        return _from_json_bytes(
+            urlpath=urlpath,
             delimiter=delimiter,
-            blocksize=blocksize,  # type: ignore
-            sample=None,  # type: ignore
-            **storage_options,
+            blocksize=blocksize,
+            meta=meta,
+            storage_options=storage_options,
         )
-        flat_chunks: list[Delayed] = list(flatten(bytechunks))
-        dsk = {
-            (name, i): (_from_json_bytes, delayed_chunk.key)
-            for i, delayed_chunk in enumerate(flat_chunks)
-        }
-        deps = flat_chunks
-        n = len(deps)
 
-        # doesn't work because flat_chunks elements are remaining delayed objects.
-        # return from_map(
-        #     _from_json_bytes,
-        #     flat_chunks,
-        #     label="from-json",
-        #     token=token,
-        #     produces_tasks=True,
-        #     deps=flat_chunks,
-        # )
-
+    # otherwise the arguments are bad
     else:
         raise TypeError("Incompatible combination of arguments.")  # pragma: no cover
-
-    hlg = HighLevelGraph.from_collections(name, dsk, dependencies=deps)
-    return new_array_object(hlg, name, meta=meta, npartitions=n)

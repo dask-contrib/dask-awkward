@@ -1,9 +1,77 @@
 [build-system]
-requires = [
-    "setuptools>=45.0",
-    "setuptools_scm[toml]>=4.2.0"
+requires = ["hatchling>=1.8.0", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dask-awkward"
+description = "Awkward Array meets Dask"
+readme = "README.md"
+license = "BSD-3-Clause"
+requires-python = ">=3.8"
+authors = [
+    { name = "Doug Davis", email = "ddavis@ddavis.io" },
+    { name = "Martin Durant", email = "mdurant@anaconda.com" },
 ]
-build-backend = "setuptools.build_meta"
+maintainers = [
+    { name = "Doug Davis", email = "ddavis@ddavis.io" },
+    { name = "Martin Durant", email = "mdurant@anaconda.com" },
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "awkward>=1.9.0rc12",
+    "dask>=2022.01.0",
+]
+dynamic = [
+    "version",
+]
+
+[project.urls]
+Homepage = "https://github.com/ContinuumIO/dask-awkward"
+"Bug Tracker" = "https://github.com/ContinuumIO/dask-awkward/issues"
+
+[project.optional-dependencies]
+complete = [
+    "pyarrow",
+    "pytest >=6.0",
+    "pytest-cov >=3.0.0",
+    "requests >=2.27.1",
+]
+docs = [
+    "dask-sphinx-theme >=3.0.2",
+    "pyarrow",
+    "pytest >=6.0",
+    "pytest-cov >=3.0.0",
+    "requests >=2.27.1",
+]
+io = [
+    "pyarrow",
+]
+test = [
+    "pyarrow",
+    "pytest >=6.0",
+    "pytest-cov >=3.0.0",
+    "requests >=2.27.1",
+]
+
+
+[tool.hatch.version]
+source = "vcs"
+path = "src/dask_awkward/__init__.py"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/dask_awkward/version.py"
+
+[tool.hatch.build.targets.sdist]
+include = ["/src"]
 
 [tool.setuptools_scm]
 write_to = "src/dask_awkward/_version.py"
@@ -11,8 +79,17 @@ write_to = "src/dask_awkward/_version.py"
 [tool.pytest.ini_options]
 minversion = "6.0"
 testpaths = ["tests"]
-addopts = ["-v", "-ra", "--showlocals", "--strict-markers", "--strict-config"]
+addopts = [
+    "-v",
+    "-ra",
+    "--showlocals",
+    "--strict-markers",
+    "--strict-config",
+]
 log_cli_level = "DEBUG"
+filterwarnings = [
+    "ignore:There is no current event loop",
+]
 
 [tool.isort]
 profile = "black"
@@ -21,9 +98,16 @@ src_paths = ["src", "tests"]
 
 [tool.mypy]
 python_version = "3.8"
-files = ["src"]
+files = ["src", "tests"]
 warn_unused_configs = true
 show_error_codes = true
+allow_incomplete_defs = false
+allow_untyped_decorators = false
+ignore_missing_imports = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_unreachable = true
 
 [[tool.mypy.overrides]]
 module = ["awkward.*"]

@@ -33,9 +33,9 @@ objects from the namespaces:
    from awkward import Array
 
 In written descriptions, we'll sometimes refer to the awkward-array
-``Array`` object as a "materialized array", or an "eager array". The
-dask-awkward object will be referred to as a "lazy array" or an "array
-collection."
+``Array`` object as a "concrete array", "materialized array", or an
+"eager array". The dask-awkward object will be referred to as an
+"array collection" or a "lazy array".
 
 Finally, the result of calling the ``compute()`` method on a
 ``dak.Array`` object will almost always result in an ``ak.Array``
