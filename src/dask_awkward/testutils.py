@@ -47,7 +47,6 @@ def assert_eq_arrays(
     a: Array | ak.Array,
     b: Array | ak.Array,
     check_forms: bool = True,
-    check_unconcat_form: bool = True,
     check_divisions: bool = True,
     scheduler: Any | None = None,
 ) -> None:
@@ -56,6 +55,8 @@ def assert_eq_arrays(
     b_is_coll = is_dask_collection(b)
     a_comp = a.compute(scheduler=scheduler) if a_is_coll else a
     b_comp = b.compute(scheduler=scheduler) if b_is_coll else b
+    a_comp_form = a_comp.layout.form
+    b_comp_form = b_comp.layout.form
 
     a_tt = typetracer_array(a)
     b_tt = typetracer_array(b)
@@ -63,45 +64,9 @@ def assert_eq_arrays(
     assert b_tt is not None
 
     if check_forms:
-        # the idempotent concatenation of the typetracers for both a
-        # and b yield the same form.
-        a_concated_form = idempotent_concatenate(a_tt).layout.form
-        b_concated_form = idempotent_concatenate(b_tt).layout.form
-        assert a_concated_form == b_concated_form
-
-        # if a is a collection with multiple partitions its computed
-        # form should be the same as the concated version
-        if a_is_coll and a.npartitions > 1:
-            assert a_comp.layout.form == a_concated_form
-
-        # if a is a collection with a _single_ partition then we don't
-        # have to use the concated typetracer.
-        elif a_is_coll and a.npartitions == 1:
-            assert a_comp.layout.form == a_tt.layout.form
-
-        # if b is a collection with multiple partitions its computed
-        # form should be the same the concated version
-        if b_is_coll and b.npartitions > 1:
-            assert b_comp.layout.form == b_concated_form
-
-        # if b is a collection with a _single_ partition then we don't
-        # have to use the concated typetracer.
-        elif b_is_coll and b.npartitions == 1:
-            assert b_comp.layout.form == b_tt.layout.form
-
-    if check_unconcat_form:
-        # check the unconcatenated versions as well; a single
-        # partition does not have the concatenation effect.
-        if a_is_coll and not b_is_coll:
-            assert (
-                b_tt.layout.form
-                == a.partitions[0].compute(scheduler=scheduler).layout.form
-            )
-        if not a_is_coll and b_is_coll:
-            assert (
-                a_tt.layout.form
-                == b.partitions[0].compute(scheduler=scheduler).layout.form
-            )
+        assert a_comp_form == a.layout.form
+        assert a_comp_form == b.layout.form
+        assert b_comp_form == a_comp_form
 
     if check_divisions:
         # check divisions if both collections

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import abc
-import io
 import warnings
 from typing import TYPE_CHECKING, Any
 
@@ -23,7 +22,6 @@ from dask_awkward.core import new_array_object, typetracer_array
 from dask_awkward.io.io import from_map
 
 if TYPE_CHECKING:
-    from dask.delayed import Delayed
     from fsspec.spec import AbstractFileSystem
 
     from dask_awkward.core import Array
@@ -47,7 +45,7 @@ class _FromJsonFn:
 
     @abc.abstractmethod
     def __call__(self, source: Any) -> ak.Array:
-        pass  # pragma: no cover
+        ...
 
 
 class _FromJsonLineDelimitedFn(_FromJsonFn):
@@ -62,7 +60,7 @@ class _FromJsonLineDelimitedFn(_FromJsonFn):
 
     def __call__(self, source: str) -> ak.Array:
         with self.storage.open(source, mode="rt", compression=self.compression) as f:
-            return ak.from_json(f.read())
+            return ak.from_json(f.read(), line_delimited=True)
 
 
 class _FromJsonSingleObjInFileFn(_FromJsonFn):
@@ -76,15 +74,13 @@ class _FromJsonSingleObjInFileFn(_FromJsonFn):
         super().__init__(*args, storage=storage, compression=compression, **kwargs)
 
     def __call__(self, source: str) -> ak.Array:
-        with self.storage.open(source, mode="r", compression=self.compression) as f:
-            return ak.Array([json.load(f)])
+        with self.storage.open(source, mode="rb", compression=self.compression) as f:
+            return ak.from_json(f)
 
 
 class _FromJsonBytesFn:
     def __call__(self, source: bytes) -> ak.Array:
-        return ak.from_iter(
-            json.loads(ch) for ch in io.TextIOWrapper(io.BytesIO(source)) if ch
-        )
+        return ak.from_json(source, line_delimited=True)
 
 
 def derive_json_meta(
@@ -189,10 +185,10 @@ def _from_json_bytes(
         urlpath,
         delimiter=delimiter,
         blocksize=blocksize,
-        sample=None,
+        sample="0",
         **storage_options,
     )
-    flat_chunks: list[Delayed] = list(flatten(bytechunks))
+    flat_chunks = list(flatten(bytechunks))
     f = _FromJsonBytesFn()
     dsk = {
         (name, i): (f, delayed_chunk.key) for i, delayed_chunk in enumerate(flat_chunks)
@@ -216,6 +212,18 @@ def _from_json_bytes(
 
 def from_json(
     urlpath: str | list[str],
+    # line_delimited: bool = False,
+    # schema: Any | None = None,
+    # nan_string: str | None = None,
+    # posinf_string: str | None = None,
+    # neginf_string: str | None = None,
+    # complex_record_fields: tuple[str, str] | None = None,
+    # buffersize: int = 65536,
+    # initial: int = 1024,
+    # resize: float = 1.5,
+    highlevel: bool = True,
+    behavior: dict | None = None,
+    *,
     blocksize: int | str | None = None,
     delimiter: bytes | None = None,
     one_obj_per_file: bool = False,
@@ -233,7 +241,7 @@ def from_json(
        This method assumes newline characters are not embedded in JSON
        values.
     2. Single JSON object per file (this requires `one_obj_per_file`
-       to be set to ``True``.
+       to be set to ``True``. These objects *must* be arrays.
     3. Reading some number of bytes at a time. If at least one of
        `blocksize` or `delimiter` are defined, Dask's
        :py:func:`~dask.bytes.read_bytes` function will be used to
@@ -292,6 +300,9 @@ def from_json(
     ... )
 
     """
+
+    if not highlevel:
+        raise ValueError("dask-awkward only supports highlevel awkward Arrays.")
 
     # allow either blocksize or delimieter being not-None to trigger
     # line deliminated JSON reading.

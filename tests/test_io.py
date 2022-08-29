@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import awkward._v2 as ak
-import fsspec
 import pytest
 from dask.array.utils import assert_eq as da_assert_eq
 from dask.delayed import delayed
@@ -40,9 +39,7 @@ def test_json_one_obj_per_file(single_record_file: str) -> None:
         [single_record_file] * 5,
         one_obj_per_file=True,
     )
-    with fsspec.open(single_record_file, "r") as f:
-        content = json.load(f)
-    caa = ak.from_iter([content] * 5)
+    caa = ak.concatenate([ak.from_json(Path(single_record_file))] * 5)
     assert_eq(daa, caa)
 
 
@@ -182,7 +179,7 @@ def test_from_map_with_args_kwargs() -> None:
 
 def test_from_map_pack_single_iterable(ndjson_points_file: str) -> None:
     def g(fname, c=1):
-        return ak.from_json(Path(fname).read_text()).points.x * c
+        return ak.from_json(Path(fname).read_text(), line_delimited=True).points.x * c
 
     n = 3
     c = 2
@@ -190,7 +187,7 @@ def test_from_map_pack_single_iterable(ndjson_points_file: str) -> None:
     fmt = "{t}\n" * n
     jsontext = fmt.format(t=Path(ndjson_points_file).read_text())
     x = dak.from_map(g, [ndjson_points_file] * n, c=c)
-    y = ak.from_json(jsontext).points.x * c
+    y = ak.from_json(jsontext, line_delimited=True).points.x * c
     assert_eq(x, y)
 
 

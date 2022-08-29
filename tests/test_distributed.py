@@ -36,7 +36,7 @@ from dask_awkward.testutils import assert_eq
 
 
 def test_compute(loop, ndjson_points_file):  # noqa
-    caa = ak.from_json(Path(ndjson_points_file).read_text())
+    caa = ak.from_json(Path(ndjson_points_file).read_text(), line_delimited=True)
     with cluster() as (s, [a, b]):
         with Client(s["address"], loop=loop) as client:
             daa = dak.from_json([ndjson_points_file])
@@ -63,7 +63,9 @@ async def test_compute_gen_cluster(
 ):
     files = [ndjson_points_file] * 3
     daa = dak.from_json(files)
-    caa = ak.concatenate([ak.from_json(Path(f).read_text()) for f in files])
+    caa = ak.concatenate(
+        [ak.from_json(Path(f).read_text(), line_delimited=True) for f in files]
+    )
     res = await c.compute(
         dak.num(daa.points.x, axis=1),
         optimize_graph=optimize_graph,
@@ -74,14 +76,14 @@ async def test_compute_gen_cluster(
 def test_from_delayed(loop, ndjson_points_file):  # noqa
     def make_a_concrete(file: str) -> ak.Array:
         with open(file) as f:
-            return ak.from_json(f.read())
+            return ak.from_json(f.read(), line_delimited=True)
 
     with cluster() as (s, [a, b]):
         with Client(s["address"], loop=loop) as client:
             make_a_delayed = delayed(make_a_concrete, pure=True)
             x = dak.from_delayed([make_a_delayed(f) for f in [ndjson_points_file] * 3])
             y = ak.concatenate([make_a_concrete(f) for f in [ndjson_points_file] * 3])
-            assert_eq(x, y, scheduler=client, check_unconcat_form=False)
+            assert_eq(x, y, scheduler=client)
 
 
 from awkward._v2.behaviors.mixins import mixin_class as ak_mixin_class
