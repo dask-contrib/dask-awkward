@@ -15,7 +15,7 @@ from dask_awkward.io.io import (
     to_delayed,
 )
 from dask_awkward.io.json import from_json
-from dask_awkward.parquet import read_parquet, to_parquet
+from dask_awkward.io.parquet import read_parquet, to_parquet
 from dask_awkward.reducers import (
     all,
     any,
