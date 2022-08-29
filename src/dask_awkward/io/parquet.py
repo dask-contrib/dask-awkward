@@ -9,7 +9,7 @@ import numpy as np
 import pyarrow
 import pyarrow.dataset as pa_ds
 import pyarrow.parquet as pq
-from awkward._v2.operations.convert import from_arrow, from_buffers, to_arrow_table
+from awkward._v2.operations import from_arrow, from_buffers, to_arrow_table
 from dask.base import tokenize
 from dask.blockwise import BlockIndex
 from dask.highlevelgraph import HighLevelGraph, MaterializedLayer
