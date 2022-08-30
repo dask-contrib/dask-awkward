@@ -137,7 +137,7 @@ def _read_metadata(path, fs, partition_base_dir=None, schema=None):
     )
 
 
-def read_parquet(
+def from_parquet(
     path,
     storage_options=None,
     ignore_metadata=False,
