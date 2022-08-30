@@ -30,7 +30,7 @@ class _FromParquetFn:
         ...
 
 
-class _FromParquetFileWise(_FromParquetFn):
+class _FromParquetFileWiseFn(_FromParquetFn):
     def __init__(self, fs, columns, filters, metadata):
         super().__init__(columns=columns, filters=filters, metadata=metadata)
         self.fs = fs
@@ -45,7 +45,7 @@ class _FromParquetFileWise(_FromParquetFn):
         )
 
 
-class _FromParquetFragmentWise(_FromParquetFn):
+class _FromParquetFragmentWiseFn(_FromParquetFn):
     def __init__(self, columns, filters, metadata):
         super().__init__(columns=columns, filters=filters, metadata=metadata)
 
@@ -270,7 +270,7 @@ def from_parquet(
     # file-wise
     if split_row_groups is False:
         return from_map(
-            _FromParquetFileWise(
+            _FromParquetFileWiseFn(
                 fs,
                 columns,
                 filters,
@@ -296,7 +296,7 @@ def from_parquet(
             itertools.accumulate([rg.num_rows for rg in rgs], operator.add)
         )
         return from_map(
-            _FromParquetFragmentWise(
+            _FromParquetFragmentWiseFn(
                 columns,
                 filters,
                 metadata,
