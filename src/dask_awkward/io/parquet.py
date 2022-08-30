@@ -1,8 +1,8 @@
+import abc
 import itertools
 import math
 import operator
 
-import awkward._v2 as ak
 import awkward._v2.forms as forms
 import fsspec
 import numpy as np
@@ -12,10 +12,50 @@ import pyarrow.parquet as pq
 from awkward._v2.operations import from_arrow, from_buffers, to_arrow_table
 from dask.base import tokenize
 from dask.blockwise import BlockIndex
-from dask.highlevelgraph import HighLevelGraph, MaterializedLayer
+from dask.highlevelgraph import HighLevelGraph
 from fsspec.core import get_fs_token_paths
 
-from dask_awkward.core import map_partitions, new_array_object, new_scalar_object
+from dask_awkward.core import map_partitions, new_scalar_object, typetracer_array
+from dask_awkward.io.io import from_map
+
+
+class _FromParquetFn:
+    def __init__(self, columns=None, filters=None, metadata=None):
+        self.columns = columns
+        self.filters = filters
+        self.metadata = metadata
+
+    @abc.abstractmethod
+    def __call__(self, source):
+        ...
+
+
+class _FromParquetFileWise(_FromParquetFn):
+    def __init__(self, fs, columns, filters, metadata):
+        super().__init__(columns=columns, filters=filters, metadata=metadata)
+        self.fs = fs
+
+    def __call__(self, source):
+        return _file_to_partition(
+            source,
+            self.fs,
+            self.columns,
+            self.filters,
+            self.metadata.schema,
+        )
+
+
+class _FromParquetFragmentWise(_FromParquetFn):
+    def __init__(self, columns, filters, metadata):
+        super().__init__(columns=columns, filters=filters, metadata=metadata)
+
+    def __call__(self, fragment):
+        return _fragment_to_partition(
+            fragment,
+            self.columns,
+            self.filters,
+            self.metadata.schema,
+        )
 
 
 def _parquet_schema_to_form(schema):
@@ -145,7 +185,8 @@ def from_parquet(
     filters=None,
     split_row_groups=None,
 ):
-    """
+    """Read parquet dataset into awkward array collection.
+
     url: str
         location of data, including protocol
     storage_options: dict
@@ -163,9 +204,9 @@ def from_parquet(
     fs, tok, paths = get_fs_token_paths(
         path, mode="rb", storage_options=storage_options
     )
-    name = "read-parquet-" + tokenize(
-        tok, ignore_metadata, columns, filters, split_row_groups
-    )
+    label = "read-parquet"
+    token = tokenize(tok, ignore_metadata, columns, filters, split_row_groups)
+
     if len(paths) == 1:
         path = paths[0]
         # single file or directory
@@ -226,15 +267,22 @@ def from_parquet(
         buffer_key="",
     )
 
+    # file-wise
     if split_row_groups is False:
-        # file-wise
-        dsk = {
-            (name, i): (_file_to_partition, path, fs, columns, filters, metadata.schema)
-            for i, path in enumerate(allfiles)
-        }
-        divisions = (None,) * (len(dsk) + 1)
+        return from_map(
+            _FromParquetFileWise(
+                fs,
+                columns,
+                filters,
+                metadata,
+            ),
+            allfiles,
+            label=label,
+            token=token,
+            meta=typetracer_array(meta),
+        )
+    # row-group wise
     else:
-        # organise row-groups into fragments
         frags = list(metadata.get_fragments())
         rgs = sum((frag.row_groups for frag in frags), [])
         frags2 = sum(
@@ -244,21 +292,21 @@ def from_parquet(
             ),
             [],
         )
-        dsk = {
-            (name, i): (_fragment_to_partition, frag, columns, filters, metadata.schema)
-            for i, frag in enumerate(frags2)
-        }
         divisions = [0] + list(
             itertools.accumulate([rg.num_rows for rg in rgs], operator.add)
         )
-    arr = new_array_object(
-        HighLevelGraph.from_collections(name, MaterializedLayer(dsk)),
-        name=name,
-        meta=ak.Array(meta.layout.typetracer),
-        divisions=divisions,
-    )
-
-    return arr
+        return from_map(
+            _FromParquetFragmentWise(
+                columns,
+                filters,
+                metadata,
+            ),
+            frags2,
+            label=label,
+            token=token,
+            divisions=tuple(divisions),
+            meta=typetracer_array(meta),
+        )
 
 
 def _frag_subset(old_frag, row_groups):
@@ -384,7 +432,7 @@ def _write_partition(
         return []
 
 
-class WritePartitionWrapper:
+class _ToParquetFn:
     def __init__(
         self,
         fs,
@@ -447,7 +495,7 @@ def to_parquet(data, path, storage_options=None, write_metadata=False, compute=T
     name = f"write-parquet-{tokenize(fs, data, path)}"
 
     map_res = map_partitions(
-        WritePartitionWrapper(fs, path=path, npartitions=data.npartitions),
+        _ToParquetFn(fs, path=path, npartitions=data.npartitions),
         data,
         BlockIndex((data.npartitions,)),
         label="to-parquet",
