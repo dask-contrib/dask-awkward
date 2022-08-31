@@ -8,12 +8,12 @@ import awkward._v2 as ak
 import numpy as np
 from awkward._v2.types.numpytype import primitive_to_dtype
 from dask.base import flatten, tokenize
-from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
 from dask.highlevelgraph import HighLevelGraph
 from dask.utils import funcname
 
 from dask_awkward.core import map_partitions, new_array_object, typetracer_array
-from dask_awkward.utils import LazyInputsDict, empty_typetracer
+from dask_awkward.layers import AwkwardIOLayer
+from dask_awkward.utils import empty_typetracer
 
 if TYPE_CHECKING:
     from dask.array.core import Array as DaskArray
@@ -461,27 +461,20 @@ def from_map(
 
     # Define io_func
     if packed or args or kwargs:
-        io_func: Callable = _PackedArgCallable(
+        func: Callable = _PackedArgCallable(
             func,
             args=args,
             kwargs=kwargs,
             packed=packed,
         )
     else:
-        io_func = func
+        func = func
 
-    io_arg_map = BlockwiseDepDict(
-        mapping=LazyInputsDict(inputs),  # type: ignore
-        produces_tasks=produces_tasks,
-    )
-
-    dsk = Blockwise(
-        output=name,
-        output_indices="i",
-        dsk={name: (io_func, blockwise_token(0))},
-        indices=[(io_arg_map, "i")],
-        numblocks={},
-        annotations=None,
+    dsk = AwkwardIOLayer(
+        name=name,
+        columns=None,
+        inputs=inputs,
+        io_func=func,
     )
 
     hlg = HighLevelGraph.from_collections(name, dsk)
