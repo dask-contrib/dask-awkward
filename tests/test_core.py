@@ -55,7 +55,7 @@ def test_calculate_known_divisions(ndjson_points_file: str) -> None:
     assert calculate_known_divisions(daa) == target
     assert calculate_known_divisions(daa.points) == target
     assert calculate_known_divisions(daa.points.x) == target
-    assert calculate_known_divisions(daa["points"]["y"]) == target  # type: ignore
+    assert calculate_known_divisions(daa["points"]["y"]) == target
     daa = dak.from_json([ndjson_points_file] * 3)
     daa.eager_compute_divisions()
     assert daa.known_divisions
@@ -146,7 +146,7 @@ def test_partitions_divisions(ndjson_points_file: str) -> None:
     assert not t1.known_divisions
     t2 = daa.partitions[1]
     assert t2.known_divisions
-    assert t2.divisions == (0, divs[2] - divs[1])  # type: ignore
+    assert t2.divisions == (0, divs[2] - divs[1])
 
 
 def test_raise_in_finalize(daa: Array) -> None:

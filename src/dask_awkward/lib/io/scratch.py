@@ -31,11 +31,11 @@ __all__ = (
 
 class _BaseFromParquetFn:
     @abc.abstractmethod
-    def project_columns(columns):
+    def project_columns(self, columns: list[str]) -> Any:
         ...
 
     @abc.abstractmethod
-    def __call__(*args, **kwargs):
+    def __call__(self, source: Any) -> ak.Array:
         ...
 
 
@@ -52,7 +52,7 @@ class _FromParquetFn(_BaseFromParquetFn):
         self.columns = columns
         self.kwargs = kwargs
 
-    def project_columns(self, columns):
+    def project_columns(self, columns: list[str]) -> _BaseFromParquetFn:
         return _FromParquetFn(
             fs=self.fs,
             columns=columns,

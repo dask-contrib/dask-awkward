@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from typing import Any, Callable, TypeVar
+from collections.abc import Callable, Mapping
+from typing import Any
 
 from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
 
 from dask_awkward.utils import LazyInputsDict
-
-AwkwardIOLayerT = TypeVar("AwkwardIOLayerT", bound="AwkwardIOLayer")
 
 
 class AwkwardIOLayer(Blockwise):
@@ -19,7 +18,7 @@ class AwkwardIOLayer(Blockwise):
         label: str | None = None,
         produces_tasks: bool = False,
         creation_info: dict | None = None,
-        annotations: dict | None = None,
+        annotations: Mapping[str, Any] | None = None,
     ) -> None:
         self.name = name
         self._columns = columns
@@ -48,9 +47,9 @@ class AwkwardIOLayer(Blockwise):
     def columns(self) -> Any:
         return self._columns
 
-    def project_columns(self, columns: list[str]) -> AwkwardIOLayerT:
+    def project_columns(self, columns: list[str]) -> AwkwardIOLayer:
         if hasattr(self.io_func, "is_parquet_read"):
-            io_func = self.io_func.project_columns(columns)
+            io_func = self.io_func.project_columns(columns)  # type: ignore
         else:
             io_func = self.io_func
 
