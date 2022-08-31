@@ -307,42 +307,7 @@ def from_dask_array(array: DaskArray) -> Array:
         return new_array_object(hlg, name, divisions=divs, meta=meta)
 
 
-# class AwkwardIOLayer(Blockwise):
-#     def __init__(
-#         self,
-#         name: str,
-#         inputs: Any,
-#         io_func: Callable,
-#         label: str | None = None,
-#         produces_tasks: bool = False,
-#         creation_info: dict | None = None,
-#         annotations: dict | None = None,
-#     ):
-#         self.name = name
-#         self.inputs = inputs
-#         self.io_func = io_func
-#         self.label = label
-#         self.produces_tasks = produces_tasks
-#         self.annotations = annotations
-#         self.creation_info = creation_info
-
-#         io_arg_map = BlockwiseDepDict(
-#             mapping=LazyInputsDict(self.inputs),  # type: ignore
-#             produces_tasks=self.produces_tasks,
-#         )
-
-#         dsk = {self.name: (io_func, blockwise_token(0))}
-#         super().__init__(
-#             output=self.name,
-#             output_indices="i",
-#             dsk=dsk,
-#             indices=[(io_arg_map, "i")],
-#             numblocks={},
-#             annotations=annotations,
-#         )
-
-
-class _PackedArgCallable:
+class PackedArgCallable:
     """Wrap a callable such that packed arguments can be unrolled.
 
     Inspired by dask.dataframe.io.io._PackedArgCallable.
@@ -461,7 +426,7 @@ def from_map(
 
     # Define io_func
     if packed or args or kwargs:
-        func = _PackedArgCallable(
+        func = PackedArgCallable(
             func,
             args=args,
             kwargs=kwargs,

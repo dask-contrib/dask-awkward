@@ -13,7 +13,13 @@ dask.config.update_defaults(defaults)
 dask.config.update_defaults(
     {
         "distributed": {
-            "scheduler": {"allowed-imports": ["dask", "distributed", "dask_awkward"]}
+            "scheduler": {
+                "allowed-imports": [
+                    "dask",
+                    "distributed",
+                    "dask_awkward",
+                ]
+            }
         }
     }
 )
