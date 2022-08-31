@@ -1,4 +1,6 @@
-from typing import Any, Callable, TypeVar, overload
+from __future__ import annotations
+
+from typing import Any, Callable, TypeVar
 
 from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
 
@@ -42,23 +44,8 @@ class AwkwardIOLayer(Blockwise):
             annotations=None,
         )
 
-    @overload
     @property
-    def columns(self) -> str:
-        ...
-
-    @overload
-    @property
-    def columns(self) -> list[str]:
-        ...
-
-    @overload
-    @property
-    def columns(self) -> None:
-        ...
-
-    @property
-    def columns(self):
+    def columns(self) -> Any:
         return self._columns
 
     def project_columns(self, columns: list[str]) -> AwkwardIOLayerT:

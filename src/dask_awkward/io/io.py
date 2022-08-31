@@ -461,14 +461,12 @@ def from_map(
 
     # Define io_func
     if packed or args or kwargs:
-        func: Callable = _PackedArgCallable(
+        func = _PackedArgCallable(
             func,
             args=args,
             kwargs=kwargs,
             packed=packed,
         )
-    else:
-        func = func
 
     dsk = AwkwardIOLayer(
         name=name,
