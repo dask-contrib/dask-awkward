@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import abc
 import math
 from typing import TYPE_CHECKING, Any
 
@@ -28,15 +29,41 @@ __all__ = (
 )
 
 
-class _FromParquetFn:
-    def __init__(self, *, storage: AbstractFileSystem, **kwargs: Any) -> None:
-        self.fs = storage
+class _BaseFromParquetFn:
+    @abc.abstractmethod
+    def project_columns(columns):
+        ...
+
+    @abc.abstractmethod
+    def __call__(*args, **kwargs):
+        ...
+
+
+class _FromParquetFn(_BaseFromParquetFn):
+    def __init__(
+        self,
+        *,
+        fs: AbstractFileSystem,
+        columns: Any = None,
+        **kwargs: Any,
+    ) -> None:
+        self.is_parquet_read = 1
+        self.fs = fs
+        self.columns = columns
         self.kwargs = kwargs
+
+    def project_columns(self, columns):
+        return _FromParquetFn(
+            fs=self.fs,
+            columns=columns,
+            **self.kwargs,
+        )
 
     def __call__(self, source: Any) -> ak.Array:
         source = fsspec.utils._unstrip_protocol(source, self.fs)
         return ak.from_parquet(
             source,
+            columns=self.columns,
             storage_options=self.fs.storage_options,
             **self.kwargs,
         )
@@ -54,7 +81,7 @@ def from_parquet(
     )
 
     return from_map(
-        _FromParquetFn(storage=fs, **kwargs),
+        _FromParquetFn(fs=fs, **kwargs),
         paths,
         label="from-parquet",
         token=tokenize(urlpath, meta, token),

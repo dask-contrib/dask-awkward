@@ -49,4 +49,18 @@ class AwkwardIOLayer(Blockwise):
         return self._columns
 
     def project_columns(self, columns: list[str]) -> AwkwardIOLayerT:
-        pass
+        if hasattr(self.io_func, "is_parquet_read"):
+            io_func = self.io_func.project_columns(columns)
+        else:
+            io_func = self.io_func
+
+        return AwkwardIOLayer(
+            name=self.name,
+            columns=columns,
+            inputs=self.inputs,
+            io_func=io_func,
+            label=self.label,
+            produces_tasks=self.produces_tasks,
+            creation_info=self.creation_info,
+            annotations=self.annotations,
+        )
