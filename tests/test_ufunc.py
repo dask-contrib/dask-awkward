@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 import dask_awkward as dak
-from dask_awkward.testutils import assert_eq
+from dask_awkward.lib.testutils import assert_eq
 
 
 def test_ufunc_add(daa: dak.Array, caa: ak.Array) -> None:

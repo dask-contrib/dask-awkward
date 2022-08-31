@@ -13,7 +13,7 @@ except ImportError:
     import json  # type: ignore
 
 import dask_awkward as dak
-from dask_awkward.testutils import assert_eq
+from dask_awkward.lib.testutils import assert_eq
 
 
 def test_force_by_lines_meta(ndjson_points_file: str) -> None:

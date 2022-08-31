@@ -16,7 +16,7 @@ except ImportError:
 import sys
 
 import dask_awkward as dak
-from dask_awkward.core import (
+from dask_awkward.lib.core import (
     Record,
     Scalar,
     calculate_known_divisions,
@@ -26,13 +26,14 @@ from dask_awkward.core import (
     meta_or_identity,
     new_array_object,
     new_known_scalar,
+    normalize_single_outer_inner_index,
     to_meta,
     typetracer_array,
 )
-from dask_awkward.testutils import assert_eq
+from dask_awkward.lib.testutils import assert_eq
 
 if TYPE_CHECKING:
-    from dask_awkward.core import Array
+    from dask_awkward.lib.core import Array
 
 
 def test_clear_divisions(ndjson_points_file: str) -> None:
@@ -89,8 +90,6 @@ def test_from_awkward(caa: ak.Array, nparts: int) -> None:
 
 
 def test_compute_typetracer(daa: Array) -> None:
-    from dask_awkward.core import new_array_object
-
     tt = compute_typetracer(daa.dask, daa.name)
     daa2 = new_array_object(daa.dask, daa.name, meta=tt, divisions=daa.divisions)
     assert_eq(daa, daa2)
@@ -420,3 +419,39 @@ def test_iter(daa: Array) -> None:
     ):
         for a in daa:
             pass
+
+
+def test_normalize_single_outer_inner_index() -> None:
+    divisions = (0, 12, 14, 20, 23, 24)
+    indices = [0, 1, 2, 8, 12, 13, 14, 15, 17, 20, 21, 22]
+    results = [
+        (0, 0),
+        (0, 1),
+        (0, 2),
+        (0, 8),
+        (1, 0),
+        (1, 1),
+        (2, 0),
+        (2, 1),
+        (2, 3),
+        (3, 0),
+        (3, 1),
+        (3, 2),
+    ]
+    for i, r in zip(indices, results):
+        res = normalize_single_outer_inner_index(divisions, i)
+        assert r == res
+
+    divisions = (0, 12)  # type: ignore
+    indices = [0, 2, 3, 6, 8, 11]
+    results = [
+        (0, 0),
+        (0, 2),
+        (0, 3),
+        (0, 6),
+        (0, 8),
+        (0, 11),
+    ]
+    for i, r in zip(indices, results):
+        res = normalize_single_outer_inner_index(divisions, i)
+        assert r == res

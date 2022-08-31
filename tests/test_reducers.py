@@ -4,7 +4,7 @@ import awkward._v2 as ak
 import pytest
 
 import dask_awkward as dak
-from dask_awkward.testutils import assert_eq
+from dask_awkward.lib.testutils import assert_eq
 
 
 @pytest.mark.parametrize("axis", [1, -1])

@@ -21,7 +21,7 @@ from distributed.utils_test import (  # noqa
 )
 
 import dask_awkward as dak
-from dask_awkward.testutils import assert_eq
+from dask_awkward.lib.testutils import assert_eq
 
 # @pytest.fixture(scope="session")
 # def small_cluster():
