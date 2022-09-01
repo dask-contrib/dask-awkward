@@ -507,7 +507,9 @@ def zip(
         raise ValueError("Only highlevel=True is supported")
 
     if not isinstance(arrays, dict):
-        raise DaskAwkwardNotImplemented("ak.zip only supports dictionary inputs.")
+        raise DaskAwkwardNotImplemented(
+            "dask_awkward.zip only supports dictionary inputs."
+        )
 
     keys, colls, metadict = [], [], {}
     for k, coll in arrays.items():
