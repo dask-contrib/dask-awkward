@@ -10,7 +10,7 @@ import fsspec
 import pytest
 
 import dask_awkward as dak
-import dask_awkward.testutils as daktu
+import dask_awkward.lib.testutils as daktu
 
 
 @pytest.fixture(scope="session")

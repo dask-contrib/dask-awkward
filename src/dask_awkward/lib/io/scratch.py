@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import abc
 import math
 from typing import TYPE_CHECKING, Any
 
@@ -14,13 +15,13 @@ from dask.base import tokenize
 from dask.blockwise import BlockIndex
 from dask.highlevelgraph import HighLevelGraph
 
-from dask_awkward.core import map_partitions, new_scalar_object
-from dask_awkward.io.io import from_map
+from dask_awkward.lib.core import map_partitions, new_scalar_object
+from dask_awkward.lib.io.io import from_map
 
 if TYPE_CHECKING:
     from fsspec.spec import AbstractFileSystem
 
-    from dask_awkward.core import Array, Scalar
+    from dask_awkward.lib.core import Array, Scalar
 
 __all__ = (
     "from_parquet",
@@ -28,15 +29,41 @@ __all__ = (
 )
 
 
-class _FromParquetFn:
-    def __init__(self, *, storage: AbstractFileSystem, **kwargs: Any) -> None:
-        self.fs = storage
+class _BaseFromParquetFn:
+    @abc.abstractmethod
+    def project_columns(self, columns: list[str]) -> Any:
+        ...
+
+    @abc.abstractmethod
+    def __call__(self, source: Any) -> ak.Array:
+        ...
+
+
+class _FromParquetFn(_BaseFromParquetFn):
+    def __init__(
+        self,
+        *,
+        fs: AbstractFileSystem,
+        columns: Any = None,
+        **kwargs: Any,
+    ) -> None:
+        self.is_parquet_read = 1
+        self.fs = fs
+        self.columns = columns
         self.kwargs = kwargs
+
+    def project_columns(self, columns: list[str]) -> _BaseFromParquetFn:
+        return _FromParquetFn(
+            fs=self.fs,
+            columns=columns,
+            **self.kwargs,
+        )
 
     def __call__(self, source: Any) -> ak.Array:
         source = fsspec.utils._unstrip_protocol(source, self.fs)
         return ak.from_parquet(
             source,
+            columns=self.columns,
             storage_options=self.fs.storage_options,
             **self.kwargs,
         )
@@ -54,7 +81,7 @@ def from_parquet(
     )
 
     return from_map(
-        _FromParquetFn(storage=fs, **kwargs),
+        _FromParquetFn(fs=fs, **kwargs),
         paths,
         label="from-parquet",
         token=tokenize(urlpath, meta, token),

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 import awkward._v2 as ak
 import numpy as np
 
-from dask_awkward.core import (
+from dask_awkward.lib.core import (
     Array,
     map_partitions,
     new_known_scalar,

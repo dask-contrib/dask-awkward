@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dask_awkward.core import Array, Record
+from dask_awkward.lib.core import Array, Record
 
 
 def fields(collection: Array | Record) -> list[str] | None:

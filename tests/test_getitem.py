@@ -7,9 +7,9 @@ import awkward._v2 as ak
 import pytest
 
 import dask_awkward as dak
-import dask_awkward.core as dakc
-from dask_awkward.core import DaskAwkwardNotImplemented, IncompatiblePartitions
-from dask_awkward.testutils import assert_eq
+import dask_awkward.lib.core as dakc
+from dask_awkward.lib.core import DaskAwkwardNotImplemented, IncompatiblePartitions
+from dask_awkward.lib.testutils import assert_eq
 
 
 def test_getattr_raise(daa: dak.Array) -> None:

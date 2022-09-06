@@ -24,15 +24,13 @@ from dask.utils import IndexCallable, funcname, key_split
 from numpy.lib.mixins import NDArrayOperatorsMixin
 from tlz import first
 
-from dask_awkward.optimize import basic_optimize
+from dask_awkward.lib.optimize import basic_optimize
 from dask_awkward.typing import AwkwardDaskCollection
 from dask_awkward.utils import (
     DaskAwkwardNotImplemented,
     IncompatiblePartitions,
-    empty_typetracer,
     hyphenize,
     is_empty_slice,
-    normalize_single_outer_inner_index,
 )
 
 if TYPE_CHECKING:
@@ -1015,17 +1013,17 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             List of delayed objects (one per partition).
 
         """
-        from dask_awkward.io.io import to_delayed
+        from dask_awkward.lib.io.io import to_delayed
 
         return to_delayed(self, optimize_graph=optimize_graph)
 
     def to_dask_array(self) -> DaskArray:
-        from dask_awkward.io.io import to_dask_array
+        from dask_awkward.lib.io.io import to_dask_array
 
         return to_dask_array(self)
 
     def to_dask_bag(self) -> DaskBag:
-        from dask_awkward.io.io import to_dask_bag
+        from dask_awkward.lib.io.io import to_dask_bag
 
         return to_dask_bag(self)
 
@@ -1699,6 +1697,19 @@ def compatible_partitions(*args: Array) -> bool:
     return True
 
 
+def empty_typetracer() -> ak.Array:
+    """Instantiate a typetracer array with unknown length.
+
+    Returns
+    -------
+    ak.Array
+        Length-less typetracer array (content-less array).
+
+    """
+    a = ak.Array([])
+    return ak.Array(a.layout.typetracer.forget_length())
+
+
 class _BehaviorMethodFn:
     def __init__(self, attr: str, **kwargs: Any) -> None:
         self.attr = attr
@@ -1714,3 +1725,43 @@ class _BehaviorPropertyFn:
 
     def __call__(self, coll: ak.Array) -> ak.Array:
         return getattr(coll, self.attr)
+
+
+def normalize_single_outer_inner_index(
+    divisions: tuple[int, ...], index: int
+) -> tuple[int, int]:
+    """Determine partition index and inner index for some divisions.
+
+    Parameters
+    ----------
+    divisions : tuple[int, ...]
+        The divisions of a Dask awkward collection.
+    index : int
+        The overall index (for the complete collection).
+
+    Returns
+    -------
+    partition_index : int
+        Which partition in the collection.
+    new_index : int
+        Which inner index in the determined partition.
+
+    Examples
+    --------
+    >>> from dask_awkward.utils import normalize_single_outer_inner_index
+    >>> divisions = (0, 3, 6, 9)
+    >>> normalize_single_outer_inner_index(divisions, 0)
+    (0, 0)
+    >>> normalize_single_outer_inner_index(divisions, 5)
+    (1, 2)
+    >>> normalize_single_outer_inner_index(divisions, 8)
+    (2, 2)
+
+    """
+    if index < 0:
+        index = divisions[-1] + index
+    if len(divisions) == 2:
+        return (0, index)
+    partition_index = int(np.digitize(index, divisions)) - 1
+    new_index = index - divisions[partition_index]
+    return (partition_index, new_index)

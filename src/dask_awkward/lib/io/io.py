@@ -8,19 +8,23 @@ import awkward._v2 as ak
 import numpy as np
 from awkward._v2.types.numpytype import primitive_to_dtype
 from dask.base import flatten, tokenize
-from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
 from dask.highlevelgraph import HighLevelGraph
 from dask.utils import funcname
 
-from dask_awkward.core import map_partitions, new_array_object, typetracer_array
-from dask_awkward.utils import LazyInputsDict, empty_typetracer
+from dask_awkward.layers import AwkwardIOLayer
+from dask_awkward.lib.core import (
+    empty_typetracer,
+    map_partitions,
+    new_array_object,
+    typetracer_array,
+)
 
 if TYPE_CHECKING:
     from dask.array.core import Array as DaskArray
     from dask.bag.core import Bag as DaskBag
     from dask.delayed import Delayed
 
-    from dask_awkward.core import Array
+    from dask_awkward.lib.core import Array
 
 
 class _FromAwkwardFn:
@@ -307,42 +311,7 @@ def from_dask_array(array: DaskArray) -> Array:
         return new_array_object(hlg, name, divisions=divs, meta=meta)
 
 
-# class AwkwardIOLayer(Blockwise):
-#     def __init__(
-#         self,
-#         name: str,
-#         inputs: Any,
-#         io_func: Callable,
-#         label: str | None = None,
-#         produces_tasks: bool = False,
-#         creation_info: dict | None = None,
-#         annotations: dict | None = None,
-#     ):
-#         self.name = name
-#         self.inputs = inputs
-#         self.io_func = io_func
-#         self.label = label
-#         self.produces_tasks = produces_tasks
-#         self.annotations = annotations
-#         self.creation_info = creation_info
-
-#         io_arg_map = BlockwiseDepDict(
-#             mapping=LazyInputsDict(self.inputs),  # type: ignore
-#             produces_tasks=self.produces_tasks,
-#         )
-
-#         dsk = {self.name: (io_func, blockwise_token(0))}
-#         super().__init__(
-#             output=self.name,
-#             output_indices="i",
-#             dsk=dsk,
-#             indices=[(io_arg_map, "i")],
-#             numblocks={},
-#             annotations=annotations,
-#         )
-
-
-class _PackedArgCallable:
+class PackedArgCallable:
     """Wrap a callable such that packed arguments can be unrolled.
 
     Inspired by dask.dataframe.io.io._PackedArgCallable.
@@ -461,27 +430,18 @@ def from_map(
 
     # Define io_func
     if packed or args or kwargs:
-        io_func: Callable = _PackedArgCallable(
+        func = PackedArgCallable(
             func,
             args=args,
             kwargs=kwargs,
             packed=packed,
         )
-    else:
-        io_func = func
 
-    io_arg_map = BlockwiseDepDict(
-        mapping=LazyInputsDict(inputs),  # type: ignore
-        produces_tasks=produces_tasks,
-    )
-
-    dsk = Blockwise(
-        output=name,
-        output_indices="i",
-        dsk={name: (io_func, blockwise_token(0))},
-        indices=[(io_arg_map, "i")],
-        numblocks={},
-        annotations=None,
+    dsk = AwkwardIOLayer(
+        name=name,
+        columns=None,
+        inputs=inputs,
+        io_func=func,
     )
 
     hlg = HighLevelGraph.from_collections(name, dsk)

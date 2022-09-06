@@ -18,8 +18,8 @@ from dask.highlevelgraph import HighLevelGraph
 from dask.utils import parse_bytes
 from fsspec.utils import infer_compression
 
-from dask_awkward.core import new_array_object, typetracer_array
-from dask_awkward.io.io import from_map
+from dask_awkward.lib.core import new_array_object, typetracer_array
+from dask_awkward.lib.io.io import from_map
 
 if TYPE_CHECKING:
     from fsspec.spec import AbstractFileSystem
