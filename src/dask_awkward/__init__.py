@@ -14,6 +14,6 @@ original = dir()
 
 
 def __dir__():
-    import dask_awkward.lib
+    import dask_awkward.lib  # pragma: no cover
 
-    return original + dir(dask_awkward.lib)
+    return original + dir(dask_awkward.lib)  # pragma: no cover
