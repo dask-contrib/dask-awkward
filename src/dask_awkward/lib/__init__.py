@@ -13,6 +13,7 @@ from dask_awkward.lib.io.io import (
     to_delayed,
 )
 from dask_awkward.lib.io.json import from_json
+from dask_awkward.lib.io.parquet import from_parquet, to_parquet
 from dask_awkward.lib.reducers import (
     all,
     any,
