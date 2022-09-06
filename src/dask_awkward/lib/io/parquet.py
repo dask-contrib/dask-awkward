@@ -15,8 +15,8 @@ from dask.blockwise import BlockIndex
 from dask.highlevelgraph import HighLevelGraph
 from fsspec.core import get_fs_token_paths
 
-from dask_awkward.core import map_partitions, new_scalar_object, typetracer_array
-from dask_awkward.io.io import from_map
+from dask_awkward.lib.core import map_partitions, new_scalar_object, typetracer_array
+from dask_awkward.lib.io.io import from_map
 
 
 class _FromParquetFn:
