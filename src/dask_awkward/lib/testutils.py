@@ -39,10 +39,6 @@ def assert_eq(
         assert_eq_other(a, b, scheduler=scheduler, **kwargs)
 
 
-def idempotent_concatenate(x: ak.Array) -> ak.Array:
-    return ak.concatenate([x, x[0:0]])
-
-
 def assert_eq_arrays(
     a: Array | ak.Array,
     b: Array | ak.Array,

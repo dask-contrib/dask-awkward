@@ -1,9 +1,9 @@
 [run]
 omit =
-     src/dask_awkward/io/scratch.py
+     src/dask_awkward/lib/io/scratch.py
      src/dask_awkward/tests/test_*.py
      src/dask_awkward/tests/__init__.py
-     src/dask_awkward/_version.py
+     src/dask_awkward/version.py
 source =
      src/dask_awkward
 
