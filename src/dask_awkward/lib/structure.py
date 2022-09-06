@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 import awkward._v2 as ak
 import numpy as np
 
-from dask_awkward.core import (
+from dask_awkward.lib.core import (
     Array,
     map_partitions,
     new_known_scalar,
@@ -507,7 +507,9 @@ def zip(
         raise ValueError("Only highlevel=True is supported")
 
     if not isinstance(arrays, dict):
-        raise DaskAwkwardNotImplemented("ak.zip only supports dictionary inputs.")
+        raise DaskAwkwardNotImplemented(
+            "dask_awkward.zip only supports dictionary inputs."
+        )
 
     keys, colls, metadict = [], [], {}
     for k, coll in arrays.items():

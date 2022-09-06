@@ -6,8 +6,8 @@ from typing import Any
 import awkward._v2 as ak
 from dask.base import is_dask_collection
 
-from dask_awkward.core import Array, Record, typetracer_array
-from dask_awkward.io.io import from_lists
+from dask_awkward.lib.core import Array, Record, typetracer_array
+from dask_awkward.lib.io.io import from_lists
 
 _RG = random.Random(414)
 

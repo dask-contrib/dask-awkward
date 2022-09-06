@@ -5,11 +5,11 @@ from typing import TYPE_CHECKING, Any
 import awkward._v2 as ak
 import numpy as np
 
-from dask_awkward.core import map_partitions, pw_reduction_with_agg_to_scalar
+from dask_awkward.lib.core import map_partitions, pw_reduction_with_agg_to_scalar
 from dask_awkward.utils import DaskAwkwardNotImplemented, borrow_docstring
 
 if TYPE_CHECKING:
-    from dask_awkward.core import Array
+    from dask_awkward.lib.core import Array
 
 __all__ = (
     "all",
