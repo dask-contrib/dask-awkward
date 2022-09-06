@@ -1,6 +1,9 @@
 from dask_awkward import config  # isort:skip; load awkward config
 
 
+from dask_awkward.version import __version__
+
+
 def __getattr__(value):
     import dask_awkward.lib
 
