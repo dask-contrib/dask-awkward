@@ -15,7 +15,7 @@ from dask.base import tokenize
 from dask.blockwise import BlockIndex
 from dask.highlevelgraph import HighLevelGraph
 
-from dask_awkward.lib.core import map_partitions, new_scalar_object
+from dask_awkward.lib.core import map_partitions, new_scalar_object, typetracer_array
 from dask_awkward.lib.io.io import from_map
 
 if TYPE_CHECKING:
@@ -71,6 +71,7 @@ class _FromParquetFn(_BaseFromParquetFn):
 
 def from_parquet(
     urlpath: str | list[str],
+    columns: list[str] | None = None,
     meta: ak.Array | None = None,
     storage_options: dict[str, Any] | None = None,
     **kwargs: Any,
@@ -80,11 +81,16 @@ def from_parquet(
         storage_options=storage_options,
     )
 
+    fn = _FromParquetFn(fs=fs, columns=columns, **kwargs)
+    meta = typetracer_array(fn(paths[0]))
+    token = tokenize(urlpath, columns, meta, token)
+
     return from_map(
-        _FromParquetFn(fs=fs, **kwargs),
+        fn,
         paths,
         label="from-parquet",
-        token=tokenize(urlpath, meta, token),
+        token=token,
+        meta=meta,
     )
 
 

@@ -6,6 +6,8 @@ from dask.blockwise import fuse_roots, optimize_blockwise
 from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
 
+from dask_awkward.layers import AwkwardIOLayer
+
 
 def basic_optimize(
     dsk: Mapping,
@@ -26,3 +28,9 @@ def basic_optimize(
     dsk = fuse_roots(dsk, keys=keys)  # type: ignore
 
     return dsk
+
+
+def get_io_layers(collection):
+    return [
+        k for k, v in collection.dask.layers.items() if isinstance(v, AwkwardIOLayer)
+    ]

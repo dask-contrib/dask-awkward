@@ -19,6 +19,7 @@ class AwkwardIOLayer(Blockwise):
         produces_tasks: bool = False,
         creation_info: dict | None = None,
         annotations: Mapping[str, Any] | None = None,
+        meta: Any | None = None,
     ) -> None:
         self.name = name
         self._columns = columns
@@ -28,6 +29,7 @@ class AwkwardIOLayer(Blockwise):
         self.produces_tasks = produces_tasks
         self.annotations = annotations
         self.creation_info = creation_info
+        self._meta = meta
 
         io_arg_map = BlockwiseDepDict(
             mapping=LazyInputsDict(self.inputs),  # type: ignore
