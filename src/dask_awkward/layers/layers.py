@@ -50,9 +50,11 @@ class AwkwardIOLayer(Blockwise):
         return self._columns
 
     def to_mock(self):
-        return AwkwardMockIOLayer(
+        return AwkwardIOLayer(
             name=self.name,
             columns=self.columns,
+            inputes={},
+            function=lambda *_, **__: self._meta,
             label=self.label,
             produces_tasks=self.produces_tasks,
             creation_info=self.creation_info,
@@ -75,58 +77,4 @@ class AwkwardIOLayer(Blockwise):
             produces_tasks=self.produces_tasks,
             creation_info=self.creation_info,
             annotations=self.annotations,
-        )
-
-
-class AwkwardMockIOLayer(AwkwardIOLayer):
-    def __init__(
-        self,
-        name: str,
-        columns: str | list[str] | None,
-        label: str | None = None,
-        produces_tasks: bool = False,
-        creation_info: dict | None = None,
-        annotations: Mapping[str, Any] | None = None,
-        meta: Any | None = None,
-    ) -> None:
-        self.name = name
-        self._columns = columns
-        self.inputs = {}
-        self.label = label
-        self.produces_tasks = produces_tasks
-        self.annotations = annotations
-        self.creation_info = creation_info
-        self._meta = meta
-
-        io_arg_map = BlockwiseDepDict(  # => {} ?
-            mapping={},  # type: ignore
-            produces_tasks=self.produces_tasks,
-        )
-
-        super().__init__(
-            output=self.name,
-            output_indices="i",
-            dsk={name: (self.get_meta, blockwise_token(0))},
-            indices=[(io_arg_map, "i")],
-            numblocks={},
-            annotations=None,
-        )
-
-    def get_meta(self, *_, **__):
-        return self._meta[self.columns]
-
-    @property
-    def columns(self) -> Any:
-        return self._columns
-
-    def project_columns(self, columns: list[str]) -> AwkwardMockIOLayer:
-
-        return AwkwardMockIOLayer(
-            name=self.name,
-            columns=columns,
-            label=self.label,
-            produces_tasks=self.produces_tasks,
-            creation_info=self.creation_info,
-            annotations=self.annotations,
-            meta=self._meta,
         )
