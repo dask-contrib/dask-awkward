@@ -30,7 +30,10 @@ def basic_optimize(
     return dsk
 
 
-def get_io_layers(collection):
-    return [
-        k for k, v in collection.dask.layers.items() if isinstance(v, AwkwardIOLayer)
-    ]
+def mocked(hlg: HighLevelGraph) -> HighLevelGraph:
+    layers = hlg.layers.copy()
+    deps = hlg.dependencies.copy()
+    io_layer_names = [k for k, v in hlg.layers.items() if isinstance(v, AwkwardIOLayer)]
+    io_layer_name = io_layer_names[0]
+    layers[io_layer_name] = layers[io_layer_name].to_mock()
+    return HighLevelGraph(layers, deps)
