@@ -49,7 +49,7 @@ def _attempt_compute_with_columns(collection: Array, columns: list[str]) -> None
         HighLevelGraph(layers, deps),
         collection.name,
         meta=collection._meta,
-        divisions=collection.divisions,
+        divisions=(None, None),
     ).compute()
 
 
