@@ -10,7 +10,7 @@ from dask.highlevelgraph import HighLevelGraph
 from dask_awkward.layers import AwkwardIOLayer
 
 if TYPE_CHECKING:
-    from dask.typing import HLGDaskCollection
+    from dask_awkward.lib.core import Array
 
 
 def basic_optimize(
@@ -34,52 +34,41 @@ def basic_optimize(
     return dsk
 
 
-def fun(
-    collection: HLGDaskCollection,
-    columns: list[str] | None = None,
-) -> HighLevelGraph:
-    from dask_awkward.lib.core import new_array_object
-
+def _attempt_compute_with_columns(collection: Array, columns: list[str]) -> None:
     hlg = collection.__dask_graph__()
     layers = hlg.layers.copy()
     deps = hlg.dependencies.copy()
     io_layer_names = [k for k, v in hlg.layers.items() if isinstance(v, AwkwardIOLayer)]
     top_io_layer_name = io_layer_names[0]
-    if columns is not None:
-        layers[top_io_layer_name] = layers[top_io_layer_name].project_and_mock(columns)
-    else:
-        layers[top_io_layer_name] = layers[top_io_layer_name].mock()
 
-    return new_array_object(
+    layers[top_io_layer_name] = layers[top_io_layer_name].project_and_mock(columns)
+
+    from dask_awkward.lib.core import new_array_object
+
+    new_array_object(
         HighLevelGraph(layers, deps),
         collection.name,
         meta=collection._meta,
         divisions=collection.divisions,
-    )
+    ).compute()
 
 
-def column_projection(collection):
-
-    hlg = collection.__dask_graph__()
-    layers = hlg.layers.copy()
-
-    for k, v in layers.items():
+def _necessary_columns(collection: Array) -> list[str]:
+    # staring fields should be those belonging to the AwkwardIOLayer's
+    # metadata (typetracer) array.
+    for k, v in collection.__dask_graph__().layers.items():
         if isinstance(v, AwkwardIOLayer):
             fields = v._meta.fields
             break
 
     keep = []
-
     for f in fields:
-
         holdout = f
         allfields = set(fields)
         remaining = list(allfields - {f})
-
         try:
-            fun(collection, columns=remaining).compute()
+            _attempt_compute_with_columns(collection, columns=remaining)
         except IndexError:
-            print(f"I think we should keep {holdout}")
             keep.append(holdout)
 
-    print(keep)
+    return keep
