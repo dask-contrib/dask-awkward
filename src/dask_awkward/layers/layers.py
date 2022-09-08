@@ -53,7 +53,7 @@ class AwkwardIOLayer(Blockwise):
         return AwkwardIOLayer(
             name=self.name,
             columns=self.columns,
-            inputes={},
+            inputs=[],
             io_func=lambda *_, **__: self._meta,
             label=self.label,
             produces_tasks=self.produces_tasks,
