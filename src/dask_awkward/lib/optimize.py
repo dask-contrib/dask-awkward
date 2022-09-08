@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Hashable, Mapping
-from typing import TYPE_CHECKING
+from typing import Any
 
 from dask.blockwise import fuse_roots, optimize_blockwise
 from dask.core import flatten
@@ -9,13 +9,11 @@ from dask.highlevelgraph import HighLevelGraph
 
 from dask_awkward.layers import AwkwardIOLayer
 
-if TYPE_CHECKING:
-    from dask_awkward.lib.core import Array
-
 
 def basic_optimize(
     dsk: Mapping,
     keys: Hashable | list[Hashable] | set[Hashable],
+    **kwargs: Any,
 ) -> Mapping:
     if not isinstance(keys, (list, set)):
         keys = (keys,)  # pragma: no cover
@@ -34,29 +32,24 @@ def basic_optimize(
     return dsk
 
 
-def _attempt_compute_with_columns(collection: Array, columns: list[str]) -> None:
-    hlg = collection.__dask_graph__()
-    layers = hlg.layers.copy()
-    deps = hlg.dependencies.copy()
-    io_layer_names = [k for k, v in hlg.layers.items() if isinstance(v, AwkwardIOLayer)]
+def _attempt_compute_with_columns(dsk: HighLevelGraph, columns: list[str]) -> None:
+    layers = dsk.layers.copy()
+    deps = dsk.dependencies.copy()
+    io_layer_names = [k for k, v in dsk.layers.items() if isinstance(v, AwkwardIOLayer)]
     top_io_layer_name = io_layer_names[0]
 
     layers[top_io_layer_name] = layers[top_io_layer_name].project_and_mock(columns)
 
-    from dask_awkward.lib.core import new_array_object
+    import dask.local
 
-    new_array_object(
-        HighLevelGraph(layers, deps),
-        collection.name,
-        meta=collection._meta,
-        divisions=(None, None),
-    ).compute()
+    new_hlg = HighLevelGraph(layers, deps)
+    dask.local.get_sync(new_hlg, list(new_hlg.keys()))
 
 
-def _necessary_columns(collection: Array) -> list[str]:
+def _necessary_columns(dsk: HighLevelGraph) -> list[str]:
     # staring fields should be those belonging to the AwkwardIOLayer's
     # metadata (typetracer) array.
-    for k, v in collection.__dask_graph__().layers.items():
+    for k, v in dsk.layers.items():
         if isinstance(v, AwkwardIOLayer):
             fields = v._meta.fields
             break
@@ -67,7 +60,7 @@ def _necessary_columns(collection: Array) -> list[str]:
         allfields = set(fields)
         remaining = list(allfields - {f})
         try:
-            _attempt_compute_with_columns(collection, columns=remaining)
+            _attempt_compute_with_columns(dsk, columns=remaining)
         except IndexError:
             keep.append(holdout)
 
