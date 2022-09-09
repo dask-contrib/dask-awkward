@@ -183,6 +183,7 @@ def from_parquet(
     ignore_metadata=False,
     columns=None,
     filters=None,
+    scan_files=False,
     split_row_groups=None,
 ):
     """Read parquet dataset into awkward array collection.
@@ -205,7 +206,9 @@ def from_parquet(
         path, mode="rb", storage_options=storage_options
     )
     label = "read-parquet"
-    token = tokenize(tok, ignore_metadata, columns, filters, split_row_groups)
+    token = tokenize(
+        tok, ignore_metadata, columns, filters, scan_files, split_row_groups
+    )
 
     if len(paths) == 1:
         path = paths[0]
