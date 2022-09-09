@@ -20,8 +20,12 @@ sample = (
 )
 
 
-def test_remote_single():
-    arr = dak.from_parquet(sample)
+@pytest.mark.parametrize("ignore_metadata", [True, False])
+@pytest.mark.parametrize("scan_files", [True, False])
+def test_remote_single(ignore_metadata, scan_files):
+    arr = dak.from_parquet(
+        sample, ignore_metadata=ignore_metadata, scan_files=scan_files
+    )
     assert arr.compute().to_list() == [
         {"u4": None, "u8": 1},
         {"u4": None, "u8": 2},
@@ -31,8 +35,12 @@ def test_remote_single():
     ]
 
 
-def test_remote_double():
-    arr = dak.from_parquet([sample, sample])
+@pytest.mark.parametrize("ignore_metadata", [True, False])
+@pytest.mark.parametrize("scan_files", [True, False])
+def test_remote_double(ignore_metadata, scan_files):
+    arr = dak.from_parquet(
+        [sample, sample], ignore_metadata=ignore_metadata, scan_files=scan_files
+    )
     assert arr.npartitions == 2
     assert (
         arr.compute().to_list()
@@ -47,40 +55,55 @@ def test_remote_double():
     )
 
 
-def test_dir_of_one_file(tmpdir):
+@pytest.mark.parametrize("ignore_metadata", [True, False])
+@pytest.mark.parametrize("scan_files", [True, False])
+def test_dir_of_one_file(tmpdir, ignore_metadata, scan_files):
     pad.write_dataset(ds, tmpdir, format="parquet")
-    arr = dak.from_parquet(tmpdir)
+    arr = dak.from_parquet(
+        tmpdir, ignore_metadata=ignore_metadata, scan_files=scan_files
+    )
     assert arr["arr"].compute().to_list() == data
 
 
-def test_dir_of_one_file_metadata(tmpdir):
+@pytest.mark.parametrize("ignore_metadata", [True, False])
+@pytest.mark.parametrize("scan_files", [True, False])
+def test_dir_of_one_file_metadata(tmpdir, ignore_metadata, scan_files):
     tmpdir = str(tmpdir)
 
     pad.write_dataset(ds, tmpdir, format="parquet")
     _metadata_file_from_data_files(["/".join([tmpdir, "part-0.parquet"])], fs, tmpdir)
 
-    arr = dak.from_parquet(tmpdir)
+    arr = dak.from_parquet(
+        tmpdir, ignore_metadata=ignore_metadata, scan_files=scan_files
+    )
     assert arr["arr"].compute().to_list() == data
 
 
-def test_dir_of_two_files(tmpdir):
+@pytest.mark.parametrize("ignore_metadata", [True, False])
+@pytest.mark.parametrize("scan_files", [True, False])
+def test_dir_of_two_files(tmpdir, ignore_metadata, scan_files):
     tmpdir = str(tmpdir)
     paths = ["/".join([tmpdir, _]) for _ in ["part-0.parquet", "part-1.parquet"]]
     pad.write_dataset(ds, tmpdir, format="parquet")
     fs.cp(paths[0], paths[1])
-    arr = dak.from_parquet(tmpdir)
+    arr = dak.from_parquet(
+        tmpdir, ignore_metadata=ignore_metadata, scan_files=scan_files
+    )
     assert arr["arr"].compute().to_list() == data * 2
 
 
 @pytest.mark.parametrize("ignore_metadata", [True, False])
-def test_dir_of_two_files_metadata(tmpdir, ignore_metadata):
+@pytest.mark.parametrize("scan_files", [True, False])
+def test_dir_of_two_files_metadata(tmpdir, ignore_metadata, scan_files):
     tmpdir = str(tmpdir)
     paths = ["/".join([tmpdir, _]) for _ in ["part-0.parquet", "part-1.parquet"]]
     pad.write_dataset(ds, tmpdir, format="parquet")
     fs.cp(paths[0], paths[1])
     _metadata_file_from_data_files(paths, fs, tmpdir)
 
-    arr = dak.from_parquet(tmpdir, ignore_metadata=ignore_metadata)
+    arr = dak.from_parquet(
+        tmpdir, ignore_metadata=ignore_metadata, scan_files=scan_files
+    )
     assert arr["arr"].compute().to_list() == data * 2
 
 
