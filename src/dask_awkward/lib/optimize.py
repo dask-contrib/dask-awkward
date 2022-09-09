@@ -22,6 +22,9 @@ def basic_optimize(
     if not isinstance(dsk, HighLevelGraph):
         dsk = HighLevelGraph.from_collections(id(dsk), dsk, dependencies=())
 
+    # our column optimization
+    dsk = optimize_columns(dsk, keys=keys)
+
     # Perform Blockwise optimizations for HLG input
     dsk = optimize_blockwise(dsk, keys=keys)
     # cull unncessary tasks
@@ -66,3 +69,22 @@ def _necessary_columns(dsk: HighLevelGraph) -> list[str]:
             keep.append(holdout)
 
     return keep
+
+
+def optimize_columns(
+    dsk: HighLevelGraph,
+    keys: Hashable | list[Hashable] | set[Hashable],
+) -> HighLevelGraph:
+    necessary_cols = _necessary_columns(dsk)
+
+    layers = dsk.layers.copy()
+    deps = dsk.dependencies.copy()
+    for k, v in dsk.layers.items():
+        if isinstance(v, AwkwardIOLayer):
+            new_layer = v.project_columns(necessary_cols)
+            io_layer_name = k
+            break
+
+    layers[io_layer_name] = new_layer
+
+    return HighLevelGraph(layers, deps)

@@ -53,9 +53,24 @@ class _FromParquetFn(_BaseFromParquetFn):
         self.kwargs = kwargs
 
     def project_columns(self, columns: list[str]) -> _BaseFromParquetFn:
+
+        # this commented section targets a scenario where we have to
+        # pass parquet columns to the parquet read function.
+        #
+        # ak_columns = meta.layout.form.columns()
+        # indicator = "list.item"
+        # pq_columns = meta.layout.form.columns(list_indicator=indicator)
+        # keep = [
+        #     pq_col
+        #     for pq_col, ak_col in zip(pq_columns, ak_columns)
+        #     if ak_col in columns
+        # ]
+
+        print(columns)
+
         return _FromParquetFn(
             fs=self.fs,
-            columns=columns,
+            columns=self.columns,
             **self.kwargs,
         )
 
