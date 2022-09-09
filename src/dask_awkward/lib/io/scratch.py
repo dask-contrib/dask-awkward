@@ -66,11 +66,9 @@ class _FromParquetFn(_BaseFromParquetFn):
         #     if ak_col in columns
         # ]
 
-        print(columns)
-
         return _FromParquetFn(
             fs=self.fs,
-            columns=self.columns,
+            columns=columns,
             **self.kwargs,
         )
 
