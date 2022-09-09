@@ -1782,3 +1782,14 @@ def normalize_single_outer_inner_index(
     partition_index = int(np.digitize(index, divisions)) - 1
     new_index = index - divisions[partition_index]
     return (partition_index, new_index)
+
+
+def typetracer_from_form(form) -> ak.Array:
+    return ak.Array(
+        ak.from_buffers(
+            form,
+            length=0,
+            container={"": b"\x00\x00\x00\x00\x00\x00\x00\x00"},
+            buffer_key="",
+        ).layout.typetracer.forget_length()
+    )

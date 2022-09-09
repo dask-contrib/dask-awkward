@@ -53,7 +53,7 @@ class AwkwardIOLayer(Blockwise):
         return AwkwardIOLayer(
             name=self.name,
             columns=self.columns,
-            inputs=[None] * len(self.inputs),
+            inputs=[None],
             io_func=lambda *_, **__: self._meta,
             label=self.label,
             produces_tasks=self.produces_tasks,
@@ -63,11 +63,19 @@ class AwkwardIOLayer(Blockwise):
         )
 
     def project_and_mock(self, columns: list[str]) -> AwkwardIOLayer:
+
+        # imported here because it this method should be run _only_ on
+        # the Client (which is allowed to import awkward)
+        from dask_awkward.lib.core import typetracer_from_form
+
+        new_meta = typetracer_from_form(
+            self._meta.layout.form.select_columns(columns),
+        )
         return AwkwardIOLayer(
             name=self.name,
             columns=self.columns,
-            inputs=[None] * len(self.inputs),
-            io_func=lambda *_, **__: self._meta[columns],
+            inputs=[None],
+            io_func=lambda *_, **__: new_meta,
             label=self.label,
             produces_tasks=self.produces_tasks,
             creation_info=self.creation_info,

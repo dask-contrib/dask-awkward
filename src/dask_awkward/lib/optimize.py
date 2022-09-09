@@ -33,16 +33,17 @@ def basic_optimize(
 
 
 def _attempt_compute_with_columns(dsk: HighLevelGraph, columns: list[str]) -> None:
+    import dask.local
+
     layers = dsk.layers.copy()
     deps = dsk.dependencies.copy()
     io_layer_names = [k for k, v in dsk.layers.items() if isinstance(v, AwkwardIOLayer)]
     top_io_layer_name = io_layer_names[0]
-
     layers[top_io_layer_name] = layers[top_io_layer_name].project_and_mock(columns)
-
-    import dask.local
-
-    new_hlg = HighLevelGraph(layers, deps)
+    # final necessary key is the 0th partition of the last layer in
+    # the graph (hence the toposort to find last layer).
+    final_key = (dsk._toposort_layers()[-1], 0)
+    new_hlg = HighLevelGraph(layers, deps).cull([final_key])
     dask.local.get_sync(new_hlg, list(new_hlg.keys()))
 
 
@@ -51,14 +52,14 @@ def _necessary_columns(dsk: HighLevelGraph) -> list[str]:
     # metadata (typetracer) array.
     for k, v in dsk.layers.items():
         if isinstance(v, AwkwardIOLayer):
-            fields = v._meta.fields
+            columns = v._meta.layout.form.columns()
             break
 
     keep = []
-    for f in fields:
-        holdout = f
-        allfields = set(fields)
-        remaining = list(allfields - {f})
+    for c in columns:
+        holdout = c
+        allcolumns = set(columns)
+        remaining = list(allcolumns - {holdout})
         try:
             _attempt_compute_with_columns(dsk, columns=remaining)
         except IndexError:
