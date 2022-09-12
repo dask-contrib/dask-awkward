@@ -9,7 +9,12 @@ import numpy as np
 import pyarrow
 import pyarrow.dataset as pa_ds
 import pyarrow.parquet as pq
-from awkward._v2.operations import from_arrow, from_buffers, to_arrow_table
+from awkward._v2.operations import (
+    ak_from_parquet,
+    from_arrow,
+    from_buffers,
+    to_arrow_table,
+)
 from dask.base import tokenize
 from dask.blockwise import BlockIndex
 from dask.highlevelgraph import HighLevelGraph
@@ -49,122 +54,13 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
     def __init__(self, columns, filters, metadata):
         super().__init__(columns=columns, filters=filters, metadata=metadata)
 
-    def __call__(self, fragment):
+    def __call__(self, rg):
         return _fragment_to_partition(
-            fragment,
+            rg,
             self.columns,
             self.filters,
             self.metadata.schema,
         )
-
-
-def _parquet_schema_to_form(schema):
-    """Helpre for arrow parq schema->ak form"""
-
-    def maybe_nullable(field, content):
-        if field.nullable:
-            if isinstance(content, forms.EmptyForm):
-                return forms.IndexedOptionForm(
-                    "i64",
-                    content,
-                    form_key="",
-                )
-            else:
-                return forms.ByteMaskedForm(
-                    "i8",
-                    content,
-                    valid_when=True,
-                    form_key="",
-                )
-        else:
-            return content
-
-    def contains_record(form):
-        if isinstance(form, forms.RecordForm):
-            return True
-        elif isinstance(form, forms.ListOffsetForm):
-            return contains_record(form.content)
-        else:
-            return False
-
-    def recurse(arrow_type, path):
-        if isinstance(arrow_type, pyarrow.StructType):
-            names = []
-            contents = []
-            for index in range(arrow_type.num_fields):
-                field = arrow_type[index]
-                names.append(field.name)
-                content = maybe_nullable(
-                    field, recurse(field.type, path + (field.name,))
-                )
-                contents.append(content)
-            assert len(contents) != 0
-            return forms.RecordForm(contents, names)
-
-        elif isinstance(arrow_type, pyarrow.ListType):
-            field = arrow_type.value_field
-            content = maybe_nullable(
-                field, recurse(field.type, path + ("list", "item"))
-            )
-            return forms.ListOffsetForm("i32", content, form_key="")
-
-        elif isinstance(arrow_type, pyarrow.LargeListType):
-            field = arrow_type.value_field
-            content = maybe_nullable(
-                field, recurse(field.type, path + ("list", "item"))
-            )
-            return forms.ListOffsetForm("i64", content, form_key="")
-
-        elif arrow_type == pyarrow.string():
-            return forms.ListOffsetForm(
-                "i32",
-                forms.NumpyForm("uint8"),
-                parameters={"__array__": "string"},
-                form_key="",
-            )
-
-        elif arrow_type == pyarrow.large_string():
-            return forms.ListOffsetForm(
-                "i64",
-                forms.NumpyForm("uint8"),
-                parameters={"__array__": "string"},
-                form_key="",
-            )
-
-        elif arrow_type == pyarrow.binary():
-            return forms.ListOffsetForm(
-                "i32",
-                forms.NumpyForm("uint8"),
-                parameters={"__array__": "bytestring"},
-                form_key="",
-            )
-
-        elif arrow_type == pyarrow.large_binary():
-            return forms.ListOffsetForm(
-                "i64",
-                forms.NumpyForm("uint8"),
-                parameters={"__array__": "bytestring"},
-                form_key="",
-            )
-
-        elif isinstance(arrow_type, pyarrow.DataType):
-            if arrow_type == pyarrow.null():
-                return forms.EmptyForm(form_key="")
-            else:
-                dtype = np.dtype(arrow_type.to_pandas_dtype())
-                # return forms.Form.from_numpy(dtype).with_form_key(col(path))
-                return forms.numpyform.NumpyForm(str(dtype))
-
-        else:
-            raise NotImplementedError
-
-    contents = []
-    for index, name in enumerate(schema.names):
-        field = schema.field(index)
-        content = maybe_nullable(field, recurse(field.type, (name,)))
-        contents.append(content)
-    assert len(contents) != 0
-    return forms.RecordForm(contents, schema.names)
 
 
 def _read_metadata(path, fs, partition_base_dir=None, schema=None):
@@ -180,7 +76,8 @@ def _read_metadata(path, fs, partition_base_dir=None, schema=None):
 def from_parquet(
     path,
     storage_options=None,
-    ignore_metadata=False,
+    ignore_metadata=True,
+    scan_files=False,
     columns=None,
     filters=None,
     scan_files=False,
@@ -196,11 +93,10 @@ def from_parquet(
         Select columns to load
     filters: list[list[tuple]]
         parquet-style filters for excluding row groups based on column statistics
-    split_row_groups: bool | int
+    split_row_groups: bool | None
         If True, each row group becomes a partition. If False, each file becomes
-        a partition. If int, at least this many row groups become a partition.
-        If None, the existence of a `_metadata` file implies True, else False.
-        The values True and 1 ar equivalent.
+        a partition. If None, the existence of a `_metadata` file and
+        ignore_metadata=False implies True, else False.
     """
     fs, tok, paths = get_fs_token_paths(
         path, mode="rb", storage_options=storage_options
@@ -210,68 +106,28 @@ def from_parquet(
         tok, ignore_metadata, columns, filters, scan_files, split_row_groups
     )
 
-    if len(paths) == 1:
-        path = paths[0]
-        # single file or directory
-        if not ignore_metadata and fs.isfile("/".join([path, "_metadata"])):
-            # dataset with global metadata
-            metadata = _read_metadata(path, fs)
-            if split_row_groups is None:
-                # default to one row-group per partition
-                split_row_groups = 1
-            elif split_row_groups is False:
-                # would need to pick out files from set of row-groups
-                raise NotImplementedError
-        elif fs.isfile(path):
-            # single file
-            metadata = _read_metadata(path, fs)
-            if split_row_groups is None:
-                # default to one row-group per partition
-                split_row_groups = 1
-            elif split_row_groups is False:
-                # would need to pick out files from set of row-groups
-                raise NotImplementedError
-        else:
-            # read dir as set of files
-            if split_row_groups is None:
-                # default to one file per partition
-                split_row_groups = False
-            allfiles = fs.find(path)
-            common_file = [f for f in allfiles if f.endswith("_common_metadata")]
-            allfiles = [f for f in allfiles if f.endswith(("parq", "parquet"))]
-            if split_row_groups is False:
-                # read whole files, no scan
-                # reproduce partitioning here?
-                if common_file:
-                    metadata = _read_metadata(common_file, fs)
-                else:
-                    metadata = _read_metadata(allfiles[0], fs)
-            else:
-                # metadata from all files
-                metadata = _read_metadata(allfiles, fs, partition_base_dir=path)
+    # same as ak_metadata_from_parquet
+    results = ak_from_parquet.metadata(
+        path,
+        storage_options,
+        row_groups=None,
+        columns=columns,
+        ignore_metadata=ignore_metadata,
+        scan_files=scan_files,
+    )
+    parquet_columns, subform, actual_paths, fs, subrg, row_counts, metadata = results
+    if split_row_groups is None:
+        split_row_groups = row_counts is not None and len(row_counts) > 1
 
-    else:
-        # list of data files
-        allfiles = paths
-        if split_row_groups is None:
-            # default to one file per partition
-            split_row_groups = False
-        if split_row_groups is False:
-            # metadata from first file
-            metadata = _read_metadata(paths[0], fs)
-        else:
-            metadata = _read_metadata(paths, fs)
-
-    form = _parquet_schema_to_form(metadata.schema)
     meta = from_buffers(
-        form,
+        subform,
         length=0,
         container={"": b"\x00\x00\x00\x00\x00\x00\x00\x00"},
         buffer_key="",
     )
 
-    # file-wise
     if split_row_groups is False:
+        # file-wise
         return from_map(
             _FromParquetFileWiseFn(
                 fs,
@@ -279,22 +135,15 @@ def from_parquet(
                 filters,
                 metadata,
             ),
-            allfiles,
+            actual_paths,
             label=label,
             token=token,
             meta=typetracer_array(meta),
         )
-    # row-group wise
     else:
-        frags = list(metadata.get_fragments())
-        rgs = sum((frag.row_groups for frag in frags), [])
-        frags2 = sum(
-            (
-                [_frag_subset(frag, [i]) for i in range(len(frag.row_groups))]
-                for frag in frags
-            ),
-            [],
-        )
+        # row-group wise
+        # TODO: apply filter here to remove unneeded (empty) partitions
+        rgs = [metadata.row_group(i) for i in range(metadata.num_row_groups)]
         divisions = [0] + list(
             itertools.accumulate([rg.num_rows for rg in rgs], operator.add)
         )
@@ -304,7 +153,7 @@ def from_parquet(
                 filters,
                 metadata,
             ),
-            frags2,
+            rgs,
             label=label,
             token=token,
             divisions=tuple(divisions),
@@ -337,7 +186,7 @@ def _file_to_partition(path, fs, columns, filters, schema):
     return from_arrow(table)
 
 
-def _fragment_to_partition(frag, columns, filters, schema):
+def _fragment_to_partition(rg, columns, filters, schema):
     """read one or more row-groups to awkward"""
     table = frag.to_table(
         use_threads=False,
