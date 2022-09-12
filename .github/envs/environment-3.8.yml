@@ -5,6 +5,8 @@ dependencies:
   # required dependencies
   - python=3.8
   - dask
+  - aiohttp
+  - requests
   - pytest
   - pyarrow
   - pip

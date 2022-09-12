@@ -1022,6 +1022,11 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         return to_dask_array(self)
 
+    def to_parquet(self, path: str, storage_options: dict = None, **kwargs) -> Any:
+        from dask_awkward.io.parquet import to_parquet
+
+        return to_parquet(self, path, storage_options=storage_options, **kwargs)
+
     def to_dask_bag(self) -> DaskBag:
         from dask_awkward.lib.io.io import to_dask_bag
 
