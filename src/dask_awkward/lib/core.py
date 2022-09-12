@@ -1023,7 +1023,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return to_dask_array(self)
 
     def to_parquet(self, path: str, storage_options: dict = None, **kwargs) -> Any:
-        from dask_awkward.io.parquet import to_parquet
+        from dask_awkward.lib.io.parquet import to_parquet
 
         return to_parquet(self, path, storage_options=storage_options, **kwargs)
 
