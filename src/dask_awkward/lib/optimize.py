@@ -6,6 +6,7 @@ from typing import Any
 from dask.blockwise import fuse_roots, optimize_blockwise
 from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
+from dask.local import get_sync
 
 from dask_awkward.layers import AwkwardIOLayer
 
@@ -23,7 +24,7 @@ def basic_optimize(
         dsk = HighLevelGraph.from_collections(id(dsk), dsk, dependencies=())
 
     # our column optimization
-    dsk = optimize_columns(dsk, keys=keys)
+    dsk = optimize_iolayer_columns(dsk)
 
     # Perform Blockwise optimizations for HLG input
     dsk = optimize_blockwise(dsk, keys=keys)
@@ -36,10 +37,8 @@ def basic_optimize(
 
 
 def _attempt_compute_with_columns(dsk: HighLevelGraph, columns: list[str]) -> None:
-    import dask.local
-
-    layers = dsk.layers.copy()
-    deps = dsk.dependencies.copy()
+    layers = dsk.layers
+    deps = dsk.dependencies
     io_layer_names = [k for k, v in dsk.layers.items() if isinstance(v, AwkwardIOLayer)]
     top_io_layer_name = io_layer_names[0]
     layers[top_io_layer_name] = layers[top_io_layer_name].project_and_mock(columns)
@@ -47,7 +46,7 @@ def _attempt_compute_with_columns(dsk: HighLevelGraph, columns: list[str]) -> No
     # the graph (hence the toposort to find last layer).
     final_key = (dsk._toposort_layers()[-1], 0)
     new_hlg = HighLevelGraph(layers, deps).cull([final_key])
-    dask.local.get_sync(new_hlg, list(new_hlg.keys()))
+    get_sync(new_hlg, list(new_hlg.keys()))
 
 
 def _necessary_columns(dsk: HighLevelGraph) -> list[str]:
@@ -71,10 +70,22 @@ def _necessary_columns(dsk: HighLevelGraph) -> list[str]:
     return keep
 
 
-def optimize_columns(
-    dsk: HighLevelGraph,
-    keys: Hashable | list[Hashable] | set[Hashable],
-) -> HighLevelGraph:
+def _has_projectable_awkward_io_layer(dsk: HighLevelGraph) -> bool:
+    for k, v in dsk.layers.items():
+        if isinstance(v, AwkwardIOLayer) and hasattr(v.io_func, "project_columns"):
+            return True
+    return False
+
+
+def optimize_iolayer_columns(dsk: HighLevelGraph) -> HighLevelGraph:
+    # if the task graph doesn't contain a column-projectable
+    # AwkwardIOLayer then bail on this optimization (just return the
+    # existing task graph).
+    if not _has_projectable_awkward_io_layer(dsk):
+        return dsk
+
+    # determine the necessary columns to complete the executation of
+    # the metadata (typetracer) based task graph.
     necessary_cols = _necessary_columns(dsk)
 
     layers = dsk.layers.copy()
