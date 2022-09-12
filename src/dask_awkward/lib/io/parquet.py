@@ -3,18 +3,10 @@ import itertools
 import math
 import operator
 
-import awkward._v2.forms as forms
 import fsspec
-import numpy as np
-import pyarrow
-import pyarrow.dataset as pa_ds
 import pyarrow.parquet as pq
-from awkward._v2.operations import (
-    ak_from_parquet,
-    from_arrow,
-    from_buffers,
-    to_arrow_table,
-)
+from awkward._v2.operations import ak_from_parquet, from_buffers, to_arrow_table
+from awkward._v2.operations.ak_from_parquet import _load
 from dask.base import tokenize
 from dask.blockwise import BlockIndex
 from dask.highlevelgraph import HighLevelGraph
@@ -25,10 +17,9 @@ from dask_awkward.lib.io.io import from_map
 
 
 class _FromParquetFn:
-    def __init__(self, columns=None, filters=None, metadata=None):
+    def __init__(self, columns=None, schema=None):
         self.columns = columns
-        self.filters = filters
-        self.metadata = metadata
+        self.schema = schema
 
     @abc.abstractmethod
     def __call__(self, source):
@@ -36,8 +27,8 @@ class _FromParquetFn:
 
 
 class _FromParquetFileWiseFn(_FromParquetFn):
-    def __init__(self, fs, columns, filters, metadata):
-        super().__init__(columns=columns, filters=filters, metadata=metadata)
+    def __init__(self, fs, columns, schema):
+        super().__init__(columns=columns, schema=schema)
         self.fs = fs
 
     def __call__(self, source):
@@ -45,32 +36,22 @@ class _FromParquetFileWiseFn(_FromParquetFn):
             source,
             self.fs,
             self.columns,
-            self.filters,
-            self.metadata.schema,
+            self.schema,
         )
 
 
 class _FromParquetFragmentWiseFn(_FromParquetFn):
-    def __init__(self, columns, filters, metadata):
-        super().__init__(columns=columns, filters=filters, metadata=metadata)
+    def __init__(self, fs, columns, schema):
+        super().__init__(columns=columns, schema=schema)
+        self.fs = fs
 
-    def __call__(self, rg):
-        return _fragment_to_partition(
-            rg,
-            self.columns,
-            self.filters,
-            self.metadata.schema,
+    def __call__(self, pair):
+        subrg, source = pair
+        if isinstance(subrg, int):
+            subrg = [[subrg]]
+        return _file_to_partition(
+            source, self.fs, self.columns, self.schema, subrg=subrg
         )
-
-
-def _read_metadata(path, fs, partition_base_dir=None, schema=None):
-    return pa_ds.dataset(
-        path,
-        filesystem=fs,
-        format="parquet",
-        partition_base_dir=partition_base_dir,
-        schema=schema,
-    )
 
 
 def from_parquet(
@@ -80,7 +61,6 @@ def from_parquet(
     scan_files=False,
     columns=None,
     filters=None,
-    scan_files=False,
     split_row_groups=None,
 ):
     """Read parquet dataset into awkward array collection.
@@ -126,14 +106,13 @@ def from_parquet(
         buffer_key="",
     )
 
-    if split_row_groups is False:
+    if split_row_groups is False or subrg is None:
         # file-wise
         return from_map(
             _FromParquetFileWiseFn(
                 fs,
                 columns,
-                filters,
-                metadata,
+                subform,
             ),
             actual_paths,
             label=label,
@@ -142,18 +121,32 @@ def from_parquet(
         )
     else:
         # row-group wise
-        # TODO: apply filter here to remove unneeded (empty) partitions
+
+        if set(subrg) == {None}:
+            rgs_paths = {path: 0 for path in actual_paths}
+            for i in range(metadata.num_row_groups):
+                fp = metadata.row_group(i).column(0).file_path
+                rgs_path = [p for p in rgs_paths if fp in p][
+                    0
+                ]  # returns 1st if fp is empty
+                rgs_paths[rgs_path] += 1
+
+            subrg = [list(range(i)) for _ in actual_paths]
+
         rgs = [metadata.row_group(i) for i in range(metadata.num_row_groups)]
         divisions = [0] + list(
             itertools.accumulate([rg.num_rows for rg in rgs], operator.add)
         )
+        pairs = []
+        for rgs, path in zip(subrg, actual_paths):
+            pairs.extend([(rg, path) for rg in rgs])
         return from_map(
             _FromParquetFragmentWiseFn(
+                fs,
                 columns,
-                filters,
-                metadata,
+                subform,
             ),
-            rgs,
+            pairs,
             label=label,
             token=token,
             divisions=tuple(divisions),
@@ -161,40 +154,22 @@ def from_parquet(
         )
 
 
-def _frag_subset(old_frag, row_groups):
-    """Create new fragment with row-group subset.
-
-    Used by `ArrowDatasetEngine` only.
-    """
-    return old_frag.format.make_fragment(
-        old_frag.path,
-        old_frag.filesystem,
-        old_frag.partition_expression,
-        row_groups=row_groups,
-    )
-
-
-def _file_to_partition(path, fs, columns, filters, schema):
+def _file_to_partition(path, fs, columns, schema, subrg=None):
     """read a whole parquet file to awkward"""
-    ds = _read_metadata(path, fs)
-    table = ds.to_table(
-        use_threads=False,
-        columns=columns,
-        filter=pq._filters_to_expression(filters) if filters else None,
-        # schema=schema
+    return _load(
+        actual_paths=[path],
+        fs=fs,
+        parquet_columns=columns,
+        subrg=subrg or [None],
+        footer_sample_size=2**15,
+        max_gap=2**10,
+        max_block=2**22,
+        generate_bitmasks=False,
+        metadata=None,
+        highlevel=True,
+        subform=schema,
+        behavior=None,
     )
-    return from_arrow(table)
-
-
-def _fragment_to_partition(rg, columns, filters, schema):
-    """read one or more row-groups to awkward"""
-    table = frag.to_table(
-        use_threads=False,
-        schema=schema,
-        columns=columns,
-        filter=pq._filters_to_expression(filters) if filters else None,
-    )
-    return from_arrow(table)
 
 
 def _metadata_file_from_data_files(path_list, fs, out_path):

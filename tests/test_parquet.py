@@ -18,10 +18,10 @@ sample = (
     "https://github.com/scikit-hep/awkward-1.0/raw/main/tests/"
     "samples/nullable-record-primitives-simple.parquet"
 )
-# deep = ak.Array({"arr": [{"a": [1, 2, 3], "b": [3, 4, 5]}] * 4})
-# ds_deep = pa.Table.from_arrays(
-#    [ak.to_arrow(deep, extensionarray=False, list_to32=True)], names=["arr"]
-# )
+deep = ak.Array({"arr": [{"a": [1, 2, 3], "b": [3, 4, 5]}] * 4})
+ds_deep = pa.Table.from_arrays(
+    [ak.to_arrow(deep, extensionarray=False, list_to32=True)], names=["arr"]
+)
 
 
 @pytest.mark.parametrize("ignore_metadata", [True, False])
@@ -111,13 +111,19 @@ def test_dir_of_two_files_metadata(tmpdir, ignore_metadata, scan_files):
     assert arr["arr"].compute().to_list() == data * 2
 
 
-# def test_columns(tmpdir):
-#    tmpdir = str(tmpdir)
-#    pad.write_dataset(ds_deep, tmpdir, format="parquet")
-#    arr = dak.from_parquet(tmpdir)
-#    import pyarrow.dataset
-#
-#    ds = pyarrow.dataset.dataset(tmpdir)
+def test_columns(tmpdir):
+    tmpdir = str(tmpdir)
+    pad.write_dataset(ds_deep, tmpdir, format="parquet")
+    arr = dak.from_parquet(tmpdir)
+    arr2 = dak.from_parquet(tmpdir, columns=["arr.arr.a"])
+    arr3 = dak.from_parquet(tmpdir, columns=["arr.arr.b"])
+
+    assert arr.arr.arr.a.compute().tolist() == arr2.arr.arr.a.compute().tolist()
+    assert arr.arr.arr.b.compute().tolist() == arr3.arr.arr.b.compute().tolist()
+
+    assert arr.arr.arr.fields == ["a", "b"]
+    assert arr2.arr.arr.fields == ["a"]
+    assert arr3.arr.arr.fields == ["b"]
 
 
 def test_write_simple(tmpdir):
