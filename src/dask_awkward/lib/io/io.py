@@ -442,6 +442,7 @@ def from_map(
         columns=None,
         inputs=inputs,
         io_func=func,
+        meta=meta,
     )
 
     hlg = HighLevelGraph.from_collections(name, dsk)

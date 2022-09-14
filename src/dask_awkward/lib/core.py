@@ -47,16 +47,28 @@ T = TypeVar("T")
 
 
 def _finalize_array(results: Sequence[Any]) -> Any:
-    if any(isinstance(r, ak.Array) for r in results):
+
+    # special cases for length 1 results
+    if len(results) == 1:
+        if isinstance(results[0], (int, ak.Array)):
+            return results[0]
+
+    # a sequence of arrays that need to be concatenated.
+    elif any(isinstance(r, ak.Array) for r in results):
         return ak.concatenate(results)
-    elif len(results) == 1 and isinstance(results[0], int):
-        return results[0]
+
+    # sometimes we just check the length of partitions so all results
+    # will be integers, just make an array out of that.
     elif isinstance(results, tuple) and all(
         isinstance(r, (int, np.integer)) for r in results
     ):
         return ak.Array(list(results))
+
+    # sometimes all partition results will be None (some write-to-disk
+    # operations)
     elif all(r is None for r in results):
         return None
+
     else:
         msg = (
             "Unexpected results of a computation.\n "
@@ -1770,3 +1782,14 @@ def normalize_single_outer_inner_index(
     partition_index = int(np.digitize(index, divisions)) - 1
     new_index = index - divisions[partition_index]
     return (partition_index, new_index)
+
+
+def typetracer_from_form(form) -> ak.Array:
+    return ak.Array(
+        ak.from_buffers(
+            form,
+            length=0,
+            container={"": b"\x00\x00\x00\x00\x00\x00\x00\x00"},
+            buffer_key="",
+        ).layout.typetracer.forget_length()
+    )
