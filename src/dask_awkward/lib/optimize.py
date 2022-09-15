@@ -53,11 +53,14 @@ def _necessary_columns(dsk: HighLevelGraph) -> list[str]:
     # staring fields should be those belonging to the AwkwardIOLayer's
     # metadata (typetracer) array.
     out_meta = list(dsk.layers.values())[-1]._meta
-    keep = out_meta.layout.form.columns()
     for k, v in dsk.layers.items():
         if isinstance(v, AwkwardIOLayer):
             columns = v._meta.layout.form.columns()
             break
+
+    # can only select output columns that exist in the input
+    # (other names may have come from aliases)
+    keep = [c for c in out_meta.layout.form.columns() if c in columns]
 
     for c in columns:
         if c in keep:
