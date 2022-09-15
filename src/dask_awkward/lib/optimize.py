@@ -37,7 +37,7 @@ def basic_optimize(
 
 
 def _attempt_compute_with_columns(dsk: HighLevelGraph, columns: list[str]) -> None:
-    layers = dsk.layers
+    layers = dsk.layers.copy()
     deps = dsk.dependencies
     io_layer_names = [k for k, v in dsk.layers.items() if isinstance(v, AwkwardIOLayer)]
     top_io_layer_name = io_layer_names[0]
