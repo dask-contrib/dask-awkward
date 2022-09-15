@@ -52,13 +52,16 @@ def _attempt_compute_with_columns(dsk: HighLevelGraph, columns: list[str]) -> No
 def _necessary_columns(dsk: HighLevelGraph) -> list[str]:
     # staring fields should be those belonging to the AwkwardIOLayer's
     # metadata (typetracer) array.
+    out_meta = list(dsk.layers.values())[-1]._meta
+    keep = out_meta.layout.form.columns()
     for k, v in dsk.layers.items():
         if isinstance(v, AwkwardIOLayer):
             columns = v._meta.layout.form.columns()
             break
 
-    keep = []
     for c in columns:
+        if c in keep:
+            continue
         holdout = c
         allcolumns = set(columns)
         remaining = list(allcolumns - {holdout})
@@ -66,7 +69,8 @@ def _necessary_columns(dsk: HighLevelGraph) -> list[str]:
             _attempt_compute_with_columns(dsk, columns=remaining)
         except IndexError:
             keep.append(holdout)
-
+    if keep == columns:
+        keep = None
     return keep
 
 
@@ -87,6 +91,8 @@ def optimize_iolayer_columns(dsk: HighLevelGraph) -> HighLevelGraph:
     # determine the necessary columns to complete the executation of
     # the metadata (typetracer) based task graph.
     necessary_cols = _necessary_columns(dsk)
+    if necessary_cols is None:
+        return dsk
 
     layers = dsk.layers.copy()
     deps = dsk.dependencies.copy()

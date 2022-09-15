@@ -446,6 +446,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         divisions: tuple[int | None, ...],
     ) -> None:
         self._dask: HighLevelGraph = dsk
+        list(dsk.layers.values())[-1]._meta = meta  # output typetracer
         self._name: str = name
         self._divisions: tuple[int | None, ...] = divisions
         self._meta: ak.Array = meta
