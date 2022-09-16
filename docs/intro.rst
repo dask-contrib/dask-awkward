@@ -24,13 +24,14 @@ We accomplish this by creating a new collection type:
 ``dask_awkward``'s :py:class:`~dask_awkward.core.Array` class, which
 is a partitioned representation of a concrete Awkward Array.
 
-Imagine a dataset of multiple line delimited JSON files (data.00.json,
-data.01.json, and so on). Loading that data, and selecting a subset of
-the dataset based on the total number of entries in a nested attribute
-of the data can be done with both ``awkward`` and ``dask-awkward``
-with the same programming style; on the left we operate eagerly with
-``awkward`` and on the right we operate lazily with ``dask-awkward``
-(notice the ``compute()`` method call):
+Imagine a dataset of multiple, line delimited JSON files
+(data.00.json, data.01.json, and so on). Loading that data and
+selecting a subset of the dataset based on the total number of entries
+in some nested attribute of the data can be done with both ``awkward``
+and ``dask-awkward`` with the same programming style; on the left we
+operate eagerly with ``awkward`` (and on a single file only) and on
+the right we operate lazily with ``dask-awkward`` on multiple files,
+notice the use of wildcard syntax ("*").
 
 .. grid:: 2
 
@@ -38,8 +39,9 @@ with the same programming style; on the left we operate eagerly with
 
         .. code-block:: python
 
+           from pathlib import Path
            import awkward._v2 as ak
-           x = ak.from_json("data.00.json")
+           x = ak.from_json(Path("data.00.json"), line_delimited=True)
            x = x[ak.num(x.foo) > 2]
 
     .. grid-item-card::  Dask
@@ -47,10 +49,11 @@ with the same programming style; on the left we operate eagerly with
         .. code-block:: python
 
            import dask_awkward as dak
-           x = dak.from_json("data.*.json")
+           x = dak.from_json("data.*.json")  # dask-awkward uses
+                                             # line-delimited by default
            x = x[dak.num(x.foo) > 2]
 
-           # Compute result
+           # With Dask we have to ask for the result with compute
            x = x.compute()
 
 .. note::
