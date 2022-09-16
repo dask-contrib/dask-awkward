@@ -37,7 +37,7 @@ with the same programming style; on the left we operate eagerly with
     .. grid-item-card::  Awkward Array
 
         .. code-block:: python
-        
+
            import awkward._v2 as ak
            x = ak.from_json("data.00.json")
            x = x[ak.num(x.foo) > 2]
