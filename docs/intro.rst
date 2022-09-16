@@ -41,7 +41,8 @@ notice the use of wildcard syntax ("*").
 
            from pathlib import Path
            import awkward._v2 as ak
-           x = ak.from_json(Path("data.00.json"), line_delimited=True)
+           file = Path("data.00.json")
+           x = ak.from_json(file, line_delimited=True)
            x = x[ak.num(x.foo) > 2]
 
     .. grid-item-card::  Dask
@@ -49,8 +50,8 @@ notice the use of wildcard syntax ("*").
         .. code-block:: python
 
            import dask_awkward as dak
-           x = dak.from_json("data.*.json")  # dask-awkward uses
-                                             # line-delimited by default
+           # dask-awkward only supports line-delimited=True
+           x = dak.from_json("data.*.json")
            x = x[dak.num(x.foo) > 2]
 
            # With Dask we have to ask for the result with compute
@@ -61,18 +62,17 @@ notice the use of wildcard syntax ("*").
    dask-awkward depends on the in-development version 2 of awkward;
    which exists in the ``awkward._v2`` namespace.
 
-On the left (the eager version) the second line will immediately begin
-to read data from disk and decode the JSON. Sequentially after that,
-the selection step will execute.
+On the left (the eager version) the ``from_json`` call will
+immediately begin to read data from disk and decode the JSON.
+Sequentially after that, the selection step will execute.
 
-On the right (the lazy version) the second line will *stage* the
-reading of each detected JSON file (task graph creation), the next
-line will stage the selection (extending the task graph) and then call
-compute on that graph .Dask will execute the JSON reading and decoding
-of each file in parallel, and when each reading task is done, the
-selection tasks will follow. Dask will schedule the tasks itself (and
-it will attempt to optimize its work).
-
+On the right (the lazy version) the ``from_json`` call will *stage*
+the reading of each detected JSON file (task graph creation), the next
+line will then stage the selection (extending the task graph). Dask
+will execute the JSON reading and decoding of each file in parallel,
+and when each reading task is done, the selection tasks will follow.
+Dask will schedule the tasks itself (and it will attempt to optimize
+its work).
 
 For example usage of dask-awkward, `we have a demo repository
 <https://github.com/douglasdavis/dask-awkward-demo>`__.
