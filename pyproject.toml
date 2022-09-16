@@ -49,6 +49,7 @@ complete = [
 docs = [
     "dask-sphinx-theme >=3.0.2",
     "pyarrow",
+    "sphinx-design",
     "pytest >=6.0",
     "pytest-cov >=3.0.0",
     "requests >=2.27.1",
