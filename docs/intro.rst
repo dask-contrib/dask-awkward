@@ -4,21 +4,23 @@ Introduction
 .. note::
 
    This introduction assumes that you have some familiarity with
-   `Dask`_.
+   `Dask`_ and `Awkward-Array`_.
 
-The Dask project provides "collections" which behave as parallelized
+The Dask project provides **collections** which behave as parallelized
 and/or distributed versions of the core PyData data types:
 
-- dask.array provides a NumPy like interface for creating task graphs.
+- dask.array provides a NumPy like interface for creating task graphs
+  operating on chunked NumPy ndarrays.
 - dask.dataframe provides a Pandas like interface for creating task
-  graphs.
-- dask.bag provides a functional interface for creating task graphs.
+  graphs operating on partitioned Pandas DataFrames and Series
+- dask.bag provides a functional interface for creating task graphs
+  operating on Python iteratables.
 - dask.delayed provides an interface for custom task graphs.
 
 With dask-awkward, we aim to provide an additional interface:
 
 - dask-awkward provides an Awkward-Array_\-like interface for creating
-  task graphs.
+  task graphs operating on partitioned awkward Arrays.
 
 We accomplish this by creating a new collection type:
 ``dask_awkward``'s :py:class:`~dask_awkward.core.Array` class, which
