@@ -32,11 +32,26 @@ with the same programming style; on the left we operate eagerly with
 ``awkward`` and on the right we operate lazily with ``dask-awkward``
 (notice the ``compute()`` method call):
 
-.. code-block:: python
+.. grid:: 2
 
-   import awkward._v2 as ak                import dask_awkward as dak
-   x = ak.from_json("data.00.json")        x = dak.from_json("data.*.json")
-   x = x[ak.num(x.foo) > 2]                x = x[dak.num(x.foo).compute()
+    .. grid-item-card::  Awkward Array
+
+        .. code-block:: python
+
+           import awkward._v2 as ak
+           x = ak.from_json("data.00.json")
+           x = x[ak.num(x.foo) > 2]
+
+    .. grid-item-card::  Dask
+
+        .. code-block:: python
+
+           import dask_awkward as dak
+           x = dak.from_json("data.*.json")
+           x = x[dak.num(x.foo) > 2]
+
+           # Compute result
+           x = x.compute()
 
 .. note::
 
