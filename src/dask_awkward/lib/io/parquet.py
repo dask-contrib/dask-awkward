@@ -4,7 +4,6 @@ import math
 import operator
 
 import fsspec
-import pyarrow.parquet as pq
 from awkward._v2.operations import ak_from_parquet, from_buffers, to_arrow_table
 from awkward._v2.operations.ak_from_parquet import _load
 from dask.base import tokenize
@@ -186,6 +185,8 @@ def _metadata_file_from_data_files(path_list, fs, out_path):
     out_path: str
         Root directory of the dataset
     """
+    import pyarrow.parquet as pq
+
     meta = None
     out_path = out_path.rstrip("/")
     for path in path_list:
@@ -229,6 +230,8 @@ def _write_partition(
     head=False,  # is this the first piece
     # custom_metadata=None,
 ):
+    import pyarrow.parquet as pq
+
     t = to_arrow_table(
         data,
         list_to32=True,
