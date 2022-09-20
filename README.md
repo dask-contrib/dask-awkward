@@ -30,7 +30,7 @@ The [awkward-array](https://github.com/scikit-hep/awkward) project is
 working on version 2 of the core `awkward` Python library; `awkward`
 versions 1.8 and later include many components of what will be version
 2, but in the `awkward._v2` module. Installing `dask-awkward` requires
-`awkward>=1.9.0`.
+`awkward>=1.10.0`.
 
 It's recommended to have a bleeding edge version of `awkward`
 installed with:
