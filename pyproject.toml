@@ -27,7 +27,7 @@ classifiers = [
     "Topic :: Scientific/Engineering",
 ]
 dependencies = [
-    "awkward>=1.9.0",
+    "awkward>=1.10.0",
     "dask>=2022.01.0",
 ]
 dynamic = [
