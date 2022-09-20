@@ -49,19 +49,6 @@ class AwkwardIOLayer(Blockwise):
     def columns(self) -> Any:
         return self._columns
 
-    def mock(self):
-        return AwkwardIOLayer(
-            name=self.name,
-            columns=self.columns,
-            inputs=[None],
-            io_func=lambda *_, **__: self._meta,
-            label=self.label,
-            produces_tasks=self.produces_tasks,
-            creation_info=self.creation_info,
-            annotations=self.annotations,
-            meta=self._meta,
-        )
-
     def project_and_mock(self, columns: list[str]) -> AwkwardIOLayer:
 
         # imported here because it this method should be run _only_ on
