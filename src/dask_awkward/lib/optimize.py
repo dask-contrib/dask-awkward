@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Hashable, Mapping
 from typing import Any
 
+import dask.config
 from dask.blockwise import fuse_roots, optimize_blockwise
 from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
@@ -23,8 +24,9 @@ def basic_optimize(
     if not isinstance(dsk, HighLevelGraph):
         dsk = HighLevelGraph.from_collections(id(dsk), dsk, dependencies=())
 
-    # our column optimization
-    dsk = optimize_iolayer_columns(dsk)
+    if dask.config.get("awkward.column-projection-optimization"):
+        # our column optimization
+        dsk = optimize_iolayer_columns(dsk)
 
     # Perform Blockwise optimizations for HLG input
     dsk = optimize_blockwise(dsk, keys=keys)
@@ -53,6 +55,7 @@ def _necessary_columns(dsk: HighLevelGraph) -> list[str]:
     # staring fields should be those belonging to the AwkwardIOLayer's
     # metadata (typetracer) array.
     out_meta = list(dsk.layers.values())[-1]._meta
+    columns: list[str] = []
     for k, v in dsk.layers.items():
         if isinstance(v, AwkwardIOLayer):
             columns = v._meta.layout.form.columns()
@@ -73,12 +76,12 @@ def _necessary_columns(dsk: HighLevelGraph) -> list[str]:
         except IndexError:
             keep.append(holdout)
     if keep == columns:
-        keep = None
+        keep = []
     return keep
 
 
 def _has_projectable_awkward_io_layer(dsk: HighLevelGraph) -> bool:
-    for k, v in dsk.layers.items():
+    for _, v in dsk.layers.items():
         if isinstance(v, AwkwardIOLayer) and hasattr(v.io_func, "project_columns"):
             return True
     return False
@@ -94,7 +97,9 @@ def optimize_iolayer_columns(dsk: HighLevelGraph) -> HighLevelGraph:
     # determine the necessary columns to complete the executation of
     # the metadata (typetracer) based task graph.
     necessary_cols = _necessary_columns(dsk)
-    if necessary_cols is None:
+
+    # if necessary cols is empty just return the input graph
+    if not necessary_cols:
         return dsk
 
     layers = dsk.layers.copy()
@@ -103,8 +108,7 @@ def optimize_iolayer_columns(dsk: HighLevelGraph) -> HighLevelGraph:
         if isinstance(v, AwkwardIOLayer):
             new_layer = v.project_columns(necessary_cols)
             io_layer_name = k
+            layers[io_layer_name] = new_layer
             break
-
-    layers[io_layer_name] = new_layer
 
     return HighLevelGraph(layers, deps)

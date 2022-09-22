@@ -7,3 +7,11 @@ awkward:
   # will be instantiated with the `_meta` attribute set to an "empty"
   # typetracer, which is an empty awkward array.
   compute-unknown-meta: True
+
+  # This option is executing the column projection optimization. It's
+  # currently implemented as a brute force search for columns that are
+  # required for the task graph to complete without raising an
+  # IndexError (each column is held out and the metadata task graph is
+  # computed as a requirement test); because of this search method the
+  # optimization can be slow, so it is configurable.
+  column-projection-optimization: True
