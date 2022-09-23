@@ -87,14 +87,14 @@ def _necessary_columns(dsk: HighLevelGraph) -> list[str]:
 
 
 def _is_getitem(layer: Blockwise) -> bool:
-    """Determine if a layer is a ``operator.getitem`` call."""
+    """Determine if a layer is an ``operator.getitem`` call."""
     if not isinstance(layer, Blockwise):
         return False
     return layer.dsk[layer.output][0] == operator.getitem
 
 
 def _requested_columns(layer: Blockwise) -> set[str]:
-    """Determine the columns requested in a ``__getitem__`` call."""
+    """Determine the columns requested in an ``operator.getitem`` call."""
     fn_arg = layer.indices[1][0]
     if isinstance(fn_arg, list):
         return set(fn_arg)
