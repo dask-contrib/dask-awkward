@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import operator
 from collections.abc import Hashable, Mapping
 from typing import Any
 
 import dask.config
-from dask.blockwise import fuse_roots, optimize_blockwise
+from dask.blockwise import Blockwise, fuse_roots, optimize_blockwise
 from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
 from dask.local import get_sync
 
 from dask_awkward.layers import AwkwardIOLayer
+
+NEW_METHOD = 1
 
 
 def basic_optimize(
@@ -41,14 +44,17 @@ def basic_optimize(
 def _attempt_compute_with_columns(dsk: HighLevelGraph, columns: list[str]) -> None:
     layers = dsk.layers.copy()
     deps = dsk.dependencies
-    io_layer_names = [k for k, v in dsk.layers.items() if isinstance(v, AwkwardIOLayer)]
-    top_io_layer_name = io_layer_names[0]
+    pio_layer_names = [
+        k for k, v in dsk.layers.items() if isinstance(v, AwkwardIOLayer)
+    ]
+    top_io_layer_name = pio_layer_names[0]
     layers[top_io_layer_name] = layers[top_io_layer_name].project_and_mock(columns)
     # final necessary key is the 0th partition of the last layer in
     # the graph (hence the toposort to find last layer).
     final_key = (dsk._toposort_layers()[-1], 0)
     new_hlg = HighLevelGraph(layers, deps).cull([final_key])
     get_sync(new_hlg, list(new_hlg.keys()))
+    return None
 
 
 def _necessary_columns(dsk: HighLevelGraph) -> list[str]:
@@ -80,35 +86,68 @@ def _necessary_columns(dsk: HighLevelGraph) -> list[str]:
     return keep
 
 
-def _has_projectable_awkward_io_layer(dsk: HighLevelGraph) -> bool:
-    for _, v in dsk.layers.items():
-        if isinstance(v, AwkwardIOLayer) and hasattr(v.io_func, "project_columns"):
-            return True
-    return False
+def _is_getitem(layer: Blockwise) -> bool:
+    """Determine if a layer is a ``operator.getitem`` call."""
+    if not isinstance(layer, Blockwise):
+        return False
+    return layer.dsk[layer.output][0] == operator.getitem
+
+
+def _requested_columns(layer: Blockwise) -> set[str]:
+    """Determine the columns requested in a ``__getitem__`` call."""
+    fn_arg = layer.indices[1][0]
+    if isinstance(fn_arg, list):
+        return set(fn_arg)
+    return {fn_arg}
 
 
 def optimize_iolayer_columns(dsk: HighLevelGraph) -> HighLevelGraph:
+    # find layers that are AwkwardIOLayer with a project_columns io_func method.
+    # projectable-I/O --> "pio"
+    pio_layer_names = [
+        n
+        for n, v in dsk.layers.items()
+        if isinstance(v, AwkwardIOLayer) and hasattr(v.io_func, "project_columns")
+    ]
+
     # if the task graph doesn't contain a column-projectable
     # AwkwardIOLayer then bail on this optimization (just return the
     # existing task graph).
-    if not _has_projectable_awkward_io_layer(dsk):
+    if not pio_layer_names:
         return dsk
 
-    # determine the necessary columns to complete the executation of
-    # the metadata (typetracer) based task graph.
-    necessary_cols = _necessary_columns(dsk)
+    if NEW_METHOD:
+        layers = dsk.layers.copy()
+        deps = dsk.dependencies.copy()
 
-    # if necessary cols is empty just return the input graph
-    if not necessary_cols:
-        return dsk
+        for pio_layer_name in pio_layer_names:
+            seed_columns = set()
+            these_deps = dsk.dependents[pio_layer_name]
+            getitem_dependents = [k for k in these_deps if _is_getitem(dsk.layers[k])]
+            for gid in getitem_dependents:
+                seed_columns |= _requested_columns(dsk.layers[gid])
 
-    layers = dsk.layers.copy()
-    deps = dsk.dependencies.copy()
-    for k, v in dsk.layers.items():
-        if isinstance(v, AwkwardIOLayer):
-            new_layer = v.project_columns(necessary_cols)
-            io_layer_name = k
-            layers[io_layer_name] = new_layer
+            if seed_columns:
+                new_layer = layers[pio_layer_name].project_columns(list(seed_columns))
+                layers[pio_layer_name] = new_layer
+
+        return HighLevelGraph(layers, deps)
+
+    else:
+        # determine the necessary columns to complete the executation of
+        # the metadata (typetracer) based task graph.
+        necessary_cols = _necessary_columns(dsk)
+
+        # if necessary cols is empty just return the input graph
+        if not necessary_cols:
+            return dsk
+
+        layers = dsk.layers.copy()
+        deps = dsk.dependencies.copy()
+
+        for pio_layer_name in pio_layer_names:
+            new_layer = layers[pio_layer_name].project_columns(necessary_cols)
+            layers[pio_layer_name] = new_layer
             break
 
-    return HighLevelGraph(layers, deps)
+        return HighLevelGraph(layers, deps)

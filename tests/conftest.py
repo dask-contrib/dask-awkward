@@ -54,9 +54,9 @@ def daa(ndjson_points1: str) -> dak.Array:
 
 @pytest.fixture(scope="session")
 def caa(ndjson_points1: str) -> ak.Array:
-    with open(ndjson_points1) as f:
-        lines = [json.loads(line) for line in f]
-    return ak.Array(lines * 3)
+    with open(ndjson_points1, "rb") as f:
+        a = ak.from_json(f, line_delimited=True)
+    return ak.concatenate([a, a, a])
 
 
 @pytest.fixture(scope="session")
@@ -114,3 +114,10 @@ def L3() -> list[list[dict[str, float]]]:
         [{"x": 1.9, "y": 7.0}],
         [{"x": 1.9, "y": 6.0}, {"x": 6.0, "y": 4.8}, {"x": 9.9, "y": 9.0}],
     ]
+
+
+@pytest.fixture(scope="session")
+def caa_parquet(caa: ak.Array, tmpdir_factory: pytest.TempdirFactory) -> str:
+    fn = tmpdir_factory.mktemp("parquet_data").join("caa.parquet")
+    ak.to_parquet(caa, str(fn))
+    return fn
