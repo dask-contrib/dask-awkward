@@ -1155,7 +1155,7 @@ def partitionwise_layer(
             )
         else:
             pairs.extend([arg, None])
-    return dask_blockwise(
+    layer = dask_blockwise(
         func,
         name,
         "i",
@@ -1164,6 +1164,7 @@ def partitionwise_layer(
         concatenate=True,
         **kwargs,
     )
+    return layer
 
 
 def map_partitions(

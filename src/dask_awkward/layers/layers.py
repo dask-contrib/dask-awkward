@@ -11,15 +11,16 @@ from dask_awkward.utils import LazyInputsDict
 class AwkwardIOLayer(Blockwise):
     def __init__(
         self,
+        *,
         name: str,
         columns: str | list[str] | None,
         inputs: Any,
         io_func: Callable,
+        meta: Any,
         label: str | None = None,
         produces_tasks: bool = False,
         creation_info: dict | None = None,
         annotations: Mapping[str, Any] | None = None,
-        meta: Any | None = None,
     ) -> None:
         self.name = name
         self._columns = columns
@@ -85,4 +86,5 @@ class AwkwardIOLayer(Blockwise):
             produces_tasks=self.produces_tasks,
             creation_info=self.creation_info,
             annotations=self.annotations,
+            meta=self._meta,
         )

@@ -18,7 +18,7 @@ NEW_METHOD = 1
 def basic_optimize(
     dsk: Mapping,
     keys: Hashable | list[Hashable] | set[Hashable],
-    **kwargs: Any,
+    **_: Any,
 ) -> Mapping:
     if not isinstance(keys, (list, set)):
         keys = (keys,)  # pragma: no cover
@@ -42,7 +42,7 @@ def basic_optimize(
 
 
 def _attempt_compute_with_columns(dsk: HighLevelGraph, columns: list[str]) -> None:
-    layers = dsk.layers.copy()
+    layers = dsk.layers.copy()  # type: ignore
     deps = dsk.dependencies
     pio_layer_names = [
         k for k, v in dsk.layers.items() if isinstance(v, AwkwardIOLayer)
