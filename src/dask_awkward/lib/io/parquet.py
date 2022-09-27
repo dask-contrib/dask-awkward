@@ -24,6 +24,10 @@ class _FromParquetFn:
     def __call__(self, source):
         ...
 
+    @abc.abstractmethod
+    def project_columns(self, columns):
+        ...
+
 
 class _FromParquetFileWiseFn(_FromParquetFn):
     def __init__(self, fs, columns, schema):
@@ -38,6 +42,13 @@ class _FromParquetFileWiseFn(_FromParquetFn):
             self.schema,
         )
 
+    def project_columns(self, columns):
+        return _FromParquetFileWiseFn(
+            fs=self.fs,
+            columns=columns,
+            schema=self.schema,
+        )
+
 
 class _FromParquetFragmentWiseFn(_FromParquetFn):
     def __init__(self, fs, columns, schema):
@@ -50,6 +61,13 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
             subrg = [[subrg]]
         return _file_to_partition(
             source, self.fs, self.columns, self.schema, subrg=subrg
+        )
+
+    def project_columns(self, columns):
+        return _FromParquetFragmentWiseFn(
+            fs=self.fs,
+            columns=columns,
+            schema=self.schema,
         )
 
 

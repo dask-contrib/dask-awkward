@@ -44,7 +44,7 @@ def test_compute(loop, ndjson_points_file):  # noqa
 
 
 @gen_cluster(client=True)
-async def test_persist(c, s, a, b, ndjson_points_file):  # noqa
+async def test_persist(c, s, a, b, ndjson_points_file):
     daa = dak.from_json([ndjson_points_file])
     (x1,) = persist(daa, scheduler=c)
     await _wait(x1)
@@ -54,10 +54,10 @@ async def test_persist(c, s, a, b, ndjson_points_file):  # noqa
 @pytest.mark.parametrize("optimize_graph", [True, False])
 @gen_cluster(client=True)
 async def test_compute_gen_cluster(
-    c,  # noqa
-    s,  # noqa
-    a,  # noqa
-    b,  # noqa
+    c,
+    s,
+    a,
+    b,
     ndjson_points_file,
     optimize_graph,
 ):
@@ -118,7 +118,7 @@ def test_from_list_behaviorized(loop, L1, L2):  # noqa
             assert_eq(daa.distance(daa), caa.distance(caa), scheduler=client)
 
 
-# def test_from_list_behaviorized2(simple_client, L1, L2) -> None:  # noqa
+# def test_from_list_behaviorized2(simple_client, L1, L2) -> None:
 #     client = simple_client
 #     daa = dak.from_lists([L1, L2])
 #     daa = dak.with_name(daa, name="Point", behavior=behaviors)

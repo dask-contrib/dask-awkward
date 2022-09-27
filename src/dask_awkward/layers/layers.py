@@ -11,18 +11,19 @@ from dask_awkward.utils import LazyInputsDict
 class AwkwardIOLayer(Blockwise):
     def __init__(
         self,
+        *,
         name: str,
         columns: str | list[str] | None,
         inputs: Any,
         io_func: Callable,
+        meta: Any,
         label: str | None = None,
         produces_tasks: bool = False,
         creation_info: dict | None = None,
         annotations: Mapping[str, Any] | None = None,
-        meta: Any | None = None,
     ) -> None:
         self.name = name
-        self._columns = columns
+        self.columns = columns
         self.inputs = inputs
         self.io_func = io_func
         self.label = label
@@ -43,23 +44,6 @@ class AwkwardIOLayer(Blockwise):
             indices=[(io_arg_map, "i")],
             numblocks={},
             annotations=None,
-        )
-
-    @property
-    def columns(self) -> Any:
-        return self._columns
-
-    def mock(self):
-        return AwkwardIOLayer(
-            name=self.name,
-            columns=self.columns,
-            inputs=[None],
-            io_func=lambda *_, **__: self._meta,
-            label=self.label,
-            produces_tasks=self.produces_tasks,
-            creation_info=self.creation_info,
-            annotations=self.annotations,
-            meta=self._meta,
         )
 
     def project_and_mock(self, columns: list[str]) -> AwkwardIOLayer:
@@ -86,16 +70,15 @@ class AwkwardIOLayer(Blockwise):
     def project_columns(self, columns: list[str]) -> AwkwardIOLayer:
         if hasattr(self.io_func, "project_columns"):
             io_func = self.io_func.project_columns(columns)  # type: ignore
-        else:
-            io_func = self.io_func
-
-        return AwkwardIOLayer(
-            name=self.name,
-            columns=columns,
-            inputs=self.inputs,
-            io_func=io_func,
-            label=self.label,
-            produces_tasks=self.produces_tasks,
-            creation_info=self.creation_info,
-            annotations=self.annotations,
-        )
+            return AwkwardIOLayer(
+                name=self.name,
+                columns=columns,
+                inputs=self.inputs,
+                io_func=io_func,
+                label=self.label,
+                produces_tasks=self.produces_tasks,
+                creation_info=self.creation_info,
+                annotations=self.annotations,
+                meta=self._meta,
+            )
+        return self
