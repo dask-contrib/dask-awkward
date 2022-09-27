@@ -120,4 +120,4 @@ def L3() -> list[list[dict[str, float]]]:
 def caa_parquet(caa: ak.Array, tmpdir_factory: pytest.TempdirFactory) -> str:
     fn = tmpdir_factory.mktemp("parquet_data").join("caa.parquet")
     ak.to_parquet(caa, str(fn))
-    return fn
+    return str(fn)

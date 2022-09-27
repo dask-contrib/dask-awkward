@@ -5,7 +5,7 @@ from collections.abc import Hashable, Mapping
 from typing import Any
 
 import dask.config
-from dask.blockwise import Blockwise, fuse_roots, optimize_blockwise
+from dask.blockwise import Blockwise, Layer, fuse_roots, optimize_blockwise
 from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
 
@@ -26,7 +26,7 @@ def basic_optimize(
 
     if dask.config.get("awkward.column-projection-optimization"):
         # our column optimization
-        dsk = optimize_iolayer_columns(dsk)
+        dsk = optimize_iolayer_columns(dsk)  # type: ignore
 
     # Perform Blockwise optimizations for HLG input
     dsk = optimize_blockwise(dsk, keys=keys)
@@ -38,7 +38,7 @@ def basic_optimize(
     return dsk
 
 
-def _is_getitem(layer: Blockwise) -> bool:
+def _is_getitem(layer: Layer) -> bool:
     """Determine if a layer is an ``operator.getitem`` call."""
     if not isinstance(layer, Blockwise):
         return False
@@ -48,8 +48,8 @@ def _is_getitem(layer: Blockwise) -> bool:
 def _requested_columns(layer: Blockwise) -> set[str]:
     """Determine the columns requested in an ``operator.getitem`` call."""
     fn_arg = layer.indices[1][0]
-    if isinstance(fn_arg, list):
-        return set(fn_arg)
+    if isinstance(fn_arg, list):  # type: ignore
+        return set(fn_arg)  # type: ignore
     return {fn_arg}
 
 
@@ -68,8 +68,8 @@ def optimize_iolayer_columns(dsk: HighLevelGraph) -> HighLevelGraph:
     if not pio_layer_names:
         return dsk
 
-    layers = dsk.layers.copy()
-    deps = dsk.dependencies.copy()
+    layers = dsk.layers.copy()  # type: ignore
+    deps = dsk.dependencies.copy()  # type: ignore
 
     for pio_layer_name in pio_layer_names:
         cols_used_in_getitem = set()
@@ -81,7 +81,8 @@ def optimize_iolayer_columns(dsk: HighLevelGraph) -> HighLevelGraph:
         ]
         # of the getitem dependencies, determine the columns that were requested.
         for dep_that_is_getitem in deps_that_are_getitem:
-            cols_used_in_getitem |= _requested_columns(dsk.layers[dep_that_is_getitem])
+            layer_of_interest = dsk.layers[dep_that_is_getitem]
+            cols_used_in_getitem |= _requested_columns(layer_of_interest)  # type: ignore
         # project columns using the discovered getitem columns.
         if cols_used_in_getitem:
             new_layer = layers[pio_layer_name].project_columns(

@@ -24,6 +24,7 @@ from dask.utils import IndexCallable, funcname, key_split
 from numpy.lib.mixins import NDArrayOperatorsMixin
 from tlz import first
 
+from dask_awkward.layers import AwkwardIOLayer
 from dask_awkward.lib.optimize import basic_optimize
 from dask_awkward.typing import AwkwardDaskCollection
 from dask_awkward.utils import (
@@ -447,8 +448,10 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     ) -> None:
         self._dask: HighLevelGraph = dsk
         if hasattr(dsk, "layers"):
+            last_layer = list(dsk.layers.values())[-1]
             # i.e., NOT matrializes/persisted state
-            list(dsk.layers.values())[-1]._meta = meta  # output typetracer
+            if isinstance(last_layer, AwkwardIOLayer):
+                last_layer._meta = meta  # output typetracer
         self._name: str = name
         self._divisions: tuple[int | None, ...] = divisions
         self._meta: ak.Array = meta
@@ -1037,7 +1040,12 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         return to_dask_array(self)
 
-    def to_parquet(self, path: str, storage_options: dict = None, **kwargs) -> Any:
+    def to_parquet(
+        self,
+        path: str,
+        storage_options: dict | None = None,
+        **kwargs: Any,
+    ) -> Any:
         from dask_awkward.lib.io.parquet import to_parquet
 
         return to_parquet(self, path, storage_options=storage_options, **kwargs)
@@ -1788,7 +1796,7 @@ def normalize_single_outer_inner_index(
     return (partition_index, new_index)
 
 
-def typetracer_from_form(form) -> ak.Array:
+def typetracer_from_form(form: Any) -> ak.Array:
     return ak.Array(
         ak.from_buffers(
             form,
