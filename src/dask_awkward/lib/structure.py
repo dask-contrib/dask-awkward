@@ -9,6 +9,7 @@ import numpy as np
 
 from dask_awkward.lib.core import (
     Array,
+    empty_typetracer,
     map_partitions,
     new_known_scalar,
     pw_reduction_with_agg_to_scalar,
@@ -480,7 +481,7 @@ def zeros_like(
     )
 
 
-class _ZipFn:
+class _ZipDictInputFn:
     def __init__(self, keys: Sequence[str], **kwargs: Any) -> None:
         self.keys = keys
         self.kwargs = kwargs
@@ -490,6 +491,14 @@ class _ZipFn:
             {k: p for k, p in builtins.zip(self.keys, list(parts))},
             **self.kwargs,
         )
+
+
+class _ZipArrInputFn:
+    def __init__(self, **kwargs: Any) -> None:
+        self.kwargs = kwargs
+
+    def __call__(self, *parts):
+        return ak.zip(list(parts), **self.kwargs)
 
 
 @borrow_docstring(ak.zip)
@@ -506,31 +515,15 @@ def zip(
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
 
-    if not isinstance(arrays, dict):
-        raise DaskAwkwardNotImplemented(
-            "dask_awkward.zip only supports dictionary inputs."
-        )
+    if isinstance(arrays, dict):
+        keys, colls, metadict = [], [], {}
+        for k, coll in arrays.items():
+            keys.append(k)
+            colls.append(coll)
+            metadict[k] = coll._meta
 
-    keys, colls, metadict = [], [], {}
-    for k, coll in arrays.items():
-        keys.append(k)
-        colls.append(coll)
-        metadict[k] = coll._meta
-
-    meta = ak.zip(
-        metadict,
-        depth_limit=depth_limit,
-        parameters=parameters,
-        with_name=with_name,
-        highlevel=highlevel,
-        behavior=behavior,
-        right_broadcast=right_broadcast,
-        optiontype_outside_record=optiontype_outside_record,
-    )
-
-    return map_partitions(
-        _ZipFn(
-            keys,
+        meta = ak.zip(
+            metadict,
             depth_limit=depth_limit,
             parameters=parameters,
             with_name=with_name,
@@ -538,8 +531,40 @@ def zip(
             behavior=behavior,
             right_broadcast=right_broadcast,
             optiontype_outside_record=optiontype_outside_record,
-        ),
-        *colls,
-        label="zip",
-        meta=meta,
-    )
+        )
+
+        return map_partitions(
+            _ZipDictInputFn(
+                keys,
+                depth_limit=depth_limit,
+                parameters=parameters,
+                with_name=with_name,
+                highlevel=highlevel,
+                behavior=behavior,
+                right_broadcast=right_broadcast,
+                optiontype_outside_record=optiontype_outside_record,
+            ),
+            *colls,
+            label="zip",
+            meta=meta,
+        )
+
+    elif isinstance(arrays, list):
+        fn = _ZipArrInputFn(
+            depth_limit=depth_limit,
+            parameters=parameters,
+            with_name=with_name,
+            highlevel=highlevel,
+            behavior=behavior,
+            right_broadcast=right_broadcast,
+            optiontype_outside_record=optiontype_outside_record,
+        )
+        return map_partitions(
+            fn,
+            *arrays,
+            label="zip",
+            meta=empty_typetracer(),
+        )
+
+    else:
+        raise TypeError("Only dictionary or list input is supported")
