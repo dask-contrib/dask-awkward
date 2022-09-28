@@ -31,7 +31,7 @@ def test_num(caa: ak.Array, daa: dak.Array, axis: int | None) -> None:
         assert_eq(da[c1], ca[c2])
 
 
-def test_zip(caa: ak.Array, daa: dak.Array) -> None:
+def test_zip_dict_input(caa: ak.Array, daa: dak.Array) -> None:
     da1 = daa["points"]["x"]
     da2 = daa["points"]["x"]
     ca1 = caa["points"]["x"]
@@ -40,6 +40,17 @@ def test_zip(caa: ak.Array, daa: dak.Array) -> None:
     da_z = dak.zip({"a": da1, "b": da2})
     ca_z = ak.zip({"a": ca1, "b": ca2})
     assert_eq(da_z, ca_z)
+
+
+def test_zip_list_input(caa: ak.Array, daa: dak.Array) -> None:
+    da1 = daa.points.x
+    ca1 = caa.points.x
+    dz1 = dak.zip([da1, da1])
+    cz1 = ak.zip([ca1, ca1])
+    assert_eq(dz1, cz1)
+    dz2 = dak.zip([da1, da1, da1])
+    cz2 = ak.zip([ca1, ca1, ca1])
+    assert_eq(dz2, cz2)
 
 
 def test_cartesian(caa: ak.Array, daa: dak.Array) -> None:
