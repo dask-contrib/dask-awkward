@@ -9,7 +9,6 @@ import numpy as np
 
 from dask_awkward.lib.core import (
     Array,
-    empty_typetracer,
     map_partitions,
     new_known_scalar,
     pw_reduction_with_agg_to_scalar,
@@ -563,7 +562,6 @@ def zip(
             fn,
             *arrays,
             label="zip",
-            meta=empty_typetracer(),
         )
 
     else:
