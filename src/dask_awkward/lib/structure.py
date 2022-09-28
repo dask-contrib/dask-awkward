@@ -565,4 +565,4 @@ def zip(
         )
 
     else:
-        raise TypeError("Only dictionary or list input is supported")
+        raise DaskAwkwardNotImplemented("dict or list input is supported by dak.zip")
