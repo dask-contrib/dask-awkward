@@ -492,7 +492,7 @@ class _ZipDictInputFn:
         )
 
 
-class _ZipArrInputFn:
+class _ZipListInputFn:
     def __init__(self, **kwargs: Any) -> None:
         self.kwargs = kwargs
 
@@ -549,7 +549,7 @@ def zip(
         )
 
     elif isinstance(arrays, list):
-        fn = _ZipArrInputFn(
+        fn = _ZipListInputFn(
             depth_limit=depth_limit,
             parameters=parameters,
             with_name=with_name,

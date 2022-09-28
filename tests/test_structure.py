@@ -42,7 +42,7 @@ def test_zip_dict_input(caa: ak.Array, daa: dak.Array) -> None:
     assert_eq(da_z, ca_z)
 
 
-def test_zip_lists_input(caa: ak.Array, daa: dak.Array) -> None:
+def test_zip_list_input(caa: ak.Array, daa: dak.Array) -> None:
     da1 = daa.points.x
     ca1 = caa.points.x
     dz1 = dak.zip([da1, da1])
