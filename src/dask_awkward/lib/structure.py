@@ -496,7 +496,7 @@ class _ZipListInputFn:
     def __init__(self, **kwargs: Any) -> None:
         self.kwargs = kwargs
 
-    def __call__(self, *parts):
+    def __call__(self, *parts: Any) -> ak.Array:
         return ak.zip(list(parts), **self.kwargs)
 
 
