@@ -13,9 +13,6 @@ import dask.config
 import numpy as np
 from awkward._typetracer import MaybeNone, OneOf, UnknownScalar
 from awkward.highlevel import _dir_pattern
-
-# from awkward._v2._typetracer import MaybeNone, OneOf, UnknownScalar
-# from awkward._v2.highlevel import _dir_pattern
 from dask.base import DaskMethodsMixin, dont_optimize, is_dask_collection, tokenize
 from dask.blockwise import BlockwiseDep
 from dask.blockwise import blockwise as dask_blockwise
