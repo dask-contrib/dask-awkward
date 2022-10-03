@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import awkward._v2 as ak
+import awkward as ak
 import numpy as np
 import pytest
-from awkward._v2.behaviors.mixins import mixin_class as ak_mixin_class
-from awkward._v2.behaviors.mixins import mixin_class_method as ak_mixin_class_method
+from awkward.behaviors.mixins import mixin_class as ak_mixin_class
+from awkward.behaviors.mixins import mixin_class_method as ak_mixin_class_method
 
 import dask_awkward as dak
 from dask_awkward.lib.testutils import assert_eq

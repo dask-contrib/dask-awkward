@@ -3,7 +3,7 @@ from __future__ import annotations
 import random
 from typing import Any
 
-import awkward._v2 as ak
+import awkward as ak
 from dask.base import is_dask_collection
 
 from dask_awkward.lib.core import Array, Record, typetracer_array

@@ -8,11 +8,14 @@ from functools import cached_property, partial
 from numbers import Number
 from typing import TYPE_CHECKING, Any, TypeVar
 
-import awkward._v2 as ak
+import awkward as ak
 import dask.config
 import numpy as np
-from awkward._v2._typetracer import MaybeNone, OneOf, UnknownScalar
-from awkward._v2.highlevel import _dir_pattern
+from awkward._typetracer import MaybeNone, OneOf, UnknownScalar
+from awkward.highlevel import _dir_pattern
+
+# from awkward._v2._typetracer import MaybeNone, OneOf, UnknownScalar
+# from awkward._v2.highlevel import _dir_pattern
 from dask.base import DaskMethodsMixin, dont_optimize, is_dask_collection, tokenize
 from dask.blockwise import BlockwiseDep
 from dask.blockwise import blockwise as dask_blockwise
@@ -35,9 +38,9 @@ from dask_awkward.utils import (
 )
 
 if TYPE_CHECKING:
-    from awkward._v2.contents.content import Content
-    from awkward._v2.forms.form import Form
-    from awkward._v2.types.type import Type
+    from awkward.contents.content import Content
+    from awkward.forms.form import Form
+    from awkward.types.type import Type
     from dask.array.core import Array as DaskArray
     from dask.bag.core import Bag as DaskBag
     from dask.blockwise import Blockwise
@@ -655,7 +658,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         Examples
         --------
         >>> import dask_awkward as dak
-        >>> import awkward._v2 as ak
+        >>> import awkward as ak
         >>> aa = ak.Array([[1, 2, 3], [], [2]])
         >>> a = dak.from_awkward(aa, npartitions=3)
         >>> a
@@ -1626,7 +1629,7 @@ def meta_or_identity(obj: Any) -> Any:
 
     Examples
     --------
-    >>> import awkward._v2 as ak
+    >>> import awkward as ak
     >>> import dask_awkward as dak
     >>> from dask_awkward.core import meta_or_identity
     >>> x = ak.from_iter([[1, 2, 3], [4]])

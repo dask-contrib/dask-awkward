@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-import awkward._v2 as ak
+import awkward as ak
 import dask.config
 import fsspec
 import numpy as np
@@ -77,7 +77,7 @@ def test_form(ndjson_points_file: str) -> None:
     assert daa.form
     daa.reset_meta()
 
-    from awkward._v2.forms.emptyform import EmptyForm
+    from awkward.forms.emptyform import EmptyForm
 
     assert daa.form == EmptyForm()
 

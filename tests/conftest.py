@@ -5,7 +5,7 @@ try:
 except ImportError:
     import json  # type: ignore
 
-import awkward._v2 as ak
+import awkward as ak
 import fsspec
 import pytest
 

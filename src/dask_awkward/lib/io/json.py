@@ -9,7 +9,7 @@ try:
 except ImportError:
     import json  # type: ignore
 
-import awkward._v2 as ak
+import awkward as ak
 import fsspec
 from dask.base import tokenize
 from dask.bytes.core import read_bytes

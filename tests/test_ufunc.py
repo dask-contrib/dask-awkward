@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-import awkward._v2 as ak
+import awkward as ak
 import numpy as np
 import pytest
 

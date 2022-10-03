@@ -1,4 +1,4 @@
-import awkward._v2 as ak
+import awkward as ak
 
 import dask_awkward as dak
 
