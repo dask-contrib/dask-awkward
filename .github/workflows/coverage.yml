@@ -24,6 +24,7 @@ jobs:
         python-version: 3.9
     - name: Generate Report
       run: |
+        pip install git+https://github.com/scikit-hep/awkward@main
         pip install --ignore-installed -q --no-cache-dir -e .[complete]
         pip install pytest-cov
         pytest --cov=dask_awkward --cov-report=xml
