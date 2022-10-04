@@ -28,7 +28,7 @@ jobs:
       run: |
         pip install pip setuptools wheel -U
         pip install dask[complete]
-        pip install git+https://github.com/scikit-hep/awkward@a2e91db99ed2a012231503584998ead20933393b
+        pip install git+https://github.com/scikit-hep/awkward@main
         pip install --ignore-installed -q --no-cache-dir -e .[complete]
         pip list
     - name: test
