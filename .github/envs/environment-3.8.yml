@@ -11,4 +11,4 @@ dependencies:
   - pyarrow
   - pip
   - pip:
-    - git+https://github.com/scikit-hep/awkward
+    - git+https://github.com/scikit-hep/awkward@a2e91db99ed2a012231503584998ead20933393b
