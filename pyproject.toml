@@ -133,3 +133,26 @@ ignore_missing_imports = true
 include = ["src"]
 pythonVersion = "3.8"
 reportPrivateImportUsage = false
+
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "except ImportError:",
+    "NotImplementedError",
+    "DaskAwkwardNotImplemented",
+    "_ipython_key_completions_",
+    "Only highlevel=True is supported",
+]
+fail_under = 90
+show_missing = true
+
+[tool.coverage.run]
+omit = [
+     "src/dask_awkward/lib/io/scratch.py",
+     "src/dask_awkward/tests/test_*.py",
+     "src/dask_awkward/tests/__init__.py",
+     "src/dask_awkward/version.py",
+]
+source = ["src/dask_awkward"]
