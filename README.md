@@ -32,3 +32,9 @@ We also recommend installing `dask-awkward` via its `main` branch:
 ```
 pip install git+https://github.com/ContinuumIO/dask-awkward@main
 ```
+
+Documentation
+-------------
+
+Documentation is hosted at
+[https://dask-awkward.readthedocs.io/](https://dask-awkward.readthedocs.io/en/latest/index.html).
