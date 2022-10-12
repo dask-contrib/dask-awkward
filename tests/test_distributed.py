@@ -6,7 +6,7 @@ distributed = pytest.importorskip("distributed")
 
 from pathlib import Path
 
-import awkward._v2 as ak
+import awkward as ak
 import numpy as np
 from dask import persist
 from dask.delayed import delayed
@@ -86,8 +86,8 @@ def test_from_delayed(loop, ndjson_points_file):  # noqa
             assert_eq(x, y, scheduler=client)
 
 
-from awkward._v2.behaviors.mixins import mixin_class as ak_mixin_class
-from awkward._v2.behaviors.mixins import mixin_class_method as ak_mixin_class_method
+from awkward.behaviors.mixins import mixin_class as ak_mixin_class
+from awkward.behaviors.mixins import mixin_class_method as ak_mixin_class_method
 
 behaviors: dict = {}
 

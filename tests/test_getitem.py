@@ -3,7 +3,7 @@ from __future__ import annotations
 import operator
 from collections.abc import Callable
 
-import awkward._v2 as ak
+import awkward as ak
 import pytest
 
 import dask_awkward as dak

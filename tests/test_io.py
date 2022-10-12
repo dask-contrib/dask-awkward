@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import awkward._v2 as ak
+import awkward as ak
 import pytest
 from dask.array.utils import assert_eq as da_assert_eq
 from dask.delayed import delayed

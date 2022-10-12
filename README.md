@@ -20,26 +20,21 @@ encourage willing users to experiment and report issues!
 Installing
 ----------
 
-If you are interested in experimenting with `dask-awkward` we
-recommend installing from the `main` branch:
-
-```
-pip install git+https://github.com/ContinuumIO/dask-awkward@main
-```
-
-The [awkward-array](https://github.com/scikit-hep/awkward) project is
-working on version 2 of the core `awkward` Python library; `awkward`
-versions 1.8 and later include many components of what will be version
-2, but in the `awkward._v2` module. Installing `dask-awkward` requires
-`awkward>=1.10.0`.
-
-It's recommended to have a bleeding edge version of `awkward`
-installed with:
+If you are interested in experimenting with `dask-awkward` you will
+need to install `awkward` from its `main` branch:
 
 ```
 pip install git+https://github.com/scikit-hep/awkward@main
 ```
 
-Since `dask-awkward` is designed for `awkward` version 2, the
-concrete, high-level array object (`ak.Array`) that we use is actually
-the `awkward._v2.Array` object.
+We also recommend installing `dask-awkward` via its `main` branch:
+
+```
+pip install git+https://github.com/ContinuumIO/dask-awkward@main
+```
+
+Documentation
+-------------
+
+Documentation is hosted at
+[https://dask-awkward.readthedocs.io/](https://dask-awkward.readthedocs.io/en/latest/index.html).

@@ -9,7 +9,7 @@ import abc
 import math
 from typing import TYPE_CHECKING, Any
 
-import awkward._v2 as ak
+import awkward as ak
 import fsspec
 from dask.base import tokenize
 from dask.blockwise import BlockIndex

@@ -4,9 +4,9 @@ import math
 from collections.abc import Callable, Iterable
 from typing import TYPE_CHECKING, Any
 
-import awkward._v2 as ak
+import awkward as ak
 import numpy as np
-from awkward._v2.types.numpytype import primitive_to_dtype
+from awkward.types.numpytype import primitive_to_dtype
 from dask.base import flatten, tokenize
 from dask.highlevelgraph import HighLevelGraph
 from dask.utils import funcname
@@ -55,7 +55,7 @@ def from_awkward(source: ak.Array, npartitions: int, label: str | None = None) -
     Examples
     --------
     >>> import dask_awkward as dak
-    >>> import awkward._v2 as ak
+    >>> import awkward as ak
     >>> a = ak.Array([[1, 2, 3], [4], [5, 6, 7, 8]])
     >>> c = dak.from_awkward(a, npartitions=3)
     >>> c.partitions[[0, 1]].compute()

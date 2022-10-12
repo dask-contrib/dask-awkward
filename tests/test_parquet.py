@@ -1,4 +1,4 @@
-import awkward._v2 as ak
+import awkward as ak
 import fsspec
 import pyarrow as pa
 import pyarrow.dataset as pad
