@@ -144,6 +144,7 @@ exclude_lines = [
     "DaskAwkwardNotImplemented",
     "_ipython_key_completions_",
     "Only highlevel=True is supported",
+    "\\.\\.\\.$",
 ]
 fail_under = 90
 show_missing = true
