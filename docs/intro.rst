@@ -42,7 +42,7 @@ notice the use of wildcard syntax ("*").
         .. code-block:: python
 
            from pathlib import Path
-           import awkward._v2 as ak
+           import awkward as ak
            file = Path("data.00.json")
            x = ak.from_json(file, line_delimited=True)
            x = x[ak.num(x.foo) > 2]
@@ -58,11 +58,6 @@ notice the use of wildcard syntax ("*").
 
            # With Dask we have to ask for the result with compute
            x = x.compute()
-
-.. note::
-
-   dask-awkward depends on the in-development version 2 of awkward;
-   which exists in the ``awkward._v2`` namespace.
 
 On the left (the eager version) the ``from_json`` call will
 immediately begin to read data from disk and decode the JSON.
