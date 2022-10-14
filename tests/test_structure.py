@@ -53,6 +53,17 @@ def test_zip_list_input(caa: ak.Array, daa: dak.Array) -> None:
     assert_eq(dz2, cz2)
 
 
+def test_zip_tuple_input(caa: ak.Array, daa: dak.Array) -> None:
+    da1 = daa.points.x
+    ca1 = caa.points.x
+    dz1 = dak.zip((da1, da1))
+    cz1 = ak.zip((ca1, ca1))
+    assert_eq(dz1, cz1)
+    dz2 = dak.zip((da1, da1, da1))
+    cz2 = ak.zip((ca1, ca1, ca1))
+    assert_eq(dz2, cz2)
+
+
 def test_cartesian(caa: ak.Array, daa: dak.Array) -> None:
     da1 = daa["points", "x"]
     da2 = daa["points", "y"]

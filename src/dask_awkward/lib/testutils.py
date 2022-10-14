@@ -143,5 +143,5 @@ def list3() -> list:
     ]  # pragma: no cover
 
 
-def lists() -> ak.Array:
+def lists() -> Array:
     return from_lists([list1(), list2(), list3()])  # pragma: no cover
