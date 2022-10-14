@@ -5,6 +5,7 @@ import pytest
 
 import dask_awkward as dak
 from dask_awkward.lib.testutils import assert_eq
+from dask_awkward.utils import DaskAwkwardNotImplemented
 
 
 @pytest.mark.parametrize("axis", [None, 0, 1, -1])
@@ -62,6 +63,13 @@ def test_zip_tuple_input(caa: ak.Array, daa: dak.Array) -> None:
     dz2 = dak.zip((da1, da1, da1))
     cz2 = ak.zip((ca1, ca1, ca1))
     assert_eq(dz2, cz2)
+
+
+def test_zip_bad_input(caa: ak.Array, daa: dak.Array) -> None:
+    da1 = daa.points.x
+    gd = (x for x in (da1, da1))
+    with pytest.raises(DaskAwkwardNotImplemented, match="only sized iterables"):
+        dak.zip(gd)
 
 
 def test_cartesian(caa: ak.Array, daa: dak.Array) -> None:
