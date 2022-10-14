@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import builtins
-from collections.abc import Sequence, Sized
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 import awkward as ak
@@ -502,7 +502,7 @@ class _ZipListInputFn:
 
 @borrow_docstring(ak.zip)
 def zip(
-    arrays: dict[str, Array] | Sized,
+    arrays: dict | list | tuple,
     depth_limit: int | None = None,
     parameters: dict | None = None,
     with_name: str | None = None,
@@ -513,9 +513,6 @@ def zip(
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
-
-    if not isinstance(arrays, Sized):
-        raise DaskAwkwardNotImplemented("only Sized Iterables are supported by dak.zip")
 
     if isinstance(arrays, dict):
         keys, colls, metadict = [], [], {}
@@ -551,17 +548,21 @@ def zip(
             meta=meta,
         )
 
-    fn = _ZipListInputFn(
-        depth_limit=depth_limit,
-        parameters=parameters,
-        with_name=with_name,
-        highlevel=highlevel,
-        behavior=behavior,
-        right_broadcast=right_broadcast,
-        optiontype_outside_record=optiontype_outside_record,
-    )
-    return map_partitions(
-        fn,
-        *arrays,
-        label="zip",
-    )
+    elif isinstance(arrays, (list, tuple)):
+        fn = _ZipListInputFn(
+            depth_limit=depth_limit,
+            parameters=parameters,
+            with_name=with_name,
+            highlevel=highlevel,
+            behavior=behavior,
+            right_broadcast=right_broadcast,
+            optiontype_outside_record=optiontype_outside_record,
+        )
+        return map_partitions(
+            fn,
+            *arrays,
+            label="zip",
+        )
+
+    else:
+        raise DaskAwkwardNotImplemented("only Sized Iterables are supported by dak.zip")
