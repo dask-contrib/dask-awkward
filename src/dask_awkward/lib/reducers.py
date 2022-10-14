@@ -5,7 +5,11 @@ from typing import TYPE_CHECKING, Any
 import awkward as ak
 import numpy as np
 
-from dask_awkward.lib.core import map_partitions, pw_reduction_with_agg_to_scalar
+from dask_awkward.lib.core import (
+    _total_reduction_to_scalar,
+    map_partitions,
+    pw_reduction_with_agg_to_scalar,
+)
 from dask_awkward.utils import DaskAwkwardNotImplemented, borrow_docstring
 
 if TYPE_CHECKING:
@@ -264,13 +268,12 @@ def max(
             flatten_records=flatten_records,
         )
     if axis is None:
-        return pw_reduction_with_agg_to_scalar(
-            ak.max,
-            ak.max,
+        return _total_reduction_to_scalar(
             array,
+            ak.max,
             axis=None,
+            mask_identity=mask_identity,
             flatten_records=flatten_records,
-            agg_kwargs={"axis": None, "flatten_records": flatten_records},
         )
     else:
         raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
@@ -327,12 +330,12 @@ def min(
             flatten_records=flatten_records,
         )
     if axis is None:
-        return pw_reduction_with_agg_to_scalar(
-            ak.min,
-            ak.min,
+        return _total_reduction_to_scalar(
             array,
+            ak.min,
             axis=None,
-            agg_kwargs={"axis": None},
+            mask_identity=mask_identity,
+            flatten_records=flatten_records,
         )
     else:
         raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
@@ -402,7 +405,13 @@ def sum(
             flatten_records=flatten_records,
         )
     elif axis is None:
-        return pw_reduction_with_agg_to_scalar(ak.sum, ak.sum, array)
+        return _total_reduction_to_scalar(
+            array,
+            ak.sum,
+            axis=None,
+            flatten_records=flatten_records,
+            mask_identity=mask_identity,
+        )
     elif axis == 0:
         raise DaskAwkwardNotImplemented(
             f"axis={axis} is not supported for this array yet."
