@@ -565,4 +565,6 @@ def zip(
         )
 
     else:
-        raise DaskAwkwardNotImplemented("only Sized Iterables are supported by dak.zip")
+        raise DaskAwkwardNotImplemented(
+            "only sized iterables are supported by dak.zip (dict, list, or tuple)"
+        )
