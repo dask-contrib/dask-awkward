@@ -36,10 +36,12 @@ class _FromJsonFn:
         *args: Any,
         storage: AbstractFileSystem,
         compression: str | None = None,
+        schema: dict | None = None,
         **kwargs: Any,
     ) -> None:
         self.compression = compression
         self.storage = storage
+        self.schema = schema
         self.args = args
         self.kwargs = kwargs
 
@@ -54,13 +56,33 @@ class _FromJsonLineDelimitedFn(_FromJsonFn):
         *args: Any,
         storage: AbstractFileSystem,
         compression: str | None = None,
+        schema: dict | None = None,
         **kwargs: Any,
     ) -> None:
-        super().__init__(*args, storage=storage, compression=compression, **kwargs)
+        super().__init__(
+            *args,
+            storage=storage,
+            compression=compression,
+            schema=schema,
+            **kwargs,
+        )
+
+        # read beginning of file to get starting metadata (for form)
 
     def __call__(self, source: str) -> ak.Array:
         with self.storage.open(source, mode="rt", compression=self.compression) as f:
-            return ak.from_json(f.read(), line_delimited=True)
+            return ak.from_json(f.read(), line_delimited=True, schema=self.schema)
+
+    def project_columns(self, columns):
+        schema = self.schema
+
+        # TODO: do something with columns to redefine schema...
+
+        return _FromJsonLineDelimitedFn(
+            schema=schema,
+            storage=self.storage,
+            compression=self.compression,
+        )
 
 
 class _FromJsonSingleObjInFileFn(_FromJsonFn):
@@ -338,3 +360,25 @@ def from_json(
     # otherwise the arguments are bad
     else:
         raise TypeError("Incompatible combination of arguments.")  # pragma: no cover
+
+
+def layout_to_jsonschema(layout, input=None):
+    if input is None:
+        input = {"type": "object", "properties": {}}
+    if layout.is_RecordType:
+        input["type"] = "object"
+        input["properties"] = {}
+        for field in layout.fields:
+            input["properties"][field] = {"type": None}
+            layout_to_jsonschema(layout[field], input["properties"][field])
+    elif layout.is_ListType:
+        input["type"] = "array"
+        input["items"] = {}
+        layout_to_jsonschema(layout.content, input["items"])
+    elif layout.dtype.kind == "i":
+        input["type"] = "integer"
+    elif layout.dtype.kind == "f":
+        input["type"] = "number"
+    elif layout.dtype.kind.lower() in "uso":
+        input["type"] = "string"
+    return input

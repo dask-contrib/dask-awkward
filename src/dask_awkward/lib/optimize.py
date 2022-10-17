@@ -57,6 +57,10 @@ def _is_getitem(layer: Layer) -> bool:
 def _requested_columns(layer: Blockwise) -> set[str]:
     """Determine the columns requested in an ``operator.getitem`` call."""
     fn_arg = layer.indices[1][0]
+    if isinstance(fn_arg, tuple):
+        fn_arg = fn_arg[0]
+        if isinstance(fn_arg, slice):
+            return set()
     if isinstance(fn_arg, list):  # type: ignore
         return set(fn_arg)  # type: ignore
     return {fn_arg}
