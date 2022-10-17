@@ -1302,28 +1302,50 @@ def map_partitions(
 
 
 def _total_reduction_to_scalar(
-    array: Array,
-    fn: Callable,
     *,
-    label: str | None = None,
+    label: str,
+    array: Array,
+    meta: Any,
+    chunked_fn: Callable,
+    comb_fn: Callable | None = None,
+    agg_fn: Callable | None = None,
     token: str | None = None,
     dtype: Any | None = None,
-    meta: Any | None = None,
     split_every: int | bool | None = None,
-    **kwargs: Any,
-) -> Any:
+    chunked_kwargs: dict[str, Any] | None = None,
+    comb_kwargs: dict[str, Any] | None = None,
+    agg_kwargs: dict[str, Any] | None = None,
+) -> Scalar:
     from dask.layers import DataFrameTreeReduction
 
-    meta = meta or fn(array._meta, **kwargs)
-    label = label or funcname(fn)
-    token = token or tokenize(array, fn, label, dtype, kwargs)
+    chunked_kwargs = chunked_kwargs or {}
+    token = token or tokenize(
+        array,
+        chunked_fn,
+        comb_fn,
+        agg_fn,
+        label,
+        dtype,
+        split_every,
+        chunked_kwargs,
+        comb_kwargs,
+        agg_kwargs,
+    )
     name_comb = f"{label}-combine-{token}"
     name_agg = f"{label}-agg-{token}"
 
-    fn = partial(fn, **kwargs)
+    comb_kwargs = comb_kwargs or chunked_kwargs
+    agg_kwargs = agg_kwargs or comb_kwargs
+
+    comb_fn = comb_fn or chunked_fn
+    agg_fn = agg_fn or comb_fn
+
+    chunked_fn = partial(chunked_fn, **chunked_kwargs)
+    comb_fn = partial(comb_fn, **comb_kwargs)
+    agg_fn = partial(agg_fn, **agg_kwargs)
 
     chunked_result = map_partitions(
-        fn,
+        chunked_fn,
         array,
         meta=empty_typetracer(),
     )
@@ -1340,8 +1362,8 @@ def _total_reduction_to_scalar(
         name_input=chunked_result.name,
         npartitions_input=chunked_result.npartitions,
         concat_func=ak.from_iter,
-        tree_node_func=fn,
-        finalize_func=fn,
+        tree_node_func=comb_fn,
+        finalize_func=agg_fn,
         split_every=split_every,
         tree_node_name=name_comb,
     )
@@ -1350,57 +1372,6 @@ def _total_reduction_to_scalar(
         name_agg, dftr, dependencies=(chunked_result,)
     )
     return new_scalar_object(graph, name_agg, meta=meta)
-
-
-def pw_reduction_with_agg_to_scalar(
-    func: Callable,
-    agg: Callable,
-    array: Array,
-    *,
-    dtype: Any | None = None,
-    agg_kwargs: Mapping[str, Any] | None = None,
-    **kwargs: Any,
-) -> Scalar:
-    """Partitionwise operation with aggregation to scalar.
-
-    Parameters
-    ----------
-    array : dask_awkward.Array
-        Awkward array collection.
-    func : Callable
-        Function to apply on all partitions.
-    agg : Callable
-        Function to aggregate the result on each partition.
-    name : str, optional
-        Name for the computation, if ``None`` the name of `func` will
-        be used.
-    **kwargs : Any
-        Keyword arguments passed to `func`.
-
-    Returns
-    -------
-    Scalar
-        Resulting scalar Dask collection.
-
-    """
-    if agg_kwargs is None:
-        agg_kwargs = {}
-    token = tokenize(array)
-    namefunc = func.__name__
-    nameagg = agg.__name__
-    namefunc = f"{namefunc}-{token}"
-    nameagg = f"{nameagg}-agg-{token}"
-    func = partial(func, **kwargs)
-    agg = partial(agg, **agg_kwargs)
-    dsk = {(namefunc, i): (func, k) for i, k in enumerate(array.__dask_keys__())}
-    dsk[(nameagg, 0)] = (agg, list(dsk.keys()))  # type: ignore
-    hlg = HighLevelGraph.from_collections(
-        nameagg,
-        dsk,
-        dependencies=(array,),
-    )
-    meta = UnknownScalar(np.dtype(dtype)) if dtype is not None else None
-    return new_scalar_object(hlg, name=nameagg, meta=meta)
 
 
 def calculate_known_divisions(array: Array) -> tuple[int, ...]:
