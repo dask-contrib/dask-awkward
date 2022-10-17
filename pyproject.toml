@@ -135,7 +135,6 @@ include = ["src"]
 pythonVersion = "3.8"
 reportPrivateImportUsage = false
 
-
 [tool.coverage.report]
 exclude_lines = [
     "pragma: no cover",

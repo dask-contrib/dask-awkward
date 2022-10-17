@@ -362,7 +362,8 @@ def from_json(
         raise TypeError("Incompatible combination of arguments.")  # pragma: no cover
 
 
-def layout_to_jsonschema(layout, input=None):
+def layout_to_jsonschema(layout, input=None) -> dict:
+    """Convert awkward array Layout to a JSON Schema dictionary."""
     if input is None:
         input = {"type": "object", "properties": {}}
     if layout.is_RecordType:
