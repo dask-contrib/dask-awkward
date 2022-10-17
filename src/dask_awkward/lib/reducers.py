@@ -4,8 +4,9 @@ from typing import TYPE_CHECKING, Any
 
 import awkward as ak
 import numpy as np
+from awkward._typetracer import UnknownScalar
 
-from dask_awkward.lib.core import map_partitions, pw_reduction_with_agg_to_scalar
+from dask_awkward.lib.core import _total_reduction_to_scalar, map_partitions
 from dask_awkward.utils import DaskAwkwardNotImplemented, borrow_docstring
 
 if TYPE_CHECKING:
@@ -154,19 +155,16 @@ def count(
             flatten_records=flatten_records,
         )
     elif axis is None:
-        trivial_result = map_partitions(
-            ak.count,
-            array,
-            axis=1,
-            keepdims=keepdims,
-            mask_identity=mask_identity,
-            flatten_records=flatten_records,
-        )
-        return pw_reduction_with_agg_to_scalar(
-            ak.sum,
-            ak.sum,
-            trivial_result,
-            dtype=np.int64,
+        return _total_reduction_to_scalar(
+            label="count_nonzero",
+            array=array,
+            meta=UnknownScalar(np.dtype(int)),
+            chunked_fn=ak.count_nonzero,
+            chunked_kwargs={"axis": 1},
+            comb_fn=ak.sum,
+            comb_kwargs={"axis": None},
+            agg_fn=ak.sum,
+            agg_kwargs={"axis": None},
         )
     else:
         raise ValueError("axis must be None or an integer.")
@@ -195,19 +193,16 @@ def count_nonzero(
             flatten_records=flatten_records,
         )
     elif axis is None:
-        trivial_result = map_partitions(
-            ak.count_nonzero,
-            array,
-            axis=1,
-            keepdims=keepdims,
-            mask_identity=mask_identity,
-            flatten_records=flatten_records,
-        )
-        return pw_reduction_with_agg_to_scalar(
-            ak.sum,
-            ak.sum,
-            trivial_result,
-            dtype=np.int64,
+        return _total_reduction_to_scalar(
+            label="count_nonzero",
+            array=array,
+            meta=UnknownScalar(np.dtype(int)),
+            chunked_fn=ak.count_nonzero,
+            chunked_kwargs={"axis": 1},
+            comb_fn=ak.sum,
+            comb_kwargs={"axis": None},
+            agg_fn=ak.sum,
+            agg_kwargs={"axis": None},
         )
     else:
         raise ValueError("axis must be None or an integer.")
@@ -264,13 +259,16 @@ def max(
             flatten_records=flatten_records,
         )
     if axis is None:
-        return pw_reduction_with_agg_to_scalar(
-            ak.max,
-            ak.max,
-            array,
-            axis=None,
-            flatten_records=flatten_records,
-            agg_kwargs={"axis": None, "flatten_records": flatten_records},
+        return _total_reduction_to_scalar(
+            label="max",
+            array=array,
+            chunked_fn=ak.max,
+            chunked_kwargs={
+                "axis": None,
+                "mask_identity": mask_identity,
+                "flatten_records": flatten_records,
+            },
+            meta=ak.max(array._meta, axis=None),
         )
     else:
         raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
@@ -327,12 +325,16 @@ def min(
             flatten_records=flatten_records,
         )
     if axis is None:
-        return pw_reduction_with_agg_to_scalar(
-            ak.min,
-            ak.min,
-            array,
-            axis=None,
-            agg_kwargs={"axis": None},
+        return _total_reduction_to_scalar(
+            label="min",
+            array=array,
+            chunked_fn=ak.min,
+            chunked_kwargs={
+                "axis": None,
+                "mask_identity": mask_identity,
+                "flatten_records": flatten_records,
+            },
+            meta=ak.max(array._meta, axis=None),
         )
     else:
         raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
@@ -402,7 +404,17 @@ def sum(
             flatten_records=flatten_records,
         )
     elif axis is None:
-        return pw_reduction_with_agg_to_scalar(ak.sum, ak.sum, array)
+        return _total_reduction_to_scalar(
+            label="sum",
+            array=array,
+            chunked_fn=ak.sum,
+            chunked_kwargs={
+                "axis": None,
+                "mask_identity": mask_identity,
+                "flatten_records": flatten_records,
+            },
+            meta=ak.max(array._meta, axis=None),
+        )
     elif axis == 0:
         raise DaskAwkwardNotImplemented(
             f"axis={axis} is not supported for this array yet."

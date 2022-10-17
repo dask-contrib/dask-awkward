@@ -6,12 +6,13 @@ from typing import TYPE_CHECKING, Any
 
 import awkward as ak
 import numpy as np
+from awkward._typetracer import UnknownScalar
 
 from dask_awkward.lib.core import (
     Array,
+    _total_reduction_to_scalar,
     map_partitions,
     new_known_scalar,
-    pw_reduction_with_agg_to_scalar,
 )
 from dask_awkward.utils import DaskAwkwardNotImplemented, borrow_docstring
 
@@ -322,15 +323,14 @@ def num(
         if array.known_divisions:
             return new_known_scalar(array.divisions[-1], dtype=int)
         else:
-            return pw_reduction_with_agg_to_scalar(
-                func=ak.num,
-                agg=ak.sum,
+            return _total_reduction_to_scalar(
+                label="num",
                 array=array,
-                axis=0,
-                dtype=np.int64,
-                agg_kwargs={"axis": None},
-                highlevel=highlevel,
-                behavior=behavior,
+                meta=UnknownScalar(np.dtype(int)),
+                chunked_fn=ak.num,
+                chunked_kwargs={"axis": 0},
+                comb_fn=ak.sum,
+                comb_kwargs={"axis": None},
             )
     raise DaskAwkwardNotImplemented("TODO")
 
