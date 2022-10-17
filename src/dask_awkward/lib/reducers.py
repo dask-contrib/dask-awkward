@@ -156,10 +156,10 @@ def count(
         )
     elif axis is None:
         return _total_reduction_to_scalar(
-            label="count_nonzero",
+            label="count",
             array=array,
             meta=UnknownScalar(np.dtype(int)),
-            chunked_fn=ak.count_nonzero,
+            chunked_fn=ak.count,
             chunked_kwargs={"axis": 1},
             comb_fn=ak.sum,
             comb_kwargs={"axis": None},
