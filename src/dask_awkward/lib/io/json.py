@@ -24,7 +24,7 @@ from dask_awkward.lib.io.io import from_map
 if TYPE_CHECKING:
     from fsspec.spec import AbstractFileSystem
 
-    from dask_awkward.core import Array
+    from dask_awkward.lib.core import Array
 
 
 __all__ = ("from_json",)
