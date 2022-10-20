@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     from dask_awkward.lib.core import Array, Scalar
 
 
-__all__ = ("from_json",)
+__all__ = ("from_json", "to_json")
 
 
 class _FromJsonFn:
@@ -393,7 +393,7 @@ def from_json(
         raise TypeError("Incompatible combination of arguments.")  # pragma: no cover
 
 
-def layout_to_jsonschema(layout, input=None) -> dict:
+def layout_to_jsonschema(layout, input=None):
     """Convert awkward array Layout to a JSON Schema dictionary."""
     if input is None:
         input = {"type": "object", "properties": {}}
@@ -448,7 +448,7 @@ class _ToJsonFn:
         elif self.wildcarded:
             path = self.path.replace("*", part)
         else:
-            raise RuntimeError("Cannot construct output file path.")
+            raise RuntimeError("Cannot construct output file path.")  # pragma: no cover
 
         try:
             with self.fs.open(path, mode="wt", compression=self.compression) as f:

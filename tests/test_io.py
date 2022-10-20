@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import awkward as ak
@@ -272,3 +273,43 @@ def test_to_bag(daa, caa):
     a = daa.to_dask_bag()
     for comprec, entry in zip(a.compute(), caa):
         assert comprec.tolist() == entry.tolist()
+
+
+def test_to_json(daa, tmpdir_factory):
+    tdir = str(tmpdir_factory.mktemp("json_temp"))
+
+    p1 = os.path.join(tdir, "z", "z")
+
+    dak.to_json(daa, p1, compute=True, line_delimited=True)
+    paths = list((Path(tdir) / "z" / "z").glob("part*.json"))
+    assert len(paths) == daa.npartitions
+    arrays = ak.concatenate([ak.from_json(p, line_delimited=True) for p in paths])
+    assert_eq(daa, arrays)
+
+    x = dak.from_json(os.path.join(p1, "*.json"))
+    assert_eq(arrays, x)
+
+    s = dak.to_json(
+        daa,
+        os.path.join(tdir, "file-*.json.gz"),
+        compute=False,
+        line_delimited=True,
+    )
+    s.compute()
+    r = dak.from_json(os.path.join(tdir, "*.json.gz"))
+    assert_eq(x, r)
+
+
+def test_to_json_raise_filenotfound(
+    daa: dak.Array,
+    tmpdir_factory: pytest.TempdirFactory,
+) -> None:
+    p = tmpdir_factory.mktemp("onelevel")
+    p2 = os.path.join(str(p), "two")
+    with pytest.raises(FileNotFoundError, match="Parent directory for output file"):
+        dak.to_json(
+            daa,
+            os.path.join(p2, "three", "four", "*.json"),
+            compute=True,
+            line_delimited=True,
+        )
