@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import abc
+import math
+import os
 import warnings
 from typing import TYPE_CHECKING, Any
 
@@ -10,21 +12,27 @@ except ImportError:
     import json  # type: ignore
 
 import awkward as ak
-import fsspec
 from dask.base import tokenize
+from dask.blockwise import BlockIndex
 from dask.bytes.core import read_bytes
 from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
 from dask.utils import parse_bytes
+from fsspec.core import get_fs_token_paths, url_to_fs
 from fsspec.utils import infer_compression
 
-from dask_awkward.lib.core import new_array_object, typetracer_array
+from dask_awkward.lib.core import (
+    map_partitions,
+    new_array_object,
+    new_scalar_object,
+    typetracer_array,
+)
 from dask_awkward.lib.io.io import from_map
 
 if TYPE_CHECKING:
     from fsspec.spec import AbstractFileSystem
 
-    from dask_awkward.lib.core import Array
+    from dask_awkward.lib.core import Array, Scalar
 
 
 __all__ = ("from_json",)
@@ -50,6 +58,31 @@ class _FromJsonFn:
         ...
 
 
+def _read_beginning_compressed(
+    storage: AbstractFileSystem,
+    source: str,
+    compression: str | None,
+    n_lines: int = 5,
+) -> ak.Array:
+    lines = []
+    with storage.open(source, mode="rt", compression=compression) as f:
+        for i, line in enumerate(f):
+            if i >= n_lines:
+                break
+            lines.append(ak.from_json(line))
+        return ak.from_iter(lines)
+
+
+def _read_beginning_uncompressed(
+    storage: AbstractFileSystem,
+    source: str,
+    numbytes: int = 16384,
+) -> ak.Array:
+    bytes = storage.cat(source, start=0, end=numbytes)
+    array = ak.concatenate([ak.from_json(line) for line in bytes.split(b"\n")[:-1]])
+    return array
+
+
 class _FromJsonLineDelimitedFn(_FromJsonFn):
     def __init__(
         self,
@@ -66,8 +99,6 @@ class _FromJsonLineDelimitedFn(_FromJsonFn):
             schema=schema,
             **kwargs,
         )
-
-        # read beginning of file to get starting metadata (for form)
 
     def __call__(self, source: str) -> ak.Array:
         with self.storage.open(source, mode="rt", compression=self.compression) as f:
@@ -162,7 +193,7 @@ def _from_json_files(
     derive_meta_kwargs: dict[str, Any] | None = None,
     storage_options: dict[str, Any] | None = None,
 ) -> Array:
-    fs, fstoken, urlpaths = fsspec.get_fs_token_paths(
+    fs, fstoken, urlpaths = get_fs_token_paths(
         urlpath,
         mode="rb",
         storage_options=storage_options,
@@ -383,3 +414,84 @@ def layout_to_jsonschema(layout, input=None) -> dict:
     elif layout.dtype.kind.lower() in "uso":
         input["type"] = "string"
     return input
+
+
+class _ToJsonFn:
+    def __init__(
+        self,
+        fs: AbstractFileSystem,
+        path: str,
+        npartitions: int,
+        compression: str | None,
+        line_delimited: bool,
+        **kwargs: Any,
+    ) -> None:
+        self.fs = fs
+        self.path = path
+        self.just_dir = ".json" not in self.path
+        if self.just_dir:
+            if not self.fs.exists(path):
+                self.fs.mkdir(path)
+        self.wildcarded = "*" in self.path
+        self.zfill = math.ceil(math.log(npartitions, 10))
+        self.kwargs = kwargs
+        self.compression = compression
+        if self.compression == "infer":
+            self.compression = infer_compression(self.path)
+        self.line_delimited = line_delimited
+
+    def __call__(self, array: ak.Array, block_index: tuple[int]) -> None:
+        part = str(block_index[0]).zfill(self.zfill)
+
+        if self.just_dir:
+            path = os.path.join(self.path, f"part{part}.json")
+        elif self.wildcarded:
+            path = self.path.replace("*", part)
+        else:
+            raise RuntimeError("Cannot construct output file path.")
+
+        try:
+            with self.fs.open(path, mode="wt", compression=self.compression) as f:
+                ak.to_json(array, f, line_delimited=self.line_delimited, **self.kwargs)
+        except FileNotFoundError:
+            raise FileNotFoundError(
+                f"Parent directory for output file ({path}) "
+                "is not available, create it."
+            )
+
+        return None
+
+
+def to_json(
+    array: Array,
+    path: str,
+    line_delimited: bool = True,
+    storage_options: dict[str, Any] | None = None,
+    compute: bool = False,
+    compression: str | None = "infer",
+    **kwargs: Any,
+) -> Scalar:
+    storage_options = storage_options or {}
+    fs, _ = url_to_fs(path, **storage_options)
+    nparts = array.npartitions
+    write_res = map_partitions(
+        _ToJsonFn(
+            fs,
+            path,
+            npartitions=nparts,
+            compression=compression,
+            line_delimited=line_delimited,
+            **kwargs,
+        ),
+        array,
+        BlockIndex((nparts,)),
+        label="to-json-on-block",
+        meta=array._meta,
+    )
+    name = f"to-json-{tokenize(array, path)}"
+    dsk = {(name, 0): (lambda *_: None, write_res.__dask_keys__())}
+    graph = HighLevelGraph.from_collections(name, dsk, dependencies=(write_res,))
+    res = new_scalar_object(graph, name=name, meta=None)
+    if compute:
+        res.compute()
+    return res
