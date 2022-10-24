@@ -1,3 +1,7 @@
+import pytest
+
+pytest.importorskip("pyarrow")
+
 import dask_awkward as dak
 import dask_awkward.lib.optimize as o
 from dask_awkward.layers import AwkwardIOLayer
