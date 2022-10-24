@@ -121,24 +121,35 @@ class _FromJsonSingleObjInFileFn(_FromJsonFn):
         self,
         *args: Any,
         storage: AbstractFileSystem,
+        schema: dict | None = None,
         compression: str | None = None,
         **kwargs: Any,
     ) -> None:
-        super().__init__(*args, storage=storage, compression=compression, **kwargs)
+        super().__init__(
+            *args,
+            storage=storage,
+            compression=compression,
+            schema=schema,
+            **kwargs,
+        )
 
     def __call__(self, source: str) -> ak.Array:
         with self.storage.open(source, mode="rb", compression=self.compression) as f:
-            return ak.from_json(f)
+            return ak.from_json(f, schema=self.schema, **self.kwargs)
 
 
 class _FromJsonBytesFn:
+    def __init__(self, schema: dict | None = None) -> None:
+        self.schema = schema
+
     def __call__(self, source: bytes) -> ak.Array:
-        return ak.from_json(source, line_delimited=True)
+        return ak.from_json(source, line_delimited=True, schema=self.schema)
 
 
 def derive_json_meta(
     storage: AbstractFileSystem,
     source: str,
+    schema: dict | None = None,
     compression: str | None = "infer",
     sample_rows: int = 5,
     bytechunks: str | int = "16 KiB",
@@ -151,7 +162,11 @@ def derive_json_meta(
     bytechunks = parse_bytes(bytechunks)
 
     if one_obj_per_file:
-        fn = _FromJsonSingleObjInFileFn(storage=storage, compression=compression)
+        fn = _FromJsonSingleObjInFileFn(
+            storage=storage,
+            compression=compression,
+            schema=schema,
+        )
         return typetracer_array(fn(source))
 
     # when the data is uncompressed we read `bytechunks` number of
@@ -187,6 +202,7 @@ def derive_json_meta(
 def _from_json_files(
     *,
     urlpath: str | list[str],
+    schema: dict | None = None,
     one_obj_per_file: bool = False,
     compression: str | None = "infer",
     meta: ak.Array | None = None,
@@ -203,6 +219,7 @@ def _from_json_files(
         meta = derive_json_meta(
             fs,
             urlpaths[0],
+            schema=schema,
             one_obj_per_file=one_obj_per_file,
             **meta_read_kwargs,
         )
@@ -216,9 +233,14 @@ def _from_json_files(
         f: _FromJsonFn = _FromJsonSingleObjInFileFn(
             storage=fs,
             compression=compression,
+            schema=schema,
         )
     else:
-        f = _FromJsonLineDelimitedFn(storage=fs, compression=compression)
+        f = _FromJsonLineDelimitedFn(
+            storage=fs,
+            compression=compression,
+            schema=schema,
+        )
 
     return from_map(f, urlpaths, label="from-json", token=token, meta=meta)
 
@@ -226,6 +248,7 @@ def _from_json_files(
 def _from_json_bytes(
     *,
     urlpath: str | list[str],
+    schema: dict | None,
     blocksize: int | str,
     delimiter: Any,
     meta: ak.Array | None,
@@ -242,7 +265,7 @@ def _from_json_bytes(
         **storage_options,
     )
     flat_chunks = list(flatten(bytechunks))
-    f = _FromJsonBytesFn()
+    f = _FromJsonBytesFn(schema=schema)
     dsk = {
         (name, i): (f, delayed_chunk.key) for i, delayed_chunk in enumerate(flat_chunks)
     }
@@ -265,8 +288,7 @@ def _from_json_bytes(
 
 def from_json(
     urlpath: str | list[str],
-    # line_delimited: bool = False,
-    # schema: Any | None = None,
+    schema: dict | None = None,
     # nan_string: str | None = None,
     # posinf_string: str | None = None,
     # neginf_string: str | None = None,
@@ -370,6 +392,7 @@ def from_json(
     if delimiter is None and blocksize is None:
         return _from_json_files(
             urlpath=urlpath,
+            schema=schema,
             one_obj_per_file=one_obj_per_file,
             compression=compression,
             meta=meta,
@@ -382,6 +405,7 @@ def from_json(
     elif delimiter is not None and blocksize is not None:
         return _from_json_bytes(
             urlpath=urlpath,
+            schema=schema,
             delimiter=delimiter,
             blocksize=blocksize,
             meta=meta,
@@ -391,29 +415,6 @@ def from_json(
     # otherwise the arguments are bad
     else:
         raise TypeError("Incompatible combination of arguments.")  # pragma: no cover
-
-
-def layout_to_jsonschema(layout, input=None):
-    """Convert awkward array Layout to a JSON Schema dictionary."""
-    if input is None:
-        input = {"type": "object", "properties": {}}
-    if layout.is_RecordType:
-        input["type"] = "object"
-        input["properties"] = {}
-        for field in layout.fields:
-            input["properties"][field] = {"type": None}
-            layout_to_jsonschema(layout[field], input["properties"][field])
-    elif layout.is_ListType:
-        input["type"] = "array"
-        input["items"] = {}
-        layout_to_jsonschema(layout.content, input["items"])
-    elif layout.dtype.kind == "i":
-        input["type"] = "integer"
-    elif layout.dtype.kind == "f":
-        input["type"] = "number"
-    elif layout.dtype.kind.lower() in "uso":
-        input["type"] = "string"
-    return input
 
 
 class _ToJsonFn:
@@ -495,3 +496,26 @@ def to_json(
     if compute:
         res.compute()
     return res
+
+
+def layout_to_jsonschema(layout, input=None):
+    """Convert awkward array Layout to a JSON Schema dictionary."""
+    if input is None:
+        input = {"type": "object", "properties": {}}
+    if layout.is_RecordType:
+        input["type"] = "object"
+        input["properties"] = {}
+        for field in layout.fields:
+            input["properties"][field] = {"type": None}
+            layout_to_jsonschema(layout[field], input["properties"][field])
+    elif layout.is_ListType:
+        input["type"] = "array"
+        input["items"] = {}
+        layout_to_jsonschema(layout.content, input["items"])
+    elif layout.dtype.kind == "i":
+        input["type"] = "integer"
+    elif layout.dtype.kind == "f":
+        input["type"] = "number"
+    elif layout.dtype.kind.lower() in "uso":
+        input["type"] = "string"
+    return input
