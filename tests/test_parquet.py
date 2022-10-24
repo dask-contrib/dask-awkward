@@ -1,8 +1,11 @@
+import pytest
+
+pytest.importorskip("pyarrow")
+
 import awkward as ak
 import fsspec
 import pyarrow as pa
 import pyarrow.dataset as pad
-import pytest
 
 import dask_awkward as dak
 from dask_awkward.lib.io.parquet import _metadata_file_from_data_files, to_parquet
