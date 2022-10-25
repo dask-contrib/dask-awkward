@@ -54,15 +54,16 @@ def _is_getitem(layer: Layer) -> bool:
     return layer.dsk[layer.output][0] == operator.getitem
 
 
-def _requested_columns(layer: Blockwise) -> set[str]:
+def _requested_columns(layer):
     """Determine the columns requested in an ``operator.getitem`` call."""
     fn_arg = layer.indices[1][0]
     if isinstance(fn_arg, tuple):
         fn_arg = fn_arg[0]
         if isinstance(fn_arg, slice):
             return set()
-    if isinstance(fn_arg, list):  # type: ignore
-        return set(fn_arg)  # type: ignore
+    if isinstance(fn_arg, list):
+        if all(isinstance(x, str) for x in fn_arg):
+            return set(fn_arg)
     return {fn_arg}
 
 
@@ -95,7 +96,7 @@ def optimize_iolayer_columns_getitem(dsk: HighLevelGraph) -> HighLevelGraph:
         # of the getitem dependencies, determine the columns that were requested.
         for dep_that_is_getitem in deps_that_are_getitem:
             layer_of_interest = dsk.layers[dep_that_is_getitem]
-            cols_used_in_getitem |= _requested_columns(layer_of_interest)  # type: ignore
+            cols_used_in_getitem |= _requested_columns(layer_of_interest)
         # project columns using the discovered getitem columns.
         if cols_used_in_getitem:
             new_layer = layers[pio_layer_name].project_columns(
