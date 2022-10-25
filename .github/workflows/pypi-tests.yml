@@ -28,7 +28,6 @@ jobs:
       run: |
         pip install pip wheel -U
         pip install dask[complete]
-        pip install git+https://github.com/scikit-hep/awkward@main
         pip install -q --no-cache-dir .[complete]
         pip list
     - name: test
