@@ -26,7 +26,6 @@ jobs:
       run: |
         pip install wheel
         pip install pytest-cov
-        pip install git+https://github.com/scikit-hep/awkward@main
         pip install -q --no-cache-dir -e .[complete]
         pytest --cov=dask_awkward --cov-report=xml
     - name: Upload Coverage to Codecov
