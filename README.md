@@ -20,14 +20,8 @@ encourage willing users to experiment and report issues!
 Installing
 ----------
 
-If you are interested in experimenting with `dask-awkward` you will
-need to install `awkward` from its `main` branch:
-
-```
-pip install git+https://github.com/scikit-hep/awkward@main
-```
-
-We also recommend installing `dask-awkward` via its `main` branch:
+If you are interested in experimenting with `dask-awkward`, we
+recommend installing from the `HEAD` of the `main` branch:
 
 ```
 pip install git+https://github.com/ContinuumIO/dask-awkward@main
