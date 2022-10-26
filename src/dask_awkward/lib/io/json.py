@@ -519,3 +519,53 @@ def layout_to_jsonschema(layout, input=None):
     elif layout.dtype.kind.lower() in "uso":
         input["type"] = "string"
     return input
+
+
+def form_to_jsonschema(form, input=None):
+    """Convert awkward array Layout to a JSON Schema dictionary."""
+    if input is None:
+        input = {"type": "object", "properties": {}}
+    if form.is_RecordType:
+        input["type"] = "object"
+        input["properties"] = {}
+        for field, content in zip(form.fields, form.contents):
+            input["properties"][field] = {"type": None}
+            form_to_jsonschema(content, input["properties"][field])
+    elif form.parameters.get("__array__") == "string":
+        input["type"] = "string"
+    elif form.is_ListType:
+        input["type"] = "array"
+        input["items"] = {}
+        form_to_jsonschema(form.content, input["items"])
+    elif "int" in form.type.primitive:
+        breakpoint()
+        input["type"] = "integer"
+    elif "float" in form.type.primitive:
+        input["type"] = "number"
+    elif hasattr(form, "content"):
+        form_to_jsonschema(form.content, input)
+    else:
+        raise ValueError
+    return input
+
+
+def form_to_dict(form):
+    """Convert awkward array Layout to a JSON Schema dictionary."""
+    if form.is_RecordType:
+        out = {}
+        for field, content in zip(form.fields, form.contents):
+            out[field] = form_to_dict(content)
+        return out
+    elif form.parameters.get("__array__") == "string":
+        return "string"
+    elif form.is_ListType:
+        return [form_to_dict(form.content)]
+    elif hasattr(form, "content"):
+        return form_to_dict(form.content)
+    else:
+        return form.type.primitive
+
+
+def ak_schema_repr(arr):
+    import yaml
+    return yaml.dump(arr.layout.form)
