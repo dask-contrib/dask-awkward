@@ -568,4 +568,5 @@ def form_to_dict(form):
 
 def ak_schema_repr(arr):
     import yaml
+
     return yaml.dump(arr.layout.form)
