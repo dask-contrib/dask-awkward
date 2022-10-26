@@ -538,7 +538,6 @@ def form_to_jsonschema(form, input=None):
         input["items"] = {}
         form_to_jsonschema(form.content, input["items"])
     elif "int" in form.type.primitive:
-        breakpoint()
         input["type"] = "integer"
     elif "float" in form.type.primitive:
         input["type"] = "number"
