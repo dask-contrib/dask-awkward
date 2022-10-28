@@ -16,9 +16,9 @@ from dask_awkward.lib.io.io import from_map
 
 
 class _FromParquetFn:
-    def __init__(self, columns=None, schema=None):
-        self.columns = columns
+    def __init__(self, schema=None, listsep="list.item"):
         self.schema = schema
+        self.listsep = listsep
 
     @abc.abstractmethod
     def __call__(self, source):
@@ -30,30 +30,29 @@ class _FromParquetFn:
 
 
 class _FromParquetFileWiseFn(_FromParquetFn):
-    def __init__(self, fs, columns, schema):
-        super().__init__(columns=columns, schema=schema)
+    def __init__(self, fs, schema, listsep="list.item"):
+        super().__init__(schema=schema, listsep=listsep)
         self.fs = fs
 
     def __call__(self, source):
-        print(self.columns)
         return _file_to_partition(
             source,
             self.fs,
-            self.columns,
+            self.schema.columns(self.listsep),
             self.schema,
         )
 
     def project_columns(self, columns):
         return _FromParquetFileWiseFn(
             fs=self.fs,
-            columns=columns,
-            schema=self.schema,
+            schema=self.schema.select_columns(columns),
+            listsep=self.listsep
         )
 
 
 class _FromParquetFragmentWiseFn(_FromParquetFn):
-    def __init__(self, fs, columns, schema):
-        super().__init__(columns=columns, schema=schema)
+    def __init__(self, fs, schema, listep="list.item"):
+        super().__init__(schema=schema, listsep=listep)
         self.fs = fs
 
     def __call__(self, pair):
@@ -61,14 +60,14 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
         if isinstance(subrg, int):
             subrg = [[subrg]]
         return _file_to_partition(
-            source, self.fs, self.columns, self.schema, subrg=subrg
+            source, self.fs, self.schema.columns(self.listsep),
+            self.schema, subrg=subrg
         )
 
     def project_columns(self, columns):
         return _FromParquetFragmentWiseFn(
             fs=self.fs,
-            columns=columns,
-            schema=self.schema,
+            schema=self.schema.select_columns(columns),
         )
 
 
@@ -114,6 +113,7 @@ def from_parquet(
         scan_files=scan_files,
     )
     parquet_columns, subform, actual_paths, fs, subrg, row_counts, metadata = results
+    print(parquet_columns)
     if split_row_groups is None:
         split_row_groups = row_counts is not None and len(row_counts) > 1
 
@@ -129,7 +129,6 @@ def from_parquet(
         return from_map(
             _FromParquetFileWiseFn(
                 fs,
-                columns,
                 subform,
             ),
             actual_paths,
@@ -161,7 +160,6 @@ def from_parquet(
         return from_map(
             _FromParquetFragmentWiseFn(
                 fs,
-                columns,
                 subform,
             ),
             pairs,

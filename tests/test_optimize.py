@@ -38,7 +38,6 @@ def test_config_adjust_1(caa_parquet):
         a.points.x.compute()
 
 
-@pytest.mark.xfail(reason="empty array at compute time")
 def test_config_adjust_2(caa_parquet):
     a = dak.from_parquet([caa_parquet] * 3)
     with dask.config.set({"awkward.column-projection-optimization": "brute-force"}):
