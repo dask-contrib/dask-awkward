@@ -44,13 +44,15 @@ class _FromParquetFileWiseFn(_FromParquetFn):
 
     def project_columns(self, columns):
         return _FromParquetFileWiseFn(
-            fs=self.fs, schema=self.schema.select_columns(columns), listsep=self.listsep
+            fs=self.fs,
+            schema=self.schema.select_columns(columns),
+            listsep=self.listsep,
         )
 
 
 class _FromParquetFragmentWiseFn(_FromParquetFn):
-    def __init__(self, fs, schema, listep="list.item"):
-        super().__init__(schema=schema, listsep=listep)
+    def __init__(self, fs, schema, listsep="list.item"):
+        super().__init__(schema=schema, listsep=listsep)
         self.fs = fs
 
     def __call__(self, pair):
@@ -58,7 +60,11 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
         if isinstance(subrg, int):
             subrg = [[subrg]]
         return _file_to_partition(
-            source, self.fs, self.schema.columns(self.listsep), self.schema, subrg=subrg
+            source,
+            self.fs,
+            self.schema.columns(self.listsep),
+            self.schema,
+            subrg=subrg,
         )
 
     def project_columns(self, columns):
@@ -110,7 +116,13 @@ def from_parquet(
         scan_files=scan_files,
     )
     parquet_columns, subform, actual_paths, fs, subrg, row_counts, metadata = results
-    print(parquet_columns)
+
+    listsep = (
+        "list.element"
+        if any(".list.element." in c for c in parquet_columns)
+        else "list.item"
+    )
+
     if split_row_groups is None:
         split_row_groups = row_counts is not None and len(row_counts) > 1
 
@@ -127,6 +139,7 @@ def from_parquet(
             _FromParquetFileWiseFn(
                 fs,
                 subform,
+                listsep=listsep,
             ),
             actual_paths,
             label=label,
@@ -158,6 +171,7 @@ def from_parquet(
             _FromParquetFragmentWiseFn(
                 fs,
                 subform,
+                listsep=listsep,
             ),
             pairs,
             label=label,
