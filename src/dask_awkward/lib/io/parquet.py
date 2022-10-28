@@ -44,9 +44,7 @@ class _FromParquetFileWiseFn(_FromParquetFn):
 
     def project_columns(self, columns):
         return _FromParquetFileWiseFn(
-            fs=self.fs,
-            schema=self.schema.select_columns(columns),
-            listsep=self.listsep
+            fs=self.fs, schema=self.schema.select_columns(columns), listsep=self.listsep
         )
 
 
@@ -60,8 +58,7 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
         if isinstance(subrg, int):
             subrg = [[subrg]]
         return _file_to_partition(
-            source, self.fs, self.schema.columns(self.listsep),
-            self.schema, subrg=subrg
+            source, self.fs, self.schema.columns(self.listsep), self.schema, subrg=subrg
         )
 
     def project_columns(self, columns):
