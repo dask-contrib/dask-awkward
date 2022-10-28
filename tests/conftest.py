@@ -15,31 +15,31 @@ import dask_awkward.lib.testutils as daktu
 
 @pytest.fixture(scope="session")
 def single_record_file(tmpdir_factory: pytest.TempdirFactory) -> str:
-    fn = tmpdir_factory.mktemp("data").join("single_record.json")
+    fname = tmpdir_factory.mktemp("data") / "single_record.json"  # type: ignore
     record = [{"record": [1, 2, 3]}]
-    with fsspec.open(fn, "w") as f:
+    with fsspec.open(fname, "w") as f:
         print(json.dumps(record), file=f)
-    return str(fn)
+    return str(fname)
 
 
 @pytest.fixture(scope="session")
 def ndjson_points1(tmpdir_factory: pytest.TempdirFactory) -> str:
     array = daktu.awkward_xy_points()
-    fn = tmpdir_factory.mktemp("data").join("points_ndjson1.json")
-    with fsspec.open(fn, "w") as f:
+    fname = tmpdir_factory.mktemp("data") / "points_ndjson1.json"  # type: ignore
+    with fsspec.open(fname, "w") as f:
         for entry in array.tolist():
             print(json.dumps({"points": entry}), file=f)
-    return str(fn)
+    return str(fname)
 
 
 @pytest.fixture(scope="session")
 def ndjson_points2(tmpdir_factory: pytest.TempdirFactory) -> str:
     array = daktu.awkward_xy_points()
-    fn = tmpdir_factory.mktemp("data").join("points_ndjson2.json")
-    with fsspec.open(fn, "w") as f:
+    fname = tmpdir_factory.mktemp("data") / "points_ndjson2.json"  # type: ignore
+    with fsspec.open(fname, "w") as f:
         for entry in array.tolist():
             print(json.dumps({"points": entry}), file=f)
-    return str(fn)
+    return str(fname)
 
 
 @pytest.fixture(scope="session")
@@ -118,6 +118,6 @@ def L3() -> list[list[dict[str, float]]]:
 
 @pytest.fixture(scope="session")
 def caa_parquet(caa: ak.Array, tmpdir_factory: pytest.TempdirFactory) -> str:
-    fn = tmpdir_factory.mktemp("parquet_data").join("caa.parquet")
-    ak.to_parquet(caa, str(fn))
-    return str(fn)
+    fname = tmpdir_factory.mktemp("parquet_data") / "caa.parquet"  # type: ignore
+    ak.to_parquet(caa, str(fname), extensionarray=False)
+    return str(fname)

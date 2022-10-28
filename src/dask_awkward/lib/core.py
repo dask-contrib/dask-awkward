@@ -25,8 +25,7 @@ from dask.utils import IndexCallable, funcname, key_split
 from numpy.lib.mixins import NDArrayOperatorsMixin
 from tlz import first
 
-from dask_awkward.layers import AwkwardIOLayer
-from dask_awkward.lib.optimize import basic_optimize
+from dask_awkward.lib.optimize import optimize as dak_optimize
 from dask_awkward.typing import AwkwardDaskCollection
 from dask_awkward.utils import (
     DaskAwkwardNotImplemented,
@@ -119,7 +118,7 @@ class Scalar(DaskMethodsMixin):
         return self.name
 
     __dask_optimize__ = globalmethod(
-        basic_optimize, key="awkward_scalar_optimize", falsey=dont_optimize
+        dak_optimize, key="awkward_scalar_optimize", falsey=dont_optimize
     )
 
     __dask_scheduler__ = staticmethod(threaded_get)
@@ -449,10 +448,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     ) -> None:
         self._dask: HighLevelGraph = dsk
         if hasattr(dsk, "layers"):
-            last_layer = list(dsk.layers.values())[-1]
             # i.e., NOT matrializes/persisted state
-            if isinstance(last_layer, AwkwardIOLayer):
-                last_layer._meta = meta  # output typetracer
+            list(dsk.layers.values())[-1]._meta = meta  # output typetracer
         self._name: str = name
         self._divisions: tuple[int | None, ...] = divisions
         self._meta: ak.Array = meta
@@ -476,7 +473,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return self._rebuild, ()
 
     __dask_optimize__ = globalmethod(
-        basic_optimize, key="awkward_array_optimize", falsey=dont_optimize
+        dak_optimize, key="awkward_array_optimize", falsey=dont_optimize
     )
 
     __dask_scheduler__ = staticmethod(threaded_get)

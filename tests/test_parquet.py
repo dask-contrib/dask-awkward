@@ -10,9 +10,6 @@ import pyarrow.dataset as pad
 import dask_awkward as dak
 from dask_awkward.lib.io.parquet import _metadata_file_from_data_files, to_parquet
 
-if pa.__version__.split(".") < ["6"]:
-    pytest.skip("Needs pyarrow 6")
-
 data = [[1, 2, 3], [4, None], None]
 arr = pa.array(data)
 ds = pa.Table.from_arrays([arr], names=["arr"])
