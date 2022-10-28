@@ -74,6 +74,7 @@ class _FromParquetFn(_BaseFromParquetFn):
 
     def __call__(self, source: Any) -> ak.Array:
         source = fsspec.utils._unstrip_protocol(source, self.fs)
+        print(self.columns)
         return ak.from_parquet(
             source,
             columns=self.columns,

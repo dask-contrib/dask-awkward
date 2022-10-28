@@ -60,6 +60,7 @@ io = [
 ]
 test = [
     "aiohttp",
+    "distributed",
     "pyarrow",
     "pytest >=6.0",
     "pytest-cov >=3.0.0",

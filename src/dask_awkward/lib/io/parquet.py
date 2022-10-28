@@ -35,6 +35,7 @@ class _FromParquetFileWiseFn(_FromParquetFn):
         self.fs = fs
 
     def __call__(self, source):
+        print(self.columns)
         return _file_to_partition(
             source,
             self.fs,
