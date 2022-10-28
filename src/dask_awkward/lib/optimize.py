@@ -32,7 +32,7 @@ def optimize(
         dsk = optimize_iolayer_columns_brute(dsk)  # type: ignore
     elif confopt == "chained":
         raise NotImplementedError(
-            'chained is not supported (yet), use "simple-getitem]" or "brute-force".'
+            '"chained" is not supported (yet), use "simple-getitem" or "brute-force".'
         )
     else:
         pass
