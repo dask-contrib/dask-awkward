@@ -54,11 +54,16 @@ def _is_getitem(layer: Layer) -> bool:
     return layer.dsk[layer.output][0] == operator.getitem
 
 
-def _requested_columns(layer: Blockwise) -> set[str]:
+def _requested_columns(layer):
     """Determine the columns requested in an ``operator.getitem`` call."""
     fn_arg = layer.indices[1][0]
-    if isinstance(fn_arg, list):  # type: ignore
-        return set(fn_arg)  # type: ignore
+    if isinstance(fn_arg, tuple):
+        fn_arg = fn_arg[0]
+        if isinstance(fn_arg, slice):
+            return set()
+    if isinstance(fn_arg, list):
+        if all(isinstance(x, str) for x in fn_arg):
+            return set(fn_arg)
     return {fn_arg}
 
 
@@ -91,7 +96,7 @@ def optimize_iolayer_columns_getitem(dsk: HighLevelGraph) -> HighLevelGraph:
         # of the getitem dependencies, determine the columns that were requested.
         for dep_that_is_getitem in deps_that_are_getitem:
             layer_of_interest = dsk.layers[dep_that_is_getitem]
-            cols_used_in_getitem |= _requested_columns(layer_of_interest)  # type: ignore
+            cols_used_in_getitem |= _requested_columns(layer_of_interest)
         # project columns using the discovered getitem columns.
         if cols_used_in_getitem:
             new_layer = layers[pio_layer_name].project_columns(
@@ -103,8 +108,8 @@ def optimize_iolayer_columns_getitem(dsk: HighLevelGraph) -> HighLevelGraph:
 
 
 def _attempt_compute_with_columns(dsk: HighLevelGraph, columns: list[str]) -> None:
-    layers = dsk.layers.copy()
-    deps = dsk.dependencies.copy()
+    layers = dsk.layers.copy()  # type: ignore
+    deps = dsk.dependencies.copy()  # type: ignore
     io_layer_names = [k for k, v in dsk.layers.items() if isinstance(v, AwkwardIOLayer)]
     top_io_layer_name = io_layer_names[0]
     layers[top_io_layer_name] = layers[top_io_layer_name].project_and_mock(columns)
@@ -115,11 +120,12 @@ def _attempt_compute_with_columns(dsk: HighLevelGraph, columns: list[str]) -> No
     get_sync(new_hlg, list(new_hlg.keys()))
 
 
-def _necessary_columns(dsk: HighLevelGraph) -> list[str]:
+def _necessary_columns(dsk: HighLevelGraph) -> list[str] | None:
     # staring fields should be those belonging to the AwkwardIOLayer's
     # metadata (typetracer) array.
-    out_meta = list(dsk.layers.values())[-1]._meta
+    out_meta = list(dsk.layers.values())[-1]._meta  # type: ignore
     keep = out_meta.layout.form.columns()
+    columns: list[str] = []
     for _, v in dsk.layers.items():
         if isinstance(v, AwkwardIOLayer):
             columns = v._meta.layout.form.columns()
@@ -162,8 +168,8 @@ def optimize_iolayer_columns_brute(dsk: HighLevelGraph) -> HighLevelGraph:
     necessary_cols = _necessary_columns(dsk)
     if necessary_cols is None:
         return dsk
-    layers = dsk.layers.copy()
-    deps = dsk.dependencies.copy()
+    layers = dsk.layers.copy()  # type: ignore
+    deps = dsk.dependencies.copy()  # type: ignore
     for k, v in dsk.layers.items():
         if isinstance(v, AwkwardIOLayer):
             new_layer = v.project_columns(necessary_cols)

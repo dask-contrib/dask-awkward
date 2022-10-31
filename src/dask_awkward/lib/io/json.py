@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import abc
+import math
+import os
 import warnings
 from typing import TYPE_CHECKING, Any
 
@@ -10,24 +12,30 @@ except ImportError:
     import json  # type: ignore
 
 import awkward as ak
-import fsspec
 from dask.base import tokenize
+from dask.blockwise import BlockIndex
 from dask.bytes.core import read_bytes
 from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
 from dask.utils import parse_bytes
+from fsspec.core import get_fs_token_paths, url_to_fs
 from fsspec.utils import infer_compression
 
-from dask_awkward.lib.core import new_array_object, typetracer_array
+from dask_awkward.lib.core import (
+    map_partitions,
+    new_array_object,
+    new_scalar_object,
+    typetracer_array,
+)
 from dask_awkward.lib.io.io import from_map
 
 if TYPE_CHECKING:
     from fsspec.spec import AbstractFileSystem
 
-    from dask_awkward.core import Array
+    from dask_awkward.lib.core import Array, Scalar
 
 
-__all__ = ("from_json",)
+__all__ = ("from_json", "to_json")
 
 
 class _FromJsonFn:
@@ -36,10 +44,12 @@ class _FromJsonFn:
         *args: Any,
         storage: AbstractFileSystem,
         compression: str | None = None,
+        schema: dict | None = None,
         **kwargs: Any,
     ) -> None:
         self.compression = compression
         self.storage = storage
+        self.schema = schema
         self.args = args
         self.kwargs = kwargs
 
@@ -54,13 +64,31 @@ class _FromJsonLineDelimitedFn(_FromJsonFn):
         *args: Any,
         storage: AbstractFileSystem,
         compression: str | None = None,
+        schema: dict | None = None,
         **kwargs: Any,
     ) -> None:
-        super().__init__(*args, storage=storage, compression=compression, **kwargs)
+        super().__init__(
+            *args,
+            storage=storage,
+            compression=compression,
+            schema=schema,
+            **kwargs,
+        )
 
     def __call__(self, source: str) -> ak.Array:
         with self.storage.open(source, mode="rt", compression=self.compression) as f:
-            return ak.from_json(f.read(), line_delimited=True)
+            return ak.from_json(f.read(), line_delimited=True, schema=self.schema)
+
+    def project_columns(self, columns):
+        schema = self.schema
+
+        # TODO: do something with columns to redefine schema...
+
+        return _FromJsonLineDelimitedFn(
+            schema=schema,
+            storage=self.storage,
+            compression=self.compression,
+        )
 
 
 class _FromJsonSingleObjInFileFn(_FromJsonFn):
@@ -68,24 +96,35 @@ class _FromJsonSingleObjInFileFn(_FromJsonFn):
         self,
         *args: Any,
         storage: AbstractFileSystem,
+        schema: dict | None = None,
         compression: str | None = None,
         **kwargs: Any,
     ) -> None:
-        super().__init__(*args, storage=storage, compression=compression, **kwargs)
+        super().__init__(
+            *args,
+            storage=storage,
+            compression=compression,
+            schema=schema,
+            **kwargs,
+        )
 
     def __call__(self, source: str) -> ak.Array:
         with self.storage.open(source, mode="rb", compression=self.compression) as f:
-            return ak.from_json(f)
+            return ak.from_json(f, schema=self.schema, **self.kwargs)
 
 
 class _FromJsonBytesFn:
+    def __init__(self, schema: dict | None = None) -> None:
+        self.schema = schema
+
     def __call__(self, source: bytes) -> ak.Array:
-        return ak.from_json(source, line_delimited=True)
+        return ak.from_json(source, line_delimited=True, schema=self.schema)
 
 
 def derive_json_meta(
     storage: AbstractFileSystem,
     source: str,
+    schema: dict | None = None,
     compression: str | None = "infer",
     sample_rows: int = 5,
     bytechunks: str | int = "16 KiB",
@@ -98,7 +137,11 @@ def derive_json_meta(
     bytechunks = parse_bytes(bytechunks)
 
     if one_obj_per_file:
-        fn = _FromJsonSingleObjInFileFn(storage=storage, compression=compression)
+        fn = _FromJsonSingleObjInFileFn(
+            storage=storage,
+            compression=compression,
+            schema=schema,
+        )
         return typetracer_array(fn(source))
 
     # when the data is uncompressed we read `bytechunks` number of
@@ -134,13 +177,14 @@ def derive_json_meta(
 def _from_json_files(
     *,
     urlpath: str | list[str],
+    schema: dict | None = None,
     one_obj_per_file: bool = False,
     compression: str | None = "infer",
     meta: ak.Array | None = None,
     derive_meta_kwargs: dict[str, Any] | None = None,
     storage_options: dict[str, Any] | None = None,
 ) -> Array:
-    fs, fstoken, urlpaths = fsspec.get_fs_token_paths(
+    fs, fstoken, urlpaths = get_fs_token_paths(
         urlpath,
         mode="rb",
         storage_options=storage_options,
@@ -150,6 +194,7 @@ def _from_json_files(
         meta = derive_json_meta(
             fs,
             urlpaths[0],
+            schema=schema,
             one_obj_per_file=one_obj_per_file,
             **meta_read_kwargs,
         )
@@ -163,9 +208,14 @@ def _from_json_files(
         f: _FromJsonFn = _FromJsonSingleObjInFileFn(
             storage=fs,
             compression=compression,
+            schema=schema,
         )
     else:
-        f = _FromJsonLineDelimitedFn(storage=fs, compression=compression)
+        f = _FromJsonLineDelimitedFn(
+            storage=fs,
+            compression=compression,
+            schema=schema,
+        )
 
     return from_map(f, urlpaths, label="from-json", token=token, meta=meta)
 
@@ -173,6 +223,7 @@ def _from_json_files(
 def _from_json_bytes(
     *,
     urlpath: str | list[str],
+    schema: dict | None,
     blocksize: int | str,
     delimiter: Any,
     meta: ak.Array | None,
@@ -189,7 +240,7 @@ def _from_json_bytes(
         **storage_options,
     )
     flat_chunks = list(flatten(bytechunks))
-    f = _FromJsonBytesFn()
+    f = _FromJsonBytesFn(schema=schema)
     dsk = {
         (name, i): (f, delayed_chunk.key) for i, delayed_chunk in enumerate(flat_chunks)
     }
@@ -212,8 +263,7 @@ def _from_json_bytes(
 
 def from_json(
     urlpath: str | list[str],
-    # line_delimited: bool = False,
-    # schema: Any | None = None,
+    schema: dict | None = None,
     # nan_string: str | None = None,
     # posinf_string: str | None = None,
     # neginf_string: str | None = None,
@@ -317,6 +367,7 @@ def from_json(
     if delimiter is None and blocksize is None:
         return _from_json_files(
             urlpath=urlpath,
+            schema=schema,
             one_obj_per_file=one_obj_per_file,
             compression=compression,
             meta=meta,
@@ -329,6 +380,7 @@ def from_json(
     elif delimiter is not None and blocksize is not None:
         return _from_json_bytes(
             urlpath=urlpath,
+            schema=schema,
             delimiter=delimiter,
             blocksize=blocksize,
             meta=meta,
@@ -338,3 +390,84 @@ def from_json(
     # otherwise the arguments are bad
     else:
         raise TypeError("Incompatible combination of arguments.")  # pragma: no cover
+
+
+class _ToJsonFn:
+    def __init__(
+        self,
+        fs: AbstractFileSystem,
+        path: str,
+        npartitions: int,
+        compression: str | None,
+        line_delimited: bool,
+        **kwargs: Any,
+    ) -> None:
+        self.fs = fs
+        self.path = path
+        self.just_dir = ".json" not in self.path
+        if self.just_dir:
+            if not self.fs.exists(path):
+                self.fs.mkdir(path)
+        self.wildcarded = "*" in self.path
+        self.zfill = math.ceil(math.log(npartitions, 10))
+        self.kwargs = kwargs
+        self.compression = compression
+        if self.compression == "infer":
+            self.compression = infer_compression(self.path)
+        self.line_delimited = line_delimited
+
+    def __call__(self, array: ak.Array, block_index: tuple[int]) -> None:
+        part = str(block_index[0]).zfill(self.zfill)
+
+        if self.just_dir:
+            path = os.path.join(self.path, f"part{part}.json")
+        elif self.wildcarded:
+            path = self.path.replace("*", part)
+        else:
+            raise RuntimeError("Cannot construct output file path.")  # pragma: no cover
+
+        try:
+            with self.fs.open(path, mode="wt", compression=self.compression) as f:
+                ak.to_json(array, f, line_delimited=self.line_delimited, **self.kwargs)
+        except FileNotFoundError:
+            raise FileNotFoundError(
+                f"Parent directory for output file ({path}) "
+                "is not available, create it."
+            )
+
+        return None
+
+
+def to_json(
+    array: Array,
+    path: str,
+    line_delimited: bool = True,
+    storage_options: dict[str, Any] | None = None,
+    compute: bool = False,
+    compression: str | None = "infer",
+    **kwargs: Any,
+) -> Scalar:
+    storage_options = storage_options or {}
+    fs, _ = url_to_fs(path, **storage_options)
+    nparts = array.npartitions
+    write_res = map_partitions(
+        _ToJsonFn(
+            fs,
+            path,
+            npartitions=nparts,
+            compression=compression,
+            line_delimited=line_delimited,
+            **kwargs,
+        ),
+        array,
+        BlockIndex((nparts,)),
+        label="to-json-on-block",
+        meta=array._meta,
+    )
+    name = f"to-json-{tokenize(array, path)}"
+    dsk = {(name, 0): (lambda *_: None, write_res.__dask_keys__())}
+    graph = HighLevelGraph.from_collections(name, dsk, dependencies=(write_res,))
+    res = new_scalar_object(graph, name=name, meta=None)
+    if compute:
+        res.compute()
+    return res

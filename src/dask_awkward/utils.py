@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from typing import Any
+from typing import Any, TypeVar
+
+T = TypeVar("T")
 
 
 class DaskAwkwardNotImplemented(NotImplementedError):
@@ -62,7 +64,7 @@ class LazyInputsDict(Mapping):
         return ((i,) for i in range(len(self.inputs)))
 
 
-def borrow_docstring(original: Callable) -> Callable:
+def borrow_docstring(original: Callable[..., T]) -> Callable[..., T]:
     def wrapper(method):
         method.__doc__ = (
             f"Partitioned version of ak.{original.__name__}\n" f"{original.__doc__}"

@@ -449,7 +449,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         self._dask: HighLevelGraph = dsk
         if hasattr(dsk, "layers"):
             # i.e., NOT matrializes/persisted state
-            list(dsk.layers.values())[-1]._meta = meta  # output typetracer
+            # output typetracer
+            list(dsk.layers.values())[-1]._meta = meta  # type: ignore
         self._name: str = name
         self._divisions: tuple[int | None, ...] = divisions
         self._meta: ak.Array = meta
