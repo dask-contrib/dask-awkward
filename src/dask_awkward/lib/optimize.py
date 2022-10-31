@@ -108,8 +108,8 @@ def optimize_iolayer_columns_getitem(dsk: HighLevelGraph) -> HighLevelGraph:
 
 
 def _attempt_compute_with_columns(dsk: HighLevelGraph, columns: list[str]) -> None:
-    layers = dsk.layers.copy()
-    deps = dsk.dependencies.copy()
+    layers = dsk.layers.copy()  # type: ignore
+    deps = dsk.dependencies.copy()  # type: ignore
     io_layer_names = [k for k, v in dsk.layers.items() if isinstance(v, AwkwardIOLayer)]
     top_io_layer_name = io_layer_names[0]
     layers[top_io_layer_name] = layers[top_io_layer_name].project_and_mock(columns)
@@ -120,11 +120,12 @@ def _attempt_compute_with_columns(dsk: HighLevelGraph, columns: list[str]) -> No
     get_sync(new_hlg, list(new_hlg.keys()))
 
 
-def _necessary_columns(dsk: HighLevelGraph) -> list[str]:
+def _necessary_columns(dsk: HighLevelGraph) -> list[str] | None:
     # staring fields should be those belonging to the AwkwardIOLayer's
     # metadata (typetracer) array.
-    out_meta = list(dsk.layers.values())[-1]._meta
+    out_meta = list(dsk.layers.values())[-1]._meta  # type: ignore
     keep = out_meta.layout.form.columns()
+    columns: list[str] = []
     for _, v in dsk.layers.items():
         if isinstance(v, AwkwardIOLayer):
             columns = v._meta.layout.form.columns()
@@ -167,8 +168,8 @@ def optimize_iolayer_columns_brute(dsk: HighLevelGraph) -> HighLevelGraph:
     necessary_cols = _necessary_columns(dsk)
     if necessary_cols is None:
         return dsk
-    layers = dsk.layers.copy()
-    deps = dsk.dependencies.copy()
+    layers = dsk.layers.copy()  # type: ignore
+    deps = dsk.dependencies.copy()  # type: ignore
     for k, v in dsk.layers.items():
         if isinstance(v, AwkwardIOLayer):
             new_layer = v.project_columns(necessary_cols)
