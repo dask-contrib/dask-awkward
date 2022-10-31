@@ -58,31 +58,6 @@ class _FromJsonFn:
         ...
 
 
-def _read_beginning_compressed(
-    storage: AbstractFileSystem,
-    source: str,
-    compression: str | None,
-    n_lines: int = 5,
-) -> ak.Array:
-    lines = []
-    with storage.open(source, mode="rt", compression=compression) as f:
-        for i, line in enumerate(f):
-            if i >= n_lines:
-                break
-            lines.append(ak.from_json(line))
-        return ak.from_iter(lines)
-
-
-def _read_beginning_uncompressed(
-    storage: AbstractFileSystem,
-    source: str,
-    numbytes: int = 16384,
-) -> ak.Array:
-    bytes = storage.cat(source, start=0, end=numbytes)
-    array = ak.concatenate([ak.from_json(line) for line in bytes.split(b"\n")[:-1]])
-    return array
-
-
 class _FromJsonLineDelimitedFn(_FromJsonFn):
     def __init__(
         self,
@@ -496,76 +471,3 @@ def to_json(
     if compute:
         res.compute()
     return res
-
-
-def layout_to_jsonschema(layout, input=None):
-    """Convert awkward array Layout to a JSON Schema dictionary."""
-    if input is None:
-        input = {"type": "object", "properties": {}}
-    if layout.is_RecordType:
-        input["type"] = "object"
-        input["properties"] = {}
-        for field in layout.fields:
-            input["properties"][field] = {"type": None}
-            layout_to_jsonschema(layout[field], input["properties"][field])
-    elif layout.is_ListType:
-        input["type"] = "array"
-        input["items"] = {}
-        layout_to_jsonschema(layout.content, input["items"])
-    elif layout.dtype.kind == "i":
-        input["type"] = "integer"
-    elif layout.dtype.kind == "f":
-        input["type"] = "number"
-    elif layout.dtype.kind.lower() in "uso":
-        input["type"] = "string"
-    return input
-
-
-def form_to_jsonschema(form, input=None):
-    """Convert awkward array Layout to a JSON Schema dictionary."""
-    if input is None:
-        input = {"type": "object", "properties": {}}
-    if form.is_RecordType:
-        input["type"] = "object"
-        input["properties"] = {}
-        for field, content in zip(form.fields, form.contents):
-            input["properties"][field] = {"type": None}
-            form_to_jsonschema(content, input["properties"][field])
-    elif form.parameters.get("__array__") == "string":
-        input["type"] = "string"
-    elif form.is_ListType:
-        input["type"] = "array"
-        input["items"] = {}
-        form_to_jsonschema(form.content, input["items"])
-    elif "int" in form.type.primitive:
-        input["type"] = "integer"
-    elif "float" in form.type.primitive:
-        input["type"] = "number"
-    elif hasattr(form, "content"):
-        form_to_jsonschema(form.content, input)
-    else:
-        raise ValueError
-    return input
-
-
-def form_to_dict(form):
-    """Convert awkward array Layout to a JSON Schema dictionary."""
-    if form.is_RecordType:
-        out = {}
-        for field, content in zip(form.fields, form.contents):
-            out[field] = form_to_dict(content)
-        return out
-    elif form.parameters.get("__array__") == "string":
-        return "string"
-    elif form.is_ListType:
-        return [form_to_dict(form.content)]
-    elif hasattr(form, "content"):
-        return form_to_dict(form.content)
-    else:
-        return form.type.primitive
-
-
-def ak_schema_repr(arr):
-    import yaml
-
-    return yaml.dump(arr.layout.form)
