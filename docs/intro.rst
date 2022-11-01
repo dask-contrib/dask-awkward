@@ -14,7 +14,7 @@ and/or distributed versions of the core PyData data types:
 - dask.dataframe provides a Pandas like interface for creating task
   graphs operating on partitioned Pandas DataFrames and Series
 - dask.bag provides a functional interface for creating task graphs
-  operating on Python iteratables.
+  operating on Python iterables.
 - dask.delayed provides an interface for custom task graphs.
 
 With dask-awkward, we aim to provide an additional interface:
