@@ -4,6 +4,7 @@ IO
 .. currentmodule:: dask_awkward
 
 .. autosummary::
+   :toctree: generated/
 
    from_awkward
    from_dask_array
@@ -11,14 +12,8 @@ IO
    from_json
    from_lists
    from_map
+   from_parquet
    to_dask_array
    to_delayed
-
-.. autofunction:: from_awkward
-.. autofunction:: from_dask_array
-.. autofunction:: from_delayed
-.. autofunction:: from_json
-.. autofunction:: from_lists
-.. autofunction:: from_map
-.. autofunction:: to_dask_array
-.. autofunction:: to_delayed
+   to_parquet
+   to_json

@@ -21,7 +21,7 @@ dask-awkward
    terminology.rst
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: API
 
    api_array.rst

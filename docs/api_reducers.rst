@@ -5,10 +5,11 @@ Reduction functions from the awkward-array API. Dedicated Dask
 specific API documentation will be added here; for now please consult
 the awkward-array API docs.
 
-.. currentmodule:: dask_awkward
-
 ..
+   .. currentmodule:: dask_awkward
+
    .. autosummary::
+      :toctree: generated/
 
       all
       any
@@ -29,23 +30,3 @@ the awkward-array API docs.
       std
       sum
       var
-
-   .. autofunction:: all
-   .. autofunction:: any
-   .. autofunction:: argmax
-   .. autofunction:: argmin
-   .. autofunction:: corr
-   .. autofunction:: count
-   .. autofunction:: count_nonzero
-   .. autofunction:: covar
-   .. autofunction:: linear_fit
-   .. autofunction:: max
-   .. autofunction:: mean
-   .. autofunction:: min
-   .. autofunction:: moment
-   .. autofunction:: prod
-   .. autofunction:: ptp
-   .. autofunction:: softmax
-   .. autofunction:: std
-   .. autofunction:: sum
-   .. autofunction:: var

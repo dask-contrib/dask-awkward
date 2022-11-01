@@ -4,11 +4,6 @@ Array
 .. currentmodule:: dask_awkward
 
 .. autosummary::
+   :toctree: generated/
 
    Array
-   map_partitions
-
-.. autoclass:: Array
-   :members:
-
-.. autofunction:: map_partitions
