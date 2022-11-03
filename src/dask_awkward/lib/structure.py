@@ -10,9 +10,9 @@ from awkward._typetracer import UnknownScalar
 
 from dask_awkward.lib.core import (
     Array,
-    _total_reduction_to_scalar,
     map_partitions,
     new_known_scalar,
+    total_reduction_to_scalar,
 )
 from dask_awkward.utils import DaskAwkwardNotImplemented, borrow_docstring
 
@@ -323,7 +323,7 @@ def num(
         if array.known_divisions:
             return new_known_scalar(array.divisions[-1], dtype=int)
         else:
-            return _total_reduction_to_scalar(
+            return total_reduction_to_scalar(
                 label="num",
                 array=array,
                 meta=UnknownScalar(np.dtype(int)),

@@ -6,7 +6,7 @@ import awkward as ak
 import numpy as np
 from awkward._typetracer import UnknownScalar
 
-from dask_awkward.lib.core import _total_reduction_to_scalar, map_partitions
+from dask_awkward.lib.core import map_partitions, total_reduction_to_scalar
 from dask_awkward.utils import DaskAwkwardNotImplemented, borrow_docstring
 
 if TYPE_CHECKING:
@@ -155,7 +155,7 @@ def count(
             flatten_records=flatten_records,
         )
     elif axis is None:
-        return _total_reduction_to_scalar(
+        return total_reduction_to_scalar(
             label="count",
             array=array,
             meta=UnknownScalar(np.dtype(int)),
@@ -193,7 +193,7 @@ def count_nonzero(
             flatten_records=flatten_records,
         )
     elif axis is None:
-        return _total_reduction_to_scalar(
+        return total_reduction_to_scalar(
             label="count_nonzero",
             array=array,
             meta=UnknownScalar(np.dtype(int)),
@@ -259,7 +259,7 @@ def max(
             flatten_records=flatten_records,
         )
     if axis is None:
-        return _total_reduction_to_scalar(
+        return total_reduction_to_scalar(
             label="max",
             array=array,
             chunked_fn=ak.max,
@@ -325,7 +325,7 @@ def min(
             flatten_records=flatten_records,
         )
     if axis is None:
-        return _total_reduction_to_scalar(
+        return total_reduction_to_scalar(
             label="min",
             array=array,
             chunked_fn=ak.min,
@@ -404,7 +404,7 @@ def sum(
             flatten_records=flatten_records,
         )
     elif axis is None:
-        return _total_reduction_to_scalar(
+        return total_reduction_to_scalar(
             label="sum",
             array=array,
             chunked_fn=ak.sum,

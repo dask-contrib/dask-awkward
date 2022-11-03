@@ -206,10 +206,10 @@ class Scalar(DaskMethodsMixin):
             )
         return f"dask.awkward<{key_split(self.name)}, type=Scalar, dtype={dt}>"
 
-    def __getitem__(self, where: Any) -> Any:
+    def __getitem__(self, _: Any) -> Any:
         raise RuntimeError("Scalars do not support __getitem__")
 
-    def __getattr__(self, attr: str) -> Any:
+    def __getattr__(self, _: str) -> Any:
         raise RuntimeError("Scalars do not support __getattr__")
 
     @property
@@ -1299,7 +1299,7 @@ def map_partitions(
         )
 
 
-def _total_reduction_to_scalar(
+def total_reduction_to_scalar(
     *,
     label: str,
     array: Array,
