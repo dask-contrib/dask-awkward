@@ -11,4 +11,4 @@ dependencies:
   - pyarrow
   - pip
   - pip:
-    - awkward==2.0.0rc1
+    - awkward==2.0.0rc2
