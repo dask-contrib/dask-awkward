@@ -3,8 +3,6 @@ from __future__ import annotations
 import awkward as ak
 import numpy as np
 import pytest
-from awkward.behaviors.mixins import mixin_class as ak_mixin_class
-from awkward.behaviors.mixins import mixin_class_method as ak_mixin_class_method
 
 import dask_awkward as dak
 from dask_awkward.lib.testutils import assert_eq
@@ -12,7 +10,7 @@ from dask_awkward.lib.testutils import assert_eq
 behaviors: dict = {}
 
 
-@ak_mixin_class(behaviors)
+@ak.mixin_class(behaviors)
 class Point:
     def distance(self, other):
         return np.sqrt((self.x - other.x) ** 2 + (self.y - other.y) ** 2)
@@ -21,7 +19,7 @@ class Point:
     def x2(self):
         return self.x * self.x
 
-    @ak_mixin_class_method(np.abs)
+    @ak.mixin_class_method(np.abs)
     def point_abs(self):
         return np.sqrt(self.x**2 + self.y**2)
 
