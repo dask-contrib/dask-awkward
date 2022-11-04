@@ -104,3 +104,14 @@ def test_fill_none(vf: int | float | str, axis: int | None) -> None:
     d = dak.fill_none(c, vf, axis=axis)
     e = ak.fill_none(ak.from_iter(a + b), vf, axis=axis)
     assert_eq(d, e, check_forms=(not isinstance(vf, str)))
+
+
+@pytest.mark.parametrize("axis", [0, 1, -1])
+def test_is_none(axis: int) -> None:
+    a = [[1, 2, None], None, None, [], [None], [5, 6, 7, None], [1, 2], None]
+    b = [[None, 2, 1], [None], [], None, [7, 6, None, 5], [None, None]]
+    c = dak.from_lists([a, b])
+    with pytest.warns(UserWarning, match="compute on the first partition"):
+        d = dak.is_none(c, axis=axis)
+    e = ak.is_none(ak.from_iter(a + b), axis=axis)
+    assert_eq(d, e)

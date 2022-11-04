@@ -269,9 +269,18 @@ def isclose(
     raise DaskAwkwardNotImplemented("TODO")
 
 
+class _IsNoneFn:
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __call__(self, array):
+        return ak.is_none(array, **self.kwargs)
+
+
 @borrow_docstring(ak.is_none)
 def is_none(array, axis=0, highlevel=True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+    fn = _IsNoneFn(axis=axis, highlevel=highlevel, behavior=behavior)
+    return map_partitions(fn, array, label="is-none", output_divisions=1)
 
 
 @borrow_docstring(ak.local_index)
