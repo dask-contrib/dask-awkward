@@ -189,7 +189,7 @@ def fill_none(
     behavior: dict | None = None,
 ) -> Array:
     fn = _FillNoneFn(value, axis=axis, highlevel=highlevel, behavior=behavior)
-    return map_partitions(fn, array, label="fill-none")
+    return map_partitions(fn, array, label="fill-none", output_divisions=1)
 
 
 class _FirstsFn:
