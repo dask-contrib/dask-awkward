@@ -93,3 +93,13 @@ def test_zeros_like(caa: ak.Array, daa: dak.Array) -> None:
     da1 = dak.zeros_like(daa["points", "x"])
     ca1 = ak.zeros_like(caa.points.x)
     assert_eq(da1, ca1)
+
+
+@pytest.mark.parametrize("vf", [9, 99.9, "ok"])
+def test_fill_none(vf: int | float | str) -> None:
+    a = [[1, 2, None], [], [None], [5, 6, 7, None], [1, 2]]
+    b = [[None, 2, 1], [None], [], [7, 6, None, 5], [None, None]]
+    c = dak.from_lists([a, b])
+    d = dak.fill_none(c, vf)
+    e = ak.fill_none(ak.from_iter(a + b), vf)
+    assert_eq(d, e, check_forms=(not isinstance(vf, str)))
