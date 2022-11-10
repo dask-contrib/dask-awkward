@@ -171,9 +171,25 @@ def copy(array):
     raise DaskAwkwardNotImplemented("TODO")
 
 
+class _FillNoneFn:
+    def __init__(self, value, **kwargs):
+        self.value = value
+        self.kwargs = kwargs
+
+    def __call__(self, arr):
+        return ak.fill_none(arr, self.value, **self.kwargs)
+
+
 @borrow_docstring(ak.fill_none)
-def fill_none(array, value, axis=-1, highlevel=True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+def fill_none(
+    array: Array,
+    value: Any,
+    axis: int = -1,
+    highlevel: bool = True,
+    behavior: dict | None = None,
+) -> Array:
+    fn = _FillNoneFn(value, axis=axis, highlevel=highlevel, behavior=behavior)
+    return map_partitions(fn, array, label="fill-none", output_divisions=1)
 
 
 class _FirstsFn:
@@ -253,9 +269,18 @@ def isclose(
     raise DaskAwkwardNotImplemented("TODO")
 
 
+class _IsNoneFn:
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __call__(self, array):
+        return ak.is_none(array, **self.kwargs)
+
+
 @borrow_docstring(ak.is_none)
 def is_none(array, axis=0, highlevel=True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+    fn = _IsNoneFn(axis=axis, highlevel=highlevel, behavior=behavior)
+    return map_partitions(fn, array, label="is-none", output_divisions=1)
 
 
 @borrow_docstring(ak.local_index)

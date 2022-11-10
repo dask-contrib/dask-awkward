@@ -1267,7 +1267,8 @@ def map_partitions(
             if dask.config.get("awkward.compute-unknown-meta"):
                 warnings.warn(
                     "metadata could not be determined; "
-                    "a compute on the first partition will occur."
+                    "a compute on the first partition will occur.",
+                    UserWarning,
                 )
             pass
 
