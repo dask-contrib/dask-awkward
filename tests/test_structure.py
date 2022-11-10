@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import awkward as ak
 import pytest
 
@@ -65,7 +67,7 @@ def test_zip_tuple_input(caa: ak.Array, daa: dak.Array) -> None:
     assert_eq(dz2, cz2)
 
 
-def test_zip_bad_input(caa: ak.Array, daa: dak.Array) -> None:
+def test_zip_bad_input(daa: dak.Array) -> None:
     da1 = daa.points.x
     gd = (x for x in (da1, da1))
     with pytest.raises(DaskAwkwardNotImplemented, match="only sized iterables"):
@@ -108,8 +110,8 @@ def test_fill_none(vf: int | float | str, axis: int | None) -> None:
 
 @pytest.mark.parametrize("axis", [0, 1, -1])
 def test_is_none(axis: int) -> None:
-    a = [[1, 2, None], None, None, [], [None], [5, 6, 7, None], [1, 2], None]
-    b = [[None, 2, 1], [None], [], None, [7, 6, None, 5], [None, None]]
+    a: list[Any] = [[1, 2, None], None, None, [], [None], [5, 6, 7, None], [1, 2], None]
+    b: list[Any] = [[None, 2, 1], [None], [], None, [7, 6, None, 5], [None, None]]
     c = dak.from_lists([a, b])
     with pytest.warns(UserWarning, match="compute on the first partition"):
         d = dak.is_none(c, axis=axis)
