@@ -8,13 +8,13 @@ from dask_awkward.lib.core import Array, Record, Scalar
 
 def necessary_columns(
     collection: Array | Record | Scalar,
-    method: Literal["brute"] | Literal["getitem"],
+    strategy: Literal["brute"] | Literal["getitem"],
 ) -> dict:
-    if method == "brute":
+    if strategy == "brute":
         necessary = opt._necessary_columns_brute(collection.dask)
         return {None: necessary}
-    elif method == "getitem":
+    elif strategy == "getitem":
         return opt._layers_and_columns_getitem(collection.dask)
     raise ValueError(  # pragma: no cover
-        "method argument should be 'brute' or 'getitem'"
+        "strategy argument should be 'brute' or 'getitem'"
     )
