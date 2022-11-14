@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 
 pytest.importorskip("pyarrow")
@@ -9,6 +11,7 @@ import pyarrow.dataset as pad
 
 import dask_awkward as dak
 from dask_awkward.lib.io.parquet import _metadata_file_from_data_files, to_parquet
+from dask_awkward.lib.testutils import assert_eq
 
 data = [[1, 2, 3], [4, None], None]
 arr = pa.array(data)
@@ -41,9 +44,19 @@ def test_remote_single(ignore_metadata, scan_files):
 
 @pytest.mark.parametrize("ignore_metadata", [True, False])
 @pytest.mark.parametrize("scan_files", [True, False])
-def test_remote_double(ignore_metadata, scan_files):
+@pytest.mark.parametrize(
+    "split_row_groups",
+    [
+        False,
+        pytest.param(True, marks=pytest.mark.xfail(reason="same file used twice")),
+    ],
+)
+def test_remote_double(ignore_metadata, scan_files, split_row_groups):
     arr = dak.from_parquet(
-        [sample, sample], ignore_metadata=ignore_metadata, scan_files=scan_files
+        [sample, sample],
+        ignore_metadata=ignore_metadata,
+        scan_files=scan_files,
+        split_row_groups=split_row_groups,
     )
     assert arr.npartitions == 2
     assert (
@@ -151,3 +164,20 @@ def test_write_roundtrip(tmpdir):
     arr = dak.from_awkward(ak.from_iter(data), 2)
     to_parquet(arr, tmpdir)
     arr = dak.from_parquet(tmpdir)
+
+
+@pytest.mark.parametrize("columns", [None, ["minutes", "passes.to"], ["passes.*"]])
+def test_unnamed_root(
+    unnamed_root_parquet_file: str,
+    columns: list[str] | None,
+) -> None:
+    daa = dak.from_parquet(
+        unnamed_root_parquet_file,
+        split_row_groups=True,
+        columns=columns,
+    )
+    caa = ak.from_parquet(
+        unnamed_root_parquet_file,
+        columns=columns,
+    )
+    assert_eq(daa, caa, check_forms=False)

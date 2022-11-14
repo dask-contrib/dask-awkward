@@ -121,3 +121,12 @@ def caa_parquet(caa: ak.Array, tmpdir_factory: pytest.TempdirFactory) -> str:
     fname = tmpdir_factory.mktemp("parquet_data") / "caa.parquet"  # type: ignore
     ak.to_parquet(caa, str(fname), extensionarray=False)
     return str(fname)
+
+
+@pytest.fixture(scope="session")
+def unnamed_root_parquet_file(tmpdir_factory: pytest.TempdirFactory) -> str:
+    from dask_awkward.lib.testutils import unnamed_root_ds
+
+    fname = tmpdir_factory.mktemp("unnamed_parquet_data") / "file.parquet"
+    ak.to_parquet(unnamed_root_ds(), str(fname), extensionarray=False, row_group_size=3)
+    return str(fname)
