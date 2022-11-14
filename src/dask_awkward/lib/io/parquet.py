@@ -16,9 +16,13 @@ from dask_awkward.lib.io.io import from_map
 
 
 class _FromParquetFn:
-    def __init__(self, schema=None, listsep="list.item"):
+    def __init__(self, schema=None, listsep="list.item", unnamed_root=False):
         self.schema = schema
         self.listsep = listsep
+        self.unnamed_root = unnamed_root
+        self.columns = self.schema.columns(self.listsep)
+        if self.unnamed_root:
+            self.columns = [f".{c}" for c in self.columns]
 
     @abc.abstractmethod
     def __call__(self, source):
@@ -30,15 +34,15 @@ class _FromParquetFn:
 
 
 class _FromParquetFileWiseFn(_FromParquetFn):
-    def __init__(self, fs, schema, listsep="list.item"):
-        super().__init__(schema=schema, listsep=listsep)
+    def __init__(self, fs, schema, listsep="list.item", unnamed_root=False):
+        super().__init__(schema=schema, listsep=listsep, unnamed_root=unnamed_root)
         self.fs = fs
 
     def __call__(self, source):
         return _file_to_partition(
             source,
             self.fs,
-            self.schema.columns(self.listsep),
+            self.columns,
             self.schema,
         )
 
@@ -47,12 +51,13 @@ class _FromParquetFileWiseFn(_FromParquetFn):
             fs=self.fs,
             schema=self.schema.select_columns(columns),
             listsep=self.listsep,
+            unnamed_root=self.unnamed_root,
         )
 
 
 class _FromParquetFragmentWiseFn(_FromParquetFn):
-    def __init__(self, fs, schema, listsep="list.item"):
-        super().__init__(schema=schema, listsep=listsep)
+    def __init__(self, fs, schema, listsep="list.item", unnamed_root=False):
+        super().__init__(schema=schema, listsep=listsep, unnamed_root=unnamed_root)
         self.fs = fs
 
     def __call__(self, pair):
@@ -62,7 +67,7 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
         return _file_to_partition(
             source,
             self.fs,
-            self.schema.columns(self.listsep),
+            self.columns,
             self.schema,
             subrg=subrg,
         )
@@ -71,6 +76,7 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
         return _FromParquetFragmentWiseFn(
             fs=self.fs,
             schema=self.schema.select_columns(columns),
+            unnamed_root=self.unnamed_root,
         )
 
 
@@ -117,11 +123,14 @@ def from_parquet(
     )
     parquet_columns, subform, actual_paths, fs, subrg, row_counts, metadata = results
 
-    listsep = (
-        "list.element"
-        if any(".list.element." in c for c in parquet_columns)
-        else "list.item"
-    )
+    listsep = "list.item"
+    unnamed_root = False
+    for c in parquet_columns:
+        if ".list.element." in c:
+            listsep = "list.element"
+            break
+        if c.startswith("."):
+            unnamed_root = True
 
     if split_row_groups is None:
         split_row_groups = row_counts is not None and len(row_counts) > 1
@@ -140,6 +149,7 @@ def from_parquet(
                 fs,
                 subform,
                 listsep=listsep,
+                unnamed_root=unnamed_root,
             ),
             actual_paths,
             label=label,
@@ -158,20 +168,22 @@ def from_parquet(
                 ]  # returns 1st if fp is empty
                 rgs_paths[rgs_path] += 1
 
-            subrg = [list(range(i + 1)) for _ in actual_paths]
+            subrg = [list(range(rgs_paths[_])) for _ in actual_paths]
 
         rgs = [metadata.row_group(i) for i in range(metadata.num_row_groups)]
         divisions = [0] + list(
             itertools.accumulate([rg.num_rows for rg in rgs], operator.add)
         )
         pairs = []
-        for rgs, path in zip(subrg, actual_paths):
-            pairs.extend([(rg, path) for rg in rgs])
+
+        for isubrg, path in zip(subrg, actual_paths):
+            pairs.extend([(irg, path) for irg in isubrg])
         return from_map(
             _FromParquetFragmentWiseFn(
                 fs,
                 subform,
                 listsep=listsep,
+                unnamed_root=unnamed_root,
             ),
             pairs,
             label=label,

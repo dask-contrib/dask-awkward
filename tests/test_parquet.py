@@ -41,9 +41,19 @@ def test_remote_single(ignore_metadata, scan_files):
 
 @pytest.mark.parametrize("ignore_metadata", [True, False])
 @pytest.mark.parametrize("scan_files", [True, False])
-def test_remote_double(ignore_metadata, scan_files):
+@pytest.mark.parametrize(
+    "split_row_groups",
+    [
+        False,
+        pytest.param(True, marks=pytest.mark.xfail(reason="same file used twice")),
+    ],
+)
+def test_remote_double(ignore_metadata, scan_files, split_row_groups):
     arr = dak.from_parquet(
-        [sample, sample], ignore_metadata=ignore_metadata, scan_files=scan_files
+        [sample, sample],
+        ignore_metadata=ignore_metadata,
+        scan_files=scan_files,
+        split_row_groups=split_row_groups,
     )
     assert arr.npartitions == 2
     assert (
