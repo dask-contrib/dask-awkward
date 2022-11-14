@@ -145,3 +145,33 @@ def list3() -> list:
 
 def lists() -> Array:
     return from_lists([list1(), list2(), list3()])  # pragma: no cover
+
+
+def unnamed_root_ds() -> Array:
+    ds = [
+        [
+            {
+                "minutes": 33,
+                "passes": {"to": [2, 5, 6], "success": [True, True, False]},
+            },
+            {
+                "minutes": 34,
+                "passes": {"to": [5, 6, 7, 8], "success": [False, False, True, True]},
+            },
+        ],
+        [
+            {
+                "minutes": 24,
+                "passes": {"to": [0, 3, 4, 5], "success": [True, True, True, False]},
+            },
+            {
+                "minutes": 3,
+                "passes": {"to": [], "success": []},
+            },
+            {
+                "minutes": 18,
+                "passes": {"to": [0, 3, 4, 5], "success": [False, True, True, False]},
+            },
+        ],
+    ]
+    return ak.Array(ds * 3)

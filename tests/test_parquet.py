@@ -9,6 +9,7 @@ import pyarrow.dataset as pad
 
 import dask_awkward as dak
 from dask_awkward.lib.io.parquet import _metadata_file_from_data_files, to_parquet
+from dask_awkward.lib.testutils import assert_eq
 
 data = [[1, 2, 3], [4, None], None]
 arr = pa.array(data)
@@ -161,3 +162,20 @@ def test_write_roundtrip(tmpdir):
     arr = dak.from_awkward(ak.from_iter(data), 2)
     to_parquet(arr, tmpdir)
     arr = dak.from_parquet(tmpdir)
+
+
+@pytest.mark.parametrize("columns", [None, ["minutes", "passes.to"], ["passes.*"]])
+def test_unnamed_root(
+    unnamed_root_parquet_file: str,
+    columns: list[str] | None,
+) -> None:
+    daa = dak.from_parquet(
+        unnamed_root_parquet_file,
+        split_row_groups=True,
+        columns=columns,
+    )
+    caa = ak.from_parquet(
+        unnamed_root_parquet_file,
+        columns=columns,
+    )
+    assert_eq(daa, caa, check_forms=False)
