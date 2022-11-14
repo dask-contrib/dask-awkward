@@ -43,6 +43,8 @@ def test_property_behavior(daa_p1: dak.Array, caa_p1: ak.Array) -> None:
     caa = ak.Array(caa_p1.points, with_name="Point", behavior=behaviors)
     assert_eq(daa.x2, caa.x2)
 
+    assert daa.behavior == caa.behavior
+
 
 def test_nonexistent_behavior(daa_p1: dak.Array, daa_p2: dak.Array) -> None:
     daa1 = dak.with_name(daa_p1["points"], "Point", behavior=behaviors)
