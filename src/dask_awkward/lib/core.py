@@ -597,6 +597,14 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         raise ValueError("This collection's meta is None; unknown layout.")
 
     @property
+    def behavior(self) -> dict:
+        if self._meta is not None:
+            return self._meta.behavior
+        raise ValueError(
+            "This collection's meta is None; no behavior property available."
+        )
+
+    @property
     def fields(self) -> list[str]:
         """Record field names (if any)."""
         return ak.fields(self._meta)
