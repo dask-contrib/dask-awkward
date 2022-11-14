@@ -158,7 +158,7 @@ def from_parquet(
                 ]  # returns 1st if fp is empty
                 rgs_paths[rgs_path] += 1
 
-            subrg = [list(range(i)) for _ in actual_paths]
+            subrg = [list(range(i + 1)) for _ in actual_paths]
 
         rgs = [metadata.row_group(i) for i in range(metadata.num_row_groups)]
         divisions = [0] + list(
