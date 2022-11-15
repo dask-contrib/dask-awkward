@@ -321,8 +321,7 @@ class _ToParquetFn:
             math.ceil(math.log(npartitions, 10)) if npartitions is not None else 1
         )
 
-        if self.fs.protocol == "file":
-            self.fs.mkdir(self.path)
+        self.fs.mkdirs(self.path, exist_ok=True)
 
     def __call__(self, data, block_index):
         filename = f"part{str(block_index[0]).zfill(self.zfill)}.parquet"
