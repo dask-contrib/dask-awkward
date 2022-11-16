@@ -117,6 +117,19 @@ def test_is_none(axis: int) -> None:
     assert_eq(d, e)
 
 
+@pytest.mark.parametrize("axis", [1, -1, 2, -2])
+@pytest.mark.parametrize("target", [5, 10, 1])
+def test_pad_none(axis: int, target: int) -> None:
+    a = [[1, 2, 3], [4], None]
+    b = [[7], [], None, [6, 7, 8]]
+    c = dak.from_lists([[a, b], [b, a]])
+    d = ak.from_iter([a, b] + [b, a])
+    assert_eq(
+        dak.pad_none(c, target=target, axis=axis),
+        ak.pad_none(d, target=target, axis=axis),
+    )
+
+
 def test_with_parameter() -> None:
     a = [[1, 2, 3], [], [4]]
     b = [[], [3], []]
