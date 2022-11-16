@@ -525,7 +525,7 @@ def without_parameters(
     return map_partitions(
         _WithoutParameterFn(behavior=behavior),
         array,
-        label="without-parameter",
+        label="without-parameters",
         output_divisions=1,
     )
 

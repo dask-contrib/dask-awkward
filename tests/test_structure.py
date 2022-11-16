@@ -115,3 +115,23 @@ def test_is_none(axis: int) -> None:
         d = dak.is_none(c, axis=axis)
     e = ak.is_none(ak.from_iter(a + b), axis=axis)
     assert_eq(d, e)
+
+
+def test_with_parameter() -> None:
+    a = [[1, 2, 3], [], [4]]
+    b = [[], [3], []]
+    c = dak.from_lists([a, b])
+    d = dak.with_parameter(c, "something", {})
+    x = ak.from_iter(a + b)
+    y = ak.with_parameter(x, "something", {})
+    assert_eq(d, y)
+
+    assert d.compute().layout.parameters == y.layout.parameters
+    assert d._meta.layout.parameters == y.layout.parameters
+
+    d2 = dak.without_parameters(d)
+    y2 = ak.without_parameters(y)
+    assert_eq(d2, y2)
+    assert not d2.compute().layout.parameters
+    assert d2.compute().layout.parameters == y2.layout.parameters
+    assert d2._meta.layout.parameters == y2.layout.parameters
