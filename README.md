@@ -6,8 +6,8 @@ dask-awkward
 
 [![Tests](https://github.com/ContinuumIO/dask-awkward/actions/workflows/pypi-tests.yml/badge.svg)](https://github.com/ContinuumIO/dask-awkward/actions/workflows/pypi-tests.yml)
 [![Tests](https://github.com/ContinuumIO/dask-awkward/actions/workflows/conda-tests.yml/badge.svg)](https://github.com/ContinuumIO/dask-awkward/actions/workflows/conda-tests.yml)
-[![Coverage](https://codecov.io/gh/ContinuumIO/dask-awkward/branch/main/graph/badge.svg)](https://codecov.io/gh/ContinuumIO/dask-awkward/branch/main)
 [![Documentation Status](https://readthedocs.org/projects/dask-awkward/badge/?version=latest)](https://dask-awkward.readthedocs.io/en/latest/?badge=latest)
+[![Coverage](https://codecov.io/gh/ContinuumIO/dask-awkward/branch/main/graph/badge.svg)](https://codecov.io/gh/ContinuumIO/dask-awkward/branch/main)
 [![PyPI](https://img.shields.io/pypi/v/dask-awkward?color=blue)](https://pypi.org/project/dask-awkward)
 [![Conda Forge](https://img.shields.io/conda/vn/conda-forge/dask-awkward.svg?colorB=486b87&style=flat)](https://anaconda.org/conda-forge/dask-awkward)
 
