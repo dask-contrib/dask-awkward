@@ -473,7 +473,7 @@ def with_name(
         _WithNameFn(name=name, behavior=behavior),
         array,
         label="with-name",
-        output_partitions=1,
+        output_divisions=1,
     )
 
 
@@ -504,7 +504,7 @@ def with_parameter(
         _WithParameterFn(parameter=parameter, value=value, behavior=behavior),
         array,
         label="with-parameter",
-        output_partitions=1,
+        output_divisions=1,
     )
 
 
