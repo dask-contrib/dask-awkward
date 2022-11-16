@@ -473,17 +473,61 @@ def with_name(
         _WithNameFn(name=name, behavior=behavior),
         array,
         label="with-name",
+        output_partitions=1,
     )
 
 
+class _WithParameterFn:
+    def __init__(self, parameter, value, behavior):
+        self.parameter = parameter
+        self.value = value
+        self.behavior = behavior
+
+    def __call__(self, array):
+        return ak.with_parameter(
+            array,
+            paramter=self.parameter,
+            value=self.value,
+            behavior=self.behavior,
+        )
+
+
 @borrow_docstring(ak.with_parameter)
-def with_parameter(array, parameter, value, highlevel=True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+def with_parameter(
+    array: Array,
+    parameter: str,
+    value: Any,
+    highlevel: bool = True,
+    behavior: dict | None = None,
+) -> Array:
+    return map_partitions(
+        _WithParameterFn(parameter=parameter, value=value, behavior=behavior),
+        array,
+        label="with-parameter",
+        output_partitions=1,
+    )
+
+
+class _WithoutParameterFn:
+    def __init__(self, behavior):
+        self.behavior = behavior
+
+    def __call__(self, array):
+        return ak.without_parameter(array, behavior=self.behavior)
 
 
 @borrow_docstring(ak.without_parameters)
-def without_parameters(array, highlevel=True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+def without_parameters(
+    array: Array,
+    highlevel: bool = True,
+    behavior: dict | None = None,
+) -> Array:
+    return map_partitions(
+        _WithoutParameterFn(behavior=behavior),
+        array,
+        label="without-parameter",
+        output_partitions=1,
+    )
 
 
 @borrow_docstring(ak.zeros_like)
