@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import operator
+import warnings
 from collections.abc import Hashable, Mapping
 from typing import Any
 
@@ -34,8 +35,13 @@ def optimize(
         raise NotImplementedError(
             '"chained" is not supported (yet), use "simple-getitem" or "brute-force".'
         )
-    else:
+    elif confopt == "none":
         pass
+    else:
+        warnings.warn(
+            f"column-projection-optimization option {confopt!r} is unknown; "
+            "no column projection optimization will be executed."
+        )
 
     # Perform Blockwise optimizations for HLG input
     dsk = optimize_blockwise(dsk, keys=keys)
