@@ -486,7 +486,7 @@ class _WithParameterFn:
     def __call__(self, array):
         return ak.with_parameter(
             array,
-            paramter=self.parameter,
+            parameter=self.parameter,
             value=self.value,
             behavior=self.behavior,
         )
@@ -513,7 +513,7 @@ class _WithoutParameterFn:
         self.behavior = behavior
 
     def __call__(self, array):
-        return ak.without_parameter(array, behavior=self.behavior)
+        return ak.without_parameters(array, behavior=self.behavior)
 
 
 @borrow_docstring(ak.without_parameters)
@@ -526,7 +526,7 @@ def without_parameters(
         _WithoutParameterFn(behavior=behavior),
         array,
         label="without-parameter",
-        output_partitions=1,
+        output_divisions=1,
     )
 
 
