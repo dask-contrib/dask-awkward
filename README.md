@@ -23,7 +23,7 @@ Installing
 ----------
 
 If you are interested in experimenting with `dask-awkward`, we
-recommend installing from the `HEAD` of the `main` branch:
+recommend installing from the `main` branch:
 
 ```
 pip install git+https://github.com/ContinuumIO/dask-awkward@main
