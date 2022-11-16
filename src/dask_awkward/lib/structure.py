@@ -384,6 +384,21 @@ def packed(array, highlevel=True, behavior=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
+class _PadNoneFn:
+    def __init__(self, target, axis, **kwargs):
+        self.target = target
+        self.axis = axis
+        self.kwargs = kwargs
+
+    def __call__(self, array):
+        return ak.pad_none(
+            array,
+            target=self.target,
+            axis=self.axis,
+            **self.kwargs,
+        )
+
+
 @borrow_docstring(ak.pad_none)
 def pad_none(
     array,
@@ -393,7 +408,19 @@ def pad_none(
     highlevel=True,
     behavior=None,
 ):
-    raise DaskAwkwardNotImplemented("TODO")
+    if axis == 0:
+        DaskAwkwardNotImplemented("axis=0 for pad_none is not supported")
+    return map_partitions(
+        _PadNoneFn(
+            target=target,
+            axis=axis,
+            clip=clip,
+            behavior=behavior,
+        ),
+        array,
+        label="pad-none",
+        output_divisions=1,
+    )
 
 
 @borrow_docstring(ak.ravel)
