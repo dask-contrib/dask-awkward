@@ -615,6 +615,15 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             return self._meta.layout.form
         raise ValueError("This collection's meta is None; unknown form.")
 
+    @property
+    def type(self) -> ak.types.ArrayType:
+        t = ak.types.ArrayType(
+            self._meta._layout.form.type_from_behavior(self._meta._behavior),
+            0,
+        )
+        t._length = "??"
+        return t
+
     @cached_property
     def keys_array(self) -> np.ndarray:
         """NumPy array of task graph keys."""
