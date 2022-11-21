@@ -126,7 +126,7 @@ def corr(
     weight=None,
     axis=None,
     keepdims=False,
-    mask_identity=True,
+    mask_identity=False,
     flatten_records=False,
 ):
     raise DaskAwkwardNotImplemented("TODO")
@@ -215,7 +215,7 @@ def covar(
     weight=None,
     axis=None,
     keepdims=False,
-    mask_identity=True,
+    mask_identity=False,
     flatten_records=False,
 ):
     raise DaskAwkwardNotImplemented("TODO")
@@ -228,7 +228,7 @@ def linear_fit(
     weight=None,
     axis=None,
     keepdims=False,
-    mask_identity=True,
+    mask_identity=False,
     flatten_records=False,
 ):
     raise DaskAwkwardNotImplemented("TODO")
@@ -280,7 +280,7 @@ def mean(
     weight=None,
     axis=None,
     keepdims=False,
-    mask_identity=True,
+    mask_identity=False,
     flatten_records=False,
 ):
     if axis == 0 or axis == -1 * array.ndim:
@@ -347,7 +347,7 @@ def moment(
     weight=None,
     axis=None,
     keepdims=False,
-    mask_identity=True,
+    mask_identity=False,
     flatten_records=False,
 ):
     raise DaskAwkwardNotImplemented("TODO")
@@ -375,7 +375,7 @@ def std(
     ddof=0,
     axis=None,
     keepdims=False,
-    mask_identity=True,
+    mask_identity=False,
     flatten_records=False,
 ):
     raise DaskAwkwardNotImplemented("TODO")
@@ -430,7 +430,7 @@ def var(
     ddof=0,
     axis=None,
     keepdims=False,
-    mask_identity=True,
+    mask_identity=False,
     flatten_records=False,
 ):
     raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")

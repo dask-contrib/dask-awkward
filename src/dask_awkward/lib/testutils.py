@@ -42,6 +42,7 @@ def assert_eq(
 def assert_eq_arrays(
     a: Array | ak.Array,
     b: Array | ak.Array,
+    isclose_equal_nan: bool = False,
     check_forms: bool = True,
     check_divisions: bool = True,
     scheduler: Any | None = None,
@@ -73,7 +74,16 @@ def assert_eq_arrays(
                 assert a.npartitions == b.npartitions
 
     # finally check the values
-    assert a_comp.tolist() == b_comp.tolist()
+    if isclose_equal_nan:
+        assert ak.all(
+            ak.isclose(
+                ak.from_iter(a_comp.tolist()),
+                ak.from_iter(b_comp.tolist()),
+                equal_nan=True,
+            )
+        )
+    else:
+        assert a_comp.tolist() == b_comp.tolist()
 
 
 def assert_eq_records(
