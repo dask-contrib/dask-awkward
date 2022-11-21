@@ -1697,7 +1697,24 @@ def normalize_single_outer_inner_index(
     return (partition_index, new_index)
 
 
-def typetracer_from_form(form: Any) -> ak.Array:
+def typetracer_from_form(form: Form) -> ak.Array:
+    """Create a typetracer Array from an awkward form.
+
+    This functions uses `form` along with :func:`awkward.from_buffers`
+    to create an awkward typetracer Array (an Array that does not
+    carry data).
+
+    Parameters
+    ----------
+    form : awkward.form.Form
+        Form that the resulting Array will have.
+
+    Returns
+    -------
+    awkward.Array
+        Resulting highlevel typetracer Array
+
+    """
     return ak.Array(
         ak.from_buffers(
             form,
