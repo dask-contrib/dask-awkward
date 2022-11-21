@@ -37,6 +37,7 @@ from dask_awkward.utils import (
 if TYPE_CHECKING:
     from awkward.contents.content import Content
     from awkward.forms.form import Form
+    from awkward.types.arraytype import ArrayType
     from awkward.types.type import Type
     from dask.array.core import Array as DaskArray
     from dask.bag.core import Bag as DaskBag
@@ -614,6 +615,15 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if self._meta is not None:
             return self._meta.layout.form
         raise ValueError("This collection's meta is None; unknown form.")
+
+    @property
+    def type(self) -> ArrayType:
+        t = ak.types.ArrayType(
+            self._meta._layout.form.type_from_behavior(self._meta._behavior),
+            0,
+        )
+        t._length = "??"
+        return t
 
     @cached_property
     def keys_array(self) -> np.ndarray:
