@@ -35,8 +35,8 @@ dynamic = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/ContinuumIO/dask-awkward"
-"Bug Tracker" = "https://github.com/ContinuumIO/dask-awkward/issues"
+Homepage = "https://github.com/dask-contrib/dask-awkward"
+"Bug Tracker" = "https://github.com/dask-contrib/dask-awkward/issues"
 
 [project.optional-dependencies]
 complete = [

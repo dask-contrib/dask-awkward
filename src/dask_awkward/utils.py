@@ -11,7 +11,7 @@ class DaskAwkwardNotImplemented(NotImplementedError):
 
 If you would like this unsupported call to be supported by
 dask-awkward please open an issue at:
-https://github.com/ContinuumIO/dask-awkward."""
+https://github.com/dask-contrib/dask-awkward."""
 
     def __init__(self, msg: str | None = None) -> None:
         msg = f"{msg or ''}{self.NOT_SUPPORTED_MSG}"
