@@ -29,7 +29,7 @@ pre-release, we have been uploading alpha releases to PyPI
 pip install dask-awkward
 ```
 
-This will install release candidate version of `awkward`.
+This will install a release candidate version of `awkward`.
 
 Documentation
 -------------
