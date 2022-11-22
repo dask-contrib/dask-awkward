@@ -139,18 +139,48 @@ def cartesian(
     raise DaskAwkwardNotImplemented("TODO")
 
 
+class _CombinationsFn:
+    def __init__(self, n: int, axis: int, **kwargs: Any):
+        self.n = n
+        self.axis = axis
+        self.kwargs = kwargs
+
+    def __call__(self, array):
+        return ak.combinations(array, self.n, axis=self.axis, **self.kwargs)
+
+
 @borrow_docstring(ak.combinations)
 def combinations(
-    array,
-    n,
-    replacement=False,
-    axis=1,
-    fields=None,
-    parameters=None,
-    with_name=None,
-    highlevel=True,
-    behavior=None,
-):
+    array: Array,
+    n: int,
+    replacement: bool = False,
+    axis: int = 1,
+    fields: list[str] | None = None,
+    parameters: dict | None = None,
+    with_name: str | None = None,
+    highlevel: bool = True,
+    behavior: dict | None = None,
+) -> Array:
+    if fields is not None and len(fields) != n:
+        raise ValueError("if provided, the length of 'fields' must be 'n'")
+
+    if axis != 0:
+        fn = _CombinationsFn(
+            n=n,
+            replacement=replacement,
+            axis=axis,
+            fields=fields,
+            parameters=parameters,
+            with_name=with_name,
+            highlevel=highlevel,
+            behavior=behavior,
+        )
+        return map_partitions(
+            fn,
+            array,
+            label="combinations",
+            output_divisions=1,
+        )
     raise DaskAwkwardNotImplemented("TODO")
 
 

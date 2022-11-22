@@ -148,3 +148,17 @@ def test_with_parameter() -> None:
     assert not d2.compute().layout.parameters
     assert d2.compute().layout.parameters == y2.layout.parameters
     assert d2._meta.layout.parameters == y2.layout.parameters
+
+
+@pytest.mark.parametrize("axis", [1, -1])
+@pytest.mark.parametrize("fields", [None, ["a", "b"]])
+def test_combinations(caa, daa, axis, fields):
+    assert_eq(
+        dak.combinations(daa, 2, axis=axis),
+        ak.combinations(caa, 2, axis=axis),
+    )
+
+
+def test_combinations_raise(daa):
+    with pytest.raises(ValueError, match="if provided, the length"):
+        dak.combinations(daa, 2, fields=["a", "b", "c"])
