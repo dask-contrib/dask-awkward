@@ -8,15 +8,15 @@ dask-awkward
 
 *Connecting Dask and Awkward Array.*
 
-.. warning::
-
-   dask-awkward is currently in alpha status: we welcome feedback but
-   please know that there is no guaranteed API stability.
+The dask-awkward project implements a native Dask collection for
+representing partitioned Awkward arrays. Read more about Awkward
+arrays at `their website <awkwardarray_>`_.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents
+   :caption: Getting Started
 
+   install.rst
    intro.rst
    terminology.rst
 
@@ -29,9 +29,5 @@ dask-awkward
    api_reducers.rst
    api_structure.rst
 
-..   Indices and tables
-..   ==================
 
-..   * :ref:`genindex`
-..   * :ref:`modindex`
-..   * :ref:`search`
+.. _awkwardarray: https://awkward-array.org/
