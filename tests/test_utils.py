@@ -22,7 +22,7 @@ def test_lazyfilesdict() -> None:
     assert lfd[(0,)] == "f1.json"
     assert lfd[(1,)] == "f2.json"
     assert list(lfd) == inputs
-    assert not (5,) in lfd
+    assert (5,) not in lfd
     assert "a" not in lfd
 
 

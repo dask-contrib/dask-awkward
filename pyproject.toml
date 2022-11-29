@@ -157,3 +157,7 @@ omit = [
      "src/dask_awkward/version.py",
 ]
 source = ["src/dask_awkward"]
+
+[tool.ruff]
+ignore = ["E501", "E402"]
+per-file-ignores = {"__init__.py" = ["E402", "F401"]}
