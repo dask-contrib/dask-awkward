@@ -423,6 +423,14 @@ def sum(
         raise ValueError("axis must be none or an integer")
 
 
+class _VarFn:
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __call__(self, array):
+        return ak.var(array, **self.kwargs)
+
+
 @borrow_docstring(ak.var)
 def var(
     x,
@@ -433,4 +441,22 @@ def var(
     mask_identity=False,
     flatten_records=False,
 ):
-    raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
+    if weight is not None:
+        raise DaskAwkwardNotImplemented("weight argument is not supported.")
+    if axis is None or axis == 0 or axis == -1 * x.ndim:
+        raise DaskAwkwardNotImplemented(
+            f"axis={axis} is not supported for this array yet."
+        )
+    if axis and axis != 0:
+        return map_partitions(
+            _VarFn(
+                ddof=ddof,
+                axis=axis,
+                keepdims=keepdims,
+                mask_identity=mask_identity,
+                flatten_records=flatten_records,
+            ),
+            x,
+            output_divisions=1,
+        )
+    raise DaskAwkwardNotImplemented("TODO")
