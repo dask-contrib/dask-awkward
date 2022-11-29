@@ -111,3 +111,19 @@ def test_sum(daa: dak.Array, caa: ak.Array, axis: int | None, attr: str) -> None
     ar = ak.sum(caa.points[attr], axis=axis)
     dr = dak.sum(daa.points[attr], axis=axis)
     assert_eq(ar, dr)
+
+
+@pytest.mark.parametrize("axis", [1, -1])
+@pytest.mark.parametrize("attr", ["y", "x"])
+def test_var(daa: dak.Array, caa: ak.Array, axis: int | None, attr: str) -> None:
+    ar = ak.var(caa.points[attr], axis=axis)
+    dr = dak.var(daa.points[attr], axis=axis)
+    assert_eq(ar, dr, isclose_equal_nan=True)
+
+
+@pytest.mark.parametrize("axis", [1, -1])
+@pytest.mark.parametrize("attr", ["y", "x"])
+def test_std(daa: dak.Array, caa: ak.Array, axis: int | None, attr: str) -> None:
+    ar = ak.std(caa.points[attr], axis=axis)
+    dr = dak.std(daa.points[attr], axis=axis)
+    assert_eq(ar, dr, isclose_equal_nan=True)
