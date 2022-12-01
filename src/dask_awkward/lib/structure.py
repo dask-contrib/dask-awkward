@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Any
 
 import awkward as ak
 import numpy as np
-from awkward._typetracer import UnknownScalar
 
+from dask_awkward.lib.compat import unknown_scalar
 from dask_awkward.lib.core import (
     Array,
     map_partitions,
@@ -381,7 +381,7 @@ def num(
             return total_reduction_to_scalar(
                 label="num",
                 array=array,
-                meta=UnknownScalar(np.dtype(int)),
+                meta=unknown_scalar(np.dtype(int)),
                 chunked_fn=ak.num,
                 chunked_kwargs={"axis": 0},
                 comb_fn=ak.sum,

@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, Any, TypeVar
 import awkward as ak
 import dask.config
 import numpy as np
-from awkward._typetracer import MaybeNone, OneOf, UnknownScalar
 from awkward.highlevel import _dir_pattern
 from dask.base import DaskMethodsMixin, dont_optimize, is_dask_collection, tokenize
 from dask.blockwise import BlockwiseDep
@@ -25,6 +24,7 @@ from dask.utils import IndexCallable, funcname, key_split
 from numpy.lib.mixins import NDArrayOperatorsMixin
 from tlz import first
 
+from dask_awkward.lib.compat import MaybeNone, OneOf, is_unknown_scalar, unknown_scalar
 from dask_awkward.lib.optimize import optimize as dak_optimize
 from dask_awkward.typing import AwkwardDaskCollection
 from dask_awkward.utils import (
@@ -157,7 +157,7 @@ class Scalar(DaskMethodsMixin):
         return (self._name, 0)
 
     def _check_meta(self, m: Any) -> Any | None:
-        if not isinstance(m, (MaybeNone, UnknownScalar, OneOf)):
+        if not (isinstance(m, (MaybeNone, OneOf)) or is_unknown_scalar(m)):
             raise TypeError(f"meta must be a typetracer object, not a {type(m)}")
         return m
 
@@ -260,7 +260,7 @@ def new_scalar_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Scalar:
 
     """
     if meta is None:
-        meta = UnknownScalar(np.dtype(None))
+        meta = unknown_scalar(np.dtype(None))
     return Scalar(dsk, name, meta, known_value=None)
 
 
@@ -310,7 +310,7 @@ def new_known_scalar(
         dtype = np.dtype(dtype)
     llg = {(name, 0): s}
     hlg = HighLevelGraph.from_collections(name, llg, dependencies=())
-    return Scalar(hlg, name, meta=UnknownScalar(dtype), known_value=s)
+    return Scalar(hlg, name, meta=unknown_scalar(dtype), known_value=s)
 
 
 class Record(Scalar):
@@ -785,7 +785,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             return result
 
         # otherwise make sure we have one of the other potential results.
-        if not isinstance(new_meta, (ak.Record, UnknownScalar, OneOf, MaybeNone)):
+        if not (isinstance(new_meta, (ak.Record, OneOf, MaybeNone)) or is_unknown_scalar(new_meta)):
             raise DaskAwkwardNotImplemented("Key type not supported for this array.")
 
         token = tokenize(partition, where)
@@ -1505,10 +1505,13 @@ def is_typetracer(obj: Any) -> bool:
             and not obj.layout.array.nplike.known_data
         ):
             return True
-    # scalar-like typetracer
-    if isinstance(obj, (UnknownScalar, MaybeNone, OneOf)):
+
+    # typetracer primitives
+    if isinstance(obj, (MaybeNone, OneOf)):
         return True
-    return False
+
+    # scalar-like typetracer
+    return is_unknown_scalar(obj)
 
 
 def meta_or_identity(obj: Any) -> Any:

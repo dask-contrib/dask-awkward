@@ -4,8 +4,8 @@ from typing import TYPE_CHECKING, Any
 
 import awkward as ak
 import numpy as np
-from awkward._typetracer import UnknownScalar
 
+from dask_awkward.lib.core import unknown_scalar
 from dask_awkward.lib.core import map_partitions, total_reduction_to_scalar
 from dask_awkward.utils import DaskAwkwardNotImplemented, borrow_docstring
 
@@ -158,7 +158,7 @@ def count(
         return total_reduction_to_scalar(
             label="count",
             array=array,
-            meta=UnknownScalar(np.dtype(int)),
+            meta=unknown_scalar(np.dtype(int)),
             chunked_fn=ak.count,
             chunked_kwargs={"axis": 1},
             comb_fn=ak.sum,
@@ -196,7 +196,7 @@ def count_nonzero(
         return total_reduction_to_scalar(
             label="count_nonzero",
             array=array,
-            meta=UnknownScalar(np.dtype(int)),
+            meta=unknown_scalar(np.dtype(int)),
             chunked_fn=ak.count_nonzero,
             chunked_kwargs={"axis": 1},
             comb_fn=ak.sum,
