@@ -11,13 +11,9 @@ dask-awkward
 [![PyPI](https://img.shields.io/pypi/v/dask-awkward?color=blue)](https://pypi.org/project/dask-awkward)
 [![Conda Forge](https://img.shields.io/conda/vn/conda-forge/dask-awkward.svg?colorB=486b87&style=flat)](https://anaconda.org/conda-forge/dask-awkward)
 
-
-**This is alpha software** without any guaranteed API stability. The
-dask-awkward project is affiliated with awkward-array's v1 to v2
-transition. [Read more about that
-here](https://github.com/scikit-hep/awkward/wiki). The first official
-stable release of dask-awkward is planned for December 2022. We still
-encourage willing users to experiment and report issues!
+The first official release of dask-awkward will be coming in December
+2022, but pre-releases are available and we're happy to receive issues
+and PRs from curious users.
 
 Installing
 ----------
