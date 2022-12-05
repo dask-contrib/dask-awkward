@@ -163,24 +163,39 @@ def unnamed_root_ds() -> Array:
             {
                 "minutes": 33,
                 "passes": {"to": [2, 5, 6], "success": [True, True, False]},
+                "assists": [
+                    {"distance": 3.3, "scorer": 6},
+                    {"distance": 4.4, "scorer": 6},
+                ],
             },
             {
                 "minutes": 34,
                 "passes": {"to": [5, 6, 7, 8], "success": [False, False, True, True]},
+                "assists": [],
             },
         ],
         [
             {
                 "minutes": 24,
                 "passes": {"to": [0, 3, 4, 5], "success": [True, True, True, False]},
+                "assists": [
+                    {"distance": 10.3, "scorer": 0},
+                    {"distance": 14.0, "scorer": 0},
+                ],
             },
             {
                 "minutes": 3,
                 "passes": {"to": [], "success": []},
+                "assists": [
+                    {"distance": 3.3, "scorer": 0},
+                    {"distance": 2.3, "scorer": 4},
+                    {"distance": 1.0, "scorer": 5},
+                ],
             },
             {
                 "minutes": 18,
                 "passes": {"to": [0, 3, 4, 5], "success": [False, True, True, False]},
+                "assists": [{"distance": 4.3, "scorer": 0}],
             },
         ],
     ]

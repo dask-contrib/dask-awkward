@@ -25,9 +25,9 @@ def test_requested_columns(caa_parquet):
         if isinstance(v, AwkwardIOLayer):
             continue
         if k.startswith("points"):
-            assert o._requested_columns(v) == {"points"}
+            assert o._requested_columns_getitem(v) == {"points"}
         if k.startswith("x"):
-            assert o._requested_columns(v) == {"x"}
+            assert o._requested_columns_getitem(v) == {"x"}
 
 
 def test_config_adjust_1(caa_parquet):

@@ -148,12 +148,12 @@ show_missing = true
 
 [tool.coverage.run]
 omit = [
-     "src/dask_awkward/lib/io/scratch.py",
-     "src/dask_awkward/tests/test_*.py",
-     "src/dask_awkward/tests/__init__.py",
-     "src/dask_awkward/version.py",
+     "*/lib/io/scratch.py",
+     "*/tests/test_*.py",
+     "*/tests/__init__.py",
+     "*/version.py",
 ]
-source = ["src/dask_awkward"]
+source = ["src/"]
 
 [tool.ruff]
 ignore = ["E501", "E402"]

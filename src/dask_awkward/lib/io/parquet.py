@@ -109,7 +109,7 @@ def from_parquet(
     )
     label = "read-parquet"
     token = tokenize(
-        tok, ignore_metadata, columns, filters, scan_files, split_row_groups
+        tok, paths, ignore_metadata, columns, filters, scan_files, split_row_groups
     )
 
     # same as ak_metadata_from_parquet
