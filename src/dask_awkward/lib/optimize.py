@@ -73,14 +73,32 @@ def _requested_columns_getitem(layer):
     return {fn_arg}
 
 
-def _layers_and_columns_getitem(dsk: HighLevelGraph) -> dict[str, list[str]]:
-    # find layers that are AwkwardIOLayer with a project_columns io_func method.
-    # projectable-I/O --> "pio"
-    pio_layer_names = [
+def _projectable_io_layer_names(dsk: HighLevelGraph) -> list[str]:
+    """Get list of column-projectable AwkwardIOLayer names.
+
+    Parameters
+    ----------
+    dsk : HighLevelGraph
+        Task graph of interest
+
+    Returns
+    -------
+    list[str]
+        Names of the AwkwardIOLayers in the graph that are
+        column-projectable.
+
+    """
+    return [
         n
         for n, v in dsk.layers.items()
         if isinstance(v, AwkwardIOLayer) and hasattr(v.io_func, "project_columns")
     ]
+
+
+def _layers_and_columns_getitem(dsk: HighLevelGraph) -> dict[str, list[str]]:
+    # find layers that are AwkwardIOLayer with a project_columns io_func method.
+    # projectable-I/O --> "pio"
+    pio_layer_names = _projectable_io_layer_names(dsk)
 
     # if no projectable AwkwardIOLayers bail and return empty dict
     if not pio_layer_names:
@@ -142,16 +160,21 @@ def _attempt_compute_with_columns_brute(
     get_sync(new_hlg, list(new_hlg.keys()))
 
 
-def _necessary_columns_brute(dsk: HighLevelGraph) -> list[str] | None:
+def _necessary_columns_brute(dsk: HighLevelGraph) -> dict:
     # staring fields should be those belonging to the AwkwardIOLayer's
     # metadata (typetracer) array.
     out_meta = list(dsk.layers.values())[-1]._meta  # type: ignore
     keep = out_meta.layout.form.columns()
     columns: list[str] = []
-    for _, v in dsk.layers.items():
-        if isinstance(v, AwkwardIOLayer):
-            columns = v._meta.layout.form.columns()
-            break
+
+    pio_layer_names = _projectable_io_layer_names(dsk)
+    if len(pio_layer_names) > 1:
+        raise RuntimeError(
+            "'brute' method of optimization currently only graphs with a single IO layer."
+        )
+    pio_layer = pio_layer_names[0]
+
+    columns = dsk.layers[pio_layer]._meta.layout.form.columns()  # type: ignore
 
     # can only select output columns that exist in the input
     # (other names may have come from aliases)
@@ -169,7 +192,7 @@ def _necessary_columns_brute(dsk: HighLevelGraph) -> list[str] | None:
             keep.append(holdout)
     if keep == columns:
         keep = None
-    return keep
+    return {pio_layer: keep}
 
 
 def _has_projectable_awkward_io_layer(dsk: HighLevelGraph) -> bool:
@@ -188,19 +211,15 @@ def optimize_iolayer_columns_brute(dsk: HighLevelGraph) -> HighLevelGraph:
     # determine the necessary columns to complete the executation of
     # the metadata (typetracer) based task graph.
     necessary_cols = _necessary_columns_brute(dsk)
+    layer_name, necessary_cols = list(_necessary_columns_brute(dsk).items())[0]
+
     if necessary_cols is None:
         return dsk
     layers = dsk.layers.copy()  # type: ignore
     deps = dsk.dependencies.copy()  # type: ignore
-    io_layer_name: str | None = None
     new_layer: Layer | None = None
-    for k, v in dsk.layers.items():
-        if isinstance(v, AwkwardIOLayer):
-            new_layer = v.project_columns(necessary_cols)
-            io_layer_name = k
-            break
 
-    if io_layer_name is not None and new_layer is not None:
-        layers[io_layer_name] = new_layer
+    new_layer = dsk.layers[layer_name].project_columns(necessary_cols)  # type: ignore
+    layers[layer_name] = new_layer
 
     return HighLevelGraph(layers, deps)
