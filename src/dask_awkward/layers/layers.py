@@ -69,7 +69,7 @@ class AwkwardIOLayer(Blockwise):
 
     def project_columns(self, columns: list[str]) -> AwkwardIOLayer:
         if hasattr(self.io_func, "project_columns"):
-            io_func = self.io_func.project_columns(columns)  # type: ignore
+            io_func = self.io_func.project_columns(columns)
             return AwkwardIOLayer(
                 name=self.name,
                 columns=columns,

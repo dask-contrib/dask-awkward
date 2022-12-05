@@ -114,9 +114,6 @@ warn_redundant_casts = true
 warn_unused_ignores = true
 warn_unreachable = true
 
-[[tool.mypy.overrides]]
-module = ["awkward.*"]
-ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["IPython.*"]
