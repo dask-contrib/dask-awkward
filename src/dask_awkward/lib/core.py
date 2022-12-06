@@ -1494,19 +1494,14 @@ def is_typetracer(obj: Any) -> bool:
         True if the `obj` is a typetracer like object.
 
     """
-    # array typetracer
-    if isinstance(obj, ak.Array):
-        if not obj.layout.nplike.known_shape and not obj.layout.nplike.known_data:
-            return True
-    # record typetracer
-    if isinstance(obj, ak.Record):
-        if (
-            not obj.layout.array.nplike.known_shape
-            and not obj.layout.array.nplike.known_data
-        ):
+    # array/record typetracer
+    if isinstance(obj, (ak.Array, ak.Record)):
+        backend = obj.layout.backend
+
+        if not backend.nplike.known_shape and not backend.nplike.known_data:
             return True
     # scalar-like typetracer
-    if isinstance(obj, (UnknownScalar, MaybeNone, OneOf)):
+    elif isinstance(obj, (UnknownScalar, MaybeNone, OneOf)):
         return True
     return False
 
