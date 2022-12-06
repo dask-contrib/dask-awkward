@@ -35,7 +35,7 @@ def optimize(
         raise NotImplementedError(
             '"chained" is not supported (yet), use "simple-getitem" or "brute-force".'
         )
-    elif confopt == "none":
+    elif confopt in ("none", False, None):
         pass
     else:
         warnings.warn(

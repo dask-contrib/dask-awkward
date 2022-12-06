@@ -148,7 +148,6 @@ show_missing = true
 
 [tool.coverage.run]
 omit = [
-     "*/lib/io/scratch.py",
      "*/tests/test_*.py",
      "*/tests/__init__.py",
      "*/version.py",
