@@ -31,7 +31,7 @@ def test_requested_columns(caa_parquet):
 
 
 def test_config_adjust_1(caa_parquet):
-    from dask_awkward.lib.io.scratch import from_parquet
+    from dask_awkward.lib import from_parquet
 
     a = from_parquet([caa_parquet] * 3)
     with dask.config.set({"awkward.column-projection-optimization": "brute-force"}):
