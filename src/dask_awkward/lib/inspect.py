@@ -8,7 +8,7 @@ from dask_awkward.lib.core import Array, Record, Scalar
 
 def necessary_columns(
     collection: Array | Record | Scalar,
-    strategy: Literal["brute"] | Literal["getitem"],
+    strategy: Literal["brute", "getitem"],
 ) -> dict[str, Any]:
     if strategy == "brute":
         return opt._necessary_columns_brute(collection.dask)
