@@ -12,13 +12,10 @@ from dask import persist
 from dask.delayed import delayed
 from distributed import Client
 from distributed.client import _wait
-from distributed.utils_test import (  # noqa
-    cleanup,
-    cluster,
-    gen_cluster,
-    loop,
-    loop_in_thread,
-)
+from distributed.utils_test import cleanup  # noqa
+from distributed.utils_test import loop  # noqa
+from distributed.utils_test import loop_in_thread  # noqa
+from distributed.utils_test import cluster, gen_cluster
 
 import dask_awkward as dak
 from dask_awkward.lib.testutils import assert_eq
