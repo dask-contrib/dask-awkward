@@ -32,4 +32,4 @@ jobs:
         pip list
     - name: test
       run: |
-        python -m pytest tests/test_no_awkward
+        python -m pytest tests/test_no_awkward.py
