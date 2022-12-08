@@ -1,0 +1,39 @@
+name: No awkward
+
+on:
+  push:
+    paths-ignore:
+    - '**.md'
+  pull_request:
+    paths-ignore:
+    - '**.md'
+  workflow_dispatch:
+
+concurrency:
+  group: 'pypi-tests-${{ github.head_ref || github.run_id }}'
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ubuntu-latest]
+        python-version: ["3.10"]
+    runs-on: ${{matrix.platform}}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: setup Python ${{matrix.python-version}}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{matrix.python-version}}
+    - name: install
+      run: |
+        pip install pip wheel -U
+        pip install -q --no-cache-dir .
+        pip uninstall awkward -y
+        pip list
+    - name: test
+      run: |
+        python -m pytest tests/test_no_awkward

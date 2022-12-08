@@ -5,12 +5,20 @@ try:
 except ImportError:
     import json  # type: ignore
 
-import awkward as ak
+try:
+    import awkward as ak
+except ImportError:
+    pass
+
 import fsspec
 import pytest
 
 import dask_awkward as dak
-import dask_awkward.lib.testutils as daktu
+
+try:
+    import dask_awkward.lib.testutils as daktu
+except ImportError:
+    pass
 
 
 @pytest.fixture(scope="session")
