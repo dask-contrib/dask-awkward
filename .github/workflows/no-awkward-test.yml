@@ -26,6 +26,7 @@ jobs:
     - name: install
       run: |
         pip install pip wheel -U
+        pip install pytest
         pip install -q --no-cache-dir .
         pip uninstall awkward -y
         pip list
