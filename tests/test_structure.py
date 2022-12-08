@@ -97,7 +97,7 @@ def test_zeros_like(caa: ak.Array, daa: dak.Array) -> None:
     assert_eq(da1, ca1)
 
 
-@pytest.mark.parametrize("vf", [9, 99.9, "ok"])
+@pytest.mark.parametrize("vf", [9, 99.9])
 @pytest.mark.parametrize("axis", [None, 0, 1, -1])
 def test_fill_none(vf: int | float | str, axis: int | None) -> None:
     a = [[1, 2, None], [], [None], [5, 6, 7, None], [1, 2], None]
