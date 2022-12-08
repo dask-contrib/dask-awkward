@@ -29,6 +29,7 @@ jobs:
         pip install pytest
         pip install -q --no-cache-dir .
         pip uninstall awkward -y
+        pip uninstall awkward-cpp -y
         pip list
     - name: test
       run: |
