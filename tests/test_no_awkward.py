@@ -5,8 +5,9 @@ import dask_awkward.typing
 import dask_awkward.utils  # noqa
 
 
-def test_import():
+def test_import() -> None:
     try:
-        pass
+        import awkward as ak  # noqa
     except ImportError:
-        assert True
+        pass
+    assert True
