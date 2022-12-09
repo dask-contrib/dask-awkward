@@ -2,11 +2,10 @@ name: conda Tests
 
 on:
   push:
-    paths-ignore:
-    - '**.md'
+    branches: ['main']
+    paths-ignore: ['**.md', 'docs/**']
   pull_request:
-    paths-ignore:
-    - '**.md'
+    paths-ignore: ['**.md', 'docs/**']
   workflow_dispatch:
 
 concurrency:
