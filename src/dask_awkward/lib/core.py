@@ -1576,7 +1576,7 @@ def typetracer_array(a: ak.Array | Array) -> ak.Array:
     if isinstance(a, Array):
         return a._meta
     elif isinstance(a, ak.Array):
-        return ak.Array(a.layout.typetracer.forget_length())
+        return ak.Array(a.layout.to_typetracer(forget_length=True))
     else:
         msg = (
             "`a` should be an awkward array or a Dask awkward collection.\n"
@@ -1631,7 +1631,7 @@ def empty_typetracer() -> ak.Array:
 
     """
     a = ak.Array([])
-    return ak.Array(a.layout.typetracer.forget_length())
+    return ak.Array(a.layout.to_typetracer(forget_length=True))
 
 
 class _BehaviorMethodFn:
@@ -1715,5 +1715,5 @@ def typetracer_from_form(form: Form) -> ak.Array:
             length=0,
             container={"": b"\x00\x00\x00\x00\x00\x00\x00\x00"},
             buffer_key="",
-        ).layout.typetracer.forget_length()
+        ).layout.to_typetracer(forget_length=True)
     )
