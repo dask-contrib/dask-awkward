@@ -1709,11 +1709,5 @@ def typetracer_from_form(form: Form) -> ak.Array:
         Resulting highlevel typetracer Array
 
     """
-    return ak.Array(
-        ak.from_buffers(
-            form,
-            length=0,
-            container={"": b"\x00\x00\x00\x00\x00\x00\x00\x00"},
-            buffer_key="",
-        ).layout.to_typetracer(forget_length=True)
-    )
+    layout = form.length_zero_array(highlevel=False)
+    return ak.Array(layout.to_typetracer(forget_length=True))
