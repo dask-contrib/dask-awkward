@@ -491,6 +491,10 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             raise ValueError("rename= unsupported in dask-awkward")
         return Array(dsk, name, self._meta, divisions=self.divisions)
 
+    def reset_meta(self) -> None:
+        """Assign an empty typetracer array as the collection metadata."""
+        self._meta = empty_typetracer()
+
     def __len__(self) -> int:
         if not self.known_divisions:
             self.eager_compute_divisions()
@@ -522,19 +526,14 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             "an awkward array and use that function with map_partitions."
         )
 
-    def reset_meta(self) -> None:
-        """Assign an empty typetracer array as the collection metadata."""
-        self._meta = empty_typetracer()
+    def _ipython_display_(self):
+        return self._meta._ipython_display_()
 
-    # def _ipython_display_(self) -> None:
-    #     if self._meta is None:
-    #         return None
-    #
-    #     import json
-    #
-    #     from IPython.display import display_json
-    #
-    #     display_json(json.loads(self._meta.form.to_json()), raw=True)
+    def _ipython_canary_method_should_not_exist_(self):
+        return self._meta._ipython_canary_method_should_not_exist_()
+
+    def _repr_mimebundle_(self):
+        return self._meta._repr_mimebundle_()
 
     def _ipython_key_completions_(self) -> list[str]:
         if self._meta is not None:
