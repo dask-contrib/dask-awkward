@@ -6,6 +6,7 @@ import operator
 import fsspec
 from awkward.operations import ak_from_parquet, from_buffers, to_arrow_table
 from awkward.operations.ak_from_parquet import _load
+from awkward.highlevel import Array as _Array
 from dask.base import tokenize
 from dask.blockwise import BlockIndex
 from dask.highlevelgraph import HighLevelGraph
@@ -135,12 +136,7 @@ def from_parquet(
     if split_row_groups is None:
         split_row_groups = row_counts is not None and len(row_counts) > 1
 
-    meta = from_buffers(
-        subform,
-        length=0,
-        container={"": b"\x00\x00\x00\x00\x00\x00\x00\x00"},
-        buffer_key="",
-    )
+    meta = _Array(subform.length_zero_array(highlevel=False).to_typetracer())
 
     if split_row_groups is False or subrg is None:
         # file-wise

@@ -42,13 +42,13 @@ __all__ = (
     "nan_to_num",
     "num",
     "ones_like",
-    "packed",
     "pad_none",
     "ravel",
     "run_lengths",
     "singletons",
     "sort",
     "strings_astype",
+    "to_packed",
     "to_regular",
     "unflatten",
     "unzip",
@@ -409,8 +409,8 @@ def ones_like(
     )
 
 
-@borrow_docstring(ak.packed)
-def packed(array, highlevel=True, behavior=None):
+@borrow_docstring(ak.to_packed)
+def to_packed(array, highlevel=True, behavior=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
