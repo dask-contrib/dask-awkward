@@ -48,6 +48,7 @@ async def test_persist(c, s, a, b, ndjson_points_file):
     assert x1.__dask_keys__()[0] in daa.__dask_keys__()
 
 
+@pytest.mark.xfail(reason="iterating on coroutine")
 @pytest.mark.parametrize("optimize_graph", [True, False])
 @gen_cluster(client=True)
 async def test_compute_gen_cluster(
