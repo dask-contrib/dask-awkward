@@ -29,5 +29,10 @@ arrays at `their website <awkwardarray_>`_.
    api_reducers.rst
    api_structure.rst
 
+.. toctree::
+   :maxdepth: 1
+   :caption: Development
+
+   contributing.rst
 
 .. _awkwardarray: https://awkward-array.org/

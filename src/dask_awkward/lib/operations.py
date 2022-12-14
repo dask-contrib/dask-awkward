@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import awkward as ak
 from dask.base import tokenize
 from dask.highlevelgraph import HighLevelGraph
