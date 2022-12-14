@@ -163,3 +163,11 @@ def test_combinations(caa, daa, axis, fields):
 def test_combinations_raise(daa):
     with pytest.raises(ValueError, match="if provided, the length"):
         dak.combinations(daa, 2, fields=["a", "b", "c"])
+
+
+@pytest.mark.parametrize("ascending", [True, False])
+def test_argsort(daa, caa, ascending):
+    assert_eq(
+        dak.argsort(daa.points.x, ascending=ascending),
+        ak.argsort(caa.points.x, ascending=ascending),
+    )
