@@ -251,6 +251,14 @@ def test_singletons(L4):
 
 
 @pytest.mark.parametrize("ascending", [True, False])
+def test_argsort(daa, caa, ascending):
+    assert_eq(
+        dak.argsort(daa.points.x, ascending=ascending),
+        ak.argsort(caa.points.x, ascending=ascending),
+    )
+
+
+@pytest.mark.parametrize("ascending", [True, False])
 def test_sort(daa, caa, ascending):
     assert_eq(
         dak.sort(daa.points.x, ascending=ascending),

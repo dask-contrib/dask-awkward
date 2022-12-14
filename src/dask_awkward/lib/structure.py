@@ -164,6 +164,14 @@ def argcombinations(
     raise DaskAwkwardNotImplemented("TODO")
 
 
+class _ArgsortFn:
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __call__(self, array):
+        return ak.argsort(array, **self.kwargs)
+
+
 @borrow_docstring(ak.argsort)
 def argsort(
     array,
@@ -173,7 +181,15 @@ def argsort(
     highlevel=True,
     behavior=None,
 ):
-    raise DaskAwkwardNotImplemented("TODO")
+    if axis == 0:
+        raise DaskAwkwardNotImplemented("TODO")
+    fn = _ArgsortFn(
+        axis=axis,
+        ascending=ascending,
+        stable=stable,
+        behavior=behavior,
+    )
+    return map_partitions(fn, array, label="argsort", output_divisions=1)
 
 
 @borrow_docstring(ak.broadcast_arrays)
