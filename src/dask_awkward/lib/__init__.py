@@ -14,6 +14,7 @@ from dask_awkward.lib.io.io import (
 )
 from dask_awkward.lib.io.json import from_json, to_json
 from dask_awkward.lib.io.parquet import from_parquet, to_parquet
+from dask_awkward.lib.operations import concatenate
 from dask_awkward.lib.reducers import (
     all,
     any,
@@ -42,7 +43,6 @@ from dask_awkward.lib.structure import (
     broadcast_arrays,
     cartesian,
     combinations,
-    concatenate,
     copy,
     fill_none,
     firsts,
