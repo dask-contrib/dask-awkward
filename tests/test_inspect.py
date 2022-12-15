@@ -27,10 +27,10 @@ def test_necessary_columns_gh126(tmpdir_factory):
     dname1 = d / "f1.parquet"
     dname2 = d / "f2.parquet"
     lists = dask_awkward.lib.testutils.lists().compute()
-    ak.to_parquet(lists, str(dname1))
-    ak.to_parquet(lists, str(dname2))
+    ak.to_parquet(lists, str(dname1), extensionarray=False)
+    ak.to_parquet(lists, str(dname2), extensionarray=False)
     ds = dak.from_parquet([str(dname1), str(dname2)])
     selection = ds[ds.x > 1.0]
     nc = necessary_columns(selection, "getitem")
     assert list(nc.values())[0] == ["x"]
-    assert selection.compute()
+    assert len(selection.compute()) > 0
