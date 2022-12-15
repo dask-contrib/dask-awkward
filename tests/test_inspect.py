@@ -17,7 +17,7 @@ def test_necessary_columns(
     ds = dak.from_parquet(str(dname))
     aioname = list(ds.dask.layers.items())[0][0]
     assert necessary_columns(ds.points.x, "brute") == {aioname: ["points.x"]}
-    assert necessary_columns(ds.points.x, "getitem") == {aioname: ["points"]}
+    assert necessary_columns(ds.points.x, "getitem") == {aioname: None}
     with pytest.raises(ValueError, match="strategy argument should"):
         assert necessary_columns(ds.points, "okokok")  # type: ignore
 
@@ -30,7 +30,23 @@ def test_necessary_columns_gh126(tmpdir_factory):
     ak.to_parquet(lists, str(dname1), extensionarray=False)
     ak.to_parquet(lists, str(dname2), extensionarray=False)
     ds = dak.from_parquet([str(dname1), str(dname2)])
-    selection = ds[ds.x > 1.0]
-    nc = necessary_columns(selection, "getitem")
+
+    selection0 = ds[ds.x > 1.0].x
+    nc = necessary_columns(selection0, "getitem")
     assert list(nc.values())[0] == ["x"]
-    assert len(selection.compute()) > 0
+    assert len(selection0.compute()) > 0
+
+    selection3 = ds[ds.x > 1.0].y
+    nc = necessary_columns(selection3, "getitem")
+    assert list(nc.values())[0] is None
+    assert len(selection3.compute()) > 0
+
+    selection1 = ds[ds.x > 1.0]
+    nc = necessary_columns(selection1, "getitem")
+    assert list(nc.values())[0] is None  # none because we never select anything
+    assert len(selection1.compute()) > 0
+
+    selection2 = ds[ds.y > 1.0].y
+    nc2 = necessary_columns(selection2, "brute")
+    assert list(nc2.values())[0] == ["y"]
+    assert len(selection2.compute()) > 0
