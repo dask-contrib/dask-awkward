@@ -35,12 +35,12 @@ def test_necessary_columns_gh126(tmpdir_factory):
 
     case0 = daa[daa.x > 1.0].x
     nc = necessary_columns(case0, "getitem")
-    assert list(nc.values())[0] == ["x"]
+    assert list(nc.values())[0] == ["x"]  # only x gets used
     assert_eq(case0, caa[caa.x > 1.0].x, check_forms=False)
 
     case1 = daa[daa.x > 1.0].y
     nc = necessary_columns(case1, "getitem")
-    assert list(nc.values())[0] is None
+    assert list(nc.values())[0] is None  # none because all detected columns get used
     assert_eq(case1, caa[caa.x > 1.0].y)
 
     case2 = daa[daa.x > 1.0]
@@ -50,10 +50,10 @@ def test_necessary_columns_gh126(tmpdir_factory):
 
     case3 = daa[daa.y > 1.0].y
     nc2 = necessary_columns(case3, "brute")
-    assert list(nc2.values())[0] == ["y"]
+    assert list(nc2.values())[0] == ["y"]  # only y gets used
     assert_eq(caa[caa.y > 1.0].y, case3, check_forms=False)
 
     case4 = daa[daa.y > 1.0].x
     nc2 = necessary_columns(case4, "brute")
-    assert list(nc2.values())[0] is None
+    assert list(nc2.values())[0] is None  # none because all detected columns get used
     assert_eq(caa[caa.y > 1.0].x, case4, check_forms=False)
