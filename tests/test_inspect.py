@@ -4,8 +4,9 @@ import awkward as ak
 import pytest
 
 import dask_awkward as dak
-import dask_awkward.lib.testutils
+import dask_awkward.lib.testutils as daktu
 from dask_awkward.lib.inspect import necessary_columns
+from dask_awkward.lib.testutils import assert_eq
 
 
 def test_necessary_columns(
@@ -26,27 +27,33 @@ def test_necessary_columns_gh126(tmpdir_factory):
     d = tmpdir_factory.mktemp("pq126")
     dname1 = d / "f1.parquet"
     dname2 = d / "f2.parquet"
-    lists = dask_awkward.lib.testutils.lists().compute()
+    lists = daktu.lists().compute()
     ak.to_parquet(lists, str(dname1), extensionarray=False)
     ak.to_parquet(lists, str(dname2), extensionarray=False)
-    ds = dak.from_parquet([str(dname1), str(dname2)])
+    daa = dak.from_parquet([str(dname1), str(dname2)])
+    caa = ak.concatenate([lists, lists])
 
-    selection0 = ds[ds.x > 1.0].x
+    selection0 = daa[daa.x > 1.0].x
     nc = necessary_columns(selection0, "getitem")
     assert list(nc.values())[0] == ["x"]
-    assert len(selection0.compute()) > 0
+    assert_eq(selection0, caa[caa.x > 1.0].x, check_forms=False)
 
-    selection3 = ds[ds.x > 1.0].y
+    selection3 = daa[daa.x > 1.0].y
     nc = necessary_columns(selection3, "getitem")
     assert list(nc.values())[0] is None
-    assert len(selection3.compute()) > 0
+    assert_eq(selection3, caa[caa.x > 1.0].y)
 
-    selection1 = ds[ds.x > 1.0]
+    selection1 = daa[daa.x > 1.0]
     nc = necessary_columns(selection1, "getitem")
     assert list(nc.values())[0] is None  # none because we never select anything
-    assert len(selection1.compute()) > 0
+    assert_eq(caa[caa.x > 1.0], selection1)
 
-    selection2 = ds[ds.y > 1.0].y
+    selection2 = daa[daa.y > 1.0].y
     nc2 = necessary_columns(selection2, "brute")
     assert list(nc2.values())[0] == ["y"]
-    assert len(selection2.compute()) > 0
+    assert_eq(caa[caa.y > 1.0].y, selection2, check_forms=False)
+
+    selection2 = daa[daa.y > 1.0].x
+    nc2 = necessary_columns(selection2, "brute")
+    assert list(nc2.values())[0] is None
+    assert_eq(caa[caa.y > 1.0].x, selection2, check_forms=False)
