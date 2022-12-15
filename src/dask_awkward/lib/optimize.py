@@ -106,6 +106,7 @@ def _layers_and_columns_getitem(dsk: HighLevelGraph) -> dict[str, list[str]]:
 
     result = {}
     for pio_layer_name in pio_layer_names:
+        starting_fields = set(dsk.layers[pio_layer_name]._meta.fields)
         cols_used_in_getitem = set()
         # dependencies of the current IOLayer
         pio_layer_deps = dsk.dependents[pio_layer_name]
@@ -116,7 +117,9 @@ def _layers_and_columns_getitem(dsk: HighLevelGraph) -> dict[str, list[str]]:
         # of the getitem dependencies, determine the columns that were requested.
         for dep_that_is_getitem in deps_that_are_getitem:
             layer_of_interest = dsk.layers[dep_that_is_getitem]
-            cols_used_in_getitem |= _requested_columns_getitem(layer_of_interest)
+            cols_used_in_getitem |= (
+                _requested_columns_getitem(layer_of_interest) & starting_fields
+            )
         # project columns using the discovered getitem columns.
         if cols_used_in_getitem:
             result[pio_layer_name] = list(cols_used_in_getitem)
