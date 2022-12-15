@@ -105,7 +105,7 @@ def _all_getitem_call_columns(dsk: HighLevelGraph) -> set[str]:
     return result
 
 
-def _layers_and_columns_getitem(dsk: HighLevelGraph) -> dict[str, list[str]]:
+def _layers_and_columns_getitem(dsk: HighLevelGraph) -> dict[str, list[str] | None]:
     # find layers that are AwkwardIOLayer with a project_columns io_func method.
     # projectable-I/O --> "pio"
     pio_layer_names = _projectable_io_layer_names(dsk)
@@ -118,7 +118,7 @@ def _layers_and_columns_getitem(dsk: HighLevelGraph) -> dict[str, list[str]]:
 
     last_layer = list(dsk.layers.values())[-1]
     if hasattr(last_layer, "_meta"):
-        out_meta = last_layer._meta  # type: ignore
+        out_meta = last_layer._meta
         out_meta_columns = out_meta.layout.form.columns()
         if out_meta_columns == [""]:
             out_meta_columns = []
@@ -127,11 +127,11 @@ def _layers_and_columns_getitem(dsk: HighLevelGraph) -> dict[str, list[str]]:
     # can only select output columns that exist in the input
     # (other names may have come from aliases)
 
-    result = {}
+    result: dict[str, list[str] | None] = {}
     for pio_layer_name in pio_layer_names:
-        columns = dsk.layers[pio_layer_name]._meta.fields
+        columns = dsk.layers[pio_layer_name]._meta.fields  # type: ignore
         starting_columns = set(columns)
-        keep = [c for c in out_meta_columns if c in columns]
+        keep = {c for c in out_meta_columns if c in columns}
 
         cols_used_in_getitem = set()
         # dependencies of the current IOLayer
@@ -251,7 +251,7 @@ def optimize_iolayer_columns_brute(dsk: HighLevelGraph) -> HighLevelGraph:
     layer_name, necessary_cols = list(_necessary_columns_brute(dsk).items())[0]
 
     if necessary_cols is None:
-        return dsk
+        return dsk  # type: ignore
     layers = dsk.layers.copy()  # type: ignore
     deps = dsk.dependencies.copy()  # type: ignore
     new_layer: Layer | None = None
