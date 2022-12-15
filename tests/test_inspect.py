@@ -17,8 +17,8 @@ def test_necessary_columns(
     dak.to_parquet(daa, str(dname), compute=True)
     ds = dak.from_parquet(str(dname))
     aioname = list(ds.dask.layers.items())[0][0]
-    assert necessary_columns(ds.points.x, "brute") == {aioname: ["points.x"]}
-    assert necessary_columns(ds.points.x, "getitem") == {aioname: None}
+    assert necessary_columns(ds.points.x, "brute-force") == {aioname: ["points.x"]}
+    assert necessary_columns(ds.points.x, "simple-getitem") == {aioname: None}
     with pytest.raises(ValueError, match="strategy argument should"):
         assert necessary_columns(ds.points, "okokok")  # type: ignore
 
@@ -34,26 +34,26 @@ def test_necessary_columns_gh126(tmpdir_factory):
     caa = ak.concatenate([lists, lists])
 
     case0 = daa[daa.x > 1.0].x
-    nc = necessary_columns(case0, "getitem")
+    nc = necessary_columns(case0, "simple-getitem")
     assert list(nc.values())[0] == ["x"]  # only x gets used
     assert_eq(case0, caa[caa.x > 1.0].x, check_forms=False)
 
     case1 = daa[daa.x > 1.0].y
-    nc = necessary_columns(case1, "getitem")
+    nc = necessary_columns(case1, "simple-getitem")
     assert list(nc.values())[0] is None  # none because all detected columns get used
     assert_eq(case1, caa[caa.x > 1.0].y)
 
     case2 = daa[daa.x > 1.0]
-    nc = necessary_columns(case2, "getitem")
+    nc = necessary_columns(case2, "simple-getitem")
     assert list(nc.values())[0] is None  # none because we never select anything
     assert_eq(caa[caa.x > 1.0], case2)
 
     case3 = daa[daa.y > 1.0].y
-    nc2 = necessary_columns(case3, "brute")
+    nc2 = necessary_columns(case3, "brute-force")
     assert list(nc2.values())[0] == ["y"]  # only y gets used
     assert_eq(caa[caa.y > 1.0].y, case3, check_forms=False)
 
     case4 = daa[daa.y > 1.0].x
-    nc2 = necessary_columns(case4, "brute")
+    nc2 = necessary_columns(case4, "brute-force")
     assert list(nc2.values())[0] is None  # none because all detected columns get used
     assert_eq(caa[caa.y > 1.0].x, case4, check_forms=False)
