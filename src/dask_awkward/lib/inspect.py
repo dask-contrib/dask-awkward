@@ -8,10 +8,10 @@ from dask_awkward.lib.core import Array, Record, Scalar
 
 def necessary_columns(
     collection: Array | Record | Scalar,
-    strategy: Literal["brute", "getitem"],
+    strategy: Literal["brute-force", "simple-getitem"],
 ) -> dict[str, Any]:
-    if strategy == "brute":
+    if strategy == "brute-force":
         return opt._necessary_columns_brute(collection.dask)
-    elif strategy == "getitem":
+    elif strategy == "simple-getitem":
         return opt._layers_and_columns_getitem(collection.dask)
-    raise ValueError("strategy argument should be 'brute' or 'getitem'")
+    raise ValueError("strategy argument should be 'brute-force' or 'simple-getitem'")
