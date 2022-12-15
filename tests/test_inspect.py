@@ -33,27 +33,27 @@ def test_necessary_columns_gh126(tmpdir_factory):
     daa = dak.from_parquet([str(dname1), str(dname2)])
     caa = ak.concatenate([lists, lists])
 
-    selection0 = daa[daa.x > 1.0].x
-    nc = necessary_columns(selection0, "getitem")
+    case0 = daa[daa.x > 1.0].x
+    nc = necessary_columns(case0, "getitem")
     assert list(nc.values())[0] == ["x"]
-    assert_eq(selection0, caa[caa.x > 1.0].x, check_forms=False)
+    assert_eq(case0, caa[caa.x > 1.0].x, check_forms=False)
 
-    selection3 = daa[daa.x > 1.0].y
-    nc = necessary_columns(selection3, "getitem")
+    case1 = daa[daa.x > 1.0].y
+    nc = necessary_columns(case1, "getitem")
     assert list(nc.values())[0] is None
-    assert_eq(selection3, caa[caa.x > 1.0].y)
+    assert_eq(case1, caa[caa.x > 1.0].y)
 
-    selection1 = daa[daa.x > 1.0]
-    nc = necessary_columns(selection1, "getitem")
+    case2 = daa[daa.x > 1.0]
+    nc = necessary_columns(case2, "getitem")
     assert list(nc.values())[0] is None  # none because we never select anything
-    assert_eq(caa[caa.x > 1.0], selection1)
+    assert_eq(caa[caa.x > 1.0], case2)
 
-    selection2 = daa[daa.y > 1.0].y
-    nc2 = necessary_columns(selection2, "brute")
+    case3 = daa[daa.y > 1.0].y
+    nc2 = necessary_columns(case3, "brute")
     assert list(nc2.values())[0] == ["y"]
-    assert_eq(caa[caa.y > 1.0].y, selection2, check_forms=False)
+    assert_eq(caa[caa.y > 1.0].y, case3, check_forms=False)
 
-    selection2 = daa[daa.y > 1.0].x
-    nc2 = necessary_columns(selection2, "brute")
+    case4 = daa[daa.y > 1.0].x
+    nc2 = necessary_columns(case4, "brute")
     assert list(nc2.values())[0] is None
-    assert_eq(caa[caa.y > 1.0].x, selection2, check_forms=False)
+    assert_eq(caa[caa.y > 1.0].x, case4, check_forms=False)
