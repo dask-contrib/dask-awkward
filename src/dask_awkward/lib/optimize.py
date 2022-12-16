@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import operator
+import re
 import warnings
 from collections.abc import Hashable, Mapping
 from typing import Any
@@ -60,19 +61,24 @@ def _is_getitem(layer: Layer) -> bool:
     return layer.dsk[layer.output][0] == operator.getitem
 
 
-def _requested_columns_getitem(layer):
+_task_key_regex = re.compile(r"^[a-z-]+-[0-9a-f]{32}")
+
+
+def _requested_columns_getitem(layer) -> set[str]:
     """Determine the columns requested in an ``operator.getitem`` call."""
     fn_arg = layer.indices[1][0]
+    result = set()
     if isinstance(fn_arg, tuple):
         fn_arg = fn_arg[0]
         if isinstance(fn_arg, slice):
-            return set()
+            result = set()
     if isinstance(fn_arg, list):
         if all(isinstance(x, str) for x in fn_arg):
-            return set(fn_arg)
+            result = set(fn_arg)
     if isinstance(fn_arg, str):
-        return {fn_arg}
-    return set()
+        result = {fn_arg}
+
+    return set(filter(lambda x: _task_key_regex.match(x) is None, result))
 
 
 def _projectable_io_layer_names(dsk: HighLevelGraph) -> list[str]:
