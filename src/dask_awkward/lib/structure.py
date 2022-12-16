@@ -498,9 +498,44 @@ def values_astype(array, to, highlevel=True, behavior=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
+class _WhereFn:
+    def __init__(
+        self,
+        mergebool: bool = True,
+        highlevel: bool = True,
+        behavior: dict | None = None,
+    ) -> None:
+        self.mergebool = mergebool
+        self.highlevel = highlevel
+        self.behavior = behavior
+
+    def __call__(self, condition: ak.Array, *args) -> ak.Array:
+        return ak.where(
+            condition,
+            *args,
+            mergebool=self.mergebool,
+            highlevel=self.highlevel,
+            behavior=self.behavior,
+        )
+
+
 @borrow_docstring(ak.where)
-def where(condition, *args, **kwargs):
-    raise DaskAwkwardNotImplemented("TODO")
+def where(
+    condition: Array,
+    *args,
+    mergebool: bool = True,
+    highlevel: bool = True,
+    behavior: dict | None = None,
+) -> Array:
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+    return map_partitions(
+        _WhereFn(mergebool=mergebool, highlevel=highlevel, behavior=behavior),
+        condition,
+        *args,
+        label="where",
+        output_divisions=1,
+    )
 
 
 @borrow_docstring(ak.with_field)
