@@ -509,10 +509,11 @@ class _WhereFn:
         self.highlevel = highlevel
         self.behavior = behavior
 
-    def __call__(self, condition: ak.Array, *args) -> ak.Array:
+    def __call__(self, condition: ak.Array, x: ak.Array, y: ak.Array) -> ak.Array:
         return ak.where(
             condition,
-            *args,
+            x,
+            y,
             mergebool=self.mergebool,
             highlevel=self.highlevel,
             behavior=self.behavior,
@@ -522,7 +523,8 @@ class _WhereFn:
 @borrow_docstring(ak.where)
 def where(
     condition: Array,
-    *args,
+    x: Array,
+    y: Array,
     mergebool: bool = True,
     highlevel: bool = True,
     behavior: dict | None = None,
@@ -532,7 +534,8 @@ def where(
     return map_partitions(
         _WhereFn(mergebool=mergebool, highlevel=highlevel, behavior=behavior),
         condition,
-        *args,
+        x,
+        y,
         label="where",
         output_divisions=1,
     )
