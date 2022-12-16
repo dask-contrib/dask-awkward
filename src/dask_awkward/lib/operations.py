@@ -18,7 +18,6 @@ class _ConcatenateFnAxis1:
         self.kwargs = kwargs
 
     def __call__(self, *args):
-        print(args)
         return ak.concatenate(list(args), **self.kwargs)
 
 
