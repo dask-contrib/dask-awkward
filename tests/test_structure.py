@@ -167,14 +167,6 @@ def test_combinations_raise(daa):
 
 @pytest.mark.parametrize("mergebool", [True, False])
 def test_where(caa, daa, mergebool):
-    # assert_eq(
-    #    dak.where(dak.flatten(daa.points.x > daa.points.y), mergebool=mergebool),
-    #    ak.where(ak.flatten(caa.points.x > caa.points.y), mergebool=mergebool),
-    # )
-    # assert_eq(
-    #    dak.where(daa.points.x > daa.points.y, daa.points.x, mergebool=mergebool),
-    #    ak.where(caa.points.x > caa.points.y, caa.points.x, mergebool=mergebool),
-    # )
     assert_eq(
         dak.where(
             daa.points.x > daa.points.y, daa.points.x, daa.points.y, mergebool=mergebool
