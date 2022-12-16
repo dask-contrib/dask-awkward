@@ -19,6 +19,8 @@ arrays at `their website <awkwardarray_>`_.
    install.rst
    intro.rst
    terminology.rst
+   limitations.rst
+   faq.rst
 
 .. toctree::
    :maxdepth: 1
