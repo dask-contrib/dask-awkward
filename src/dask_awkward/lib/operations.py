@@ -13,7 +13,7 @@ from dask_awkward.lib.core import (
 from dask_awkward.utils import DaskAwkwardNotImplemented
 
 
-class _ConcatenateFnAxis1:
+class _ConcatenateFnAxisGT0:
     def __init__(self, **kwargs):
         self.kwargs = kwargs
 
@@ -48,11 +48,11 @@ def concatenate(
         hlg = HighLevelGraph.from_collections(name, g, dependencies=arrays)
         return new_array_object(hlg, name, meta=meta, npartitions=npartitions)
 
-    if axis == 1:
+    if axis > 0:
         if not compatible_divisions(*arrays):
             raise ValueError("All arrays must have identical divisions")
 
-        fn = _ConcatenateFnAxis1(axis=axis)
+        fn = _ConcatenateFnAxisGT0(axis=axis)
         return map_partitions(fn, *arrays)
 
     else:
