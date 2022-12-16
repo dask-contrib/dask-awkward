@@ -4,9 +4,9 @@ import math
 import operator
 
 import fsspec
-from awkward.operations import ak_from_parquet, from_buffers, to_arrow_table
-from awkward.operations.ak_from_parquet import _load
 from awkward.highlevel import Array as _Array
+from awkward.operations import ak_from_parquet, to_arrow_table
+from awkward.operations.ak_from_parquet import _load
 from dask.base import tokenize
 from dask.blockwise import BlockIndex
 from dask.highlevelgraph import HighLevelGraph
