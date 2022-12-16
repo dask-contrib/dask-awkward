@@ -10,12 +10,12 @@ operations under this umbrella:
    the awkward API that is readily available: For example,
    ``dak.sum(a, axis=1)``.
 
-2. **Things that are possible but we haven't implemented**: An operation
-   like ``dak.std(a, axis=0)``. Right now this operation will raise a
-   ``DaskAwkwardNotImplemented`` exception. If you run into something
-   like this please feel free to open up an issue on the GitHub issue
-   tracker to start a discussion and get feature request process
-   started.
+2. **Things that are possible but we haven't implemented**: For
+   example, an operation like ``dak.std(a, axis=0)``. Right now this
+   operation will raise a ``DaskAwkwardNotImplemented`` exception. If
+   you run into something like this please feel free to open up an
+   issue on the GitHub issue tracker to start a discussion and get the
+   feature request process started.
 
 3. **Things that just won't be implemented**: There will be parts of
    the dask-awkward API that we simply cannot implement for lazy
