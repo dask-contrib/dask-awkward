@@ -5,23 +5,35 @@ from dask.base import tokenize
 from dask.highlevelgraph import HighLevelGraph
 
 from dask_awkward.lib.core import Array, new_array_object
+from dask_awkward.utils import DaskAwkwardNotImplemented
 
 
-def concatenate(arrays: list[Array]) -> Array:
+def concatenate(
+    arrays: list[Array],
+    axis: int = 0,
+    mergebool: bool = True,
+    highlevel: bool = True,
+    behavior: dict | None = None,
+) -> Array:
     label = "concatenate"
-    token = tokenize(arrays)
+    token = tokenize(arrays, axis, mergebool, highlevel, behavior)
     name = f"{label}-{token}"
-    npartitions = sum([a.npartitions for a in arrays])
-    g = {}
-    i = 0
-    metas = []
-    for collection in arrays:
-        metas.append(collection._meta)
-        for k in collection.__dask_keys__():
-            g[(name, i)] = k
-            i += 1
 
-    meta = ak.concatenate(metas)
+    if axis == 0:
+        npartitions = sum([a.npartitions for a in arrays])
+        g = {}
+        i = 0
+        metas = []
+        for collection in arrays:
+            metas.append(collection._meta)
+            for k in collection.__dask_keys__():
+                g[(name, i)] = k
+                i += 1
 
-    hlg = HighLevelGraph.from_collections(name, g, dependencies=arrays)
-    return new_array_object(hlg, name, meta=meta, npartitions=npartitions)
+        meta = ak.concatenate(metas)
+
+        hlg = HighLevelGraph.from_collections(name, g, dependencies=arrays)
+        return new_array_object(hlg, name, meta=meta, npartitions=npartitions)
+
+    else:
+        raise DaskAwkwardNotImplemented("TODO")
