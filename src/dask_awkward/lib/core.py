@@ -1621,6 +1621,15 @@ def compatible_partitions(*args: Array) -> bool:
     return True
 
 
+def compatible_divisions(*args: Array) -> bool:
+    if not all(a.known_divisions for a in args):
+        return False
+    for arg in args[1:]:
+        if arg.divisions != args[0].divisions:
+            return False
+    return True
+
+
 def empty_typetracer() -> ak.Array:
     """Instantiate a typetracer array with unknown length.
 
