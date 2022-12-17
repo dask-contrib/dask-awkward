@@ -17,7 +17,7 @@ from dask_awkward.lib.io.io import from_map
 
 
 class _FromParquetFn:
-    def __init__(self, schema=None, listsep="list.item", unnamed_root=False):
+    def __init__(self, *, schema, listsep="list.item", unnamed_root=False):
         self.schema = schema
         self.listsep = listsep
         self.unnamed_root = unnamed_root
@@ -35,7 +35,7 @@ class _FromParquetFn:
 
 
 class _FromParquetFileWiseFn(_FromParquetFn):
-    def __init__(self, fs, schema, listsep="list.item", unnamed_root=False):
+    def __init__(self, *, fs, schema, listsep="list.item", unnamed_root=False):
         super().__init__(schema=schema, listsep=listsep, unnamed_root=unnamed_root)
         self.fs = fs
 
@@ -48,6 +48,8 @@ class _FromParquetFileWiseFn(_FromParquetFn):
         )
 
     def project_columns(self, columns):
+        if columns is None:
+            return self
         return _FromParquetFileWiseFn(
             fs=self.fs,
             schema=self.schema.select_columns(columns),
@@ -57,7 +59,7 @@ class _FromParquetFileWiseFn(_FromParquetFn):
 
 
 class _FromParquetFragmentWiseFn(_FromParquetFn):
-    def __init__(self, fs, schema, listsep="list.item", unnamed_root=False):
+    def __init__(self, *, fs, schema, listsep="list.item", unnamed_root=False):
         super().__init__(schema=schema, listsep=listsep, unnamed_root=unnamed_root)
         self.fs = fs
 
@@ -74,6 +76,8 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
         )
 
     def project_columns(self, columns):
+        if columns is None:
+            return self
         return _FromParquetFragmentWiseFn(
             fs=self.fs,
             schema=self.schema.select_columns(columns),
@@ -142,8 +146,8 @@ def from_parquet(
         # file-wise
         return from_map(
             _FromParquetFileWiseFn(
-                fs,
-                subform,
+                fs=fs,
+                schema=subform,
                 listsep=listsep,
                 unnamed_root=unnamed_root,
             ),
@@ -176,8 +180,8 @@ def from_parquet(
             pairs.extend([(irg, path) for irg in isubrg])
         return from_map(
             _FromParquetFragmentWiseFn(
-                fs,
-                subform,
+                fs=fs,
+                schema=subform,
                 listsep=listsep,
                 unnamed_root=unnamed_root,
             ),
