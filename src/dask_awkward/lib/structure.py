@@ -5,12 +5,14 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 import awkward as ak
+import dask.delayed
 import numpy as np
 from awkward._typetracer import UnknownScalar
 
 from dask_awkward.lib.core import (
     Array,
     map_partitions,
+    new_array_object,
     new_known_scalar,
     total_reduction_to_scalar,
 )
@@ -500,15 +502,34 @@ class _UnzipFn:
 @borrow_docstring(ak.unzip)
 def unzip(
     array: Array, highlevel: bool = True, behavior: dict | None = None
-) -> tuple(Array):
+) -> Array | tuple(Array):
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
-    return map_partitions(
-        _UnzipFn(highlevel=highlevel, behavior=behavior),
-        array,
-        label="unzip",
-        output_divisions=1,
-    )
+
+    # this has to get a little weird right now
+    # someone else can probably determine a better impl
+
+    meta = ak.unzip(array._meta, highlevel=highlevel, behavior=behavior)
+    if isinstance(meta, tuple):
+        unzip_fn = _UnzipFn(highlevel=highlevel, behavior=behavior)
+        bound = dask.delayed(pure=True, nout=len(meta))(unzip_fn)(array)
+        # bound = graph_manip_bind(bound, array)
+        return tuple(
+            new_array_object(
+                bound[imeta].dask,
+                bound[imeta]._key,
+                meta=ameta,
+                divisions=array.divisions,
+            )
+            for imeta, ameta in enumerate(meta)
+        )
+    else:
+        return map_partitions(
+            _UnzipFn(highlevel=highlevel, behavior=behavior),
+            array,
+            label="unzip",
+            output_divisions=1,
+        )
 
 
 @borrow_docstring(ak.values_astype)
