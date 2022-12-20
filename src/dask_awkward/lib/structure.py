@@ -488,9 +488,27 @@ def unflatten(array, counts, axis=0, highlevel=True, behavior=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
+class _UnzipFn:
+    def __init__(self, highlevel: bool = True, behavior: dict | None = None) -> None:
+        self.highlevel = highlevel
+        self.behavior = behavior
+
+    def __call__(self, array: ak.Array) -> ak.Array:
+        return ak.unzip(array, highlevel=self.highlevel, behavior=self.behavior)
+
+
 @borrow_docstring(ak.unzip)
-def unzip(array, highlevel=True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+def unzip(
+    array: Array, highlevel: bool = True, behavior: dict | None = None
+) -> tuple(Array):
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+    return map_partitions(
+        _UnzipFn(highlevel=highlevel, behavior=behavior),
+        array,
+        label="unzip",
+        output_divisions=1,
+    )
 
 
 @borrow_docstring(ak.values_astype)
