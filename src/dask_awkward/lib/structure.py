@@ -8,11 +8,12 @@ import awkward as ak
 import dask.delayed
 import numpy as np
 from awkward._typetracer import UnknownScalar
+from dask.base import tokenize
 
+import dask_awkward
 from dask_awkward.lib.core import (
     Array,
     map_partitions,
-    new_array_object,
     new_known_scalar,
     total_reduction_to_scalar,
 )
@@ -506,28 +507,54 @@ def unzip(
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
 
+    _unzip_label = "unzip"
+
     # this has to get a little weird right now
     # someone else can probably determine a better impl
 
     meta = ak.unzip(array._meta, highlevel=highlevel, behavior=behavior)
     if isinstance(meta, tuple):
+        len_meta = len(meta)
         unzip_fn = _UnzipFn(highlevel=highlevel, behavior=behavior)
-        bound = dask.delayed(pure=True, nout=len(meta))(unzip_fn)(array)
-        # bound = graph_manip_bind(bound, array)
-        return tuple(
-            new_array_object(
-                bound[imeta].dask,
-                bound[imeta]._key,
-                meta=ameta,
-                divisions=array.divisions,
+
+        temp_delayed = array.to_delayed()
+
+        unzipped_delayed_list = [
+            dask.delayed(pure=True, nout=len(meta))(unzip_fn)(delayed_array)
+            for delayed_array in temp_delayed
+        ]
+
+        unzipped_delayed_by_meta = []
+
+        for ipart, unzipped_delayed in enumerate(unzipped_delayed_list):
+            unzipped_delayed_by_meta.extend(
+                [
+                    unzipped_delayed.__getitem__(
+                        i, dask_key_name=("getitem-" + tokenize(array, i), ipart)
+                    )
+                    for i in range(len_meta)
+                ]
             )
-            for imeta, ameta in enumerate(meta)
-        )
+
+        unzipped_arrays = []
+        for i, imeta in enumerate(meta):
+            unzipped_arrays.append(
+                dask_awkward.from_delayed(
+                    tuple(
+                        unzipped_delayed_by_meta[len(meta) * j + i]
+                        for j in range(array.npartitions)
+                    ),
+                    meta=imeta,
+                    prefix=_unzip_label,
+                )
+            )
+
+        return tuple(unzipped_arrays)
     else:
         return map_partitions(
             _UnzipFn(highlevel=highlevel, behavior=behavior),
             array,
-            label="unzip",
+            label=_unzip_label,
             output_divisions=1,
         )
 

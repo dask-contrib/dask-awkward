@@ -45,6 +45,10 @@ def test_zip_dict_input(caa: ak.Array, daa: dak.Array) -> None:
     assert_eq(da_z, ca_z)
 
 
+def test_unzip_dict_input(caa: ak.Array, daa: dak.Array) -> None:
+    assert_eq(dak.zip(dak.unzip(daa["points"])), ak.zip(ak.unzip(caa["points"])))
+
+
 def test_zip_list_input(caa: ak.Array, daa: dak.Array) -> None:
     da1 = daa.points.x
     ca1 = caa.points.x
