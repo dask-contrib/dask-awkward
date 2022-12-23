@@ -515,34 +515,31 @@ def unzip(
 
     meta = ak.unzip(array._meta, highlevel=highlevel, behavior=behavior)
     if isinstance(meta, tuple):
-        len_meta = len(meta)
         unzip_fn = _UnzipFn(highlevel=highlevel, behavior=behavior)
 
-        temp_delayed = array.to_delayed()
-
         unzipped_delayed_list = [
-            dask.delayed(pure=True, nout=len(meta))(unzip_fn)(delayed_array)
-            for delayed_array in temp_delayed
+            dask.delayed(unzip_fn, pure=True, nout=len(meta))(
+                delayed_array,
+                dask_key_name=(
+                    f"{_unzip_label}-delayed-{tokenize(array)}",
+                    idelayed % array.npartitions,
+                ),
+            )
+            for idelayed, delayed_array in enumerate(array.to_delayed())
         ]
 
-        unzipped_delayed_by_meta = []
-
-        # here I pop out the necessary portion of dak.from_delayed to skip unncessary steps in the dag
-        for ipart, unzipped_delayed in enumerate(unzipped_delayed_list):
-            unzipped_delayed_by_meta.extend(
-                [
-                    unzipped_delayed.__getitem__(
-                        i, dask_key_name=(f"{_unzip_label}-{tokenize(array, i)}", ipart)
-                    )
-                    for i in range(len_meta)
-                ]
-            )
-
+        # here I pop out the necessary portion of dak.from_delayed to skip unncessary steps in the dag and remove unnecessary loops
         unzipped_arrays = []
         for i, imeta in enumerate(meta):
             parts = [
-                unzipped_delayed_by_meta[len(meta) * j + i]
-                for j in range(array.npartitions)
+                unzipped_delayed_list[ipart].__getitem__(
+                    i,
+                    dask_key_name=(
+                        f"{_unzip_label}-getitem-{tokenize(array, i)}",
+                        ipart,
+                    ),
+                )
+                for ipart in range(array.npartitions)
             ]
             name = f"{_unzip_label}-{tokenize(array, i)}"
             dsk = {(name, i): part.key for i, part in enumerate(parts)}
