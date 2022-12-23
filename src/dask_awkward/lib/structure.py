@@ -531,18 +531,17 @@ def unzip(
         # here I pop out the necessary portion of dak.from_delayed to skip unncessary steps in the dag and remove unnecessary loops
         unzipped_arrays = []
         for i, imeta in enumerate(meta):
-            parts = [
-                unzipped_delayed_list[ipart].__getitem__(
-                    i,
-                    dask_key_name=(
-                        f"{_unzip_label}-getitem-{tokenize(array, i)}",
-                        ipart,
-                    ),
-                )
-                for ipart in range(array.npartitions)
-            ]
             name = f"{_unzip_label}-{tokenize(array, i)}"
-            dsk = {(name, i): part.key for i, part in enumerate(parts)}
+            getitem_name = f"{_unzip_label}-getitem-{tokenize(array, i)}"
+            parts = []
+            dsk = {}
+            for ipart in range(array.npartitions):
+                parts.append(
+                    unzipped_delayed_list[ipart].__getitem__(
+                        i, dask_key_name=(getitem_name, ipart)
+                    )
+                )
+                dsk[(name, ipart)] = parts[-1].key
 
             hlg = HighLevelGraph.from_collections(name, dsk, dependencies=parts)
             divs: tuple[int | None, ...] = (None,) * (len(parts) + 1)
