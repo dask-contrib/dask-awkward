@@ -9,11 +9,12 @@ import dask.delayed
 import numpy as np
 from awkward._typetracer import UnknownScalar
 from dask.base import tokenize
+from dask.highlevelgraph import HighLevelGraph
 
-import dask_awkward
 from dask_awkward.lib.core import (
     Array,
     map_partitions,
+    new_array_object,
     new_known_scalar,
     total_reduction_to_scalar,
 )
@@ -526,11 +527,12 @@ def unzip(
 
         unzipped_delayed_by_meta = []
 
+        # here I pop out the necessary portion of dak.from_delayed to skip unncessary steps in the dag
         for ipart, unzipped_delayed in enumerate(unzipped_delayed_list):
             unzipped_delayed_by_meta.extend(
                 [
                     unzipped_delayed.__getitem__(
-                        i, dask_key_name=("getitem-" + tokenize(array, i), ipart)
+                        i, dask_key_name=(f"{_unzip_label}-{tokenize(array, i)}", ipart)
                     )
                     for i in range(len_meta)
                 ]
@@ -538,14 +540,22 @@ def unzip(
 
         unzipped_arrays = []
         for i, imeta in enumerate(meta):
+            parts = [
+                unzipped_delayed_by_meta[len(meta) * j + i]
+                for j in range(array.npartitions)
+            ]
+            name = f"{_unzip_label}-{tokenize(array, i)}"
+            dsk = {(name, i): part.key for i, part in enumerate(parts)}
+
+            hlg = HighLevelGraph.from_collections(name, dsk, dependencies=parts)
+            divs: tuple[int | None, ...] = (None,) * (len(parts) + 1)
+
             unzipped_arrays.append(
-                dask_awkward.from_delayed(
-                    tuple(
-                        unzipped_delayed_by_meta[len(meta) * j + i]
-                        for j in range(array.npartitions)
-                    ),
+                new_array_object(
+                    hlg,
+                    name=name,
                     meta=imeta,
-                    prefix=_unzip_label,
+                    divisions=divs,
                 )
             )
 
@@ -555,7 +565,6 @@ def unzip(
             _UnzipFn(highlevel=highlevel, behavior=behavior),
             array,
             label=_unzip_label,
-            output_divisions=1,
         )
 
 
