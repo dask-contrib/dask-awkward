@@ -1,20 +1,18 @@
 from __future__ import annotations
 
 import builtins
+import operator
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 import awkward as ak
-import dask.delayed
 import numpy as np
 from awkward._typetracer import UnknownScalar
-from dask.base import tokenize
-from dask.highlevelgraph import HighLevelGraph
 
 from dask_awkward.lib.core import (
     Array,
+    empty_typetracer,
     map_partitions,
-    new_array_object,
     new_known_scalar,
     total_reduction_to_scalar,
 )
@@ -508,59 +506,34 @@ def unzip(
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
 
-    _unzip_label = "unzip"
-
-    # this has to get a little weird right now
-    # someone else can probably determine a better impl
-
     meta = ak.unzip(array._meta, highlevel=highlevel, behavior=behavior)
     if isinstance(meta, tuple):
         unzip_fn = _UnzipFn(highlevel=highlevel, behavior=behavior)
 
-        unzipped_delayed_list = [
-            dask.delayed(unzip_fn, pure=True, nout=len(meta))(
-                delayed_array,
-                dask_key_name=(
-                    f"{_unzip_label}-delayed-{tokenize(array)}",
-                    idelayed % array.npartitions,
-                ),
-            )
-            for idelayed, delayed_array in enumerate(array.to_delayed())
-        ]
+        dak_unzip = map_partitions(
+            unzip_fn,
+            array,
+            label="unzip",
+            meta=empty_typetracer(),  # this seems like an abuse of the system to get what I want...
+        )
 
-        # here I pop out the necessary portion of dak.from_delayed to skip unncessary steps in the dag and remove unnecessary loops
         unzipped_arrays = []
         for i, imeta in enumerate(meta):
-            name = f"{_unzip_label}-{tokenize(array, i)}"
-            getitem_name = f"{_unzip_label}-getitem-{tokenize(array, i)}"
-            parts = []
-            dsk = {}
-            for ipart in range(array.npartitions):
-                parts.append(
-                    unzipped_delayed_list[ipart].__getitem__(
-                        i, dask_key_name=(getitem_name, ipart)
-                    )
-                )
-                dsk[(name, ipart)] = parts[-1].key
-
-            hlg = HighLevelGraph.from_collections(name, dsk, dependencies=parts)
-            divs: tuple[int | None, ...] = (None,) * (len(parts) + 1)
-
-            unzipped_arrays.append(
-                new_array_object(
-                    hlg,
-                    name=name,
-                    meta=imeta,
-                    divisions=divs,
-                )
+            dak_getitem = map_partitions(
+                operator.getitem,
+                dak_unzip,
+                i,
+                label="getitem",
+                meta=imeta,
             )
+            unzipped_arrays.append(dak_getitem)
 
         return tuple(unzipped_arrays)
     else:
         return map_partitions(
             _UnzipFn(highlevel=highlevel, behavior=behavior),
             array,
-            label=_unzip_label,
+            label="unzip",
         )
 
 
