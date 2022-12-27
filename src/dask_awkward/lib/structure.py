@@ -544,7 +544,6 @@ def where(
         x,
         y,
         label="where",
-        output_divisions=1,
     )
 
 
