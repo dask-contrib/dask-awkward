@@ -131,6 +131,13 @@ def test_pad_none(axis: int, target: int) -> None:
     )
 
 
+def test_with_field(caa: ak.Array, daa: dak.Array) -> None:
+    assert_eq(
+        ak.with_field(caa["points"], caa["points"]["x"], where="xx"),
+        dak.with_field(daa["points"], daa["points"]["x"], where="xx"),
+    )
+
+
 def test_with_parameter() -> None:
     a = [[1, 2, 3], [], [4]]
     b = [[], [3], []]

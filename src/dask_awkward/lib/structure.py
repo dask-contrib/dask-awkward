@@ -10,11 +10,16 @@ from awkward._typetracer import UnknownScalar
 
 from dask_awkward.lib.core import (
     Array,
+    compatible_partitions,
     map_partitions,
     new_known_scalar,
     total_reduction_to_scalar,
 )
-from dask_awkward.utils import DaskAwkwardNotImplemented, borrow_docstring
+from dask_awkward.utils import (
+    DaskAwkwardNotImplemented,
+    IncompatiblePartitions,
+    borrow_docstring,
+)
 
 if TYPE_CHECKING:
     from numpy.typing import DTypeLike
@@ -503,9 +508,40 @@ def where(condition, *args, **kwargs):
     raise DaskAwkwardNotImplemented("TODO")
 
 
+class _WithFieldFn:
+    def __init__(
+        self,
+        where: str | None = None,
+        highlevel: bool = True,
+        behavior: dict | None = None,
+    ) -> None:
+        self.where = where
+        self.highlevel = highlevel
+        self.behavior = behavior
+
+    def __call__(self, base: ak.Array, what: ak.Array) -> ak.Array:
+        return ak.with_field(
+            base,
+            what,
+            where=self.where,
+            highlevel=self.highlevel,
+            behavior=self.behavior,
+        )
+
+
 @borrow_docstring(ak.with_field)
 def with_field(base, what, where=None, highlevel=True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+    if not compatible_partitions(base, what):
+        raise IncompatiblePartitions("with_field", base, what)
+    return map_partitions(
+        _WithFieldFn(where=where, highlevel=highlevel, behavior=behavior),
+        base,
+        what,
+        label="with-field",
+        output_divisions=1,
+    )
 
 
 class _WithNameFn:
