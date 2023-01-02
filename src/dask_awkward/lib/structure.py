@@ -494,8 +494,11 @@ def unzip(
 ) -> Array | tuple(Array):
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
-
-    return tuple(array[field] for field in ak.fields(array._meta))
+    fields = ak.fields(array._meta)
+    if len(fields) == 0:
+        return tuple([array])
+    else:
+        return tuple(array[field] for field in ak.fields(array._meta))
 
 
 @borrow_docstring(ak.values_astype)
