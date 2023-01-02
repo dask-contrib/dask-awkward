@@ -496,7 +496,7 @@ def unzip(
         raise ValueError("Only highlevel=True is supported")
     fields = ak.fields(array._meta)
     if len(fields) == 0:
-        return tuple([array])
+        return (array, )
     else:
         return tuple(array[field] for field in fields)
 
