@@ -491,7 +491,7 @@ def unflatten(array, counts, axis=0, highlevel=True, behavior=None):
 @borrow_docstring(ak.unzip)
 def unzip(
     array: Array, highlevel: bool = True, behavior: dict | None = None
-) -> Array | tuple(Array):
+) -> tuple(Array):
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
     fields = ak.fields(array._meta)
