@@ -10,11 +10,16 @@ from awkward._typetracer import UnknownScalar
 
 from dask_awkward.lib.core import (
     Array,
+    compatible_partitions,
     map_partitions,
     new_known_scalar,
     total_reduction_to_scalar,
 )
-from dask_awkward.utils import DaskAwkwardNotImplemented, borrow_docstring
+from dask_awkward.utils import (
+    DaskAwkwardNotImplemented,
+    IncompatiblePartitions,
+    borrow_docstring,
+)
 
 if TYPE_CHECKING:
     from numpy.typing import DTypeLike
@@ -506,9 +511,48 @@ def values_astype(array, to, highlevel=True, behavior=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
+class _WhereFn:
+    def __init__(
+        self,
+        mergebool: bool = True,
+        highlevel: bool = True,
+        behavior: dict | None = None,
+    ) -> None:
+        self.mergebool = mergebool
+        self.highlevel = highlevel
+        self.behavior = behavior
+
+    def __call__(self, condition: ak.Array, x: ak.Array, y: ak.Array) -> ak.Array:
+        return ak.where(
+            condition,
+            x,
+            y,
+            mergebool=self.mergebool,
+            highlevel=self.highlevel,
+            behavior=self.behavior,
+        )
+
+
 @borrow_docstring(ak.where)
-def where(condition, *args, **kwargs):
-    raise DaskAwkwardNotImplemented("TODO")
+def where(
+    condition: Array,
+    x: Array,
+    y: Array,
+    mergebool: bool = True,
+    highlevel: bool = True,
+    behavior: dict | None = None,
+) -> Array:
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+    if not compatible_partitions(condition, x, y):
+        raise IncompatiblePartitions("where", condition, x, y)
+    return map_partitions(
+        _WhereFn(mergebool=mergebool, highlevel=highlevel, behavior=behavior),
+        condition,
+        x,
+        y,
+        label="where",
+    )
 
 
 @borrow_docstring(ak.with_field)
