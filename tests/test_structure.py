@@ -45,6 +45,24 @@ def test_zip_dict_input(caa: ak.Array, daa: dak.Array) -> None:
     assert_eq(da_z, ca_z)
 
 
+def test_unzip_dict_input(caa: ak.Array, daa: dak.Array) -> None:
+    assert_eq(dak.zip(dak.unzip(daa["points"])), ak.zip(ak.unzip(caa["points"])))
+
+
+def test_unzip_tuple_record() -> None:
+    array = ak.Array([(1, 1.1, "one"), (2, 2.2, "two")])
+    dakarray = dak.from_awkward(array, 1)
+
+    assert_eq(dak.zip(dak.unzip(dakarray)), ak.zip(ak.unzip(array)))
+
+
+def test_unzip_not_record() -> None:
+    array = ak.Array([[1, 2, 3], [4, 5], [6]])
+    dakarray = dak.from_awkward(array, 1)
+
+    assert_eq(dak.zip(dak.unzip(dakarray)), ak.zip(ak.unzip(array)))
+
+
 def test_zip_list_input(caa: ak.Array, daa: dak.Array) -> None:
     da1 = daa.points.x
     ca1 = caa.points.x
