@@ -498,7 +498,7 @@ def unzip(
     if len(fields) == 0:
         return tuple([array])
     else:
-        return tuple(array[field] for field in ak.fields(array._meta))
+        return tuple(array[field] for field in fields)
 
 
 @borrow_docstring(ak.values_astype)
