@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import builtins
-import operator
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
@@ -11,7 +10,6 @@ from awkward._typetracer import UnknownScalar
 
 from dask_awkward.lib.core import (
     Array,
-    empty_typetracer,
     map_partitions,
     new_known_scalar,
     total_reduction_to_scalar,
@@ -490,15 +488,6 @@ def unflatten(array, counts, axis=0, highlevel=True, behavior=None):
     raise DaskAwkwardNotImplemented("TODO")
 
 
-class _UnzipFn:
-    def __init__(self, highlevel: bool = True, behavior: dict | None = None) -> None:
-        self.highlevel = highlevel
-        self.behavior = behavior
-
-    def __call__(self, array: ak.Array) -> ak.Array:
-        return ak.unzip(array, highlevel=self.highlevel, behavior=self.behavior)
-
-
 @borrow_docstring(ak.unzip)
 def unzip(
     array: Array, highlevel: bool = True, behavior: dict | None = None
@@ -506,35 +495,7 @@ def unzip(
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
 
-    meta = ak.unzip(array._meta, highlevel=highlevel, behavior=behavior)
-    if isinstance(meta, tuple):
-        unzip_fn = _UnzipFn(highlevel=highlevel, behavior=behavior)
-
-        dak_unzip = map_partitions(
-            unzip_fn,
-            array,
-            label="unzip",
-            meta=empty_typetracer(),  # this seems like an abuse of the system to get what I want...
-        )
-
-        unzipped_arrays = []
-        for i, imeta in enumerate(meta):
-            dak_getitem = map_partitions(
-                operator.getitem,
-                dak_unzip,
-                i,
-                label="getitem",
-                meta=imeta,
-            )
-            unzipped_arrays.append(dak_getitem)
-
-        return tuple(unzipped_arrays)
-    else:
-        return map_partitions(
-            _UnzipFn(highlevel=highlevel, behavior=behavior),
-            array,
-            label="unzip",
-        )
+    return tuple(array[field] for field in ak.fields(array._meta))
 
 
 @borrow_docstring(ak.values_astype)
