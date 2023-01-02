@@ -555,9 +555,40 @@ def where(
     )
 
 
+class _WithFieldFn:
+    def __init__(
+        self,
+        where: str | None = None,
+        highlevel: bool = True,
+        behavior: dict | None = None,
+    ) -> None:
+        self.where = where
+        self.highlevel = highlevel
+        self.behavior = behavior
+
+    def __call__(self, base: ak.Array, what: ak.Array) -> ak.Array:
+        return ak.with_field(
+            base,
+            what,
+            where=self.where,
+            highlevel=self.highlevel,
+            behavior=self.behavior,
+        )
+
+
 @borrow_docstring(ak.with_field)
 def with_field(base, what, where=None, highlevel=True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+    if not compatible_partitions(base, what):
+        raise IncompatiblePartitions("with_field", base, what)
+    return map_partitions(
+        _WithFieldFn(where=where, highlevel=highlevel, behavior=behavior),
+        base,
+        what,
+        label="with-field",
+        output_divisions=1,
+    )
 
 
 class _WithNameFn:
