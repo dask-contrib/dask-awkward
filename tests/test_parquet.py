@@ -192,7 +192,6 @@ def test_nested_columns(tmpdir):
     assert arr2.Jet.pt.compute().tolist() == [0, 1]
 
 
-
 @pytest.mark.parametrize("columns", [None, ["minutes", "passes.to"], ["passes.*"]])
 def test_unnamed_root(
     unnamed_root_parquet_file: str,

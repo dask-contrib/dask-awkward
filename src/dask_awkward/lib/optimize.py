@@ -24,7 +24,7 @@ def optimize(
         dsk = HighLevelGraph.from_collections(id(dsk), dsk, dependencies=())
 
     # defunct
-    #confopt = dask.config.get("awkward.column-projection-optimization")
+    # confopt = dask.config.get("awkward.column-projection-optimization")
     dsk = optimize_columns(dsk, keys)
 
     # Perform Blockwise optimizations for HLG input
@@ -64,9 +64,7 @@ def optimize_columns(dsk: HighLevelGraph, outputs: Iterable[str]):
     return _apply_column_optimization(dsk, reports)
 
 
-def _get_column_report(
-    dsk: HighLevelGraph, outputs: Iterable[str]
-) -> Dict[str, Any]:
+def _get_column_report(dsk: HighLevelGraph, outputs: Iterable[str]) -> Dict[str, Any]:
 
     layers = dsk.layers.copy()  # type: ignore
     deps = dsk.dependencies.copy()  # type: ignore

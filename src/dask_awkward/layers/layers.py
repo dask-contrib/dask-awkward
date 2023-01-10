@@ -60,31 +60,32 @@ class AwkwardIOLayer(Blockwise):
         def _label_form(form, start):
             if form.is_record:
                 for field in form.fields:
-                    _label_form(form.content(field), f"{start}.{field}" if start else field)
+                    _label_form(
+                        form.content(field), f"{start}.{field}" if start else field
+                    )
             elif form.is_numpy:
                 form.form_key = start
             else:
                 _label_form(form.content, start)
 
-        new_meta = typetracer_from_form(
-            copy.deepcopy(self._meta.layout.form)
-        )
+        new_meta = typetracer_from_form(copy.deepcopy(self._meta.layout.form))
         form = new_meta.layout.form
         _label_form(form, "")
-        new_labelled_meta, report = ak._typetracer.typetracer_with_report(
-            form
+        new_labelled_meta, report = ak._typetracer.typetracer_with_report(form)
+        return (
+            AwkwardIOLayer(
+                name=self.name,
+                columns=self.columns,
+                inputs=[None],
+                io_func=lambda *_, **__: ak.Array(new_labelled_meta),
+                label=self.label,
+                produces_tasks=self.produces_tasks,
+                creation_info=self.creation_info,
+                annotations=self.annotations,
+                meta=new_labelled_meta,
+            ),
+            report,
         )
-        return AwkwardIOLayer(
-            name=self.name,
-            columns=self.columns,
-            inputs=[None],
-            io_func=lambda *_, **__: ak.Array(new_labelled_meta),
-            label=self.label,
-            produces_tasks=self.produces_tasks,
-            creation_info=self.creation_info,
-            annotations=self.annotations,
-            meta=new_labelled_meta,
-        ), report
 
     def project_columns(self, columns: list[str]) -> AwkwardIOLayer:
         if hasattr(self.io_func, "project_columns"):
