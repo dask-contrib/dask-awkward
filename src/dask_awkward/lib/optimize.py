@@ -65,7 +65,6 @@ def optimize_columns(dsk: HighLevelGraph, outputs: Iterable[str]):
 
 
 def _get_column_report(dsk: HighLevelGraph, outputs: Iterable[str]) -> Dict[str, Any]:
-
     layers = dsk.layers.copy()  # type: ignore
     deps = dsk.dependencies.copy()  # type: ignore
     reports = {}
@@ -73,6 +72,8 @@ def _get_column_report(dsk: HighLevelGraph, outputs: Iterable[str]) -> Dict[str,
         layers[name], report = layers[name].mock()
         reports[name] = report
     hlg = HighLevelGraph(layers, deps)
+    # TODO: outlayers should be any place we need all the columns, whether output
+    #  or to_* where data leaves dak
     outlayer = list(hlg.layers)[-1]
     out = get_sync(hlg, (outlayer, 0))
     out.layout._touch_data(recursive=True)
@@ -87,5 +88,10 @@ def _apply_column_optimization(
     for name, ttr in reports.items():
         cols = set(ttr.data_touched)
         cols.remove(None)
-        layers[name] = layers[name].project_columns(list(cols))
+        select = []
+        for col in cols:
+            n, c = col.split(".", 1)
+            if n == name:
+                select.append(c)
+        layers[name] = layers[name].project_columns(select)
     return HighLevelGraph(layers, dsk.dependencies)

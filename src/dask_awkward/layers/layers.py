@@ -61,7 +61,7 @@ class AwkwardIOLayer(Blockwise):
             if form.is_record:
                 for field in form.fields:
                     _label_form(
-                        form.content(field), f"{start}.{field}" if start else field
+                        form.content(field), f"{start}.{field}"
                     )
             elif form.is_numpy:
                 form.form_key = start
@@ -70,7 +70,7 @@ class AwkwardIOLayer(Blockwise):
 
         new_meta = typetracer_from_form(copy.deepcopy(self._meta.layout.form))
         form = new_meta.layout.form
-        _label_form(form, "")
+        _label_form(form, self.name)
         new_labelled_meta, report = ak._typetracer.typetracer_with_report(form)
         return (
             AwkwardIOLayer(
