@@ -163,7 +163,34 @@ def test_write_roundtrip(tmpdir):
     tmpdir = str(tmpdir)
     arr = dak.from_awkward(ak.from_iter(data), 2)
     to_parquet(arr, tmpdir)
-    arr = dak.from_parquet(tmpdir)
+    dak.from_parquet(tmpdir)
+
+
+def test_nested_columns(tmpdir):
+    tmpdir = str(tmpdir)
+    data = [
+        {
+            "Jet": {
+                "pt": 0,
+                "mass": 1,
+            }
+        },
+        {
+            "Jet": {
+                "pt": 1,
+                "mass": 2,
+            }
+        },
+    ]
+    arr = dak.from_awkward(ak.from_iter(data), 2)
+    to_parquet(arr, tmpdir)
+    arr1 = dak.from_parquet(tmpdir)
+    arr2 = dak.from_parquet(tmpdir, columns=["Jet.*"])
+    assert_eq(arr1, arr2)
+    arr2 = dak.from_parquet(tmpdir, columns=["Jet.pt"])
+    assert "mass" not in arr2.Jet.fields
+    assert arr2.Jet.pt.compute().tolist() == [0, 1]
+
 
 
 @pytest.mark.parametrize("columns", [None, ["minutes", "passes.to"], ["passes.*"]])
