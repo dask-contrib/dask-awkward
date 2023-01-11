@@ -189,6 +189,8 @@ def _from_json_files(
         mode="rb",
         storage_options=storage_options,
     )
+    if isinstance(urlpath, list) and len(urlpath) > len(urlpaths):
+        urlpaths = urlpath
     if meta is None:
         meta_read_kwargs = derive_meta_kwargs or {}
         meta = derive_json_meta(
@@ -216,7 +218,6 @@ def _from_json_files(
             compression=compression,
             schema=schema,
         )
-
     return from_map(f, urlpaths, label="from-json", token=token, meta=meta)
 
 
