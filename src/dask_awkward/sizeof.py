@@ -1,8 +1,4 @@
-from dask.sizeof import sizeof
-
-
-@sizeof.register_lazy("awkward")
-def register_awkward():
+def ak_array_sizeof_plugin(sizeof):
     import awkward as ak
 
     @sizeof.register(ak.Array)

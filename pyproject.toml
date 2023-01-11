@@ -67,6 +67,8 @@ test = [
     "requests >=2.27.1",
 ]
 
+[project.entry-points."dask.sizeof"]
+awkward = "dask_awkward.sizeof:ak_array_sizeof_plugin"
 
 [tool.hatch.version]
 source = "vcs"
