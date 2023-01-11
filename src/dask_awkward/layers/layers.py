@@ -72,11 +72,12 @@ class AwkwardIOLayer(Blockwise):
         form = new_meta.layout.form
         _label_form(form, self.name)
         new_labelled_meta, report = ak._typetracer.typetracer_with_report(form)
+        nblock = list(self.numblocks.values())[0][0]
         return (
             AwkwardIOLayer(
                 name=self.name,
                 columns=self.columns,
-                inputs=[None],
+                inputs=[None] * nblock,
                 io_func=lambda *_, **__: ak.Array(new_labelled_meta),
                 label=self.label,
                 produces_tasks=self.produces_tasks,

@@ -66,8 +66,8 @@ def optimize_columns(dsk: HighLevelGraph, outputs: Iterable[str]):
 
 def _get_column_report(dsk: HighLevelGraph, outputs: Iterable[str]) -> Dict[str, Any]:
     import awkward as ak
-    layers = dsk.layers.copy()  # type: ignore
-    deps = dsk.dependencies.copy()  # type: ignore
+    layers = dsk.layers.copy()
+    deps = dsk.dependencies.copy()
     reports = {}
     for name in _projectable_io_layer_names(dsk):
         layers[name], report = layers[name].mock()
@@ -88,6 +88,7 @@ def _apply_column_optimization(
 ) -> HighLevelGraph:
     # now apply
     layers = dsk.layers.copy()  # type: ignore
+    deps = dsk.dependencies.copy()
     for name, ttr in reports.items():
         cols = set(ttr.data_touched)
         select = []
@@ -98,4 +99,4 @@ def _apply_column_optimization(
             if n == name:
                 select.append(c)
         layers[name] = layers[name].project_columns(select)
-    return HighLevelGraph(layers, dsk.dependencies)
+    return HighLevelGraph(layers, deps)
