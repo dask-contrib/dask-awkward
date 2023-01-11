@@ -75,8 +75,8 @@ def _get_column_report(dsk: HighLevelGraph, outputs: Iterable[str]) -> Dict[str,
     hlg = HighLevelGraph(layers, deps)
     # TODO: outlayers should be any place we need all the columns, whether output
     #  or to_* where data leaves dak
-    outlayer = list(hlg.layers)[-1]
-    out = get_sync(hlg, (outlayer, 0))
+    outlayer = list(hlg.layers.values())[-1]
+    out = get_sync(hlg, list(outlayer.keys())[0])
     if isinstance(out, ak.Array):
         # if output is still an array, all columns count as touched
         out.layout._touch_data(recursive=True)
