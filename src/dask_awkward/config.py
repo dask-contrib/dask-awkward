@@ -10,16 +10,7 @@ with open(fn) as f:
     defaults = yaml.safe_load(f)
 
 dask.config.update_defaults(defaults)
-dask.config.update_defaults(
-    {
-        "distributed": {
-            "scheduler": {
-                "allowed-imports": [
-                    "dask",
-                    "distributed",
-                    "dask_awkward",
-                ]
-            }
-        }
-    }
-)
+
+allowed_imports = dask.config.get("distributed.scheduler.allowed-imports", [])
+allowed_imports += ["dask", "distributed", "dask_awkward"]
+dask.config.set({"distributed.scheduler.allowed-imports": list(set(allowed_imports))})
