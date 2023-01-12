@@ -14,6 +14,7 @@ from dask_awkward.lib.core import (
     map_partitions,
     new_known_scalar,
     total_reduction_to_scalar,
+    typetracer_from_form,
 )
 from dask_awkward.utils import (
     DaskAwkwardNotImplemented,
@@ -372,12 +373,16 @@ def num(
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
     if axis and axis != 0:
+        meta = typetracer_from_form(
+            ak.num(array._meta.layout.form.length_zero_array(), axis=axis).layout.form
+        )
         return map_partitions(
             ak.num,
             array,
             axis=axis,
             highlevel=highlevel,
             behavior=behavior,
+            meta=meta,
         )
     if axis == 0:
         if array.known_divisions:
