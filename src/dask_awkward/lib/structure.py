@@ -373,6 +373,8 @@ def num(
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
     if axis and axis != 0:
+        # TODO: remove this manual generation of typetracer after
+        # https://github.com/scikit-hep/awkward/issues/1997 is fixed
         meta = typetracer_from_form(
             ak.num(array._meta.layout.form.length_zero_array(), axis=axis).layout.form
         )
