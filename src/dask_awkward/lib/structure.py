@@ -69,6 +69,14 @@ __all__ = (
 )
 
 
+class _ArgCartesianFn:
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __call__(self, *arrays):
+        return ak.argcartesian(list(arrays), **self.kwargs)
+
+
 @borrow_docstring(ak.argcartesian)
 def argcartesian(
     arrays,
@@ -79,7 +87,27 @@ def argcartesian(
     highlevel=True,
     behavior=None,
 ):
+    if axis == 1:
+        fn = _ArgCartesianFn(
+            axis=axis,
+            nested=nested,
+            parameters=parameters,
+            with_name=with_name,
+            highlevel=highlevel,
+            behavior=behavior,
+        )
+        return map_partitions(fn, *arrays, label="argcartesian", output_divisions=1)
     raise DaskAwkwardNotImplemented("TODO")
+
+
+class _ArgCombinationsFn:
+    def __init__(self, n: int, axis: int, **kwargs: Any):
+        self.n = n
+        self.axis = axis
+        self.kwargs = kwargs
+
+    def __call__(self, array):
+        return ak.argcombinations(array, self.n, axis=self.axis, **self.kwargs)
 
 
 @borrow_docstring(ak.argcombinations)
@@ -94,6 +122,26 @@ def argcombinations(
     highlevel=True,
     behavior=None,
 ):
+    if fields is not None and len(fields) != n:
+        raise ValueError("if provided, the length of 'fields' must be 'n'")
+
+    if axis != 0:
+        fn = _ArgCombinationsFn(
+            n=n,
+            replacement=replacement,
+            axis=axis,
+            fields=fields,
+            parameters=parameters,
+            with_name=with_name,
+            highlevel=highlevel,
+            behavior=behavior,
+        )
+        return map_partitions(
+            fn,
+            array,
+            label="argcombinations",
+            output_divisions=1,
+        )
     raise DaskAwkwardNotImplemented("TODO")
 
 
@@ -302,7 +350,21 @@ def full_like(array, fill_value, highlevel=True, behavior=None, dtype=None):
 def isclose(
     a, b, rtol=1e-05, atol=1e-08, equal_nan=False, highlevel=True, behavior=None
 ):
-    raise DaskAwkwardNotImplemented("TODO")
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+    if not compatible_partitions(a, b):
+        raise IncompatiblePartitions("where", a, b)
+    return map_partitions(
+        ak.isclose,
+        a,
+        b,
+        rtol=rtol,
+        atol=atol,
+        equal_nan=equal_nan,
+        highlevel=highlevel,
+        behavior=behavior,
+        label="is-close",
+    )
 
 
 class _IsNoneFn:
@@ -476,8 +538,17 @@ def run_lengths(array, highlevel=True, behavior=None):
 
 
 @borrow_docstring(ak.singletons)
-def singletons(array, highlevel=True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+def singletons(array, axis=0, highlevel=True, behavior=None):
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+    return map_partitions(
+        ak.singletons,
+        array,
+        axis=axis,
+        highlevel=highlevel,
+        behavior=behavior,
+        label="singletons",
+    )
 
 
 @borrow_docstring(ak.sort)
