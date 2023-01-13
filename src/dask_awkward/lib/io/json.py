@@ -465,6 +465,8 @@ def to_json(
         label="to-json-on-block",
         meta=array._meta,
     )
+    write_res.dask.layers[write_res.name].annotations = {"ak_output": True}
+
     name = f"to-json-{tokenize(array, path)}"
     dsk = {(name, 0): (lambda *_: None, write_res.__dask_keys__())}
     graph = HighLevelGraph.from_collections(name, dsk, dependencies=(write_res,))

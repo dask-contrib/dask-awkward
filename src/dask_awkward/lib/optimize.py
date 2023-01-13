@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from collections.abc import Hashable, Mapping
 from typing import Any, Dict, Iterable
 
@@ -59,6 +60,30 @@ def _projectable_io_layer_names(dsk: HighLevelGraph) -> list[str]:
     ]
 
 
+def _output_io_layer_names(dsk: HighLevelGraph) -> list[str]:
+    return [
+        n
+        for n, v in dsk.layers.items()
+        if (v.annotations or {}).get("ak_output")
+    ]
+
+def _mock_io_func(*args, **kwargs):
+    import awkward as ak
+    for arg in args + tuple(kwargs.values()):
+        if isinstance(arg, ak.Array):
+            arg.layout._touch_data(recursive=True)
+
+
+def _mock_output(layer: Layer):
+    assert len(layer.dsk) == 1
+    layer2 = copy.deepcopy(layer)
+    mp = layer2.mapping.copy()  # why is this always a MetrializedLayer?
+    key = iter(mp).__next__()
+    mp[key] = (_mock_io_func, ) + mp[key][1:]
+    layer2.mapping = mp
+    return layer2
+
+
 def optimize_columns(dsk: HighLevelGraph, outputs: Iterable[str]):
     reports = _get_column_report(dsk, outputs)
     return _apply_column_optimization(dsk, reports)
@@ -70,12 +95,16 @@ def _get_column_report(dsk: HighLevelGraph, outputs: Iterable[str]) -> Dict[str,
     deps = dsk.dependencies.copy()
     reports = {}
     for name in _projectable_io_layer_names(dsk):
+        # these are the places we can select columns
         layers[name], report = layers[name].mock()
         reports[name] = report
+
+    for name in _output_io_layer_names(dsk):
+        # these are the places files would get written if we let them
+        layers[name] = _mock_output(layers[name])
+
     hlg = HighLevelGraph(layers, deps)
-    # TODO: outlayers should be any place we need all the columns, whether output
-    #  or to_* where data leaves dak
-    outlayer = list(hlg.layers.values())[-1]
+    outlayer = list(hlg.layers.values())[-1]  # or take from `outputs`?
     out = get_sync(hlg, list(outlayer.keys())[0])
     if isinstance(out, ak.Array):
         # if output is still an array, all columns count as touched

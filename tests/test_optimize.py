@@ -1,3 +1,4 @@
+import dask_awkward.lib
 import pytest
 
 pytest.importorskip("pyarrow")
@@ -13,3 +14,13 @@ def test_requested_columns(caa_parquet):
     layer_name = [_ for _ in tg.layers if _.startswith("read-parquet")][0]
     assert tg.layers[layer_name].columns is None
     assert tg2.layers[layer_name].columns == ["points.x"]
+
+
+def test_needs_all(single_record_file):
+    data = dask_awkward.lib.from_json([single_record_file])
+    out = data.to_json(path="doesntexist", compute=False)
+    reports = o._get_column_report(out.dask, [])
+    touched = iter(reports.values()).__next__().data_touched
+    touched = [t.split(".", 1)[1] for t in touched if t]
+    assert "record" in touched
+

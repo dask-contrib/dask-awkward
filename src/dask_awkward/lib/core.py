@@ -1066,6 +1066,20 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         return to_parquet(self, path, storage_options=storage_options, **kwargs)
 
+    def to_json(
+        self,
+        path: str,
+        line_delimited: bool = True,
+        storage_options: dict[str, Any] | None = None,
+        compute: bool = False,
+        compression: str | None = "infer",
+        **kwargs: Any,
+    ):
+        from dask_awkward.lib.io.json import to_json
+
+        return to_json(self, path=path, line_delimited=line_delimited, storage_options=storage_options,
+                       compute=compute, compression=compression, **kwargs)
+
     def to_dask_bag(self) -> DaskBag:
         from dask_awkward.lib.io.io import to_dask_bag
 

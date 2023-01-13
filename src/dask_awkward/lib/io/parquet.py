@@ -373,7 +373,7 @@ def to_parquet(data, path, storage_options=None, write_metadata=False, compute=T
         label="to-parquet",
         meta=data._meta,
     )
-
+    map_res.dask.layers[map_res.name].annotations = {"ak_output": True}
     dsk = {}
     if write_metadata:
         final_name = name + "-metadata"
