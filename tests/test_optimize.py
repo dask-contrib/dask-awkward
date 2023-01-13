@@ -23,4 +23,3 @@ def test_needs_all(single_record_file):
     touched = iter(reports.values()).__next__().data_touched
     touched = [t.split(".", 1)[1] for t in touched if t]
     assert "record" in touched
-

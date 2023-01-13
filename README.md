@@ -14,11 +14,18 @@ dask-awkward
 Installing
 ----------
 
-Releases are currently available from PyPI. We will have conda-forge
-releases soon!
+Releases are available from PyPI and conda-forge.
+
+PyPI:
 
 ```
 pip install dask-awkward
+```
+
+conda-forge:
+
+```
+conda install dask-awkward -c conda-forge
 ```
 
 Documentation

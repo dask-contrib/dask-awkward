@@ -41,7 +41,6 @@ def all(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = False,
-    flatten_records: bool = False,
 ) -> Any:
     if axis and axis != 0:
         return map_partitions(
@@ -51,7 +50,6 @@ def all(
             axis=axis,
             keepdims=keepdims,
             mask_identity=mask_identity,
-            flatten_records=flatten_records,
         )
     raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
 
@@ -62,7 +60,6 @@ def any(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = False,
-    flatten_records: bool = False,
 ) -> Any:
     if axis and axis != 0:
         return map_partitions(
@@ -72,7 +69,6 @@ def any(
             axis=axis,
             keepdims=keepdims,
             mask_identity=mask_identity,
-            flatten_records=flatten_records,
         )
     raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
 
@@ -83,7 +79,6 @@ def argmax(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = True,
-    flatten_records: bool = False,
 ) -> Any:
     if axis and axis >= 1:
         return map_partitions(
@@ -93,7 +88,6 @@ def argmax(
             axis=axis,
             keepdims=keepdims,
             mask_identity=mask_identity,
-            flatten_records=flatten_records,
         )
     raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
 
@@ -104,7 +98,6 @@ def argmin(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = True,
-    flatten_records: bool = False,
 ) -> Any:
     if axis and axis >= 1:
         return map_partitions(
@@ -114,7 +107,6 @@ def argmin(
             axis=axis,
             keepdims=keepdims,
             mask_identity=mask_identity,
-            flatten_records=flatten_records,
         )
     raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
 
@@ -127,7 +119,6 @@ def corr(
     axis=None,
     keepdims=False,
     mask_identity=False,
-    flatten_records=False,
 ):
     raise DaskAwkwardNotImplemented("TODO")
 
@@ -138,7 +129,6 @@ def count(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = False,
-    flatten_records: bool = False,
 ) -> Any:
     if axis == 0 or axis == -1 * array.ndim:
         raise DaskAwkwardNotImplemented(
@@ -152,7 +142,6 @@ def count(
             axis=axis,
             keepdims=keepdims,
             mask_identity=mask_identity,
-            flatten_records=flatten_records,
         )
     elif axis is None:
         return total_reduction_to_scalar(
@@ -176,7 +165,6 @@ def count_nonzero(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = False,
-    flatten_records: bool = False,
 ) -> Any:
     if axis == 0 or axis == -1 * array.ndim:
         raise DaskAwkwardNotImplemented(
@@ -190,7 +178,6 @@ def count_nonzero(
             axis=1,
             keepdims=keepdims,
             mask_identity=mask_identity,
-            flatten_records=flatten_records,
         )
     elif axis is None:
         return total_reduction_to_scalar(
@@ -216,7 +203,6 @@ def covar(
     axis=None,
     keepdims=False,
     mask_identity=False,
-    flatten_records=False,
 ):
     raise DaskAwkwardNotImplemented("TODO")
 
@@ -229,7 +215,6 @@ def linear_fit(
     axis=None,
     keepdims=False,
     mask_identity=False,
-    flatten_records=False,
 ):
     raise DaskAwkwardNotImplemented("TODO")
 
@@ -241,7 +226,6 @@ def max(
     keepdims: bool = False,
     initial: float | None = None,
     mask_identity: bool = True,
-    flatten_records: bool = False,
 ) -> Any:
     if axis == 0 or axis == -1 * array.ndim:
         raise DaskAwkwardNotImplemented(
@@ -256,7 +240,6 @@ def max(
             keepdims=keepdims,
             initial=initial,
             mask_identity=mask_identity,
-            flatten_records=flatten_records,
         )
     if axis is None:
         return total_reduction_to_scalar(
@@ -266,7 +249,6 @@ def max(
             chunked_kwargs={
                 "axis": None,
                 "mask_identity": mask_identity,
-                "flatten_records": flatten_records,
             },
             meta=ak.max(array._meta, axis=None),
         )
@@ -281,7 +263,6 @@ def mean(
     axis=None,
     keepdims=False,
     mask_identity=False,
-    flatten_records=False,
 ):
     if axis == 0 or axis == -1 * array.ndim:
         raise DaskAwkwardNotImplemented(
@@ -295,7 +276,6 @@ def mean(
             axis=axis,
             keepdims=keepdims,
             mask_identity=mask_identity,
-            flatten_records=flatten_records,
         )
     raise DaskAwkwardNotImplemented("TODO")
 
@@ -307,7 +287,6 @@ def min(
     keepdims: bool = False,
     initial: float | None = None,
     mask_identity: bool = True,
-    flatten_records: bool = False,
 ) -> Any:
     if axis == 0 or axis == -1 * array.ndim:
         raise DaskAwkwardNotImplemented(
@@ -322,7 +301,6 @@ def min(
             keepdims=keepdims,
             initial=initial,
             mask_identity=mask_identity,
-            flatten_records=flatten_records,
         )
     if axis is None:
         return total_reduction_to_scalar(
@@ -332,7 +310,6 @@ def min(
             chunked_kwargs={
                 "axis": None,
                 "mask_identity": mask_identity,
-                "flatten_records": flatten_records,
             },
             meta=ak.max(array._meta, axis=None),
         )
@@ -348,23 +325,22 @@ def moment(
     axis=None,
     keepdims=False,
     mask_identity=False,
-    flatten_records=False,
 ):
     raise DaskAwkwardNotImplemented("TODO")
 
 
 @borrow_docstring(ak.prod)
-def prod(array, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
+def prod(array, axis=None, keepdims=False, mask_identity=False):
     raise DaskAwkwardNotImplemented("TODO")
 
 
 @borrow_docstring(ak.ptp)
-def ptp(arr, axis=None, keepdims=False, mask_identity=True, flatten_records=False):
+def ptp(arr, axis=None, keepdims=False, mask_identity=True):
     raise DaskAwkwardNotImplemented("TODO")
 
 
 @borrow_docstring(ak.softmax)
-def softmax(x, axis=None, keepdims=False, mask_identity=False, flatten_records=False):
+def softmax(x, axis=None, keepdims=False, mask_identity=False):
     raise DaskAwkwardNotImplemented("TODO")
 
 
@@ -384,7 +360,6 @@ def std(
     axis=None,
     keepdims=False,
     mask_identity=False,
-    flatten_records=False,
 ):
     if weight is not None:
         raise DaskAwkwardNotImplemented("weight argument is not supported.")
@@ -399,7 +374,6 @@ def std(
                 axis=axis,
                 keepdims=keepdims,
                 mask_identity=mask_identity,
-                flatten_records=flatten_records,
             ),
             x,
             output_divisions=1,
@@ -413,7 +387,6 @@ def sum(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = False,
-    flatten_records: bool = False,
 ) -> Any:
     if axis == 0 or axis == -1 * array.ndim:
         raise DaskAwkwardNotImplemented(
@@ -427,7 +400,6 @@ def sum(
             axis=axis,
             keepdims=keepdims,
             mask_identity=mask_identity,
-            flatten_records=flatten_records,
         )
     elif axis is None:
         return total_reduction_to_scalar(
@@ -437,7 +409,6 @@ def sum(
             chunked_kwargs={
                 "axis": None,
                 "mask_identity": mask_identity,
-                "flatten_records": flatten_records,
             },
             meta=ak.max(array._meta, axis=None),
         )
@@ -465,7 +436,6 @@ def var(
     axis=None,
     keepdims=False,
     mask_identity=False,
-    flatten_records=False,
 ):
     if weight is not None:
         raise DaskAwkwardNotImplemented("weight argument is not supported.")
@@ -480,7 +450,6 @@ def var(
                 axis=axis,
                 keepdims=keepdims,
                 mask_identity=mask_identity,
-                flatten_records=flatten_records,
             ),
             x,
             output_divisions=1,

@@ -112,6 +112,30 @@ def _get_column_report(dsk: HighLevelGraph, outputs: Iterable[str]) -> Dict[str,
     return reports
 
 
+def optimize_columns(dsk: HighLevelGraph, outputs: Iterable[str]):
+    reports = _get_column_report(dsk, outputs)
+    return _apply_column_optimization(dsk, reports)
+
+
+def _get_column_report(dsk: HighLevelGraph, outputs: Iterable[str]) -> Dict[str, Any]:
+    import awkward as ak
+    layers = dsk.layers.copy()
+    deps = dsk.dependencies.copy()
+    reports = {}
+    for name in _projectable_io_layer_names(dsk):
+        layers[name], report = layers[name].mock()
+        reports[name] = report
+    hlg = HighLevelGraph(layers, deps)
+    # TODO: outlayers should be any place we need all the columns, whether output
+    #  or to_* where data leaves dak
+    outlayer = list(hlg.layers.values())[-1]
+    out = get_sync(hlg, list(outlayer.keys())[0])
+    if isinstance(out, ak.Array):
+        # if output is still an array, all columns count as touched
+        out.layout._touch_data(recursive=True)
+    return reports
+
+
 def _apply_column_optimization(
     dsk: HighLevelGraph, reports: Dict[str, Any]
 ) -> HighLevelGraph:
