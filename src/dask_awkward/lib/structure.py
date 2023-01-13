@@ -87,7 +87,19 @@ def argcartesian(
     highlevel=True,
     behavior=None,
 ):
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
     if axis == 1:
+        meta = ak.cartesian(
+            [array._meta for array in arrays],
+            axis=axis,
+            nested=nested,
+            parameters=parameters,
+            with_name=with_name,
+            highlevel=highlevel,
+            behavior=behavior,
+        )
         fn = _ArgCartesianFn(
             axis=axis,
             nested=nested,
@@ -96,7 +108,9 @@ def argcartesian(
             highlevel=highlevel,
             behavior=behavior,
         )
-        return map_partitions(fn, *arrays, label="argcartesian", output_divisions=1)
+        return map_partitions(
+            fn, *arrays, label="argcartesian", output_divisions=1, meta=meta
+        )
     raise DaskAwkwardNotImplemented("TODO")
 
 
@@ -122,8 +136,14 @@ def argcombinations(
     highlevel=True,
     behavior=None,
 ):
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
     if fields is not None and len(fields) != n:
         raise ValueError("if provided, the length of 'fields' must be 'n'")
+
+    if axis < 0:
+        raise ValueError("the 'axis' for argcombinations must be non-negative")
 
     if axis != 0:
         fn = _ArgCombinationsFn(
