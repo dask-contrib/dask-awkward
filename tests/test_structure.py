@@ -231,3 +231,27 @@ def test_where(caa, daa, mergebool):
             caa.points.x > caa.points.y, caa.points.x, caa.points.y, mergebool=mergebool
         ),
     )
+
+
+def test_isclose(daa, caa):
+    assert_eq(
+        dak.isclose(daa.points.x, daa.points.y),
+        ak.isclose(caa.points.x, caa.points.y),
+    )
+
+
+def test_singletons(L4):
+    caa = ak.Array(L4)
+    daa = dak.from_awkward(caa, 1)
+    assert_eq(
+        dak.singletons(daa),
+        ak.singletons(caa),
+    )
+
+
+@pytest.mark.parametrize("ascending", [True, False])
+def test_sort(daa, caa, ascending):
+    assert_eq(
+        dak.sort(daa.points.x, ascending=ascending),
+        ak.sort(caa.points.x, ascending=ascending),
+    )

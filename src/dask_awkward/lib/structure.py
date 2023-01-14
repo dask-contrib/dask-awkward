@@ -373,7 +373,21 @@ def isclose(
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
     if not compatible_partitions(a, b):
-        raise IncompatiblePartitions("where", a, b)
+        raise IncompatiblePartitions("isclose", a, b)
+
+    #  TODO: fix this when https://github.com/scikit-hep/awkward/issues/2124 is addressed
+    meta = typetracer_from_form(
+        ak.isclose(
+            a._meta.layout.form.length_zero_array(),
+            b._meta.layout.form.length_zero_array(),
+            rtol=rtol,
+            atol=atol,
+            equal_nan=equal_nan,
+            highlevel=highlevel,
+            behavior=behavior,
+        ).layout.form
+    )
+
     return map_partitions(
         ak.isclose,
         a,
@@ -384,6 +398,7 @@ def isclose(
         highlevel=highlevel,
         behavior=behavior,
         label="is-close",
+        meta=meta,
     )
 
 
@@ -455,18 +470,12 @@ def num(
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
     if axis and axis != 0:
-        # TODO: remove this manual generation of typetracer after
-        # https://github.com/scikit-hep/awkward/issues/1997 is fixed
-        meta = typetracer_from_form(
-            ak.num(array._meta.layout.form.length_zero_array(), axis=axis).layout.form
-        )
         return map_partitions(
             ak.num,
             array,
             axis=axis,
             highlevel=highlevel,
             behavior=behavior,
-            meta=meta,
         )
     if axis == 0:
         if array.known_divisions:
@@ -561,6 +570,17 @@ def run_lengths(array, highlevel=True, behavior=None):
 def singletons(array, axis=0, highlevel=True, behavior=None):
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
+
+    # TODO: remove this length-zero calculation once https://github.com/scikit-hep/awkward/issues/2123 is addressed
+    meta = typetracer_from_form(
+        ak.singletons(
+            array._meta.layout.form.length_zero_array(),
+            axis=axis,
+            highlevel=highlevel,
+            behavior=behavior,
+        ).layout.form
+    )
+
     return map_partitions(
         ak.singletons,
         array,
@@ -568,12 +588,29 @@ def singletons(array, axis=0, highlevel=True, behavior=None):
         highlevel=highlevel,
         behavior=behavior,
         label="singletons",
+        meta=meta,
     )
+
+
+class _SortFn:
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __call__(self, array):
+        return ak.sort(array, **self.kwargs)
 
 
 @borrow_docstring(ak.sort)
 def sort(array, axis=-1, ascending=True, stable=True, highlevel=True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+    if axis == 0:
+        raise DaskAwkwardNotImplemented("TODO")
+    fn = _SortFn(
+        axis=axis,
+        ascending=ascending,
+        stable=stable,
+        behavior=behavior,
+    )
+    return map_partitions(fn, array, label="sort", output_divisions=1)
 
 
 @borrow_docstring(ak.strings_astype)
