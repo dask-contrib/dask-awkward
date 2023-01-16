@@ -34,7 +34,6 @@ __all__ = (
     "broadcast_arrays",
     "cartesian",
     "combinations",
-    "concatenate",
     "copy",
     "fill_none",
     "firsts",
@@ -200,6 +199,8 @@ def cartesian(
     highlevel=True,
     behavior=None,
 ):
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
     if axis == 1:
         fn = _CartesianFn(
             axis=axis,
@@ -235,6 +236,9 @@ def combinations(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
     if fields is not None and len(fields) != n:
         raise ValueError("if provided, the length of 'fields' must be 'n'")
 
@@ -258,21 +262,11 @@ def combinations(
     raise DaskAwkwardNotImplemented("TODO")
 
 
-@borrow_docstring(ak.concatenate)
-def concatenate(
-    arrays,
-    axis=0,
-    merge=True,
-    mergebool=True,
-    highlevel=True,
-    behavior=None,
-):
-    raise DaskAwkwardNotImplemented("TODO")
-
-
 @borrow_docstring(ak.copy)
 def copy(array):
-    raise DaskAwkwardNotImplemented("TODO")
+    raise DaskAwkwardNotImplemented(
+        "This function is not necessary in the context of dask-awkward."
+    )
 
 
 class _FillNoneFn:
@@ -292,6 +286,9 @@ def fill_none(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
     fn = _FillNoneFn(value, axis=axis, highlevel=highlevel, behavior=behavior)
     return map_partitions(fn, array, label="fill-none", output_divisions=1)
 
@@ -363,7 +360,36 @@ def from_regular(array, axis=1, highlevel=True, behavior=None):
 
 @borrow_docstring(ak.full_like)
 def full_like(array, fill_value, highlevel=True, behavior=None, dtype=None):
-    raise DaskAwkwardNotImplemented("TODO")
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
+    if dtype is str:
+        raise ValueError(
+            """dtype cannot be 'str' for dak.full_like,
+            you can accomplish this with dask-array and
+            dak.flatten/dak.unflatten"""
+        )
+
+    #  TODO: fix when available in awkward
+    meta = typetracer_from_form(
+        ak.full_like(
+            array._meta.layout.form.length_zero_array(),
+            fill_value,
+            highlevel=highlevel,
+            behavior=behavior,
+            dtype=dtype,
+        ).layout.form
+    )
+
+    return map_partitions(
+        ak.full_like,
+        array,
+        fill_value,
+        highlevel=highlevel,
+        behavior=behavior,
+        dtype=dtype,
+        meta=meta,
+    )
 
 
 @borrow_docstring(ak.isclose)
@@ -372,6 +398,7 @@ def isclose(
 ):
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
+
     if not compatible_partitions(a, b):
         raise IncompatiblePartitions("isclose", a, b)
 

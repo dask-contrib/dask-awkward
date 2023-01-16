@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import awkward as ak
+import numpy as np
 import pytest
 
 import dask_awkward as dak
@@ -254,4 +255,46 @@ def test_sort(daa, caa, ascending):
     assert_eq(
         dak.sort(daa.points.x, ascending=ascending),
         ak.sort(caa.points.x, ascending=ascending),
+    )
+
+
+def test_copy(daa):
+    with pytest.raises(
+        DaskAwkwardNotImplemented,
+        match="This function is not necessary in the context of dask-awkward.",
+    ):
+        dak.copy(daa)
+
+
+@pytest.mark.parametrize(
+    "thedtype",
+    [
+        bool,
+        np.int8,
+        np.uint8,
+        np.int16,
+        np.uint16,
+        np.int32,
+        np.uint32,
+        np.int64,
+        np.uint64,
+        np.float32,
+        np.float64,
+        np.complex64,
+        np.complex128,
+        np.datetime64,
+        np.timedelta64,
+        np.float16,
+    ],
+)
+def test_full_like(daa, caa, thedtype):
+    value = 12.6
+    if thedtype is np.datetime64:
+        value = thedtype(int(12.6), "us")
+    elif thedtype is np.timedelta64:
+        value = thedtype(int(12.6))
+
+    assert_eq(
+        dak.full_like(daa, value, dtype=thedtype),
+        ak.full_like(caa, value, dtype=thedtype),
     )
