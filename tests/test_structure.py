@@ -298,3 +298,13 @@ def test_full_like(daa, caa, thedtype):
         dak.full_like(daa, value, dtype=thedtype),
         ak.full_like(caa, value, dtype=thedtype),
     )
+
+
+def test_unflatten(daa, caa):
+    counts = ak.Array([2, 3, 0, 5, 3, 2])
+    dcounts = dak.from_awkward(counts, daa.npartitions)
+
+    assert_eq(
+        dak.unflatten(daa, dcounts),
+        ak.unflatten(caa, counts),
+    )

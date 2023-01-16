@@ -652,7 +652,30 @@ def to_regular(array, axis=1, highlevel=True, behavior=None):
 
 @borrow_docstring(ak.unflatten)
 def unflatten(array, counts, axis=0, highlevel=True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
+    #  TODO: remove after fixing issue in awkward
+    meta = typetracer_from_form(
+        ak.unflatten(
+            array._meta.layout.form.length_zero_array(),
+            counts._meta.layout.form.length_zero_array(),
+            axis=axis,
+            highlevel=highlevel,
+            behavior=behavior,
+        ).layout.form
+    )
+
+    return map_partitions(
+        ak.unflatten,
+        array,
+        counts,
+        axis=axis,
+        highlevel=highlevel,
+        behavior=behavior,
+        meta=meta,
+        label="unflatten",
+    )
 
 
 @borrow_docstring(ak.unzip)
