@@ -450,7 +450,7 @@ def to_json(
     storage_options = storage_options or {}
     fs, _ = url_to_fs(path, **storage_options)
     nparts = array.npartitions
-    write_res = map_partitions(
+    map_res = map_partitions(
         _ToJsonFn(
             fs,
             path,
@@ -464,9 +464,10 @@ def to_json(
         label="to-json-on-block",
         meta=array._meta,
     )
+    map_res.dask.layers[map_res.name].annotations = {"ak_output": True}
     name = f"to-json-{tokenize(array, path)}"
-    dsk = {(name, 0): (lambda *_: None, write_res.__dask_keys__())}
-    graph = HighLevelGraph.from_collections(name, dsk, dependencies=(write_res,))
+    dsk = {(name, 0): (lambda *_: None, map_res.__dask_keys__())}
+    graph = HighLevelGraph.from_collections(name, dsk, dependencies=(map_res,))
     res = new_scalar_object(graph, name=name, meta=None)
     if compute:
         res.compute()

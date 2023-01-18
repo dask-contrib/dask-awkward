@@ -8,7 +8,7 @@ from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
 from dask_awkward.utils import LazyInputsDict
 
 
-class AwkwardIOLayer(Blockwise):
+class AwkwardInputLayer(Blockwise):
     def __init__(
         self,
         *,
@@ -46,6 +46,43 @@ class AwkwardIOLayer(Blockwise):
             annotations=None,
         )
 
+    def __repr__(self) -> str:
+        return f"AwkwardInputLayer<{self.output}>"
+
+    def mock(self) -> Any:
+        import copy
+
+        import awkward as ak
+
+        from dask_awkward.lib.core import typetracer_from_form
+
+        def _label_form(form, start):
+            if form.is_record:
+                for field in form.fields:
+                    _label_form(form.content(field), f"{start}.{field}")
+            elif form.is_numpy:
+                form.form_key = start
+            else:
+                _label_form(form.content, start)
+
+        new_meta = typetracer_from_form(copy.deepcopy(self._meta.layout.form))
+        form = new_meta.layout.form
+        _label_form(form, self.name)
+        new_meta_labelled, report = ak._typetracer.typetracer_with_report(form)
+        new_meta_array = ak.Array(new_meta_labelled)
+        new_input_layer = AwkwardInputLayer(
+            name=self.name,
+            columns=self.columns,
+            inputs=[None] * int(list(self.numblocks.values())[0][0]),
+            io_func=lambda *_, **__: new_meta_array,
+            label=self.label,
+            produces_tasks=self.produces_tasks,
+            creation_info=self.creation_info,
+            annotations=self.annotations,
+            meta=new_meta_labelled,
+        )
+        return new_input_layer, report
+
     def project_and_mock(self, columns: list[str]) -> AwkwardIOLayer:
 
         # imported here because it this method should be run _only_ on
@@ -55,7 +92,7 @@ class AwkwardIOLayer(Blockwise):
         new_meta = typetracer_from_form(
             self._meta.layout.form.select_columns(columns),
         )
-        return AwkwardIOLayer(
+        return AwkwardInputLayer(
             name=self.name,
             columns=self.columns,
             inputs=[None],
@@ -70,7 +107,7 @@ class AwkwardIOLayer(Blockwise):
     def project_columns(self, columns: list[str]) -> AwkwardIOLayer:
         if hasattr(self.io_func, "project_columns"):
             io_func = self.io_func.project_columns(columns)
-            return AwkwardIOLayer(
+            return AwkwardInputLayer(
                 name=self.name,
                 columns=columns,
                 inputs=self.inputs,
@@ -82,3 +119,6 @@ class AwkwardIOLayer(Blockwise):
                 meta=self._meta,
             )
         return self
+
+
+AwkwardIOLayer = AwkwardInputLayer
