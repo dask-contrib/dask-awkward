@@ -80,7 +80,6 @@ def _mock_output(layer: Layer):
     mp = layer2.mapping.copy()  # why is this always a MetrializedLayer?
     for k in iter(mp.keys()):
         mp[k] = (_mock_output_func,) + mp[k][1:]
-    mp[key] = (_mock_io_func, ) + mp[key][1:]
     layer2.mapping = mp
     return layer2
 
