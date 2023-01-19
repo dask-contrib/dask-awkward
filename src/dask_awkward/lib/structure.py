@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import builtins
+import warnings
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
@@ -670,6 +671,13 @@ def to_regular(array, axis=1, highlevel=True, behavior=None):
 def unflatten(array, counts, axis=0, highlevel=True, behavior=None):
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
+
+    warnings.warn(
+        f"""Please ensure that {counts}
+        is partitionwise-compatible with {array}
+        (e.g. counts comes from a dak.num(array, axis=1)),
+        otherwise this unflatten operation will fail when computed!"""
+    )
 
     #  TODO: remove after fixing issue in awkward
     meta = typetracer_from_form(
