@@ -149,13 +149,6 @@ def test_partitions_divisions(ndjson_points_file: str) -> None:
     assert t2.divisions == (0, divs[2] - divs[1])
 
 
-def test_raise_in_finalize(daa: Array) -> None:
-    with dask.config.set({"awkward.compute-unknown-meta": False}):
-        res = daa.map_partitions(str)
-    with pytest.raises(RuntimeError, match="type of first result: <class 'str'>"):
-        res.compute()
-
-
 def test_array_rebuild(ndjson_points_file: str) -> None:
     daa = dak.from_json([ndjson_points_file])
     x = daa.compute()

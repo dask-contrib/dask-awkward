@@ -203,7 +203,7 @@ def to_dask_bag(array: Array) -> DaskBag:
     return Bag(array.dask, array.name, array.npartitions)
 
 
-def to_dask_array(array: Array) -> DaskArray:
+def to_dask_array(array: Array, optimize_graph: bool = True) -> DaskArray:
     """Convert awkward array collection to a Dask array collection.
 
     This conversion requires the awkward array to have a rectilinear
@@ -213,6 +213,10 @@ def to_dask_array(array: Array) -> DaskArray:
     ----------
     array : Array
         The dask awkward array collection.
+    optimize_graph : bool
+        Optimize the graph associated with `array` (the
+        ``dask_awkward.Array``) before converting to
+        ``dask.array.Array``.
 
     Returns
     -------
@@ -226,6 +230,19 @@ def to_dask_array(array: Array) -> DaskArray:
         raise ValueError("Array metadata required for determining dtype")
 
     ndim = array.ndim
+
+    if optimize_graph:
+        keys = array.__dask_keys__()
+        graph = array.__dask_graph__()
+        layer = array.__dask_layers__()[0]
+        graph = array.__dask_optimize__(graph, keys)
+        hlg = HighLevelGraph.from_collections(layer, graph, dependencies=())
+        array = new_array_object(
+            hlg,
+            name=layer,
+            divisions=array.divisions,
+            meta=array._meta,
+        )
 
     if ndim == 1:
         new = map_partitions(ak.to_numpy, array, meta=empty_typetracer())
