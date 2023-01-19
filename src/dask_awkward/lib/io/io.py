@@ -5,7 +5,6 @@ from collections.abc import Callable, Iterable
 from typing import TYPE_CHECKING, Any
 
 import awkward as ak
-import dask
 import numpy as np
 from awkward.types.numpytype import primitive_to_dtype
 from dask.base import flatten, tokenize
