@@ -723,7 +723,23 @@ def strings_astype(array, to, highlevel=True, behavior=None):
 
 @borrow_docstring(ak.to_regular)
 def to_regular(array, axis=1, highlevel=True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
+    if axis == 0:
+        raise ValueError("axis must be > 0 for from_regular")
+
+    #  NB: It is impossible to compute the typetracer for this.
+    #      We don't know the output array size in general,
+    #      since it is var.
+    return map_partitions(
+        ak.to_regular,
+        array,
+        axis=axis,
+        highlevel=highlevel,
+        behavior=behavior,
+        label="to-regular",
+    )
 
 
 @borrow_docstring(ak.unflatten)

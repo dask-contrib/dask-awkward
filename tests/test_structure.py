@@ -355,3 +355,13 @@ def test_from_regular(caa):
         dak.from_regular(dregular, axis=1),
         ak.from_regular(regular, axis=1),
     )
+
+
+def test_to_regular(caa):
+    regular = ak.to_packed(caa[[0, 4, 5, 9, 10, 14]].points.x)
+    dregular = dak.from_awkward(regular, 3)
+
+    assert_eq(
+        dak.to_regular(dregular, axis=1),
+        ak.to_regular(regular, axis=1),
+    )
