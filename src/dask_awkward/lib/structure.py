@@ -610,12 +610,50 @@ def pad_none(
 
 @borrow_docstring(ak.ravel)
 def ravel(array, highlevel=True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
+    if isinstance(array._meta.layout, ak.contents.recordarray.RecordArray):
+        warnings.warn("ravel may produce inconsistent results for record arrays!")
+
+    return map_partitions(
+        ak.ravel,
+        array,
+        highlevel=highlevel,
+        behavior=behavior,
+        label="ravel",
+    )
 
 
 @borrow_docstring(ak.run_lengths)
 def run_lengths(array, highlevel=True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
+    # TODO: fix incorrect results for run_lengths when one dimensional
+    minmax_depth = array._meta.layout.minmax_depth
+    if minmax_depth[0] == 1 or minmax_depth[1] == 1:
+        warnings.warn(
+            "run_lengths can produce incorrect results for one dimensional arrays!"
+        )
+
+    # TODO: fix typetracer error in awkward
+    meta = typetracer_from_form(
+        ak.run_lengths(
+            array._meta.layout.form.length_zero_array(),
+            highlevel=highlevel,
+            behavior=behavior,
+        ).layout.form
+    )
+
+    return map_partitions(
+        ak.run_lengths,
+        array,
+        highlevel=highlevel,
+        behavior=behavior,
+        label="run-lengths",
+        meta=meta,
+    )
 
 
 @borrow_docstring(ak.singletons)

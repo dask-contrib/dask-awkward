@@ -323,3 +323,22 @@ def test_to_packed(daa, caa):
         dak.to_packed(daa),
         ak.to_packed(caa),
     )
+
+
+def test_ravel(daa, caa):
+    assert_eq(
+        dak.ravel(daa.points.x),
+        ak.ravel(caa.points.x),
+    )
+
+
+@pytest.mark.xfail
+def test_ravel_fail(daa, caa):
+    assert_eq(
+        dak.ravel(daa),
+        ak.ravel(caa),
+    )
+
+
+def test_run_lengths(daa, caa):
+    assert_eq(dak.run_lengths(daa.points.x), ak.run_lengths(caa.points.x))
