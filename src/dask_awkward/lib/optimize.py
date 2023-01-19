@@ -25,6 +25,8 @@ def optimize(
     if not isinstance(dsk, HighLevelGraph):
         dsk = HighLevelGraph.from_collections(id(dsk), dsk, dependencies=())
 
+    dsk = optimize_columns(dsk, keys=keys)
+
     # Perform Blockwise optimizations for HLG input
     dsk = optimize_blockwise(dsk, keys=keys)
     # cull unncessary tasks
@@ -102,7 +104,7 @@ def _mock_output(layer):
     return new_layer
 
 
-def _get_column_report(dsk, keys) -> dict[str, Any]:
+def _get_column_reports(dsk, keys) -> dict[str, Any]:
     if not _has_projectable_awkward_io_layer(dsk):
         return {}
 
@@ -125,3 +127,24 @@ def _get_column_report(dsk, keys) -> dict[str, Any]:
     if isinstance(out, ak.Array):
         out.layout._touch_data(recursive=True)
     return reports
+
+
+def _apply_column_optimization(dsk, reports):
+    layers = dsk.layers.copy()
+    deps = dsk.dependencies.copy()
+    for name, report in reports.items():
+        cols = set(report.data_touched)
+        select = []
+        for col in cols:
+            if col is None:
+                continue
+            n, c = col.split(".", 1)
+            if n == name:
+                select.append(c)
+        layers[name] = layers[name].project_columns(select)
+    return HighLevelGraph(layers, deps)
+
+
+def optimize_columns(dsk, keys):
+    reports = _get_column_reports(dsk, keys)
+    return _apply_column_optimization(dsk, reports)
