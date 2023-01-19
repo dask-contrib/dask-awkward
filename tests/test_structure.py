@@ -341,4 +341,17 @@ def test_ravel_fail(daa, caa):
 
 
 def test_run_lengths(daa, caa):
-    assert_eq(dak.run_lengths(daa.points.x), ak.run_lengths(caa.points.x))
+    assert_eq(
+        dak.run_lengths(daa.points.x),
+        ak.run_lengths(caa.points.x),
+    )
+
+
+def test_from_regular(caa):
+    regular = ak.to_regular(ak.to_packed(caa[[0, 4, 5, 9, 10, 14]].points.x))
+    dregular = dak.from_awkward(regular, 3)
+
+    assert_eq(
+        dak.from_regular(dregular, axis=1),
+        ak.from_regular(regular, axis=1),
+    )

@@ -372,7 +372,20 @@ def flatten(
 
 @borrow_docstring(ak.from_regular)
 def from_regular(array, axis=1, highlevel=True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
+    if axis == 0:
+        raise ValueError("axis must be > 0 for from_regular")
+
+    return map_partitions(
+        ak.from_regular,
+        array,
+        axis=axis,
+        highlevel=highlevel,
+        behavior=behavior,
+        label="from-regular",
+    )
 
 
 @borrow_docstring(ak.full_like)
