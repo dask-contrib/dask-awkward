@@ -316,3 +316,10 @@ def test_unflatten(daa, caa):
         dak.unflatten(daa, dcounts),
         ak.unflatten(caa, counts),
     )
+
+
+def test_to_packed(daa, caa):
+    assert_eq(
+        dak.to_packed(daa),
+        ak.to_packed(caa),
+    )

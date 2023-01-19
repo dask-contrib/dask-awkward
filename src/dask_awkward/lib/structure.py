@@ -558,7 +558,15 @@ def ones_like(
 
 @borrow_docstring(ak.to_packed)
 def to_packed(array, highlevel=True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
+    return map_partitions(
+        ak.to_packed,
+        array,
+        highlevel=highlevel,
+        behavior=behavior,
+    )
 
 
 class _PadNoneFn:
