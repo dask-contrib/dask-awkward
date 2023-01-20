@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import awkward as ak
-import dask.config
 import fsspec
 import numpy as np
 import pytest
