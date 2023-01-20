@@ -1138,7 +1138,9 @@ def new_array_object(
         actual_meta = compute_typetracer(dsk, name)
     else:
         if not isinstance(meta, ak.Array):
-            raise TypeError("meta must be an instance of an Awkward Array.")
+            raise TypeError(
+                f"meta must be an instance of an Awkward Array, not {type(meta)}."
+            )
         actual_meta = meta
 
     return Array(dsk, name, actual_meta, divs)
@@ -1413,15 +1415,15 @@ def calculate_known_divisions(array: Array) -> tuple[int, ...]:
         Locations (indices) of division boundaries.
 
     """
-    with dask.config.set({"awkward.compute-unknown-meta": False}):
-        # if more than 1 partition use cumulative sum
-        if array.npartitions > 1:
-            nums = np.array(array.map_partitions(len).compute())
-            cs = list(np.cumsum(nums))
-            return tuple([0, *cs])
+    num = map_partitions(ak.num, array, axis=0, meta=empty_typetracer())
 
-        # if only 1 partition just get its length.
-        return (0, array.map_partitions(len).compute())
+    # if only 1 partition things are simple
+    if array.npartitions == 1:
+        return (0, num.compute())
+
+    # if more than 1 partition cumulative sum required
+    cs = list(np.cumsum(num.compute()))
+    return tuple([0, *cs])
 
 
 def _type(array: Array) -> Type | None:

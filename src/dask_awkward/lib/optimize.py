@@ -85,7 +85,7 @@ def _has_projectable_awkward_io_layer(dsk: HighLevelGraph) -> bool:
     return False
 
 
-def _mock_output_func(*args, **kwargs):
+def _mock_output_func(*args: Any, **kwargs: Any) -> Any:
     import awkward as ak
 
     for arg in args + tuple(kwargs.values()):
@@ -93,7 +93,7 @@ def _mock_output_func(*args, **kwargs):
             arg.layout._touch_data(recursive=True)
 
 
-def _mock_output(layer):
+def _mock_output(layer: Any) -> Any:
     assert len(layer.dsk) == 1
 
     new_layer = copy.deepcopy(layer)
@@ -104,7 +104,7 @@ def _mock_output(layer):
     return new_layer
 
 
-def _get_column_reports(dsk, keys) -> dict[str, Any]:
+def _get_column_reports(dsk: HighLevelGraph, keys: Any) -> dict[str, Any]:
     if not _has_projectable_awkward_io_layer(dsk):
         return {}
 
@@ -129,22 +129,29 @@ def _get_column_reports(dsk, keys) -> dict[str, Any]:
     return reports
 
 
-def _apply_column_optimization(dsk, reports):
-    layers = dsk.layers.copy()
-    deps = dsk.dependencies.copy()
+def _necessary_columns(dsk: HighLevelGraph) -> dict[str, list[str]]:
+    reports = _get_column_reports(dsk, [])
+    kv = {}
     for name, report in reports.items():
         cols = set(report.data_touched)
         select = []
         for col in cols:
-            if col is None:
+            if col is None or col == name:
                 continue
             n, c = col.split(".", 1)
             if n == name:
                 select.append(c)
-        layers[name] = layers[name].project_columns(select)
+        kv[name] = select
+    return kv
+
+
+def optimize_columns(dsk: HighLevelGraph, keys: Any) -> HighLeveLGraph:
+    layers = dsk.layers.copy()
+    deps = dsk.dependencies.copy()
+
+    layer_to_necessary_columns: dict[str, list[str]] = _necessary_columns(dsk)
+
+    for name, neccols in layer_to_necessary_columns.items():
+        layers[name] = layers[name].project_columns(neccols)
+
     return HighLevelGraph(layers, deps)
-
-
-def optimize_columns(dsk, keys):
-    reports = _get_column_reports(dsk, keys)
-    return _apply_column_optimization(dsk, reports)

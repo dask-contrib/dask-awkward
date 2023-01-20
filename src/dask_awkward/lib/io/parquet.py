@@ -140,7 +140,9 @@ def from_parquet(
     if split_row_groups is None:
         split_row_groups = row_counts is not None and len(row_counts) > 1
 
-    meta = _Array(subform.length_zero_array(highlevel=False).to_typetracer())
+    meta = _Array(
+        subform.length_zero_array(highlevel=False).to_typetracer(forget_length=True)
+    )
 
     if split_row_groups is False or subrg is None:
         # file-wise
