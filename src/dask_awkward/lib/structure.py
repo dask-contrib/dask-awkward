@@ -193,9 +193,33 @@ def argsort(
     return map_partitions(fn, array, label="argsort", output_divisions=1)
 
 
+class _BroadcastArraysFn:
+    def __init__(self, index, **kwargs):
+        self.index = index
+        self.kwargs = kwargs
+
+    def __call__(self, *arrays):
+        return ak.broadcast_arrays(*arrays, **self.kwargs)[self.index]
+
+
 @borrow_docstring(ak.broadcast_arrays)
-def broadcast_arrays(*arrays, **kwargs):
-    raise DaskAwkwardNotImplemented("TODO")
+def broadcast_arrays(*arrays, highlevel=True, **kwargs):
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
+    array_metas = (array._meta for array in arrays)
+
+    metas = ak.broadcast_arrays(*array_metas, highlevel=highlevel, **kwargs)
+
+    return [
+        map_partitions(
+            _BroadcastArraysFn(i, highlevel=highlevel, **kwargs),
+            *arrays,
+            label="broadcast-arrays",
+            meta=meta,
+        )
+        for i, meta in enumerate(metas)
+    ]
 
 
 class _CartesianFn:

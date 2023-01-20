@@ -365,3 +365,16 @@ def test_to_regular(caa):
         dak.to_regular(dregular, axis=1),
         ak.to_regular(regular, axis=1),
     )
+
+
+def test_broadcast_arrays(daa, caa):
+    flat = ak.Array([1] * 15)
+    dflat = dak.from_awkward(flat, 3)
+
+    dak_broadcast = dak.broadcast_arrays(dflat, daa.points.x)
+    ak_broadcast = ak.broadcast_arrays(flat, caa.points.x)
+
+    assert len(dak_broadcast) == len(ak_broadcast)
+
+    for db, b in zip(dak_broadcast, ak_broadcast):
+        assert_eq(db, b)
