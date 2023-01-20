@@ -207,10 +207,17 @@ def broadcast_arrays(*arrays, highlevel=True, **kwargs):
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
 
+    if not compatible_partitions(*arrays):
+        raise IncompatiblePartitions("broadcast_arrays", *arrays)
+
     array_metas = (array._meta for array in arrays)
 
     metas = ak.broadcast_arrays(*array_metas, highlevel=highlevel, **kwargs)
 
+    # here we return the list of broadcasted arrays
+    # it's OK to repeat the work this way since usually
+    # only one of the outputs will be computed, and
+    # broadcast_arrays is fast anyway
     return [
         map_partitions(
             _BroadcastArraysFn(i, highlevel=highlevel, **kwargs),
