@@ -128,10 +128,13 @@ def _get_column_reports(dsk: HighLevelGraph, keys: Any) -> dict[str, Any]:
     try:
         out = get_sync(hlg, list(outlayer.keys())[0])
     except Exception as err:
-        if dask.config.get("awkward.warn-failed-optimization"):
+        on_fail = dask.config.get("awkward.optimization.on-fail")
+        if on_fail == "warn":
             warnings.warn(
-                f"Column projection optimization failed with {type(err)}, {err}!"
+                f"Column projection optimization failed with {type(err)}, {err}"
             )
+            return {}
+        elif on_fail == "pass":
             return {}
         else:
             raise

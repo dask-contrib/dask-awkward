@@ -8,8 +8,17 @@ awkward:
   # typetracer, which is an empty awkward array.
   compute-unknown-meta: True
 
-  # This option controls whether or not a warning is raised or an
-  # exception is raised if optimization fails. The default of "True"
-  # will raise a warning. If this option is "False" and the
-  # optimization fails, an exception will be raised intead.
-  warn-failed-optimization: True
+  # Optimization specific configuration
+  optimization:
+
+    # This option controls whether or not a warning is thrown, an
+    # exception is raised, or if nothing is done a if dask-awkward
+    # specific optimization fails (right now this is only the column
+    # projection optimization for determining necessary columns). The
+    # default value ("warn") will produce a warning if the
+    # optimization fails. If this option is set to "raise" and the
+    # optimization fails, an exception will be raised intead, crashing
+    # a program before an optimized compute. Finally, setting to
+    # "pass" the optimization will silently fail and the task graph
+    # will not be optimized.
+    on-fail: "warn"
