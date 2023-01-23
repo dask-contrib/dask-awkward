@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import warnings
+import logging
 from collections.abc import Hashable, Mapping
 from typing import Any
 
@@ -12,6 +13,9 @@ from dask.highlevelgraph import HighLevelGraph
 from dask.local import get_sync
 
 from dask_awkward.layers import AwkwardInputLayer
+
+
+log = logging.getLogger(__name__)
 
 
 def optimize(
@@ -129,11 +133,15 @@ def _get_column_reports(dsk: HighLevelGraph, keys: Any) -> dict[str, Any]:
         out = get_sync(hlg, list(outlayer.keys())[0])
     except Exception as err:
         on_fail = dask.config.get("awkward.optimization.on-fail")
+        # this is the default, throw a warning but skip the optimization.
         if on_fail == "warn":
             warnings.warn(f"Column projection optimization failed: {type(err)}, {err}")
             return {}
+        # option "pass" means do not throw warning but skip the optimization.
         elif on_fail == "pass":
+            log.debug("Column projection optimization failed; optimization skipped.")
             return {}
+        # option "raise" to raise the exception here
         else:
             raise
 
