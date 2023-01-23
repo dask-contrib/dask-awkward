@@ -926,13 +926,16 @@ def with_name(
         raise ValueError("Only highlevel=True is supported")
 
     #  TODO: remove once fixed in awkward
-    meta = typetracer_from_form(
-        ak.with_name(
-            array._meta.layout.form.length_zero_array(),
-            name,
-            highlevel=highlevel,
-            behavior=behavior,
-        ).layout.form
+    meta = ak.Array(
+        typetracer_from_form(
+            ak.with_name(
+                array._meta.layout.form.length_zero_array(),
+                name,
+                highlevel=highlevel,
+                behavior=behavior,
+            ).layout.form
+        ),
+        behavior=behavior if behavior is not None else array._meta.behavior,
     )
 
     return map_partitions(
