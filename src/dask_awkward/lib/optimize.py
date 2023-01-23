@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import warnings
 from collections.abc import Hashable, Mapping
 from typing import Any
 
@@ -123,7 +124,18 @@ def _get_column_reports(dsk: HighLevelGraph, keys: Any) -> dict[str, Any]:
 
     hlg = HighLevelGraph(layers, deps)
     outlayer = list(hlg.layers.values())[-1]
-    out = get_sync(hlg, list(outlayer.keys())[0])
+
+    try:
+        out = get_sync(hlg, list(outlayer.keys())[0])
+    except Exception as err:
+        if dask.config.get("awkward.warn-failed-optimization"):
+            warnings.warn(
+                f"Column projection optimization failed with {type(err)}, {err}!"
+            )
+            return {}
+        else:
+            raise
+
     if isinstance(out, ak.Array):
         out.layout._touch_data(recursive=True)
     return reports

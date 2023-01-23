@@ -8,21 +8,8 @@ awkward:
   # typetracer, which is an empty awkward array.
   compute-unknown-meta: True
 
-  # column-projection-optimization currently has 3 possible values
-  #
-  # - "brute-force": a brute force search for columns that are
-  #   required for the task graph to complete without raising an
-  #   IndexError (each column is held out and the metadata task graph
-  #   is computed as a requirement test)
-  #
-  # - "simple-getitem": checks for calls to getitem in the task graph.
-  #   This optimization is determined faster than the brute-force
-  #   method, but it may not be as complete w.r.t. eliminating
-  #   unncessary reads.
-  #
-  # - "chained": use both methods together
-  #    Currently not implemented (but planned)
-  #
-  # - null, false, or "none": To turn off the optimization
-  #
-  column-projection-optimization: "simple-getitem"
+  # This option controls whether or not a warning is raised or an
+  # exception is raised if optimization fails. The default of "True"
+  # will raise a warning. If this option is "False" and the
+  # optimization fails, an exception will be raised intead.
+  warn-failed-optimization: True
