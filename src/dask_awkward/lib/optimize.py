@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import copy
-import warnings
 import logging
+import warnings
 from collections.abc import Hashable, Mapping
 from typing import Any
 
@@ -13,7 +13,6 @@ from dask.highlevelgraph import HighLevelGraph
 from dask.local import get_sync
 
 from dask_awkward.layers import AwkwardInputLayer
-
 
 log = logging.getLogger(__name__)
 

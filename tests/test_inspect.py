@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import awkward as ak
 import pytest
 
 import dask_awkward as dak
