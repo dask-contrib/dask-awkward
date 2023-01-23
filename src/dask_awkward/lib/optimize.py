@@ -7,7 +7,7 @@ from collections.abc import Hashable, Mapping
 from typing import Any
 
 import dask.config
-from dask.blockwise import Blockwise, Layer, fuse_roots, optimize_blockwise
+from dask.blockwise import fuse_roots, optimize_blockwise
 from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
 from dask.local import get_sync
@@ -171,7 +171,7 @@ def _necessary_columns(dsk: HighLevelGraph) -> dict[str, list[str]]:
     return kv
 
 
-def optimize_columns(dsk: HighLevelGraph, keys: Any) -> HighLeveLGraph:
+def optimize_columns(dsk: HighLevelGraph, keys: Any) -> HighLevelGraph:
     layers = dsk.layers.copy()
     deps = dsk.dependencies.copy()
 
