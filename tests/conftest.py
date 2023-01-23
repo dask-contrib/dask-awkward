@@ -117,6 +117,17 @@ def L3() -> list[list[dict[str, float]]]:
 
 
 @pytest.fixture(scope="session")
+def L4() -> list[list[dict[str, float]]]:
+    return [
+        [{"x": 1.9, "y": 9.0}, {"x": 2.0, "y": 8.2}, {"x": 9.9, "y": 9.0}],
+        None,
+        [{"x": 1.9, "y": 8.0}, {"x": 4.0, "y": 6.5}],
+        [{"x": 1.9, "y": 7.0}],
+        [{"x": 1.9, "y": 6.0}, {"x": 6.0, "y": 4.8}, {"x": 9.9, "y": 9.0}],
+    ]
+
+
+@pytest.fixture(scope="session")
 def caa_parquet(caa: ak.Array, tmpdir_factory: pytest.TempdirFactory) -> str:
     fname = tmpdir_factory.mktemp("parquet_data") / "caa.parquet"  # type: ignore
     ak.to_parquet(caa, str(fname), extensionarray=False)

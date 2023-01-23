@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import builtins
+import warnings
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
@@ -34,7 +35,6 @@ __all__ = (
     "broadcast_arrays",
     "cartesian",
     "combinations",
-    "concatenate",
     "copy",
     "fill_none",
     "firsts",
@@ -69,6 +69,14 @@ __all__ = (
 )
 
 
+class _ArgCartesianFn:
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __call__(self, *arrays):
+        return ak.argcartesian(list(arrays), **self.kwargs)
+
+
 @borrow_docstring(ak.argcartesian)
 def argcartesian(
     arrays,
@@ -79,7 +87,41 @@ def argcartesian(
     highlevel=True,
     behavior=None,
 ):
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
+    if axis == 1:
+        meta = ak.cartesian(
+            [array._meta for array in arrays],
+            axis=axis,
+            nested=nested,
+            parameters=parameters,
+            with_name=with_name,
+            highlevel=highlevel,
+            behavior=behavior,
+        )
+        fn = _ArgCartesianFn(
+            axis=axis,
+            nested=nested,
+            parameters=parameters,
+            with_name=with_name,
+            highlevel=highlevel,
+            behavior=behavior,
+        )
+        return map_partitions(
+            fn, *arrays, label="argcartesian", output_divisions=1, meta=meta
+        )
     raise DaskAwkwardNotImplemented("TODO")
+
+
+class _ArgCombinationsFn:
+    def __init__(self, n: int, axis: int, **kwargs: Any):
+        self.n = n
+        self.axis = axis
+        self.kwargs = kwargs
+
+    def __call__(self, array):
+        return ak.argcombinations(array, self.n, axis=self.axis, **self.kwargs)
 
 
 @borrow_docstring(ak.argcombinations)
@@ -94,7 +136,41 @@ def argcombinations(
     highlevel=True,
     behavior=None,
 ):
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
+    if fields is not None and len(fields) != n:
+        raise ValueError("if provided, the length of 'fields' must be 'n'")
+
+    if axis < 0:
+        raise ValueError("the 'axis' for argcombinations must be non-negative")
+
+    if axis != 0:
+        fn = _ArgCombinationsFn(
+            n=n,
+            replacement=replacement,
+            axis=axis,
+            fields=fields,
+            parameters=parameters,
+            with_name=with_name,
+            highlevel=highlevel,
+            behavior=behavior,
+        )
+        return map_partitions(
+            fn,
+            array,
+            label="argcombinations",
+            output_divisions=1,
+        )
     raise DaskAwkwardNotImplemented("TODO")
+
+
+class _ArgsortFn:
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __call__(self, array):
+        return ak.argsort(array, **self.kwargs)
 
 
 @borrow_docstring(ak.argsort)
@@ -106,12 +182,51 @@ def argsort(
     highlevel=True,
     behavior=None,
 ):
-    raise DaskAwkwardNotImplemented("TODO")
+    if axis == 0:
+        raise DaskAwkwardNotImplemented("TODO")
+    fn = _ArgsortFn(
+        axis=axis,
+        ascending=ascending,
+        stable=stable,
+        behavior=behavior,
+    )
+    return map_partitions(fn, array, label="argsort", output_divisions=1)
+
+
+class _BroadcastArraysFn:
+    def __init__(self, index, **kwargs):
+        self.index = index
+        self.kwargs = kwargs
+
+    def __call__(self, *arrays):
+        return ak.broadcast_arrays(*arrays, **self.kwargs)[self.index]
 
 
 @borrow_docstring(ak.broadcast_arrays)
-def broadcast_arrays(*arrays, **kwargs):
-    raise DaskAwkwardNotImplemented("TODO")
+def broadcast_arrays(*arrays, highlevel=True, **kwargs):
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
+    if not compatible_partitions(*arrays):
+        raise IncompatiblePartitions("broadcast_arrays", *arrays)
+
+    array_metas = (array._meta for array in arrays)
+
+    metas = ak.broadcast_arrays(*array_metas, highlevel=highlevel, **kwargs)
+
+    # here we return the list of broadcasted arrays
+    # it's OK to repeat the work this way since usually
+    # only one of the outputs will be computed, and
+    # broadcast_arrays is fast anyway
+    return [
+        map_partitions(
+            _BroadcastArraysFn(i, highlevel=highlevel, **kwargs),
+            *arrays,
+            label="broadcast-arrays",
+            meta=meta,
+        )
+        for i, meta in enumerate(metas)
+    ]
 
 
 class _CartesianFn:
@@ -132,6 +247,8 @@ def cartesian(
     highlevel=True,
     behavior=None,
 ):
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
     if axis == 1:
         fn = _CartesianFn(
             axis=axis,
@@ -167,6 +284,9 @@ def combinations(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
     if fields is not None and len(fields) != n:
         raise ValueError("if provided, the length of 'fields' must be 'n'")
 
@@ -190,21 +310,11 @@ def combinations(
     raise DaskAwkwardNotImplemented("TODO")
 
 
-@borrow_docstring(ak.concatenate)
-def concatenate(
-    arrays,
-    axis=0,
-    merge=True,
-    mergebool=True,
-    highlevel=True,
-    behavior=None,
-):
-    raise DaskAwkwardNotImplemented("TODO")
-
-
 @borrow_docstring(ak.copy)
 def copy(array):
-    raise DaskAwkwardNotImplemented("TODO")
+    raise DaskAwkwardNotImplemented(
+        "This function is not necessary in the context of dask-awkward."
+    )
 
 
 class _FillNoneFn:
@@ -224,6 +334,9 @@ def fill_none(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
     fn = _FillNoneFn(value, axis=axis, highlevel=highlevel, behavior=behavior)
     return map_partitions(fn, array, label="fill-none", output_divisions=1)
 
@@ -290,19 +403,91 @@ def flatten(
 
 @borrow_docstring(ak.from_regular)
 def from_regular(array, axis=1, highlevel=True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
+    if axis == 0:
+        raise ValueError("axis must be > 0 for from_regular")
+
+    return map_partitions(
+        ak.from_regular,
+        array,
+        axis=axis,
+        highlevel=highlevel,
+        behavior=behavior,
+        label="from-regular",
+    )
 
 
 @borrow_docstring(ak.full_like)
 def full_like(array, fill_value, highlevel=True, behavior=None, dtype=None):
-    raise DaskAwkwardNotImplemented("TODO")
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
+    if dtype is str:
+        raise ValueError(
+            """dtype cannot be 'str' for dak.full_like,
+            you can accomplish this with dask-array and
+            dak.flatten/dak.unflatten"""
+        )
+
+    #  TODO: fix when available in awkward
+    meta = typetracer_from_form(
+        ak.full_like(
+            array._meta.layout.form.length_zero_array(),
+            fill_value,
+            highlevel=highlevel,
+            behavior=behavior,
+            dtype=dtype,
+        ).layout.form
+    )
+
+    return map_partitions(
+        ak.full_like,
+        array,
+        fill_value,
+        highlevel=highlevel,
+        behavior=behavior,
+        dtype=dtype,
+        meta=meta,
+    )
 
 
 @borrow_docstring(ak.isclose)
 def isclose(
     a, b, rtol=1e-05, atol=1e-08, equal_nan=False, highlevel=True, behavior=None
 ):
-    raise DaskAwkwardNotImplemented("TODO")
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
+    if not compatible_partitions(a, b):
+        raise IncompatiblePartitions("isclose", a, b)
+
+    #  TODO: fix this when https://github.com/scikit-hep/awkward/issues/2124 is addressed
+    meta = typetracer_from_form(
+        ak.isclose(
+            a._meta.layout.form.length_zero_array(),
+            b._meta.layout.form.length_zero_array(),
+            rtol=rtol,
+            atol=atol,
+            equal_nan=equal_nan,
+            highlevel=highlevel,
+            behavior=behavior,
+        ).layout.form
+    )
+
+    return map_partitions(
+        ak.isclose,
+        a,
+        b,
+        rtol=rtol,
+        atol=atol,
+        equal_nan=equal_nan,
+        highlevel=highlevel,
+        behavior=behavior,
+        label="is-close",
+        meta=meta,
+    )
 
 
 class _IsNoneFn:
@@ -373,18 +558,12 @@ def num(
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
     if axis and axis != 0:
-        # TODO: remove this manual generation of typetracer after
-        # https://github.com/scikit-hep/awkward/issues/1997 is fixed
-        meta = typetracer_from_form(
-            ak.num(array._meta.layout.form.length_zero_array(), axis=axis).layout.form
-        )
         return map_partitions(
             ak.num,
             array,
             axis=axis,
             highlevel=highlevel,
             behavior=behavior,
-            meta=meta,
         )
     if axis == 0:
         if array.known_divisions:
@@ -423,7 +602,15 @@ def ones_like(
 
 @borrow_docstring(ak.to_packed)
 def to_packed(array, highlevel=True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
+    return map_partitions(
+        ak.to_packed,
+        array,
+        highlevel=highlevel,
+        behavior=behavior,
+    )
 
 
 class _PadNoneFn:
@@ -467,22 +654,97 @@ def pad_none(
 
 @borrow_docstring(ak.ravel)
 def ravel(array, highlevel=True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
+    if isinstance(array._meta.layout, ak.contents.recordarray.RecordArray):
+        warnings.warn("ravel may produce inconsistent results for record arrays!")
+
+    return map_partitions(
+        ak.ravel,
+        array,
+        highlevel=highlevel,
+        behavior=behavior,
+        label="ravel",
+    )
 
 
 @borrow_docstring(ak.run_lengths)
 def run_lengths(array, highlevel=True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
+    # TODO: fix incorrect results for run_lengths when one dimensional
+    minmax_depth = array._meta.layout.minmax_depth
+    if minmax_depth[0] == 1 or minmax_depth[1] == 1:
+        warnings.warn(
+            "run_lengths can produce incorrect results for one dimensional arrays!"
+        )
+
+    # TODO: fix typetracer error in awkward
+    meta = typetracer_from_form(
+        ak.run_lengths(
+            array._meta.layout.form.length_zero_array(),
+            highlevel=highlevel,
+            behavior=behavior,
+        ).layout.form
+    )
+
+    return map_partitions(
+        ak.run_lengths,
+        array,
+        highlevel=highlevel,
+        behavior=behavior,
+        label="run-lengths",
+        meta=meta,
+    )
 
 
 @borrow_docstring(ak.singletons)
-def singletons(array, highlevel=True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+def singletons(array, axis=0, highlevel=True, behavior=None):
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
+    # TODO: remove this length-zero calculation once https://github.com/scikit-hep/awkward/issues/2123 is addressed
+    meta = typetracer_from_form(
+        ak.singletons(
+            array._meta.layout.form.length_zero_array(),
+            axis=axis,
+            highlevel=highlevel,
+            behavior=behavior,
+        ).layout.form
+    )
+
+    return map_partitions(
+        ak.singletons,
+        array,
+        axis=axis,
+        highlevel=highlevel,
+        behavior=behavior,
+        label="singletons",
+        meta=meta,
+    )
+
+
+class _SortFn:
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __call__(self, array):
+        return ak.sort(array, **self.kwargs)
 
 
 @borrow_docstring(ak.sort)
 def sort(array, axis=-1, ascending=True, stable=True, highlevel=True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+    if axis == 0:
+        raise DaskAwkwardNotImplemented("TODO")
+    fn = _SortFn(
+        axis=axis,
+        ascending=ascending,
+        stable=stable,
+        behavior=behavior,
+    )
+    return map_partitions(fn, array, label="sort", output_divisions=1)
 
 
 @borrow_docstring(ak.strings_astype)
@@ -492,12 +754,58 @@ def strings_astype(array, to, highlevel=True, behavior=None):
 
 @borrow_docstring(ak.to_regular)
 def to_regular(array, axis=1, highlevel=True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
+    if axis == 0:
+        raise ValueError("axis must be > 0 for from_regular")
+
+    #  NB: It is impossible to compute the typetracer for this.
+    #      We don't know the output array size in general,
+    #      since it is var.
+    return map_partitions(
+        ak.to_regular,
+        array,
+        axis=axis,
+        highlevel=highlevel,
+        behavior=behavior,
+        label="to-regular",
+    )
 
 
 @borrow_docstring(ak.unflatten)
 def unflatten(array, counts, axis=0, highlevel=True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
+    warnings.warn(
+        f"""Please ensure that {counts}
+        is partitionwise-compatible with {array}
+        (e.g. counts comes from a dak.num(array, axis=1)),
+        otherwise this unflatten operation will fail when computed!"""
+    )
+
+    #  TODO: remove after fixing issue in awkward
+    meta = typetracer_from_form(
+        ak.unflatten(
+            array._meta.layout.form.length_zero_array(),
+            counts._meta.layout.form.length_zero_array(),
+            axis=axis,
+            highlevel=highlevel,
+            behavior=behavior,
+        ).layout.form
+    )
+
+    return map_partitions(
+        ak.unflatten,
+        array,
+        counts,
+        axis=axis,
+        highlevel=highlevel,
+        behavior=behavior,
+        meta=meta,
+        label="unflatten",
+    )
 
 
 @borrow_docstring(ak.unzip)

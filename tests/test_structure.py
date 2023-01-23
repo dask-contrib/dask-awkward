@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import awkward as ak
+import numpy as np
 import pytest
 
 import dask_awkward as dak
@@ -103,6 +104,17 @@ def test_cartesian(caa: ak.Array, daa: dak.Array) -> None:
     assert_eq(dz, cz)
 
 
+def test_argcartesian(caa: ak.Array, daa: dak.Array) -> None:
+    da1 = daa["points", "x"]
+    da2 = daa["points", "y"]
+    ca1 = caa["points", "x"]
+    ca2 = caa["points", "y"]
+
+    dz = dak.argcartesian([da1, da2], axis=1)
+    cz = ak.argcartesian([ca1, ca2], axis=1)
+    assert_eq(dz, cz)
+
+
 def test_ones_like(caa: ak.Array, daa: dak.Array) -> None:
     da1 = dak.ones_like(daa.points.x)
     ca1 = ak.ones_like(caa["points", "x"])
@@ -190,6 +202,26 @@ def test_combinations_raise(daa):
         dak.combinations(daa, 2, fields=["a", "b", "c"])
 
 
+@pytest.mark.parametrize("axis", [1, -1])
+@pytest.mark.parametrize("fields", [None, ["a", "b"]])
+def test_argcombinations(caa, daa, axis, fields):
+    if axis < 0:
+        with pytest.raises(
+            ValueError, match="the 'axis' for argcombinations must be non-negative"
+        ):
+            dak.argcombinations(daa, 2, axis=axis)
+    else:
+        assert_eq(
+            dak.argcombinations(daa, 2, axis=axis),
+            ak.argcombinations(caa, 2, axis=axis),
+        )
+
+
+def test_argcombinations_raise(daa):
+    with pytest.raises(ValueError, match="if provided, the length"):
+        dak.argcombinations(daa, 2, fields=["a", "b", "c"])
+
+
 @pytest.mark.parametrize("mergebool", [True, False])
 def test_where(caa, daa, mergebool):
     assert_eq(
@@ -200,3 +232,149 @@ def test_where(caa, daa, mergebool):
             caa.points.x > caa.points.y, caa.points.x, caa.points.y, mergebool=mergebool
         ),
     )
+
+
+def test_isclose(daa, caa):
+    assert_eq(
+        dak.isclose(daa.points.x, daa.points.y),
+        ak.isclose(caa.points.x, caa.points.y),
+    )
+
+
+def test_singletons(L4):
+    caa = ak.Array(L4)
+    daa = dak.from_awkward(caa, 1)
+    assert_eq(
+        dak.singletons(daa),
+        ak.singletons(caa),
+    )
+
+
+@pytest.mark.parametrize("ascending", [True, False])
+def test_argsort(daa, caa, ascending):
+    assert_eq(
+        dak.argsort(daa.points.x, ascending=ascending),
+        ak.argsort(caa.points.x, ascending=ascending),
+    )
+
+
+@pytest.mark.parametrize("ascending", [True, False])
+def test_sort(daa, caa, ascending):
+    assert_eq(
+        dak.sort(daa.points.x, ascending=ascending),
+        ak.sort(caa.points.x, ascending=ascending),
+    )
+
+
+def test_copy(daa):
+    with pytest.raises(
+        DaskAwkwardNotImplemented,
+        match="This function is not necessary in the context of dask-awkward.",
+    ):
+        dak.copy(daa)
+
+
+@pytest.mark.parametrize(
+    "thedtype",
+    [
+        bool,
+        np.int8,
+        np.uint8,
+        np.int16,
+        np.uint16,
+        np.int32,
+        np.uint32,
+        np.int64,
+        np.uint64,
+        np.float32,
+        np.float64,
+        np.complex64,
+        np.complex128,
+        np.datetime64,
+        np.timedelta64,
+        np.float16,
+    ],
+)
+def test_full_like(daa, caa, thedtype):
+    value = 12.6
+    if thedtype is np.datetime64:
+        value = thedtype(int(12.6), "us")
+    elif thedtype is np.timedelta64:
+        value = thedtype(int(12.6))
+
+    assert_eq(
+        dak.full_like(daa, value, dtype=thedtype),
+        ak.full_like(caa, value, dtype=thedtype),
+    )
+
+
+def test_unflatten(daa, caa):
+    counts = ak.Array([2, 3, 0, 5, 3, 2])
+    dcounts = dak.from_awkward(counts, daa.npartitions)
+
+    assert_eq(
+        dak.unflatten(daa, dcounts),
+        ak.unflatten(caa, counts),
+    )
+
+
+def test_to_packed(daa, caa):
+    assert_eq(
+        dak.to_packed(daa),
+        ak.to_packed(caa),
+    )
+
+
+def test_ravel(daa, caa):
+    assert_eq(
+        dak.ravel(daa.points.x),
+        ak.ravel(caa.points.x),
+    )
+
+
+@pytest.mark.xfail
+def test_ravel_fail(daa, caa):
+    assert_eq(
+        dak.ravel(daa),
+        ak.ravel(caa),
+    )
+
+
+def test_run_lengths(daa, caa):
+    assert_eq(
+        dak.run_lengths(daa.points.x),
+        ak.run_lengths(caa.points.x),
+    )
+
+
+def test_from_regular(caa):
+    regular = ak.to_regular(ak.to_packed(caa[[0, 4, 5, 9, 10, 14]].points.x))
+    dregular = dak.from_awkward(regular, 3)
+
+    assert_eq(
+        dak.from_regular(dregular, axis=1),
+        ak.from_regular(regular, axis=1),
+    )
+
+
+def test_to_regular(caa):
+    regular = ak.to_packed(caa[[0, 4, 5, 9, 10, 14]].points.x)
+    dregular = dak.from_awkward(regular, 3)
+
+    assert_eq(
+        dak.to_regular(dregular, axis=1),
+        ak.to_regular(regular, axis=1),
+    )
+
+
+def test_broadcast_arrays(daa, caa):
+    flat = ak.Array([1] * 15)
+    dflat = dak.from_awkward(flat, 3)
+
+    dak_broadcast = dak.broadcast_arrays(dflat, daa.points.x)
+    ak_broadcast = ak.broadcast_arrays(flat, caa.points.x)
+
+    assert len(dak_broadcast) == len(ak_broadcast)
+
+    for db, b in zip(dak_broadcast, ak_broadcast):
+        assert_eq(db, b)
