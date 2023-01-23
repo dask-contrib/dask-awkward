@@ -924,11 +924,23 @@ def with_name(
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
+
+    #  TODO: remove once fixed in awkward
+    meta = typetracer_from_form(
+        ak.with_name(
+            array._meta.layout.form.length_zero_array(),
+            name,
+            highlevel=highlevel,
+            behavior=behavior,
+        ).layout.form
+    )
+
     return map_partitions(
         _WithNameFn(name=name, behavior=behavior),
         array,
         label="with-name",
         output_divisions=1,
+        meta=meta,
     )
 
 
