@@ -30,6 +30,7 @@ arrays at `their website <awkwardarray_>`_.
    api_io.rst
    api_reducers.rst
    api_structure.rst
+   api_utilities.rst
 
 .. toctree::
    :maxdepth: 1
