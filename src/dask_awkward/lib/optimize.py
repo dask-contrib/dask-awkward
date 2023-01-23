@@ -142,8 +142,13 @@ def _get_column_reports(dsk: HighLevelGraph, keys: Any) -> dict[str, Any]:
             log.debug("Column projection optimization failed; optimization skipped.")
             return {}
         # option "raise" to raise the exception here
-        else:
+        elif on_fail == "raise":
             raise
+        else:
+            raise ValueError(
+                f"Invalid awkward.optimization.on-fail option: {on_fail}.\n"
+                "Valid options are 'warn', 'pass', or 'raise'."
+            )
 
     if isinstance(out, ak.Array):
         out.layout._touch_data(recursive=True)
