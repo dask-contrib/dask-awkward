@@ -12,7 +12,7 @@ awkward:
   optimization:
 
     # This option controls whether or not a warning is thrown, an
-    # exception is raised, or if nothing is done a if dask-awkward
+    # exception is raised, or if nothing is done if a dask-awkward
     # specific optimization fails (right now this is only the column
     # projection optimization for determining necessary columns). The
     # default value ("warn") will produce a warning if the
