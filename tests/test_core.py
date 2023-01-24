@@ -311,6 +311,7 @@ def test_scalar_dtype() -> None:
     assert c.dtype is None
 
 
+@pytest.mark.xfail(reason="TypeTracerArray.__new__ shouldn't be called right now.")
 def test_scalar_pickle(daa: Array) -> None:
     import pickle
 
