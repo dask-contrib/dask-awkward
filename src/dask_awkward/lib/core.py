@@ -12,7 +12,12 @@ from typing import TYPE_CHECKING, Any, TypeVar
 import awkward as ak
 import dask.config
 import numpy as np
-from awkward._nplikes.typetracer import MaybeNone, OneOf, TypeTracerArray
+from awkward._nplikes.typetracer import (
+    MaybeNone,
+    OneOf,
+    TypeTracerArray,
+    is_unknown_scalar,
+)
 from awkward.highlevel import _dir_pattern
 from dask.base import DaskMethodsMixin, dont_optimize, is_dask_collection, tokenize
 from dask.blockwise import BlockwiseDep
@@ -157,9 +162,9 @@ class Scalar(DaskMethodsMixin):
         return (self._name, 0)
 
     def _check_meta(self, m: Any) -> Any | None:
-        if not isinstance(m, (TypeTracerArray, MaybeNone, OneOf)):
-            raise TypeError(f"meta must be a typetracer object, not a {type(m)}")
-        return m
+        if isinstance(m, (MaybeNone, OneOf)) or is_unknown_scalar(m):
+            return m
+        raise TypeError(f"meta must be a typetracer object, not a {type(m)}")
 
     @property
     def dtype(self) -> np.dtype | None:
