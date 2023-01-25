@@ -11,7 +11,7 @@ from dask.base import flatten, tokenize
 from dask.highlevelgraph import HighLevelGraph
 from dask.utils import funcname
 
-from dask_awkward.layers import AwkwardIOLayer
+from dask_awkward.layers import AwkwardInputLayer
 from dask_awkward.lib.core import (
     empty_typetracer,
     map_partitions,
@@ -454,7 +454,7 @@ def from_map(
             packed=packed,
         )
 
-    dsk = AwkwardIOLayer(
+    dsk = AwkwardInputLayer(
         name=name,
         columns=None,
         inputs=inputs,

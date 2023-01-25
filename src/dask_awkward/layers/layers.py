@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -49,12 +50,47 @@ class AwkwardInputLayer(Blockwise):
     def __repr__(self) -> str:
         return f"AwkwardInputLayer<{self.output}>"
 
-    def mock(self) -> Any:
-        import copy
+    def mock(self) -> AwkwardInputLayer:
+        """Mock the input layer as starting with a dataless typetracer.
 
+        This method is used to create new dask task graphs that
+        operate purely on typetracer Arrays (that is, array with
+        awkward structure but without real data buffers). This allows
+        us to test which parts of a real awkward array will be used in
+        a real computation. We do this by running a graph which starts
+        with mocked AwkwardInputLayers
+
+        We mock an AwkwardInputLayer in these steps:
+
+        1. copy the original ``_meta`` form
+        2. create a new typetracer array from that form
+        3. take the form from the new typetracer array
+        4. label the components of the new form
+        5. pass the new labelled form to the typetracer_with_report
+           function from upstream awkward. This creates a report
+           object that tells us which buffers in a form get used.
+        6. create a new typetracer array that represents an array that
+           would come from a real input layer, and make that the
+           result of the input layer.
+        7. return the new layer (which only results in a typetracer
+           array) along with the mutable report object. When this new
+           layer is added to a dask task graph and that graph is
+           computed, the report object will be mutated, telling us
+           which buffers from the original form would be required for
+           a real compute with the same graph.
+
+        Returns
+        -------
+        AwkwardInputLayer
+            Copy of the input layer with data-less input.
+
+        """
         import awkward as ak
 
-        from dask_awkward.lib.core import typetracer_from_form
+        starting_form = copy.deepcopy(self._meta.layout.form)
+        starting_layout = starting_form.length_zero_array(highlevel=False)
+        new_meta = ak.Array(starting_layout.to_typetracer(forget_length=True))
+        form = new_meta.layout.form
 
         def _label_form(form, start):
             if form.is_record:
@@ -65,10 +101,9 @@ class AwkwardInputLayer(Blockwise):
             else:
                 _label_form(form.content, start)
 
-        new_meta = typetracer_from_form(copy.deepcopy(self._meta.layout.form))
-        form = new_meta.layout.form
         _label_form(form, self.name)
-        new_meta_labelled, report = ak._typetracer.typetracer_with_report(form)
+
+        new_meta_labelled, report = ak._nplikes.typetracer.typetracer_with_report(form)
         new_meta_array = ak.Array(new_meta_labelled)
         new_input_layer = AwkwardInputLayer(
             name=self.name,
@@ -83,28 +118,7 @@ class AwkwardInputLayer(Blockwise):
         )
         return new_input_layer, report
 
-    def project_and_mock(self, columns: list[str]) -> AwkwardIOLayer:
-
-        # imported here because it this method should be run _only_ on
-        # the Client (which is allowed to import awkward)
-        from dask_awkward.lib.core import typetracer_from_form
-
-        new_meta = typetracer_from_form(
-            self._meta.layout.form.select_columns(columns),
-        )
-        return AwkwardInputLayer(
-            name=self.name,
-            columns=self.columns,
-            inputs=[None],
-            io_func=lambda *_, **__: new_meta,
-            label=self.label,
-            produces_tasks=self.produces_tasks,
-            creation_info=self.creation_info,
-            annotations=self.annotations,
-            meta=self._meta,
-        )
-
-    def project_columns(self, columns: list[str]) -> AwkwardIOLayer:
+    def project_columns(self, columns: list[str]) -> AwkwardInputLayer:
         if hasattr(self.io_func, "project_columns"):
             io_func = self.io_func.project_columns(columns)
             return AwkwardInputLayer(
@@ -119,6 +133,3 @@ class AwkwardInputLayer(Blockwise):
                 meta=self._meta,
             )
         return self
-
-
-AwkwardIOLayer = AwkwardInputLayer

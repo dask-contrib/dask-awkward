@@ -1,6 +1,3 @@
-from dask_awkward.layers.layers import AwkwardInputLayer, AwkwardIOLayer
+from dask_awkward.layers.layers import AwkwardInputLayer
 
-__all__ = (
-    "AwkwardIOLayer",
-    "AwkwardInputLayer",
-)
+__all__ = ("AwkwardInputLayer",)
