@@ -357,6 +357,7 @@ def test_from_regular(caa):
     )
 
 
+@pytest.mark.xfail(reason="typetracer")
 def test_to_regular(caa):
     regular = ak.to_packed(caa[[0, 4, 5, 9, 10, 14]].points.x)
     dregular = dak.from_awkward(regular, 3)
