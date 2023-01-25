@@ -1507,7 +1507,7 @@ def is_typetracer(obj: Any) -> bool:
         if not backend.nplike.known_shape and not backend.nplike.known_data:
             return True
     # scalar-like typetracer
-    elif isinstance(obj, (TypeTracerArray, MaybeNone, OneOf)):
+    elif is_unknown_scalar(obj) or isinstance(obj, (MaybeNone, OneOf)):
         return True
     return False
 
