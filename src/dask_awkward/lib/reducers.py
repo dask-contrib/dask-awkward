@@ -410,7 +410,7 @@ def sum(
                 "axis": None,
                 "mask_identity": mask_identity,
             },
-            meta=ak.max(array._meta, axis=None),
+            meta=ak.sum(array._meta, axis=None),
         )
     elif axis == 0:
         raise DaskAwkwardNotImplemented(
