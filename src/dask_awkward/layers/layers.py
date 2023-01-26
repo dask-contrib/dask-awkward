@@ -62,22 +62,24 @@ class AwkwardInputLayer(Blockwise):
 
         We mock an AwkwardInputLayer in these steps:
 
-        1. copy the original ``_meta`` form
-        2. create a new typetracer array from that form
-        3. take the form from the new typetracer array
-        4. label the components of the new form
-        5. pass the new labelled form to the typetracer_with_report
+        1. Copy the original ``_meta`` form.
+        2. Create a new typetracer array from that form.
+        3. Take the form from the new typetracer array.
+        4. Label the components of the new form.
+        5. Pass the new labelled form to the typetracer_with_report
            function from upstream awkward. This creates a report
            object that tells us which buffers in a form get used.
-        6. create a new typetracer array that represents an array that
+        6. Create a new typetracer array that represents an array that
            would come from a real input layer, and make that the
            result of the input layer.
-        7. return the new layer (which only results in a typetracer
-           array) along with the mutable report object. When this new
-           layer is added to a dask task graph and that graph is
-           computed, the report object will be mutated, telling us
-           which buffers from the original form would be required for
-           a real compute with the same graph.
+        7. Return the new layer (which only results in a typetracer
+           array) along with the mutable report object.
+
+        When this new layer is added to a dask task graph and that
+        graph is computed, the report object will be mutated.
+        Inspecting the report object after the compute tells us which
+        buffers from the original form would be required for a real
+        compute with the same graph.
 
         Returns
         -------
