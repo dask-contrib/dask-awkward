@@ -13,7 +13,7 @@ awkward:
 
     # If true dask-awkward specific optimizations will be run. This is
     # currently limited to column projection.
-    enabled: False
+    enabled: True
 
     # This option controls whether or not a warning is thrown, an
     # exception is raised, or if nothing is done if a dask-awkward

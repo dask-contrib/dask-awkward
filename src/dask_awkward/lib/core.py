@@ -1326,6 +1326,31 @@ def map_partitions(
         )
 
 
+def _from_iter(obj):
+    """Try to run ak.from_iter, but have fallbacks.
+
+    This function first tries to call ak.form_iter on the input (which
+    should be some iterable). We expect a list of Scalar typetracers
+    to fail, so if the call fails due to ValueError or TypeError then
+    we manually do some typetracer operations to return the proper
+    representation of the input iterable-of-typetracers.
+
+    """
+    try:
+        return ak.from_iter(obj)
+    except (ValueError, TypeError):
+        first_obj = obj[0]
+
+        if isinstance(first_obj, MaybeNone):
+            first_obj = first_obj.content
+
+        return ak.Array(
+            ak.Array(first_obj)
+            .layout.form.length_one_array()
+            .layout.to_typetracer(forget_length=True)
+        )
+
+
 def total_reduction_to_scalar(
     *,
     label: str,
@@ -1386,7 +1411,7 @@ def total_reduction_to_scalar(
         name=name_agg,
         name_input=chunked_result.name,
         npartitions_input=chunked_result.npartitions,
-        concat_func=ak.from_iter,
+        concat_func=_from_iter,
         tree_node_func=comb_fn,
         finalize_func=agg_fn,
         split_every=split_every,
