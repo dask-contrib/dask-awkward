@@ -11,6 +11,10 @@ awkward:
   # Optimization specific configuration
   optimization:
 
+    # If true dask-awkward specific optimizations will be run. This is
+    # currently limited to column projection.
+    enabled: False
+
     # This option controls whether or not a warning is thrown, an
     # exception is raised, or if nothing is done if a dask-awkward
     # specific optimization fails (right now this is only the column
@@ -18,7 +22,8 @@ awkward:
     # default value ("warn") will produce a warning if the
     # optimization fails. If this option is set to "raise" and the
     # optimization fails, an exception will be raised intead, crashing
-    # a program before an optimized compute. Finally, setting to
-    # "pass" the optimization will silently fail and the task graph
-    # will not be optimized.
+    # a program before an optimized compute. Finally, if the option is
+    # set to "pass" and the optimization fails, it will silently fail
+    # and the task graph continue on to be computed without
+    # dask-awkward specific optimizations.
     on-fail: "warn"

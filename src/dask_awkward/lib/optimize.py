@@ -29,14 +29,16 @@ def optimize(
     if not isinstance(dsk, HighLevelGraph):
         dsk = HighLevelGraph.from_collections(id(dsk), dsk, dependencies=())
 
-    dsk = optimize_columns(dsk, keys=keys)
+    else:
+        if dask.config.get("awkward.optimization.enabled", default=False):
+            dsk = optimize_columns(dsk)
+        # Perform Blockwise optimizations for HLG input
+        dsk = optimize_blockwise(dsk, keys=keys)
+        # fuse nearby layers
+        dsk = fuse_roots(dsk, keys=keys)  # type: ignore
 
-    # Perform Blockwise optimizations for HLG input
-    dsk = optimize_blockwise(dsk, keys=keys)
     # cull unncessary tasks
     dsk = dsk.cull(set(keys))  # type: ignore
-    # fuse nearby layers
-    dsk = fuse_roots(dsk, keys=keys)  # type: ignore
 
     return dsk
 
@@ -89,7 +91,7 @@ def _has_projectable_awkward_io_layer(dsk: HighLevelGraph) -> bool:
     return False
 
 
-def _mock_output_func(*args: Any, **kwargs: Any) -> Any:
+def _mock_output_func(*args, **kwargs):
     import awkward as ak
 
     for arg in args + tuple(kwargs.values()):
@@ -97,7 +99,7 @@ def _mock_output_func(*args: Any, **kwargs: Any) -> Any:
             arg.layout._touch_data(recursive=True)
 
 
-def _mock_output(layer: Any) -> Any:
+def _mock_output(layer):
     assert len(layer.dsk) == 1
 
     new_layer = copy.deepcopy(layer)
@@ -108,7 +110,7 @@ def _mock_output(layer: Any) -> Any:
     return new_layer
 
 
-def _get_column_reports(dsk: HighLevelGraph, keys: Any) -> dict[str, Any]:
+def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
     if not _has_projectable_awkward_io_layer(dsk):
         return {}
 
@@ -155,9 +157,8 @@ def _get_column_reports(dsk: HighLevelGraph, keys: Any) -> dict[str, Any]:
 
 
 def _necessary_columns(dsk: HighLevelGraph) -> dict[str, list[str]]:
-    reports = _get_column_reports(dsk, [])
     kv = {}
-    for name, report in reports.items():
+    for name, report in _get_column_reports(dsk).items():
         cols = set(report.data_touched)
         select = []
         for col in cols:
@@ -170,7 +171,7 @@ def _necessary_columns(dsk: HighLevelGraph) -> dict[str, list[str]]:
     return kv
 
 
-def optimize_columns(dsk: HighLevelGraph, keys: Any) -> HighLevelGraph:
+def optimize_columns(dsk: HighLevelGraph) -> HighLevelGraph:
     layers = dsk.layers.copy()
     deps = dsk.dependencies.copy()
 
