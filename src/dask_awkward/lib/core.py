@@ -30,7 +30,7 @@ from dask.utils import IndexCallable, funcname, key_split
 from numpy.lib.mixins import NDArrayOperatorsMixin
 from tlz import first
 
-from dask_awkward.lib.optimize import optimize as dak_optimize
+from dask_awkward.lib.optimize import total_optimize
 from dask_awkward.typing import AwkwardDaskCollection
 from dask_awkward.utils import (
     DaskAwkwardNotImplemented,
@@ -124,7 +124,7 @@ class Scalar(DaskMethodsMixin):
         return self.name
 
     __dask_optimize__ = globalmethod(
-        dak_optimize, key="awkward_scalar_optimize", falsey=dont_optimize
+        total_optimize, key="awkward_scalar_optimize", falsey=dont_optimize
     )
 
     __dask_scheduler__ = staticmethod(threaded_get)
@@ -482,7 +482,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return self._rebuild, ()
 
     __dask_optimize__ = globalmethod(
-        dak_optimize, key="awkward_array_optimize", falsey=dont_optimize
+        total_optimize, key="awkward_array_optimize", falsey=dont_optimize
     )
 
     __dask_scheduler__ = staticmethod(threaded_get)

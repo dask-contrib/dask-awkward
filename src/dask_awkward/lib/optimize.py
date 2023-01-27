@@ -17,7 +17,7 @@ from dask_awkward.layers import AwkwardInputLayer
 log = logging.getLogger(__name__)
 
 
-def optimize(
+def total_optimize(
     dsk: Mapping,
     keys: Hashable | list[Hashable] | set[Hashable],
     **_: Any,
@@ -30,8 +30,8 @@ def optimize(
         dsk = HighLevelGraph.from_collections(id(dsk), dsk, dependencies=())
 
     else:
-        if dask.config.get("awkward.optimization.enabled", default=False):
-            dsk = optimize_columns(dsk)
+        # Perform dask-awkward specific optimizations.
+        dsk = optimize(dsk, keys=keys)
         # Perform Blockwise optimizations for HLG input
         dsk = optimize_blockwise(dsk, keys=keys)
         # fuse nearby layers
@@ -41,6 +41,34 @@ def optimize(
     dsk = dsk.cull(set(keys))  # type: ignore
 
     return dsk
+
+
+def optimize(
+    dsk: Mapping,
+    keys: Hashable | list[Hashable] | set[Hashable],
+    **_: Any,
+) -> Mapping:
+    """Run optimizations specific to dask-awkward.
+
+    This is currently limited to determining the necessary columns for
+    input layers.
+
+    """
+    if dask.config.get("awkward.optimization.enabled", default=False):
+        dsk = optimize_columns(dsk)
+    return dsk
+
+
+def optimize_columns(dsk: HighLevelGraph) -> HighLevelGraph:
+    layers = dsk.layers.copy()
+    deps = dsk.dependencies.copy()
+
+    layer_to_necessary_columns: dict[str, list[str]] = _necessary_columns(dsk)
+
+    for name, neccols in layer_to_necessary_columns.items():
+        layers[name] = layers[name].project_columns(neccols)
+
+    return HighLevelGraph(layers, deps)
 
 
 def _projectable_input_layer_names(dsk: HighLevelGraph) -> list[str]:
@@ -169,15 +197,3 @@ def _necessary_columns(dsk: HighLevelGraph) -> dict[str, list[str]]:
                 select.append(c)
         kv[name] = select
     return kv
-
-
-def optimize_columns(dsk: HighLevelGraph) -> HighLevelGraph:
-    layers = dsk.layers.copy()
-    deps = dsk.dependencies.copy()
-
-    layer_to_necessary_columns: dict[str, list[str]] = _necessary_columns(dsk)
-
-    for name, neccols in layer_to_necessary_columns.items():
-        layers[name] = layers[name].project_columns(neccols)
-
-    return HighLevelGraph(layers, deps)
