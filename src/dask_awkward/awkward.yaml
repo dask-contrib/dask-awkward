@@ -26,4 +26,4 @@ awkward:
     # set to "pass" and the optimization fails, it will silently fail
     # and the task graph continue on to be computed without
     # dask-awkward specific optimizations.
-    on-fail: "warn"
+    on-fail: warn

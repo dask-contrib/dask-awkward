@@ -17,7 +17,7 @@ from dask_awkward.layers import AwkwardInputLayer
 log = logging.getLogger(__name__)
 
 
-def total_optimize(
+def all_optimizations(
     dsk: Mapping,
     keys: Hashable | list[Hashable] | set[Hashable],
     **_: Any,
