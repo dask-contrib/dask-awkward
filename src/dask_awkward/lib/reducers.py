@@ -311,7 +311,7 @@ def min(
                 "axis": None,
                 "mask_identity": mask_identity,
             },
-            meta=ak.max(array._meta, axis=None),
+            meta=ak.min(array._meta, axis=None),
         )
     else:
         raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
