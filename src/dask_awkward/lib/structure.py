@@ -811,14 +811,14 @@ def unflatten(array, counts, axis=0, highlevel=True, behavior=None):
 @borrow_docstring(ak.unzip)
 def unzip(
     array: Array, highlevel: bool = True, behavior: dict | None = None
-) -> tuple(Array):
+) -> tuple[Array, ...]:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
     fields = ak.fields(array._meta)
     if len(fields) == 0:
         return (array,)
     else:
-        return tuple(array[field] for field in fields)
+        return tuple(array[field] for field in fields)  # type: ignore
 
 
 @borrow_docstring(ak.values_astype)

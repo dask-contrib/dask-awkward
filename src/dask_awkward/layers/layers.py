@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Callable, Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
 
 from dask_awkward.utils import LazyInputsDict
+
+if TYPE_CHECKING:
+    from awkward._nplikes.typetracer import TypeTracerReport
 
 
 class AwkwardInputLayer(Blockwise):
@@ -50,7 +53,7 @@ class AwkwardInputLayer(Blockwise):
     def __repr__(self) -> str:
         return f"AwkwardInputLayer<{self.output}>"
 
-    def mock(self) -> AwkwardInputLayer:
+    def mock(self) -> tuple[AwkwardInputLayer, TypeTracerReport]:
         """Mock the input layer as starting with a dataless typetracer.
 
         This method is used to create new dask task graphs that
@@ -85,6 +88,9 @@ class AwkwardInputLayer(Blockwise):
         -------
         AwkwardInputLayer
             Copy of the input layer with data-less input.
+        TypeTracerReport
+            The mutable report object that is updated upon computation
+            of a graph starting with the new AwkwardInputLayer.
 
         """
         import awkward as ak

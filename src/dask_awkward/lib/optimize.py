@@ -55,13 +55,13 @@ def optimize(
 
     """
     if dask.config.get("awkward.optimization.enabled", default=False):
-        dsk = optimize_columns(dsk)
+        dsk = optimize_columns(dsk)  # type: ignore
     return dsk
 
 
 def optimize_columns(dsk: HighLevelGraph) -> HighLevelGraph:
-    layers = dsk.layers.copy()
-    deps = dsk.dependencies.copy()
+    layers = dsk.layers.copy()  # type: ignore
+    deps = dsk.dependencies.copy()  # type: ignore
 
     layer_to_necessary_columns: dict[str, list[str]] = _necessary_columns(dsk)
 
@@ -144,8 +144,8 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
 
     import awkward as ak
 
-    layers = dsk.layers.copy()
-    deps = dsk.dependencies.copy()
+    layers = dsk.layers.copy()  # type: ignore
+    deps = dsk.dependencies.copy()  # type: ignore
     reports = {}
 
     for name in _projectable_input_layer_names(dsk):
