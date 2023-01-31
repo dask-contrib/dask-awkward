@@ -63,7 +63,7 @@ def optimize_columns(dsk: HighLevelGraph) -> HighLevelGraph:
     layers = dsk.layers.copy()  # type: ignore
     deps = dsk.dependencies.copy()  # type: ignore
 
-    layer_to_necessary_columns: dict[str, list[str]] = _necessary_columns(dsk)
+    layer_to_necessary_columns = _necessary_columns(dsk)
 
     for name, neccols in layer_to_necessary_columns.items():
         layers[name] = layers[name].project_columns(neccols)
