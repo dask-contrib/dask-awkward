@@ -22,6 +22,12 @@ def all_optimizations(
     keys: Hashable | list[Hashable] | set[Hashable],
     **_: Any,
 ) -> Mapping:
+    """Run all optimizations that benefit dask-awkward computations.
+
+    This function will run both dask-awkward specific and upstream
+    general optimizations from core dask.
+
+    """
     if not isinstance(keys, (list, set)):
         keys = (keys,)  # pragma: no cover
     keys = tuple(flatten(keys))
@@ -60,6 +66,34 @@ def optimize(
 
 
 def optimize_columns(dsk: HighLevelGraph) -> HighLevelGraph:
+    """Run column projection optimization.
+
+    This optimization determines which columns from an
+    ``AwkwardInputLayer`` are necessary for a complete computation.
+
+    For example, if a parquet dataset is loaded with fields:
+    ``["foo", "bar", "baz.x", "baz.y"]``
+
+    And the following task graph is made:
+
+    >>> ds = dak.from_parquet("/path/to/dataset")
+    >>> z = ds["foo"] - ds["baz"]["y"]
+
+    Upon calling z.compute() the AwkwardInputLayer created in the
+    from_parquet call will only read the parquet columns ``foo`` and
+    ``baz.y``.
+
+    Parameters
+    ----------
+    dsk : HighLevelGraph
+        Original high level dask graph
+
+    Returns
+    -------
+    HighLevelGraph
+        New dask graph with a modified ``AwkwardInputLayer``.
+
+    """
     layers = dsk.layers.copy()  # type: ignore
     deps = dsk.dependencies.copy()  # type: ignore
 
@@ -113,6 +147,7 @@ def _output_layer_names(dsk: HighLevelGraph) -> list[str]:
 
 
 def _has_projectable_awkward_io_layer(dsk: HighLevelGraph) -> bool:
+    """Check if a graph at least one AwkwardInputLayer that is project-able."""
     for _, v in dsk.layers.items():
         if isinstance(v, AwkwardInputLayer) and hasattr(v.io_func, "project_columns"):
             return True
@@ -120,6 +155,7 @@ def _has_projectable_awkward_io_layer(dsk: HighLevelGraph) -> bool:
 
 
 def _mock_output_func(*args, **kwargs):
+    """Mock writing an ak.Array to disk by touching data buffers."""
     import awkward as ak
 
     for arg in args + tuple(kwargs.values()):
@@ -128,6 +164,7 @@ def _mock_output_func(*args, **kwargs):
 
 
 def _mock_output(layer):
+    """Update a layer to run the _mock_output_func."""
     assert len(layer.dsk) == 1
 
     new_layer = copy.deepcopy(layer)
@@ -139,6 +176,7 @@ def _mock_output(layer):
 
 
 def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
+    """Get the TypeTracerReport for each input layer in a task graph."""
     if not _has_projectable_awkward_io_layer(dsk):
         return {}
 
@@ -185,6 +223,7 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
 
 
 def _necessary_columns(dsk: HighLevelGraph) -> dict[str, list[str]]:
+    """Pair layer names with lists of necessary columns."""
     kv = {}
     for name, report in _get_column_reports(dsk).items():
         cols = set(report.data_touched)
