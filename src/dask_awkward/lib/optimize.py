@@ -186,6 +186,7 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
     deps = dsk.dependencies.copy()  # type: ignore
     reports = {}
 
+    # make labelled report
     for name in _projectable_input_layer_names(dsk):
         layers[name], report = layers[name].mock()
         reports[name] = report
@@ -226,13 +227,18 @@ def _necessary_columns(dsk: HighLevelGraph) -> dict[str, list[str]]:
     """Pair layer names with lists of necessary columns."""
     kv = {}
     for name, report in _get_column_reports(dsk).items():
-        cols = set(report.data_touched)
+        cols = {_ for _ in report.data_touched if _ is not None}
         select = []
-        for col in cols:
-            if col is None or col == name:
+        for col in sorted(cols):
+            if col == name:
                 continue
             n, c = col.split(".", 1)
             if n == name:
-                select.append(c)
+                if c.endswith("__list__"):
+                    cnew = c[:-9].rstrip(".")
+                    if cnew not in select:
+                        select.append(f"{cnew}.*")
+                else:
+                    select.append(c)
         kv[name] = select
     return kv

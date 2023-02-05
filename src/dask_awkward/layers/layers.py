@@ -106,6 +106,9 @@ class AwkwardInputLayer(Blockwise):
                     _label_form(form.content(field), f"{start}.{field}")
             elif form.is_numpy:
                 form.form_key = start
+            elif form.is_list:
+                form.form_key = f"{start}.__list__"
+                _label_form(form.content, start)
             else:
                 _label_form(form.content, start)
 
