@@ -19,3 +19,7 @@ def test_necessary_columns(
     )
     for k, v in dak.necessary_columns(w).items():
         assert set(v) == {"points.x"}
+
+    q = {"z": z, "w": w}
+    for k, v in dak.necessary_columns(q).items():
+        assert set(v) == {"points.x", "points.y"}

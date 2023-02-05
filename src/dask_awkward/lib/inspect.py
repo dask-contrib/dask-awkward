@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-from typing import Any
-
+from dask.base import unpack_collections
 from dask.highlevelgraph import HighLevelGraph
 
 
-def necessary_columns(obj: Any) -> dict[str, list[str]]:
+def necessary_columns(*args, traverse: bool = True) -> dict[str, list[str]]:
     """Determine the columns necessary to compute a collection.
 
     Paramters
     ---------
-    obj : Dask collection or HighLevelGraph
+    obj : (python list/dict/tuple/set of) Dask collection or HighLevelGraph
         The collection (or collection graph) of interest.
 
     Returns
@@ -51,5 +50,18 @@ def necessary_columns(obj: Any) -> dict[str, list[str]]:
     """
     import dask_awkward.lib.optimize as o
 
-    dsk = obj if isinstance(obj, HighLevelGraph) else obj.dask
-    return o._necessary_columns(dsk)
+    collections, _ = unpack_collections(*args, traverse=traverse)
+    if not collections:
+        return {}
+
+    out = {}
+    for obj in collections:
+        dsk = obj if isinstance(obj, HighLevelGraph) else obj.dask
+        cols_this_dsk = o._necessary_columns(dsk)
+
+        for key, cols in cols_this_dsk.items():
+            prev = out.get(key, [])
+            update = list(set(prev + cols))
+            out[key] = update
+
+    return out
