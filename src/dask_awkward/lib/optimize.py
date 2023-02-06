@@ -300,7 +300,11 @@ def _prune_wildcards(columns: list[str], meta: AwkwardArray) -> list[str]:
         colsplit = col.split(".")[:-1]
         parts = list(reversed(colsplit))
         while parts:
-            meta = meta[parts.pop()]
+            part = parts.pop()
+            # for unnamed roots part may be an empty string, so we
+            # need this if statement.
+            if part:
+                meta = meta[part]
 
         for field in meta.fields:
             wholecol = f"{col[:-2]}.{field}"

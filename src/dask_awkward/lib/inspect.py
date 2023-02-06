@@ -59,6 +59,10 @@ def necessary_columns(*args, traverse: bool = True) -> dict[str, list[str]]:
         dsk = obj if isinstance(obj, HighLevelGraph) else obj.dask
         cols_this_dsk = o._necessary_columns(dsk)
 
+        for name in cols_this_dsk:
+            neccols = cols_this_dsk[name]
+            cols_this_dsk[name] = o._prune_wildcards(neccols, dsk.layers[name]._meta)
+
         for key, cols in cols_this_dsk.items():
             prev = out.get(key, [])
             update = list(set(prev + cols))
