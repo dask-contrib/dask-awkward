@@ -131,47 +131,6 @@ class AwkwardInputLayer(Blockwise):
 
     def project_columns(self, columns: list[str]) -> AwkwardInputLayer:
         if hasattr(self.io_func, "project_columns"):
-
-            corrected_columns = []
-            for column in columns:
-
-                # if column ends in .* we need to choose a subfield
-                # from the array at that point. For example if the
-                # field is "foo.bar.*" and foo.bar has the fields x,
-                # y, and z, then this logic will make "foo.bar.x" a
-                # column to extract.
-                if column.endswith(".*"):
-
-                    # this is the starting metadata that has the
-                    # highest level fields
-                    meta = self._meta
-
-                    # split the current column by "."; drop the last
-                    # wildcarded "*" entry
-                    colsplit = column.split(".")[:-1]
-
-                    # reverse the columns so we can use list.pop and
-                    # dive into the metadata levels one at a time.
-                    parts = list(reversed(colsplit))
-
-                    # dive in to the levels of metadata to eventually
-                    # have a metadata at the level of the original "*"
-                    while parts:
-                        meta = meta[parts.pop()]
-
-                    # just choose the first field; perhaps we can be
-                    # smarter about this in the future.
-                    field_to_choose = meta.fields[0]
-
-                    # finally rejoin the chosen field with the levels
-                    # above it.
-                    col = ".".join(colsplit + [field_to_choose])
-                    corrected_columns.append(col)
-                else:
-                    corrected_columns.append(column)
-
-            columns = sorted(set(corrected_columns))
-
             io_func = self.io_func.project_columns(columns)
             return AwkwardInputLayer(
                 name=self.name,

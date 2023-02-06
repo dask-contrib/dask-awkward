@@ -4,7 +4,7 @@ import copy
 import logging
 import warnings
 from collections.abc import Hashable, Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import dask.config
 from dask.blockwise import fuse_roots, optimize_blockwise
@@ -15,6 +15,10 @@ from dask.local import get_sync
 from dask_awkward.layers import AwkwardInputLayer
 
 log = logging.getLogger(__name__)
+
+
+if TYPE_CHECKING:
+    from awkward import Array as AwkwardArray
 
 
 def all_optimizations(
@@ -100,6 +104,8 @@ def optimize_columns(dsk: HighLevelGraph) -> HighLevelGraph:
     layer_to_necessary_columns = _necessary_columns(dsk)
 
     for name, neccols in layer_to_necessary_columns.items():
+        meta = layers[name]._meta
+        neccols = _prune_wildcards(neccols, meta)
         layers[name] = layers[name].project_columns(neccols)
 
     return HighLevelGraph(layers, deps)
@@ -242,3 +248,65 @@ def _necessary_columns(dsk: HighLevelGraph) -> dict[str, list[str]]:
                     select.append(c)
         kv[name] = select
     return kv
+
+
+def _prune_wildcards(columns: list[str], meta: AwkwardArray) -> list[str]:
+    """Prune wildcard '.*' suffix from necessary columns results.
+
+    The _necessary_columns logic will provide some results of the
+    form:
+
+    "foo.bar.*"
+
+    This function will eliminate the wildcard in one of two ways
+    (continuing to use "foo.bar.*" as an example):
+
+    1. If "foo.bar" has leaves (subfields) "x", "y" and "z", and _any_
+       of those (so "foo.bar.x", for example) also appears in the
+       columns list, then essentially nothing will happen (except we
+       drop the wildcard string), because we can be sure that a leaf
+       of "foo.bar" will be read (in this case it's "foo.bar.x").
+
+    2. If "foo.bar" has multiple leaves but none of them appear in the
+       columns list, we will just pick the first one that we find
+       (that is, foo.bar.fields[0]).
+
+    Parameters
+    ----------
+    columns : list[str]
+        The "raw" columns deemed necessary by the necessary columns
+        logic; can still contain the wildcard syntax we've adopted.
+    meta : ak.Array
+        The metadata (typetracer array) from the AwkwardInputLayer
+        that is getting optimized.
+
+    Returns
+    -------
+    list[str]
+        Columns with the wildcard syntax pruned and (also augmented
+        with a leaf node if necessary).
+
+    """
+
+    good_columns: list[str] = []
+    wildcard_columns: list[str] = []
+    for col in columns:
+        if ".*" in col:
+            wildcard_columns.append(col)
+        else:
+            good_columns.append(col)
+
+    for col in wildcard_columns:
+        colsplit = col.split(".")[:-1]
+        parts = list(reversed(colsplit))
+        while parts:
+            meta = meta[parts.pop()]
+
+        for field in meta.fields:
+            wholecol = f"{col[:-2]}.{field}"
+            if wholecol in good_columns:
+                break
+        else:
+            good_columns.append(f"{col[:-2]}.{meta.fields[0]}")
+
+    return good_columns
