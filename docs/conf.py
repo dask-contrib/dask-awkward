@@ -75,7 +75,7 @@ intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "numpy": ("https://numpy.org/doc/stable", None),
     "dask": ("https://docs.dask.org/en/stable", None),
-    "awkward": ("https://awkward-array.readthedocs.io/en/latest/", None),
+    "awkward": ("https://awkward-array.org/doc/stable/", None),
 }
 
 autodoc_typehints = "none"

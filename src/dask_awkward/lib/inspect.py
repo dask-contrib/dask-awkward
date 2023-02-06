@@ -9,12 +9,13 @@ from dask_awkward.layers import AwkwardInputLayer
 
 
 def necessary_columns(*args: Any, traverse: bool = True) -> dict[str, list[str]]:
-    """Determine the columns necessary to compute a collection.
+    r"""Determine the columns necessary to compute a collection.
 
-    Paramters
-    ---------
-    *args : list/dict/tuple/set of Dask collections or HighLevelGraphs
-        The collection (or collection graph) of interest.
+    Parameters
+    ----------
+    *args : Dask collections or HighLevelGraphs
+        The collection (or collection graph) of interest. These can be
+        individual objects, lists, sets, or dictionaries.
 
     Returns
     -------

@@ -7,3 +7,7 @@ Array
    :toctree: generated/
 
    Array
+   Array.clear_divisions
+   Array.map_partitions
+   Record
+   Scalar

@@ -599,12 +599,14 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     @property
     def layout(self) -> Content:
+        """awkward Array layout associated with the eventual computed result."""
         if self._meta is not None:
             return self._meta.layout
         raise ValueError("This collection's meta is None; unknown layout.")
 
     @property
     def behavior(self) -> dict:
+        """awkward Array behavior dictionary."""
         if self._meta is not None:
             return self._meta.behavior
         raise ValueError(
@@ -618,12 +620,14 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     @property
     def form(self) -> Form:
+        """awkward Array form associated with the eventual computed result."""
         if self._meta is not None:
             return self._meta.layout.form
         raise ValueError("This collection's meta is None; unknown form.")
 
     @property
     def type(self) -> ArrayType:
+        """awkward Array type associated with the eventual computed result."""
         t = ak.types.ArrayType(
             self._meta._layout.form.type_from_behavior(self._meta._behavior),
             0,
