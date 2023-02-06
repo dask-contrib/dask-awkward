@@ -10,7 +10,7 @@ import pytest
 try:
     import ujson as json
 except ImportError:
-    import json  # type: ignore
+    import json
 
 import sys
 

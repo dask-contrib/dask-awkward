@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 try:
     import ujson as json
 except ImportError:
-    import json  # type: ignore
+    import json
 
 import awkward as ak
 from dask.base import tokenize

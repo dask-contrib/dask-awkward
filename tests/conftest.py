@@ -3,7 +3,7 @@ from __future__ import annotations
 try:
     import ujson as json
 except ImportError:
-    import json  # type: ignore
+    import json
 
 from pathlib import Path
 
