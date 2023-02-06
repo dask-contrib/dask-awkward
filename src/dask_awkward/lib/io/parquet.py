@@ -94,20 +94,34 @@ def from_parquet(
     filters=None,
     split_row_groups=None,
 ):
-    """Read parquet dataset into awkward array collection.
+    """Read parquet dataset into an :py:obj:`~dask_awkward.Array` collection.
 
-    url: str
-        location of data, including protocol
-    storage_options: dict
-        for creating filesystem
-    columns: list[str] or None
+    Parameters
+    ----------
+    url : str
+        Location of data, including protocol (e.g. ``s3://``)
+    storage_options : dict
+        For creating filesystem (see ``fsspec`` documentation).
+    ignore_metadata : bool
+        Ignore parquet metadata associated with the input dataset (the
+        ``_metadata`` file).
+    scan_files : bool
+        TBD
+    columns : list[str], optional
         Select columns to load
-    filters: list[list[tuple]]
-        parquet-style filters for excluding row groups based on column statistics
-    split_row_groups: bool | None
-        If True, each row group becomes a partition. If False, each file becomes
-        a partition. If None, the existence of a `_metadata` file and
-        ignore_metadata=False implies True, else False.
+    filters : list[list[tuple]], optional
+        Parquet-style filters for excluding row groups based on column statistics
+    split_row_groups: bool, optional
+        If True, each row group becomes a partition. If False, each
+        file becomes a partition. If None, the existence of a
+        ``_metadata`` file and ignore_metadata=False implies True,
+        else False.
+
+    Returns
+    -------
+    Array
+        Array collection from the parquet dataset.
+
     """
     fs, tok, paths = get_fs_token_paths(
         path, mode="rb", storage_options=storage_options
@@ -339,24 +353,29 @@ class _ToParquetFn:
 
 
 def to_parquet(data, path, storage_options=None, write_metadata=False, compute=True):
-    """Write data to parquet format
+    """Write data to parquet format.
 
     Parameters
     ----------
-    data: DaskAwrkardArray
-    path: str
+    data : dask_awkward.Array
+        Array to write to parquet.
+    path : str
         Root directory of location to write to
-    storage_options: dict
-        arguments to pass to fsspec for creating the filesystem
-    write_metadata: bool
+    storage_options : dict
+        Arguments to pass to fsspec for creating the filesystem (see
+        ``fsspec`` documentation).
+    write_metadata : bool
         Whether to create _metadata and _common_metadata files
-    compute: bool
+    compute : bool
         Whether to immediately start writing or to return the dask
         collection which can be computed at the user's discression.
 
     Returns
     -------
-    If compute=False, a dask Scalar representing the process
+    None or dask_awkward.Scalar
+        If `compute` is ``False``, a :py:class:`dask_awkward.Scalar`
+        representing the process will be returned, if `compute` is
+        ``True`` then the return is ``None``.
     """
     # TODO options we need:
     #  - compression per data type or per leaf column ("path.to.leaf": "zstd" format)

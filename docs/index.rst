@@ -26,7 +26,7 @@ arrays at `their website <awkwardarray_>`_.
    :maxdepth: 1
    :caption: API
 
-   api_array.rst
+   api_collections.rst
    api_io.rst
    api_reducers.rst
    api_structure.rst
