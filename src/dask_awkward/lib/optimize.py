@@ -297,6 +297,9 @@ def _prune_wildcards(columns: list[str], meta: AwkwardArray) -> list[str]:
             good_columns.append(col)
 
     for col in wildcard_columns:
+        # each time we meet a wildcard column we need to start back
+        # with the original meta array.
+        imeta = meta
         colsplit = col.split(".")[:-1]
         parts = list(reversed(colsplit))
         while parts:
@@ -304,13 +307,13 @@ def _prune_wildcards(columns: list[str], meta: AwkwardArray) -> list[str]:
             # for unnamed roots part may be an empty string, so we
             # need this if statement.
             if part:
-                meta = meta[part]
+                imeta = imeta[part]
 
-        for field in meta.fields:
+        for field in imeta.fields:
             wholecol = f"{col[:-2]}.{field}"
             if wholecol in good_columns:
                 break
         else:
-            good_columns.append(f"{col[:-2]}.{meta.fields[0]}")
+            good_columns.append(f"{col[:-2]}.{imeta.fields[0]}")
 
     return good_columns
