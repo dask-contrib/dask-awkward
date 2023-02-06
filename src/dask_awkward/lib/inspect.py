@@ -1,15 +1,19 @@
 from __future__ import annotations
 
+from typing import Any
+
 from dask.base import unpack_collections
 from dask.highlevelgraph import HighLevelGraph
 
+from dask_awkward.layers import AwkwardInputLayer
 
-def necessary_columns(*args, traverse: bool = True) -> dict[str, list[str]]:
+
+def necessary_columns(*args: Any, traverse: bool = True) -> dict[str, list[str]]:
     """Determine the columns necessary to compute a collection.
 
     Paramters
     ---------
-    obj : (python list/dict/tuple/set of) Dask collection or HighLevelGraph
+    *args : list/dict/tuple/set of Dask collections or HighLevelGraphs
         The collection (or collection graph) of interest.
 
     Returns
@@ -22,14 +26,14 @@ def necessary_columns(*args, traverse: bool = True) -> dict[str, list[str]]:
     --------
     If we have a hypothetical parquet dataset (``ds``) with the fields
 
-    - foo
-    - bar
-    - baz
+    - "foo"
+    - "bar"
+    - "baz"
 
-    And the baz field has subfields
+    And the "baz" field has fields
 
-    - x
-    - y
+    - "x"
+    - "y"
 
     The calculation of ``ds.bar + ds.baz.x`` will only require the
     ``bar`` and ``baz.x`` columns from the parquet file.
@@ -54,13 +58,15 @@ def necessary_columns(*args, traverse: bool = True) -> dict[str, list[str]]:
     if not collections:
         return {}
 
-    out = {}
+    out: dict[str, list[str]] = {}
     for obj in collections:
         dsk = obj if isinstance(obj, HighLevelGraph) else obj.dask
         cols_this_dsk = o._necessary_columns(dsk)
 
         for name in cols_this_dsk:
             neccols = cols_this_dsk[name]
+            if not isinstance(dsk.layers[name], AwkwardInputLayer):
+                raise TypeError(f"Layer {name} should be an AwkwardInputLayer.")
             cols_this_dsk[name] = o._prune_wildcards(neccols, dsk.layers[name]._meta)
 
         for key, cols in cols_this_dsk.items():
