@@ -54,7 +54,6 @@ T = TypeVar("T")
 
 
 def _finalize_array(results: Sequence[Any]) -> Any:
-
     # special cases for length 1 results
     if len(results) == 1:
         if isinstance(results[0], (int, ak.Array)):
@@ -844,7 +843,6 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         )
 
     def _getitem_single(self, where: Any) -> Array:
-
         # a single string
         if isinstance(where, str):
             return self._getitem_outer_str_or_list(where, label=where)

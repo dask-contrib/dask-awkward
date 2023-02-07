@@ -30,7 +30,6 @@ def test_concatenate_more_axes(axis):
     assert_eq(c, cc)
 
     if axis > 0:
-
         # add an additional entry to a to trigger bad divisions
         a = [
             [[1, 2, 3], [], [100, 101], [12, 13]],
