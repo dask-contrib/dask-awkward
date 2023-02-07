@@ -162,7 +162,6 @@ def _layers_and_columns_getitem(dsk: HighLevelGraph) -> dict[str, list[str] | No
 
 
 def _optimize_iolayer_columns_getitem(dsk: HighLevelGraph) -> HighLevelGraph:
-
     layers_and_cols = _layers_and_columns_getitem(dsk)
 
     # if the task graph doesn't contain a column-projectable

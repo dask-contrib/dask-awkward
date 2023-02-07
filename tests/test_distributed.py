@@ -103,7 +103,6 @@ class Point:
 def test_from_list_behaviorized(loop, L1, L2):  # noqa
     with cluster() as (s, [a, b]):
         with Client(s["address"], loop=loop) as client:
-
             daa = dak.from_lists([L1, L2])
             daa = dak.with_name(daa, name="Point", behavior=behaviors)
             caa = ak.Array(L1 + L2, with_name="Point", behavior=behaviors)

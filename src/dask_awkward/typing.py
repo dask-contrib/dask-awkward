@@ -14,7 +14,6 @@ except ImportError:
 
 @runtime_checkable
 class AwkwardDaskCollection(HLGDaskCollection, Protocol):
-
     _meta: Any
 
     @property

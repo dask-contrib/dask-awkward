@@ -47,7 +47,6 @@ class AwkwardIOLayer(Blockwise):
         )
 
     def project_and_mock(self, columns: list[str]) -> AwkwardIOLayer:
-
         # imported here because it this method should be run _only_ on
         # the Client (which is allowed to import awkward)
         from dask_awkward.lib.core import typetracer_from_form
