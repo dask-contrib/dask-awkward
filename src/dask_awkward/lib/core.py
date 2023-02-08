@@ -1211,7 +1211,7 @@ def map_partitions(
     token: str | None = None,
     meta: Any | None = None,
     output_divisions: int | None = None,
-    annotations: dict | None = None,
+    annotations: Mapping[str, Any] | None = None,
     **kwargs: Any,
 ) -> Array:
     """Map a callable across all partitions of any number of collections.
@@ -1247,7 +1247,7 @@ def map_partitions(
         value greater than 1 means the divisions were expanded by some
         operation. This argument is mainly for internal library
         function implementations.
-    annotations : dict[str, Any]
+    annotations : Mapping[str, Any]
         Annotations to attach to the new layer.
     **kwargs : Any
         Additional keyword arguments passed to the `fn`.
