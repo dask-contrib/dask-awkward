@@ -133,7 +133,11 @@ def _projectable_input_layer_names(dsk: HighLevelGraph) -> list[str]:
     ]
 
 
-def _output_layer_names(dsk: HighLevelGraph) -> list[str]:
+def _layers_with_annotation(dsk: HighLevelGraph, key: str) -> list[str]:
+    return [n for n, v in dsk.layers.items() if (v.annotations or {}).get(key)]
+
+
+def _ak_output_layer_names(dsk: HighLevelGraph) -> list[str]:
     """Get a list output layer names.
 
     Output layer names are annotated with 'ak_output'.
@@ -149,7 +153,11 @@ def _output_layer_names(dsk: HighLevelGraph) -> list[str]:
         Names of the output layers.
 
     """
-    return [n for n, v in dsk.layers.items() if (v.annotations or {}).get("ak_output")]
+    return _layers_with_annotation(dsk, "ak_output")
+
+
+def _ak_touch_all_layer_names(dsk: HighLevelGraph) -> list[str]:
+    return _layers_with_annotation(dsk, "ak_touch_all")
 
 
 def _has_projectable_awkward_io_layer(dsk: HighLevelGraph) -> bool:
@@ -160,7 +168,7 @@ def _has_projectable_awkward_io_layer(dsk: HighLevelGraph) -> bool:
     return False
 
 
-def _mock_output_func(*args, **kwargs):
+def _touch_all_data(*args, **kwargs):
     """Mock writing an ak.Array to disk by touching data buffers."""
     import awkward as ak
 
@@ -170,13 +178,29 @@ def _mock_output_func(*args, **kwargs):
 
 
 def _mock_output(layer):
-    """Update a layer to run the _mock_output_func."""
+    """Update a layer to run the _touch_all_data."""
     assert len(layer.dsk) == 1
 
     new_layer = copy.deepcopy(layer)
     mp = new_layer.mapping.copy()
     for k in iter(mp.keys()):
-        mp[k] = (_mock_output_func,) + mp[k][1:]
+        mp[k] = (_touch_all_data,) + mp[k][1:]
+    new_layer.mapping = mp
+    return new_layer
+
+
+def _touch_and_call_fn(fn, *args, **kwargs):
+    _touch_all_data(*args, **kwargs)
+    return fn(*args, **kwargs)
+
+
+def _touch_and_call(layer):
+    assert len(layer.dsk) == 1
+
+    new_layer = copy.deepcopy(layer)
+    mp = new_layer.mapping.copy()
+    for k in iter(mp.keys()):
+        mp[k] = (_touch_and_call_fn,) + mp[k]
     new_layer.mapping = mp
     return new_layer
 
@@ -197,8 +221,11 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
         layers[name], report = layers[name].mock()
         reports[name] = report
 
-    for name in _output_layer_names(dsk):
+    for name in _ak_output_layer_names(dsk):
         layers[name] = _mock_output(layers[name])
+
+    for name in _ak_touch_all_layer_names(dsk):
+        layers[name] = _touch_and_call(layers[name])
 
     hlg = HighLevelGraph(layers, deps)
     outlayer = list(hlg.layers.values())[-1]

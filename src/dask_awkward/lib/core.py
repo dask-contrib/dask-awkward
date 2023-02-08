@@ -1152,6 +1152,7 @@ def partitionwise_layer(
     func: Callable,
     name: str,
     *args: Any,
+    annotations: Mapping[str, Any] | None = None,
     **kwargs: Any,
 ) -> Blockwise:
     """Create a partitionwise graph layer.
@@ -1199,6 +1200,7 @@ def partitionwise_layer(
         concatenate=True,
         **kwargs,
     )
+    layer.annotations = annotations
     return layer
 
 
@@ -1209,6 +1211,7 @@ def map_partitions(
     token: str | None = None,
     meta: Any | None = None,
     output_divisions: int | None = None,
+    annotations: dict | None = None,
     **kwargs: Any,
 ) -> Array:
     """Map a callable across all partitions of any number of collections.
@@ -1244,6 +1247,8 @@ def map_partitions(
         value greater than 1 means the divisions were expanded by some
         operation. This argument is mainly for internal library
         function implementations.
+    annotations : dict[str, Any]
+        Annotations to attach to the new layer.
     **kwargs : Any
         Additional keyword arguments passed to the `fn`.
 
@@ -1282,7 +1287,13 @@ def map_partitions(
     token = token or tokenize(fn, *args, meta, **kwargs)
     label = label or funcname(fn)
     name = f"{label}-{token}"
-    lay = partitionwise_layer(fn, name, *args, **kwargs)
+    lay = partitionwise_layer(
+        fn,
+        name,
+        *args,
+        annotations=annotations,
+        **kwargs,
+    )
     deps = [a for a in args if is_dask_collection(a)] + [
         v for _, v in kwargs.items() if is_dask_collection(v)
     ]

@@ -125,7 +125,7 @@ class AwkwardInputLayer(Blockwise):
             produces_tasks=self.produces_tasks,
             creation_info=self.creation_info,
             annotations=self.annotations,
-            meta=new_meta_labelled,
+            meta=new_meta_array,
         )
         return new_input_layer, report
 
