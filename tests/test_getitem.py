@@ -102,10 +102,7 @@ def test_boolean_array_from_awkward(daa: dak.Array) -> None:
 
 def test_tuple_boolean_array_raise(daa: dak.Array) -> None:
     sel = dak.num(daa.points.x, axis=1) >= 2
-    with pytest.raises(
-        DaskAwkwardNotImplemented,
-        match="tuple style input boolean selection is not supported",
-    ):
+    with pytest.raises(DaskAwkwardNotImplemented, match="tuple style input boolean"):
         daa[sel, "points"]
 
 
