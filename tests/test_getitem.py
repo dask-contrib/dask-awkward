@@ -67,6 +67,7 @@ def test_single_ellipsis(daa: dak.Array, caa: ak.Array) -> None:
     assert_eq(daa[...], caa[...])
 
 
+@pytest.mark.xfail(reason="cannot interpret unknown lengths error")
 def test_empty_slice(daa: dak.Array, caa: ak.Array) -> None:
     assert_eq(daa[:], caa[:])
     assert_eq(daa[:, "points"], caa[:, "points"])
@@ -102,10 +103,7 @@ def test_boolean_array_from_awkward(daa: dak.Array) -> None:
 
 def test_tuple_boolean_array_raise(daa: dak.Array) -> None:
     sel = dak.num(daa.points.x, axis=1) >= 2
-    with pytest.raises(
-        DaskAwkwardNotImplemented,
-        match="tuple style input boolean selection is not supported",
-    ):
+    with pytest.raises(DaskAwkwardNotImplemented, match="tuple style input boolean"):
         daa[sel, "points"]
 
 

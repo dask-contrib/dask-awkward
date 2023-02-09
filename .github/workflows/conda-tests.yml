@@ -38,6 +38,7 @@ jobs:
       run: |
         conda activate test-environment
         python -m pip install -q --no-cache-dir .[complete]
+        pip uninstall -y awkward && pip install git+https://github.com/scikit-hep/awkward.git@main
     - name: Run tests
       shell: bash -l {0}
       run: |

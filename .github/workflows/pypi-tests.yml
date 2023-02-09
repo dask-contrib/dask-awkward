@@ -32,6 +32,7 @@ jobs:
         pip install pip wheel -U
         pip install dask[complete]
         pip install -q --no-cache-dir .[complete]
+        pip uninstall -y awkward && pip install git+https://github.com/scikit-hep/awkward.git@main
         pip list
     - name: test
       run: |
