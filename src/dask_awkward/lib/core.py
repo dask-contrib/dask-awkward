@@ -1504,7 +1504,7 @@ def is_typetracer(obj: Any) -> bool:
     if isinstance(obj, (ak.Array, ak.Record)):
         backend = obj.layout.backend
 
-        if not backend.nplike.known_shape and not backend.nplike.known_data:
+        if not backend.nplike.known_data:
             return True
     # scalar-like typetracer
     elif is_unknown_scalar(obj) or isinstance(obj, (MaybeNone, OneOf)):

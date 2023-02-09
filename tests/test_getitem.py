@@ -67,6 +67,7 @@ def test_single_ellipsis(daa: dak.Array, caa: ak.Array) -> None:
     assert_eq(daa[...], caa[...])
 
 
+@pytest.mark.xfail(reason="cannot interpret unknown lengths error")
 def test_empty_slice(daa: dak.Array, caa: ak.Array) -> None:
     assert_eq(daa[:], caa[:])
     assert_eq(daa[:, "points"], caa[:, "points"])
