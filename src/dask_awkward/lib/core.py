@@ -713,7 +713,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             label=label,
         )
 
-    def _getitem_outer_boolean_lazy_array(self, where: Array | tuple[Any, ...]) -> Any:
+    def _getitem_outer_bool_or_int_lazy_array(
+        self, where: Array | tuple[Any, ...]
+    ) -> Any:
         ba = where if isinstance(where, Array) else where[0]
         if not compatible_partitions(self, ba):
             raise IncompatiblePartitions("getitem", self, ba)
@@ -722,7 +724,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if self._meta is not None:
             if isinstance(where, tuple):
                 raise DaskAwkwardNotImplemented(
-                    "tuple style input boolean selection is not supported."
+                    "tuple style input boolean/int selection is not supported."
                 )
             elif isinstance(where, Array):
                 new_meta = self._meta[where._meta]
@@ -831,8 +833,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 dtype = where[0].layout.dtype.type
             except AttributeError:
                 dtype = where[0].layout.content.dtype.type
-            if issubclass(dtype, (np.bool_, bool)):
-                return self._getitem_outer_boolean_lazy_array(where)
+            if issubclass(dtype, (np.bool_, bool, np.int64, np.int32, int)):
+                return self._getitem_outer_bool_or_int_lazy_array(where)
 
         raise DaskAwkwardNotImplemented(
             f"Array.__getitem__ doesn't support multi object: {where}"
@@ -855,8 +857,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 dtype = where.layout.dtype.type
             except AttributeError:
                 dtype = where.layout.content.dtype.type
-            if issubclass(dtype, (np.bool_, bool)):
-                return self._getitem_outer_boolean_lazy_array(where)
+            if issubclass(dtype, (np.bool_, bool, np.int64, np.int32, int)):
+                return self._getitem_outer_bool_or_int_lazy_array(where)
 
         # an empty slice
         elif is_empty_slice(where):

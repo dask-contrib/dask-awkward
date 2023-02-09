@@ -257,6 +257,14 @@ def test_argsort(daa, caa, ascending):
         ak.argsort(caa.points.x, ascending=ascending),
     )
 
+    x = [[[1, 2, 3], [5, 4]], [[3, 1], [2, 3]]]
+    a = dak.from_lists(x)
+    b = ak.concatenate([ak.Array(x[0]), ak.Array(x[1])])
+    assert_eq(
+        a[dak.argsort(a, axis=1, ascending=ascending)],
+        b[ak.argsort(b, axis=1, ascending=ascending)],
+    )
+
 
 @pytest.mark.parametrize("ascending", [True, False])
 def test_sort(daa, caa, ascending):
