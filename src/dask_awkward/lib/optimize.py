@@ -156,8 +156,9 @@ def _ak_output_layer_names(dsk: HighLevelGraph) -> list[str]:
     return _layers_with_annotation(dsk, "ak_output")
 
 
-def _ak_touch_all_layer_names(dsk: HighLevelGraph) -> list[str]:
-    return _layers_with_annotation(dsk, "ak_touch_all")
+def _opt_touch_all_layer_names(dsk: HighLevelGraph) -> list[str]:
+    return [n for n, v in dsk.layers.items() if hasattr(v, "_opt_touch_all")]
+    # return _layers_with_annotation(dsk, "ak_touch_all")
 
 
 def _has_projectable_awkward_io_layer(dsk: HighLevelGraph) -> bool:
@@ -224,7 +225,7 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
     for name in _ak_output_layer_names(dsk):
         layers[name] = _mock_output(layers[name])
 
-    for name in _ak_touch_all_layer_names(dsk):
+    for name in _opt_touch_all_layer_names(dsk):
         layers[name] = _touch_and_call(layers[name])
 
     hlg = HighLevelGraph(layers, deps)

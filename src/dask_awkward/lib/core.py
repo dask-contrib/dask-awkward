@@ -1154,7 +1154,7 @@ def partitionwise_layer(
     func: Callable,
     name: str,
     *args: Any,
-    annotations: Mapping[str, Any] | None = None,
+    opt_touch_all: bool = False,
     **kwargs: Any,
 ) -> Blockwise:
     """Create a partitionwise graph layer.
@@ -1202,7 +1202,8 @@ def partitionwise_layer(
         concatenate=True,
         **kwargs,
     )
-    layer.annotations = annotations
+    if opt_touch_all:
+        layer._opt_touch_all = True
     return layer
 
 
@@ -1213,7 +1214,7 @@ def map_partitions(
     token: str | None = None,
     meta: Any | None = None,
     output_divisions: int | None = None,
-    annotations: Mapping[str, Any] | None = None,
+    opt_touch_all: bool = False,
     **kwargs: Any,
 ) -> Array:
     """Map a callable across all partitions of any number of collections.
@@ -1249,8 +1250,9 @@ def map_partitions(
         value greater than 1 means the divisions were expanded by some
         operation. This argument is mainly for internal library
         function implementations.
-    annotations : Mapping[str, Any]
-        Annotations to attach to the new layer.
+    opt_touch_all : bool
+        Touch all layers in this graph during typetracer based
+        optimization.
     **kwargs : Any
         Additional keyword arguments passed to the `fn`.
 
@@ -1293,7 +1295,7 @@ def map_partitions(
         fn,
         name,
         *args,
-        annotations=annotations,
+        opt_touch_all=opt_touch_all,
         **kwargs,
     )
     deps = [a for a in args if is_dask_collection(a)] + [

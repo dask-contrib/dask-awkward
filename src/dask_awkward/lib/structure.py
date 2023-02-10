@@ -1085,7 +1085,7 @@ def zip(
             *colls,
             label="zip",
             meta=meta,
-            annotations={"ak_touch_all": True},
+            opt_touch_all=True,
         )
 
     elif isinstance(arrays, (list, tuple)):
