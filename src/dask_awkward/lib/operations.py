@@ -6,11 +6,11 @@ from dask.highlevelgraph import HighLevelGraph
 
 from dask_awkward.lib.core import (
     Array,
-    compatible_divisions,
+    compatible_partitions,
     map_partitions,
     new_array_object,
 )
-from dask_awkward.utils import DaskAwkwardNotImplemented
+from dask_awkward.utils import DaskAwkwardNotImplemented, IncompatiblePartitions
 
 
 class _ConcatenateFnAxisGT0:
@@ -49,8 +49,8 @@ def concatenate(
         return new_array_object(hlg, name, meta=meta, npartitions=npartitions)
 
     if axis > 0:
-        if not compatible_divisions(*arrays):
-            raise ValueError("All arrays must have identical divisions")
+        if not compatible_partitions(*arrays):
+            raise IncompatiblePartitions("concatenate", *arrays)
 
         fn = _ConcatenateFnAxisGT0(axis=axis)
         return map_partitions(fn, *arrays)

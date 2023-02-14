@@ -1289,9 +1289,15 @@ def map_partitions(
             meta = fn(*metas, **kwargs)
         except Exception:
             if dask.config.get("awkward.compute-unknown-meta"):
+                extras = (
+                    f"function call: {fn}\n"
+                    f"metadata: {metas}\n"
+                    f"kwargs: {kwargs}\n"
+                )
                 warnings.warn(
                     "metadata could not be determined; "
-                    "a compute on the first partition will occur.",
+                    "a compute on the first partition will occur.\n"
+                    f"{extras}",
                     UserWarning,
                 )
             pass
@@ -1597,7 +1603,6 @@ def compatible_partitions(*args: Array) -> bool:
 
     In operations where the blocks of multiple collections are used
     simultaneously, we need the collections to be equally partitioned.
-
     If the first argument has known divisions, other collections with
     known divisions will be tested against the first arguments
     divisions.
