@@ -5,6 +5,7 @@ import pytest
 
 import dask_awkward as dak
 from dask_awkward.lib.testutils import assert_eq
+from dask_awkward.utils import IncompatiblePartitions
 
 
 def test_concatenate_simple(daa, caa):
@@ -43,5 +44,8 @@ def test_concatenate_more_axes(axis):
         b = [[4, 5], [10, 11, 12, 13], [102], [9, 9, 9]]
         one = dak.from_lists([a, a])
         two = dak.from_lists([b, b])
-        with pytest.raises(ValueError, match="arrays must have identical divisions"):
+        with pytest.raises(
+            IncompatiblePartitions,
+            match="The inputs to concatenate are incompatibly partitioned",
+        ):
             c = dak.concatenate([one, two], axis=axis)
