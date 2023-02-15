@@ -3,6 +3,7 @@ from __future__ import annotations
 import keyword
 import logging
 import operator
+import os
 import sys
 import warnings
 from collections.abc import Callable, Hashable, Mapping, Sequence
@@ -56,6 +57,8 @@ T = TypeVar("T")
 
 log = logging.getLogger(__name__)
 
+
+_FAILED_METAS: list[tuple[Callable, tuple, dict]] = []
 
 def _finalize_array(results: Sequence[Any]) -> Any:
     # special cases for length 1 results
@@ -709,8 +712,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             else:
                 m = to_meta([where])[0]
                 meta = self._meta[m]
-        return self.map_partitions(
+        return map_partitions(
             operator.getitem,
+            self,
             where,
             meta=meta,
             output_divisions=1,
@@ -1288,7 +1292,7 @@ def map_partitions(
     ]
 
     if meta is None:
-        meta = get_new_meta(fn, *args, **kwargs)
+        meta = map_meta(fn, *args, **kwargs)
 
     hlg = HighLevelGraph.from_collections(
         name,
@@ -1570,20 +1574,23 @@ def to_length_zero_arrays(objects: Sequence[Any]) -> tuple[Any, ...]:
     return tuple(map(length_zero_array_or_identity, objects))
 
 
-def get_new_meta(fn: Callable, *args: Any, **kwargs: Any) -> ak.Array | None:
+def map_meta(fn: Callable, *args: Any, **kwargs: Any) -> ak.Array | None:
     metas = to_meta(args)
     try:
         meta = fn(*metas, **kwargs)
         return meta
     except Exception:
-        log.debug(
+        log.warning(
             "function call on just metas failed; will try length zero array technique"
         )
         pass
-
     try:
         lzas = to_length_zero_arrays(args)
         meta = typetracer_from_form(fn(*lzas, **kwargs).layout.form)
+
+        if os.environ.get("DAK_TRACK_FAILED_META", False):
+            _FAILED_METAS.append((fn, args, kwargs))
+
         return meta
     except Exception:
         if dask.config.get("awkward.compute-unknown-meta"):
