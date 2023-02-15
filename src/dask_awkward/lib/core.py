@@ -60,6 +60,7 @@ log = logging.getLogger(__name__)
 
 _FAILED_METAS: list[tuple[Callable, tuple, dict]] = []
 
+
 def _finalize_array(results: Sequence[Any]) -> Any:
     # special cases for length 1 results
     if len(results) == 1:
