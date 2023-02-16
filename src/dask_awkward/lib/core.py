@@ -1607,7 +1607,7 @@ def map_meta(fn: Callable, *args: Any, **kwargs: Any) -> ak.Array | None:
         lzas = to_length_zero_arrays(args)
         meta = typetracer_from_form(fn(*lzas, **kwargs).layout.form)
         return meta
-    except Exception as err:
+    except Exception:
         # if compute-unknown-meta is True and we've gotten to this
         # point, we want to throw a warning because a compute is going
         # to happen as a consequence of us not being able to determine
