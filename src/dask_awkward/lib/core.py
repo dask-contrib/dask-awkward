@@ -3,7 +3,6 @@ from __future__ import annotations
 import keyword
 import logging
 import operator
-import os
 import sys
 import warnings
 from collections.abc import Callable, Hashable, Mapping, Sequence
