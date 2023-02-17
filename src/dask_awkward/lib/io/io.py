@@ -28,10 +28,12 @@ if TYPE_CHECKING:
 
 
 class ImplementsFormTransformation(Protocol):
+    behavior: dict | None
+
     def __call__(self, form: ak.form.Form) -> ak.form.Form:
         raise NotImplementedError
 
-    def extract_form_key_base_columns(self, form_keys: Iterable[str]) -> Iterable[str]:
+    def extract_form_keys_base_columns(self, form_keys: Iterable[str]) -> Iterable[str]:
         raise NotImplementedError
 
     def create_column_mapping_and_key(
