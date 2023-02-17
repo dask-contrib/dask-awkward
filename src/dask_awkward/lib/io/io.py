@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Iterable
-from typing import TYPE_CHECKING, Any
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any, Callable, Mapping, Protocol
 
 import awkward as ak
 import numpy as np
@@ -25,6 +25,19 @@ if TYPE_CHECKING:
     from dask.delayed import Delayed
 
     from dask_awkward.lib.core import Array
+
+
+class ImplementsFormTransformation(Protocol):
+    def __call__(self, form: ak.form.Form) -> ak.form.Form:
+        raise NotImplementedError
+
+    def extract_form_key_base_columns(self, form_keys: Iterable[str]) -> Iterable[str]:
+        raise NotImplementedError
+
+    def create_column_mapping_and_key(
+        self, column_source: Any, start: int, stop: int, **kwargs
+    ) -> tuple(Mapping[str, ak.Array], Callable[[str, ak.forms.Form, str], str] | str):
+        raise NotImplementedError
 
 
 class _FromAwkwardFn:
