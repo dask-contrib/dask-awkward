@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 class ImplementsFormTransformation(Protocol):
     behavior: dict | None
 
-    def __call__(self, form: ak.form.Form) -> ak.form.Form:
+    def __call__(self, form: ak.form.Form, docstr=str | None) -> ak.form.Form:
         raise NotImplementedError
 
     def extract_form_keys_base_columns(self, form_keys: Iterable[str]) -> Iterable[str]:
