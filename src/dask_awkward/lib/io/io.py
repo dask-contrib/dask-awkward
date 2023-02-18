@@ -380,6 +380,7 @@ def from_map(
     token: str | None = None,
     divisions: tuple[int, ...] | None = None,
     meta: ak.Array | None = None,
+    behavior: dict | None,
     **kwargs: Any,
 ) -> Array:
     """Create an Array collection from a custom mapping.
@@ -475,12 +476,17 @@ def from_map(
         inputs=inputs,
         io_func=func,
         meta=meta,
+        behavior=behavior,
     )
 
     hlg = HighLevelGraph.from_collections(name, dsk)
     if divisions is not None:
-        result = new_array_object(hlg, name, meta=meta, divisions=divisions)
+        result = new_array_object(
+            hlg, name, meta=meta, behavior=dsk._behavior, divisions=divisions
+        )
     else:
-        result = new_array_object(hlg, name, meta=meta, npartitions=len(inputs))
+        result = new_array_object(
+            hlg, name, meta=meta, behavior=dsk._behavior, npartitions=len(inputs)
+        )
 
     return result

@@ -1095,6 +1095,7 @@ def new_array_object(
     name: str,
     *,
     meta: ak.Array | None = None,
+    behavior: dict | None = None,
     npartitions: int | None = None,
     divisions: tuple[int | None, ...] | None = None,
 ) -> Array:
@@ -1146,6 +1147,9 @@ def new_array_object(
                 f"meta must be an instance of an Awkward Array, not {type(meta)}."
             )
         actual_meta = meta
+
+    if behavior is not None:
+        actual_meta.behavior = behavior
 
     return Array(dsk, name, actual_meta, divs)
 
