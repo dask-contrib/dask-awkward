@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import keyword
+import logging
 import operator
 import sys
 import warnings
@@ -51,6 +52,9 @@ if TYPE_CHECKING:
 
 
 T = TypeVar("T")
+
+
+log = logging.getLogger(__name__)
 
 
 def _finalize_array(results: Sequence[Any]) -> Any:
@@ -705,8 +709,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             else:
                 m = to_meta([where])[0]
                 meta = self._meta[m]
-        return self.map_partitions(
+        return map_partitions(
             operator.getitem,
+            self,
             where,
             meta=meta,
             output_divisions=1,
@@ -1080,10 +1085,14 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
 
 def compute_typetracer(dsk: HighLevelGraph, name: str) -> ak.Array:
-    if dask.config.get("awkward.compute-unknown-meta"):
-        key = (name, 0)
-        return typetracer_array(Delayed(key, dsk.cull({key}), layer=name).compute())
-    return empty_typetracer()
+    key = (name, 0)
+    return typetracer_array(
+        Delayed(
+            key,
+            dsk.cull({key}),
+            layer=name,
+        ).compute()
+    )
 
 
 def new_array_object(
@@ -1135,7 +1144,10 @@ def new_array_object(
         divs = divisions
 
     if meta is None:
-        actual_meta = compute_typetracer(dsk, name)
+        if dask.config.get("awkward.compute-unknown-meta"):
+            actual_meta = compute_typetracer(dsk, name)
+        else:
+            actual_meta = empty_typetracer()
     else:
         if not isinstance(meta, ak.Array):
             raise TypeError("meta must be an instance of an Awkward Array.")
@@ -1284,23 +1296,7 @@ def map_partitions(
     ]
 
     if meta is None:
-        metas = to_meta(args)
-        try:
-            meta = fn(*metas, **kwargs)
-        except Exception:
-            if dask.config.get("awkward.compute-unknown-meta"):
-                extras = (
-                    f"function call: {fn}\n"
-                    f"metadata: {metas}\n"
-                    f"kwargs: {kwargs}\n"
-                )
-                warnings.warn(
-                    "metadata could not be determined; "
-                    "a compute on the first partition will occur.\n"
-                    f"{extras}",
-                    UserWarning,
-                )
-            pass
+        meta = map_meta(fn, *args, **kwargs)
 
     hlg = HighLevelGraph.from_collections(
         name,
@@ -1570,6 +1566,63 @@ def to_meta(objects: Sequence[Any]) -> tuple[Any, ...]:
 
     """
     return tuple(map(meta_or_identity, objects))
+
+
+def length_zero_array_or_identity(obj: Any) -> Any:
+    if is_awkward_collection(obj):
+        return obj._meta.layout.form.length_zero_array()
+    return obj
+
+
+def to_length_zero_arrays(objects: Sequence[Any]) -> tuple[Any, ...]:
+    return tuple(map(length_zero_array_or_identity, objects))
+
+
+def map_meta(fn: Callable, *args: Any, **kwargs: Any) -> ak.Array | None:
+    metas = to_meta(args)
+    try:
+        meta = fn(*metas, **kwargs)
+        return meta
+    except Exception as err:
+        # if compute-unknown-meta is False then we don't care about
+        # this failure and we return None.
+        if not dask.config.get("awkward.compute-unknown-meta"):
+            return None
+
+        # if the metadata function call failed and raise-failed-meta
+        # is True, then we want to raise the exception here.
+        if dask.config.get("awkward.raise-failed-meta"):
+            log.debug("metadata determination failed: %s" % err)
+            raise
+
+        # if the metadata function failed and we want to move on to
+        # trying the length zero array calculation then we log a
+        # warning and pass to the next try-except block.
+        else:
+            log.warning(
+                "function call on just metas failed; will try length zero array technique"
+            )
+        pass
+    try:
+        lzas = to_length_zero_arrays(args)
+        meta = typetracer_from_form(fn(*lzas, **kwargs).layout.form)
+        return meta
+    except Exception:
+        # if compute-unknown-meta is True and we've gotten to this
+        # point, we want to throw a warning because a compute is going
+        # to happen as a consequence of us not being able to determine
+        # metadata.
+        if dask.config.get("awkward.compute-unknown-meta"):
+            extras = (
+                f"function call: {fn}\n" f"metadata: {metas}\n" f"kwargs: {kwargs}\n"
+            )
+            warnings.warn(
+                "metadata could not be determined; "
+                "a compute on the first partition will occur.\n"
+                f"{extras}",
+                UserWarning,
+            )
+    return None
 
 
 def typetracer_array(a: ak.Array | Array) -> ak.Array:
