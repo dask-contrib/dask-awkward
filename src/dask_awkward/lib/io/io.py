@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Iterable
-from typing import TYPE_CHECKING, Any
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any, Callable, Mapping, Protocol
 
 import awkward as ak
 import numpy as np
@@ -27,15 +27,35 @@ if TYPE_CHECKING:
     from dask_awkward.lib.core import Array
 
 
+class ImplementsFormTransformation(Protocol):
+    behavior: dict | None
+
+    def __call__(self, form: ak.form.Form, docstr: str | None) -> ak.form.Form:
+        raise NotImplementedError
+
+    def extract_form_keys_base_columns(self, form_keys: Iterable[str]) -> Iterable[str]:
+        raise NotImplementedError
+
+    def create_column_mapping_and_key(
+        self, column_source: Any, start: int, stop: int, **kwargs
+    ) -> tuple(Mapping[str, ak.Array], Callable[[str, ak.forms.Form, str], str] | str):
+        raise NotImplementedError
+
+
 class _FromAwkwardFn:
     def __init__(self, arr: ak.Array) -> None:
         self.arr = arr
 
-    def __call__(self, start: int, stop: int) -> ak.Array:
+    def __call__(self, start: int, stop: int, **kwargs) -> ak.Array:
         return self.arr[start:stop]
 
 
-def from_awkward(source: ak.Array, npartitions: int, label: str | None = None) -> Array:
+def from_awkward(
+    source: ak.Array,
+    npartitions: int,
+    behavior: dict | None = None,
+    label: str | None = None,
+) -> Array:
     """Create a Dask collection from a concrete awkward array.
 
     Parameters
@@ -76,18 +96,19 @@ def from_awkward(source: ak.Array, npartitions: int, label: str | None = None) -
         token=tokenize(source, npartitions),
         divisions=tuple(locs),
         meta=meta,
+        behavior=behavior,
     )
 
 
 class _FromListsFn:
-    def __init__(self):
-        pass
+    def __init__(self, behavior: dict | None = None):
+        self.behavior = behavior
 
-    def __call__(self, x):
-        return ak.Array(x)
+    def __call__(self, x, **kwargs):
+        return ak.Array(x, behavior=self.behavior)
 
 
-def from_lists(source: list[list[Any]]) -> Array:
+def from_lists(source: list[list[Any]], behavior: dict | None = None) -> Array:
     """Create a Dask collection from a list of lists.
 
     Parameters
@@ -127,6 +148,7 @@ def from_lists(source: list[list[Any]]) -> Array:
 def from_delayed(
     source: list[Delayed] | Delayed,
     meta: ak.Array | None = None,
+    behavior: dict | None = None,
     divisions: tuple[int | None, ...] | None = None,
     prefix: str = "from-delayed",
 ) -> Array:
@@ -165,7 +187,9 @@ def from_delayed(
         if len(divs) != len(parts) + 1:
             raise ValueError("divisions must be a tuple of length len(source) + 1")
     hlg = HighLevelGraph.from_collections(name, dsk, dependencies=parts)
-    return new_array_object(hlg, name=name, meta=meta, divisions=divs)
+    return new_array_object(
+        hlg, name=name, meta=meta, behavior=behavior, divisions=divs
+    )
 
 
 def to_delayed(array: Array, optimize_graph: bool = True) -> list[Delayed]:
@@ -281,7 +305,7 @@ def to_dask_array(array: Array, optimize_graph: bool = True) -> DaskArray:
         return new_da_object(graph, name, meta=None, chunks=chunks, dtype=dtype)
 
 
-def from_dask_array(array: DaskArray) -> Array:
+def from_dask_array(array: DaskArray, behavior: dict | None = None) -> Array:
     """Convert a Dask Array collection to a Dask Awkard Array collection.
 
     Parameters
@@ -322,10 +346,12 @@ def from_dask_array(array: DaskArray) -> Array:
     )
     hlg = HighLevelGraph.from_collections(name, layer, dependencies=[array])
     if np.any(np.isnan(array.chunks)):
-        return new_array_object(hlg, name, npartitions=array.npartitions, meta=meta)
+        return new_array_object(
+            hlg, name, npartitions=array.npartitions, meta=meta, behavior=behavior
+        )
     else:
         divs = (0, *np.cumsum(array.chunks))
-        return new_array_object(hlg, name, divisions=divs, meta=meta)
+        return new_array_object(hlg, name, divisions=divs, meta=meta, behavior=behavior)
 
 
 class PackedArgCallable:
@@ -365,6 +391,7 @@ def from_map(
     token: str | None = None,
     divisions: tuple[int, ...] | None = None,
     meta: ak.Array | None = None,
+    behavior: dict | None = None,
     **kwargs: Any,
 ) -> Array:
     """Create an Array collection from a custom mapping.
@@ -460,12 +487,17 @@ def from_map(
         inputs=inputs,
         io_func=func,
         meta=meta,
+        behavior=behavior,
     )
 
     hlg = HighLevelGraph.from_collections(name, dsk)
     if divisions is not None:
-        result = new_array_object(hlg, name, meta=meta, divisions=divisions)
+        result = new_array_object(
+            hlg, name, meta=meta, behavior=dsk._behavior, divisions=divisions
+        )
     else:
-        result = new_array_object(hlg, name, meta=meta, npartitions=len(inputs))
+        result = new_array_object(
+            hlg, name, meta=meta, behavior=dsk._behavior, npartitions=len(inputs)
+        )
 
     return result

@@ -4,6 +4,7 @@ from dask_awkward.lib.core import map_partitions, typetracer_from_form
 from dask_awkward.lib.describe import fields
 from dask_awkward.lib.inspect import necessary_columns
 from dask_awkward.lib.io.io import (
+    ImplementsFormTransformation,
     from_awkward,
     from_dask_array,
     from_delayed,

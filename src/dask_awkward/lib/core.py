@@ -431,6 +431,9 @@ def new_record_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Record:
         Resulting collection.
 
     """
+    out = Record(dsk, name, meta)
+    if meta.__doc__ != meta.__class__.__doc__:
+        out.__doc__ = meta.__doc__
     return Record(dsk, name, meta)
 
 
@@ -1104,6 +1107,7 @@ def new_array_object(
     name: str,
     *,
     meta: ak.Array | None = None,
+    behavior: dict | None = None,
     npartitions: int | None = None,
     divisions: tuple[int | None, ...] | None = None,
 ) -> Array:
@@ -1159,7 +1163,14 @@ def new_array_object(
             )
         actual_meta = meta
 
-    return Array(dsk, name, actual_meta, divs)
+    if behavior is not None:
+        actual_meta.behavior = behavior
+
+    out = Array(dsk, name, actual_meta, divs)
+    if actual_meta.__doc__ != actual_meta.__class__.__doc__:
+        out.__doc__ = actual_meta.__doc__
+
+    return out
 
 
 def partitionwise_layer(

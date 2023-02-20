@@ -181,6 +181,7 @@ def _from_json_files(
     one_obj_per_file: bool = False,
     compression: str | None = "infer",
     meta: ak.Array | None = None,
+    behavior: dict | None = None,
     derive_meta_kwargs: dict[str, Any] | None = None,
     storage_options: dict[str, Any] | None = None,
 ) -> Array:
@@ -217,7 +218,9 @@ def _from_json_files(
             schema=schema,
         )
 
-    return from_map(f, urlpaths, label="from-json", token=token, meta=meta)
+    return from_map(
+        f, urlpaths, label="from-json", token=token, meta=meta, behavior=behavior
+    )
 
 
 def _from_json_bytes(
@@ -227,6 +230,7 @@ def _from_json_bytes(
     blocksize: int | str,
     delimiter: Any,
     meta: ak.Array | None,
+    behavior: dict | None,
     storage_options: dict[str, Any] | None,
 ) -> Array:
     token = tokenize(urlpath, delimiter, blocksize, meta)
@@ -258,7 +262,7 @@ def _from_json_bytes(
     # )
 
     hlg = HighLevelGraph.from_collections(name, dsk, dependencies=deps)
-    return new_array_object(hlg, name, meta=meta, npartitions=n)
+    return new_array_object(hlg, name, meta=meta, behavior=behavior, npartitions=n)
 
 
 def from_json(
@@ -272,13 +276,13 @@ def from_json(
     # initial: int = 1024,
     # resize: float = 1.5,
     highlevel: bool = True,
-    behavior: dict | None = None,
     *,
     blocksize: int | str | None = None,
     delimiter: bytes | None = None,
     one_obj_per_file: bool = False,
     compression: str | None = "infer",
     meta: ak.Array | None = None,
+    behavior: dict | None = None,
     derive_meta_kwargs: dict[str, Any] | None = None,
     storage_options: dict[str, Any] | None = None,
 ) -> Array:
@@ -371,6 +375,7 @@ def from_json(
             one_obj_per_file=one_obj_per_file,
             compression=compression,
             meta=meta,
+            behavior=behavior,
             derive_meta_kwargs=derive_meta_kwargs,
             storage_options=storage_options,
         )
@@ -384,6 +389,7 @@ def from_json(
             delimiter=delimiter,
             blocksize=blocksize,
             meta=meta,
+            behavior=behavior,
             storage_options=storage_options,
         )
 

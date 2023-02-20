@@ -21,6 +21,7 @@ class AwkwardInputLayer(Blockwise):
         inputs: Any,
         io_func: Callable,
         meta: Any,
+        behavior: dict | None,
         label: str | None = None,
         produces_tasks: bool = False,
         creation_info: dict | None = None,
@@ -35,6 +36,7 @@ class AwkwardInputLayer(Blockwise):
         self.annotations = annotations
         self.creation_info = creation_info
         self._meta = meta
+        self._behavior = behavior
 
         io_arg_map = BlockwiseDepDict(
             mapping=LazyInputsDict(self.inputs),  # type: ignore
@@ -97,7 +99,9 @@ class AwkwardInputLayer(Blockwise):
 
         starting_form = copy.deepcopy(self._meta.layout.form)
         starting_layout = starting_form.length_zero_array(highlevel=False)
-        new_meta = ak.Array(starting_layout.to_typetracer(forget_length=True))
+        new_meta = ak.Array(
+            starting_layout.to_typetracer(forget_length=True), behavior=self._behavior
+        )
         form = new_meta.layout.form
 
         def _label_form(form, start):
@@ -115,7 +119,7 @@ class AwkwardInputLayer(Blockwise):
         _label_form(form, self.name)
 
         new_meta_labelled, report = ak._nplikes.typetracer.typetracer_with_report(form)
-        new_meta_array = ak.Array(new_meta_labelled)
+        new_meta_array = ak.Array(new_meta_labelled, behavior=self._behavior)
         new_input_layer = AwkwardInputLayer(
             name=self.name,
             columns=self.columns,
@@ -126,6 +130,7 @@ class AwkwardInputLayer(Blockwise):
             creation_info=self.creation_info,
             annotations=self.annotations,
             meta=new_meta_array,
+            behavior=self._behavior,
         )
         return new_input_layer, report
 
@@ -142,5 +147,6 @@ class AwkwardInputLayer(Blockwise):
                 creation_info=self.creation_info,
                 annotations=self.annotations,
                 meta=self._meta,
+                behavior=self._behavior,
             )
         return self
