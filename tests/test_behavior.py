@@ -22,9 +22,9 @@ class _ClassMethodFn:
 
 @ak.mixin_class(behaviors)
 class Point:
-    def distance(self, other, dask_array=None):
-        if dask_array is not None:
-            return dask_array.map_partitions(
+    def distance(self, other, __dask_array__=None):
+        if __dask_array__ is not None:
+            return __dask_array__.map_partitions(
                 _ClassMethodFn("distance"),
                 other,
             )
@@ -35,9 +35,9 @@ class Point:
         return self.x * self.x
 
     @ak.mixin_class_method(np.abs)
-    def point_abs(self, dask_array=None):
-        if dask_array is not None:
-            return dask_array.map_partitions(
+    def point_abs(self, __dask_array__=None):
+        if __dask_array__ is not None:
+            return __dask_array__.map_partitions(
                 _ClassMethodFn("point_abs"),
             )
         return np.sqrt(self.x**2 + self.y**2)

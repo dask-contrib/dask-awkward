@@ -921,7 +921,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         to map_partitions.
         """
         if hasattr(self._meta, method_name):
-            return getattr(self._meta, method_name)(*args, dask_array=self, **kwargs)
+            return getattr(self._meta, method_name)(
+                *args, __dask_array__=self, **kwargs
+            )
         raise AttributeError(
             f"Method {method_name} is not available to this collection."
         )
@@ -932,13 +934,13 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if a user follows the pattern:
 
         class SomeMixin:
-            def get_the_property(self, dask_array = None):
+            def get_the_property(self, __dask_array__ = None):
                 ...
 
             the_property = property(get_the_property)
 
         This pattern is caught and reissued as a method call to the "get_the_property"
-        method, passing self as dask_array.
+        method, passing self as __dask_array__.
         """
         if hasattr(self._meta.__class__, property_name):
             if hasattr(self._meta.__class__, f"get_{property_name}"):
