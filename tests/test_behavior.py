@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import awkward as ak
 import numpy as np
 import pytest
@@ -10,9 +12,22 @@ from dask_awkward.lib.testutils import assert_eq
 behaviors: dict = {}
 
 
+class _ClassMethodFn:
+    def __init__(self, attr: str, **kwargs: Any) -> None:
+        self.attr = attr
+
+    def __call__(self, coll: ak.Array, *args: Any, **kwargs: Any) -> ak.Array:
+        return getattr(coll, self.attr)(*args, **kwargs)
+
+
 @ak.mixin_class(behaviors)
 class Point:
-    def distance(self, other):
+    def distance(self, other, dask_array=None):
+        if dask_array is not None:
+            return dask_array.map_partitions(
+                _ClassMethodFn("distance"),
+                other,
+            )
         return np.sqrt((self.x - other.x) ** 2 + (self.y - other.y) ** 2)
 
     @property
@@ -20,7 +35,11 @@ class Point:
         return self.x * self.x
 
     @ak.mixin_class_method(np.abs)
-    def point_abs(self):
+    def point_abs(self, dask_array=None):
+        if dask_array is not None:
+            return dask_array.map_partitions(
+                _ClassMethodFn("point_abs"),
+            )
         return np.sqrt(self.x**2 + self.y**2)
 
 

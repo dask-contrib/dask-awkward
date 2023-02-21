@@ -921,7 +921,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         to map_partitions.
         """
         if hasattr(self._meta, method_name):
-            return getattr(self._meta, method_name)(*args, **kwargs)
+            return getattr(self._meta, method_name)(*args, dask_array=self, **kwargs)
         raise AttributeError(
             f"Method {method_name} is not available to this collection."
         )
@@ -943,14 +943,12 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if hasattr(self._meta.__class__, property_name):
             if hasattr(self._meta.__class__, f"get_{property_name}"):
                 return self._call_behavior_method(
-                    f"get_{property_name}", dask_array=self
+                    f"get_{property_name}",
                 )
             return self.map_partitions(
                 _BehaviorPropertyFn(property_name),
                 label=hyphenize(property_name),
             )
-        elif hasattr(self._meta, f"get_{property_name}"):
-            return getattr(self._meta, property_name)(self)
         raise AttributeError(
             f"Property {property_name} is not available to this collection."
         )

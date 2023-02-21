@@ -298,10 +298,7 @@ def test_copy(daa):
         np.float64,
         np.complex64,
         np.complex128,
-        pytest.param(
-            np.datetime64,
-            marks=pytest.mark.xfail(reason="specific to generic units in numpy"),
-        ),
+        np.datetime64,
         np.timedelta64,
         np.float16,
     ],
