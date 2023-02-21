@@ -942,6 +942,10 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         This pattern is caught and reissued as a method call to the "get_the_property"
         method, passing self as __dask_array__.
+        
+        If get_the_property is not defined, and the_property is decorated with
+        @property, then then no calling context is needed and the property is
+        mapped directly.
         """
         if hasattr(self._meta.__class__, property_name):
             if hasattr(self._meta.__class__, f"get_{property_name}"):
