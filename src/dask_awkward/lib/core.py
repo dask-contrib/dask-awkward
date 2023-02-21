@@ -921,8 +921,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         to map_partitions.
         """
         if hasattr(self._meta, method_name):
+            array_context = kwargs.pop("__dask_array__", self)
             return getattr(self._meta, method_name)(
-                *args, __dask_array__=self, **kwargs
+                *args, __dask_array__=array_context, **kwargs
             )
         raise AttributeError(
             f"Method {method_name} is not available to this collection."
