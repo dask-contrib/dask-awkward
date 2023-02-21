@@ -915,37 +915,57 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return self._getitem_single(where)
 
     def _call_behavior_method(self, method_name: str, *args: Any, **kwargs: Any) -> Any:
+        """Call a behavior method for an awkward array.
+        Please note that the raw dask_awkward arguments are forwarded to the
+        awkward Mixin class, and the user must deal with when to make calls
+        to map_partitions.
+        """
         if hasattr(self._meta, method_name):
-            return self.map_partitions(
-                _BehaviorMethodFn(method_name, **kwargs),
-                *args,
-                label=hyphenize(method_name),
-            )
+            return getattr(self._meta, method_name)(*args, **kwargs)
         raise AttributeError(
             f"Method {method_name} is not available to this collection."
         )
 
     def _call_behavior_property(self, property_name: str) -> Any:
-        if hasattr(self._meta, property_name):
+        """Call a property for an awkward array.
+        This also allows for some internal state to be tracked via behaviors
+        if a user follows the pattern:
+
+        class SomeMixin:
+            def get_the_property(self, dask_array = None):
+                ...
+
+            the_property = property(get_the_property)
+
+        This pattern is caught and reissued as a method call to the "get_the_property"
+        method, passing self as dask_array.
+        """
+        if hasattr(self._meta.__class__, property_name):
+            if hasattr(self._meta.__class__, f"get_{property_name}"):
+                return self._call_behavior_method(
+                    f"get_{property_name}", dask_array=self
+                )
             return self.map_partitions(
                 _BehaviorPropertyFn(property_name),
                 label=hyphenize(property_name),
             )
+        elif hasattr(self._meta, f"get_{property_name}"):
+            return getattr(self._meta, property_name)(self)
         raise AttributeError(
             f"Property {property_name} is not available to this collection."
         )
 
     def _maybe_behavior_method(self, attr: str) -> bool:
         try:
-            res = getattr(self._meta, attr)
-            return callable(res)
+            res = getattr(self._meta.__class__, attr)
+            return (not isinstance(res, property)) and callable(res)
         except AttributeError:
             return False
 
     def _maybe_behavior_property(self, attr: str) -> bool:
         try:
-            res = getattr(self._meta, attr)
-            return not callable(res)
+            res = getattr(self._meta.__class__, attr)
+            return isinstance(res, property)
         except AttributeError:
             return False
 
