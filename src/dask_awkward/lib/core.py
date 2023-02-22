@@ -215,11 +215,13 @@ class Scalar(DaskMethodsMixin):
             )
         return f"dask.awkward<{key_split(self.name)}, type=Scalar, dtype={dt}>"
 
-    def __getitem__(self, _: Any) -> Any:
-        raise RuntimeError("Scalars do not support __getitem__")
+    def __getitem__(self, where: Any) -> Any:
+        d = self.to_delayed(optimize_graph=True)
+        return d[where]
 
-    def __getattr__(self, _: str) -> Any:
-        raise RuntimeError("Scalars do not support __getattr__")
+    def __getattr__(self, where: str) -> Any:
+        d = self.to_delayed(optimize_graph=True)
+        return getattr(d, where)
 
     @property
     def known_value(self) -> Any | None:

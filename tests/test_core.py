@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import namedtuple
 from typing import TYPE_CHECKING, Any
 
 import awkward as ak
@@ -187,6 +188,16 @@ def test_record_collection(daa: Array) -> None:
 
 def test_scalar_collection(daa: Array) -> None:
     assert type(daa["points", "x"][0][0]) is Scalar
+
+
+def test_scalar_getitem_getattr() -> None:
+    d = {"a": 5}
+    s = new_known_scalar(d)
+    assert s["a"].compute() == d["a"]
+    Thing = namedtuple("Thing", "a b c")
+    t = Thing(c=3, b=2, a=1)
+    s = new_known_scalar(t)
+    assert s.c.compute() == t.c
 
 
 def test_is_typetracer(daa: Array) -> None:
