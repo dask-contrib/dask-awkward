@@ -1306,10 +1306,10 @@ def map_partitions(
 
     if output_divisions is not None:
         if output_divisions == 1:
-            new_divisions = args[0].divisions
+            new_divisions = deps[0].divisions
         else:
             new_divisions = tuple(
-                map(lambda x: x * output_divisions, args[0].divisions)
+                map(lambda x: x * output_divisions, deps[0].divisions)
             )
         return new_array_object(
             hlg,
@@ -1322,7 +1322,7 @@ def map_partitions(
             hlg,
             name=name,
             meta=meta,
-            npartitions=args[0].npartitions,
+            npartitions=deps[0].npartitions,
         )
 
 
