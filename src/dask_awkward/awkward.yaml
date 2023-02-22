@@ -16,7 +16,8 @@ awkward:
   optimization:
 
     # If true dask-awkward specific optimizations will be run. This is
-    # currently limited to column projection.
+    # currently limited to determining necessary columns and applying
+    # column projection.
     enabled: True
 
     # This option controls whether or not a warning is thrown, an
