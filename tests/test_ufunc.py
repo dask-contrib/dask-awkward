@@ -16,7 +16,6 @@ def test_ufunc_add(daa: dak.Array, caa: ak.Array) -> None:
     assert_eq(a1, a2)
 
 
-
 def test_ufunc_sub(daa: dak.Array, caa: ak.Array) -> None:
     a1 = 2 - daa.points.x
     a2 = 2 - caa.points.x
