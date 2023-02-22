@@ -390,3 +390,10 @@ def test_broadcast_arrays(daa, caa):
 
     for db, b in zip(dak_broadcast, ak_broadcast):
         assert_eq(db, b)
+
+
+def test_values_astype(daa, caa):
+    assert_eq(
+        dak.values_astype(daa, np.float32),
+        ak.values_astype(caa, np.float32),
+    )
