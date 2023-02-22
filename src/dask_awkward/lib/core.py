@@ -1309,7 +1309,7 @@ def map_partitions(
             new_divisions = deps[0].divisions
         else:
             new_divisions = tuple(
-                map(lambda x: x * output_divisions, args[0].divisions)
+                map(lambda x: x * output_divisions, deps[0].divisions)
             )
         return new_array_object(
             hlg,
