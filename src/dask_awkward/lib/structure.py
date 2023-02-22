@@ -823,7 +823,15 @@ def unzip(
 
 @borrow_docstring(ak.values_astype)
 def values_astype(array, to, highlevel=True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+    return map_partitions(
+        ak.values_astype,
+        array,
+        to=to,
+        behavior=behavior,
+        label="values-astype",
+    )
 
 
 class _WhereFn:
