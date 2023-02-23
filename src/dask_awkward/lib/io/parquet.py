@@ -22,7 +22,6 @@ from dask_awkward.lib.io.io import from_map
 log = logging.getLogger(__name__)
 
 
-
 class _FromParquetFn:
     def __init__(
         self,
@@ -128,7 +127,10 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
             subrg=subrg,
         )
 
-    def project_columns(self, columns: Sequence[str] | None) -> _FromParquetFragmentWiseFn:
+    def project_columns(
+        self,
+        columns: Sequence[str] | None,
+    ) -> _FromParquetFragmentWiseFn:
         if columns is None:
             return self
         return _FromParquetFragmentWiseFn(
