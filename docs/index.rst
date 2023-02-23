@@ -29,7 +29,7 @@ arrays at `their website <awkwardarray_>`_.
 
 .. toctree::
    :maxdepth: 1
-   :caption: More explanation
+   :caption: Deeper Explanation
 
    me-optimization.rst
    me-faq.rst
