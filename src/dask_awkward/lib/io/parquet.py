@@ -1,10 +1,14 @@
+from __future__ import annotations
+
 import abc
 import itertools
+import logging
 import math
 import operator
+from typing import Any, Sequence
 
+import awkward as ak
 import fsspec
-from awkward.highlevel import Array as _Array
 from awkward.operations import ak_from_parquet, to_arrow_table
 from awkward.operations.ak_from_parquet import _load
 from dask.base import tokenize
@@ -15,9 +19,20 @@ from fsspec.core import get_fs_token_paths
 from dask_awkward.lib.core import map_partitions, new_scalar_object, typetracer_array
 from dask_awkward.lib.io.io import from_map
 
+log = logging.getLogger(__name__)
+
+
 
 class _FromParquetFn:
-    def __init__(self, *, schema, listsep="list.item", unnamed_root=False):
+    def __init__(
+        self,
+        *,
+        fs: Any,
+        schema: Any,
+        listsep: str = "list.item",
+        unnamed_root: bool = False,
+    ) -> None:
+        self.fs = fs
         self.schema = schema
         self.listsep = listsep
         self.unnamed_root = unnamed_root
@@ -26,20 +41,41 @@ class _FromParquetFn:
             self.columns = [f".{c}" for c in self.columns]
 
     @abc.abstractmethod
-    def __call__(self, source):
+    def __call__(self, source: Any) -> ak.Array:
         ...
 
     @abc.abstractmethod
-    def project_columns(self, columns):
+    def project_columns(self, columns: Sequence[str] | None) -> _FromParquetFn:
         ...
+
+    def __repr__(self) -> str:
+        s = (
+            "\nFromParquetFn(\n"
+            f"  schema={repr(self.schema)}\n"
+            f"  listsep={self.listsep}\n"
+            f"  unnamed_root={self.unnamed_root}\n"
+            f"  self.columns={self.columns}\n)"
+        )
+        return s
+
+    def __str__(self) -> str:
+        return self.__repr__()
 
 
 class _FromParquetFileWiseFn(_FromParquetFn):
-    def __init__(self, *, fs, schema, listsep="list.item", unnamed_root=False):
-        super().__init__(schema=schema, listsep=listsep, unnamed_root=unnamed_root)
-        self.fs = fs
+    def __init__(
+        self,
+        *,
+        fs: Any,
+        schema: Any,
+        listsep: str = "list.item",
+        unnamed_root: bool = False,
+    ) -> None:
+        super().__init__(
+            fs=fs, schema=schema, listsep=listsep, unnamed_root=unnamed_root
+        )
 
-    def __call__(self, source):
+    def __call__(self, source: Any) -> Any:
         return _file_to_partition(
             source,
             self.fs,
@@ -47,23 +83,40 @@ class _FromParquetFileWiseFn(_FromParquetFn):
             self.schema,
         )
 
-    def project_columns(self, columns):
+    def project_columns(self, columns: Sequence[str] | None) -> _FromParquetFileWiseFn:
         if columns is None:
             return self
-        return _FromParquetFileWiseFn(
+
+        new_schema = self.schema.select_columns(columns)
+        new = _FromParquetFileWiseFn(
             fs=self.fs,
-            schema=self.schema.select_columns(columns),
+            schema=new_schema,
             listsep=self.listsep,
             unnamed_root=self.unnamed_root,
         )
 
+        log.debug(f"project_columns received: {columns}")
+        log.debug(f"new schema is {repr(new_schema)}")
+        log.debug(f"new schema columns are: {new_schema.columns(self.listsep)}")
+        log.debug(new)
+
+        return new
+
 
 class _FromParquetFragmentWiseFn(_FromParquetFn):
-    def __init__(self, *, fs, schema, listsep="list.item", unnamed_root=False):
-        super().__init__(schema=schema, listsep=listsep, unnamed_root=unnamed_root)
-        self.fs = fs
+    def __init__(
+        self,
+        *,
+        fs: Any,
+        schema: Any,
+        listsep: str = "list.item",
+        unnamed_root: bool = False,
+    ) -> None:
+        super().__init__(
+            fs=fs, schema=schema, listsep=listsep, unnamed_root=unnamed_root
+        )
 
-    def __call__(self, pair):
+    def __call__(self, pair: Any) -> ak.Array:
         subrg, source = pair
         if isinstance(subrg, int):
             subrg = [[subrg]]
@@ -75,7 +128,7 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
             subrg=subrg,
         )
 
-    def project_columns(self, columns):
+    def project_columns(self, columns: Sequence[str] | None) -> _FromParquetFragmentWiseFn:
         if columns is None:
             return self
         return _FromParquetFragmentWiseFn(
@@ -154,7 +207,7 @@ def from_parquet(
     if split_row_groups is None:
         split_row_groups = row_counts is not None and len(row_counts) > 1
 
-    meta = _Array(
+    meta = ak.Array(
         subform.length_zero_array(highlevel=False).to_typetracer(forget_length=True)
     )
 

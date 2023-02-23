@@ -216,8 +216,13 @@ class Scalar(DaskMethodsMixin):
         return f"dask.awkward<{key_split(self.name)}, type=Scalar, dtype={dt}>"
 
     def __getitem__(self, where: Any) -> Any:
+        token = tokenize(self, operator.getitem, where)
+        label = "getitem"
+        name = f"{label}-{token}"
         d = self.to_delayed(optimize_graph=True)
-        return d[where]
+        task = {name: (operator.getitem, d.key, where)}
+        hlg = HighLevelGraph.from_collections(name, task, dependencies=(d,))
+        return Delayed(name, hlg)
 
     def __getattr__(self, where: str) -> Any:
         d = self.to_delayed(optimize_graph=True)
