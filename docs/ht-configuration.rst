@@ -50,4 +50,6 @@ For example, they can be set with the form:
   warning of the optimization fails and continue without performing
   the optimization. If set to ``raise``, raise an exception at
   optimization time. If set to ``pass``, silently skip the
-  optimization.
+  optimization. More information can be found in the :ref:`necessary
+  columns optimization <me-optimization:necessary columns>` section of
+  the docs.
