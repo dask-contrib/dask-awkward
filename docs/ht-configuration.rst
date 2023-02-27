@@ -10,8 +10,8 @@ dask-awkward repository at the path ``src/dask_awkward/awkward.yaml``.
 The file attempts to be self documenting.
 
 
-Top level parameters
-^^^^^^^^^^^^^^^^^^^^
+Top level table
+^^^^^^^^^^^^^^^
 
 These top level parameters are configuration under the ``awkward``
 namespace in Dask configuration format. For example, they can be set

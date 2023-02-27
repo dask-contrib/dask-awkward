@@ -31,11 +31,11 @@ column of floats for ``bar.y``.
 .. code:: js
 
    [
-     {"foo": 5, "bar": {"x": [-1, -2], "y": -2.2}},
-     {"foo": 6, "bar": {"x": [-3], "y":  3.3}},
-     {"foo": 7, "bar": {"x": [-5, -6, -7], "y": -4.4}},
-     {"foo": 8, "bar": {"x": [8, 9, 10, 11, 12], "y":  5.5}},
-     ...
+       {"foo": 5, "bar": {"x": [-1, -2], "y": -2.2}},
+       {"foo": 6, "bar": {"x": [-3], "y":  3.3}},
+       {"foo": 7, "bar": {"x": [-5, -6, -7], "y": -4.4}},
+       {"foo": 8, "bar": {"x": [8, 9, 10, 11, 12], "y":  5.5}},
+       ...
    ]
 
 If our task graph is of the form:
@@ -48,15 +48,36 @@ If our task graph is of the form:
 We have five layers in the graph:
 
 1. Reading parquet from the path ``/path/to/data``
-2. ``getattr`` to access the field ``bar``
-3. ``getattr`` to access the field ``x`` from ``bar``
-4. ``getattr`` to access the field ``foo``
+2. Access the field ``foo``
+3. Access the field ``bar``
+4. Access the field ``x`` from ``bar``
 5. Array division
 
+We can see this at the REPL by inspecting the ``.dask`` property of
+the collection:
+
+.. code-block::
+
+   >>> result.dask
+   HighLevelGraph with 5 layers.
+     <dask.highlevelgraph.HighLevelGraph object at 0x134a4fc10>
+      0. read-parquet-f4e4296edcc1309191080cae9018ab4c
+      1. foo-791f3e559c4061a8c9df2e87a0524069
+      2. bar-edf7073f1aab48e986099f7c67e81be9
+      3. x-47d0bdfde8d53e07444a58204428ff2f
+      4. divide-b85b7c773695128b08311b3a75b0002b
+
 Notice that we never actually need the ``bar.y`` column of floats.
-Upon calling ``result.computeI()``, step (1) in our list above
-(reading parquet) will be updated such that the parquet read will only
-grab ``foo`` and ``bar.x``.
+Upon calling ``result.compute()``, step (1) in our list of layers
+above (reading parquet) will be updated such that the parquet read
+will only grab ``foo`` and ``bar.x``.
+
+.. note::
+
+   This is done by replacing the *original* input layer with a new
+   layer instance that will pass in the named argument
+   ``columns=["foo", "bar.x"]`` to the concrete awkward
+   :py:func:`ak.from_parquet` function at compute time.
 
 You can see which columns are determined to be necessary by calling
 :func:`dask_awkward.necessary_columns` on the collection of interest
@@ -83,3 +104,22 @@ parameter:
 - ``warn`` (the default): fail with a warning but let the compute
   continue without the necessary columns optimization (can reduce
   performance by reading unncessary data from disk).
+
+One can also use the ``columns=`` argument (with
+:func:`~dask_awkward.from_parquet`, for example) to manually define
+which columns should be read from disk. The
+:func:`~dask_awkward.necessary_columns` function can be used to
+determine how one should use the ``columns=`` argument. Using our
+above example, we write
+
+.. code:: python
+
+   >>> ds = dak.from_parquet("/path/to/data", columns=["bar.x", "foo"])
+   >>> result = ds.bar.x / ds.foo
+   >>> with dask.config.set({"awkward.optimization.enabled": False}):
+   ...     result.compute()
+
+With this code we can save a little bit of overhead by not running the
+necessary columns optimization after already defining, by hand, the
+minimal set (one should be sure about what is needed with this
+workflow).
