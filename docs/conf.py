@@ -42,6 +42,7 @@ extensions = [
     "sphinx.ext.mathjax",
     "sphinx.ext.viewcode",
     "sphinx.ext.todo",
+    "sphinx.ext.autosectionlabel",
     "sphinx_design",
 ]
 
@@ -81,3 +82,5 @@ intersphinx_mapping = {
 autodoc_typehints = "none"
 
 pygments_style = "default"
+
+autosectionlabel_prefix_document = True

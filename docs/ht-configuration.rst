@@ -19,7 +19,7 @@ with the form:
 
 .. code-block:: python
 
-   with dask.config.set({"awkward.raise-failed-meta": True}):
+   with dask.config.set({"awkward.<option>": True}):
        ...
 
 - ``raise-failed-meta`` (default: ``False``): If this option is set to
@@ -42,11 +42,11 @@ For example, they can be set with the form:
 
 .. code-block:: python
 
-   with dask.config.set({"awkward.optimization.enabled": False}):
+   with dask.config.set({"awkward.optimization.<option>": False}):
        ...
 
 - ``enabled`` (default: ``True``): Enable dask-awkward specific optimizations.
-- ``on-fail`` (default: ``"warn"``): When set to ``warn`` throw a
+- ``on-fail`` (default: ``warn``): When set to ``warn`` throw a
   warning of the optimization fails and continue without performing
   the optimization. If set to ``raise``, raise an exception at
   optimization time. If set to ``pass``, silently skip the

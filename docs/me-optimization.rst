@@ -28,7 +28,7 @@ be read off disk in Parquet format. In this format we'll have a column
 of integers for ``foo``, a column of integers for ``bar.x`` and a
 column of floats for ``bar.y``.
 
-.. code::
+.. code:: js
 
    [
      {"foo": 5, "bar": {"x": [-1, -2], "y": -2.2}},
@@ -54,9 +54,9 @@ We have five layers in the graph:
 5. Array division
 
 Notice that we never actually need the ``bar.y`` column of floats.
-Upon calling ``result.computeI()``, step (1) in our list above (reading
-parquet) will be updated such that the parquet read will only grab
-``foo`` and ``bar.x``.
+Upon calling ``result.computeI()``, step (1) in our list above
+(reading parquet) will be updated such that the parquet read will only
+grab ``foo`` and ``bar.x``.
 
 You can see which columns are determined to be necessary by calling
 :func:`dask_awkward.necessary_columns` on the collection of interest
@@ -76,10 +76,10 @@ raise an exception, the configuration parameter can be adjusted. Here
 are the options for the ``awkward.optimization.on-fail`` configuration
 parameter:
 
-- ``"pass"``: fail silently; the optimization is skipped (can reduce
+- ``pass``: fail silently; the optimization is skipped (can reduce
   performance by reading unncessary data from disk).
-- ``"raise"``: fail by raising an exception: this will stop the
-  process at compute time.
-- ``"warn"`` (the default): fail with a warning but let the compute
+- ``raise``: fail by raising an exception: this will stop the process
+  at compute time.
+- ``warn`` (the default): fail with a warning but let the compute
   continue without the necessary columns optimization (can reduce
   performance by reading unncessary data from disk).
