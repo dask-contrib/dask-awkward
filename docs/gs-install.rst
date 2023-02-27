@@ -6,19 +6,19 @@ or conda-forge.
 
 From PyPI:
 
-.. code-block::
+.. code::
 
    pip install dask-awkward
 
 From conda-forge:
 
-.. code-block::
+.. code::
 
    conda install dask-awkward -c conda-forge
 
 If you'd like to install dask-awkward from the latest commit to the
 ``main`` branch of the repository:
 
-.. code-block::
+.. code:: none
 
    pip install git+https://github.com/dask-contrib/dask-awkward@main

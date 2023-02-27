@@ -25,6 +25,7 @@ arrays at `their website <awkwardarray_>`_.
    :maxdepth: 1
    :caption: How Tos
 
+   ht-configuration.rst
    ht-io.rst
 
 .. toctree::
