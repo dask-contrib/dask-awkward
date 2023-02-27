@@ -12,21 +12,23 @@ awkward:
   # typetracer, which is an empty awkward array.
   compute-unknown-meta: True
 
-  # column-projection-optimization currently has 3 possible values
-  #
-  # - "brute-force": a brute force search for columns that are
-  #   required for the task graph to complete without raising an
-  #   IndexError (each column is held out and the metadata task graph
-  #   is computed as a requirement test)
-  #
-  # - "simple-getitem": checks for calls to getitem in the task graph.
-  #   This optimization is determined faster than the brute-force
-  #   method, but it may not be as complete w.r.t. eliminating
-  #   unncessary reads.
-  #
-  # - "chained": use both methods together
-  #    Currently not implemented (but planned)
-  #
-  # - null, false, or "none": To turn off the optimization
-  #
-  column-projection-optimization: "simple-getitem"
+  # Optimization specific configuration
+  optimization:
+
+    # If true dask-awkward specific optimizations will be run. This is
+    # currently limited to determining necessary columns and applying
+    # column projection.
+    enabled: True
+
+    # This option controls whether or not a warning is thrown, an
+    # exception is raised, or if nothing is done if a dask-awkward
+    # specific optimization fails (right now this is only the column
+    # projection optimization for determining necessary columns). The
+    # default value ("warn") will produce a warning if the
+    # optimization fails. If this option is set to "raise" and the
+    # optimization fails, an exception will be raised intead, crashing
+    # a program before an optimized compute. Finally, if the option is
+    # set to "pass" and the optimization fails, it will silently fail
+    # and the task graph continue on to be computed without
+    # dask-awkward specific optimizations.
+    on-fail: warn

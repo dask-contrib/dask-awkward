@@ -1,10 +1,14 @@
+from __future__ import annotations
+
 import abc
 import itertools
+import logging
 import math
 import operator
+from typing import Any, Sequence
 
+import awkward as ak
 import fsspec
-from awkward.highlevel import Array as _Array
 from awkward.operations import ak_from_parquet, to_arrow_table
 from awkward.operations.ak_from_parquet import _load
 from dask.base import tokenize
@@ -15,9 +19,19 @@ from fsspec.core import get_fs_token_paths
 from dask_awkward.lib.core import map_partitions, new_scalar_object, typetracer_array
 from dask_awkward.lib.io.io import from_map
 
+log = logging.getLogger(__name__)
+
 
 class _FromParquetFn:
-    def __init__(self, *, schema, listsep="list.item", unnamed_root=False):
+    def __init__(
+        self,
+        *,
+        fs: Any,
+        schema: Any,
+        listsep: str = "list.item",
+        unnamed_root: bool = False,
+    ) -> None:
+        self.fs = fs
         self.schema = schema
         self.listsep = listsep
         self.unnamed_root = unnamed_root
@@ -26,20 +40,41 @@ class _FromParquetFn:
             self.columns = [f".{c}" for c in self.columns]
 
     @abc.abstractmethod
-    def __call__(self, source):
+    def __call__(self, source: Any) -> ak.Array:
         ...
 
     @abc.abstractmethod
-    def project_columns(self, columns):
+    def project_columns(self, columns: Sequence[str] | None) -> _FromParquetFn:
         ...
+
+    def __repr__(self) -> str:
+        s = (
+            "\nFromParquetFn(\n"
+            f"  schema={repr(self.schema)}\n"
+            f"  listsep={self.listsep}\n"
+            f"  unnamed_root={self.unnamed_root}\n"
+            f"  self.columns={self.columns}\n)"
+        )
+        return s
+
+    def __str__(self) -> str:
+        return self.__repr__()
 
 
 class _FromParquetFileWiseFn(_FromParquetFn):
-    def __init__(self, *, fs, schema, listsep="list.item", unnamed_root=False):
-        super().__init__(schema=schema, listsep=listsep, unnamed_root=unnamed_root)
-        self.fs = fs
+    def __init__(
+        self,
+        *,
+        fs: Any,
+        schema: Any,
+        listsep: str = "list.item",
+        unnamed_root: bool = False,
+    ) -> None:
+        super().__init__(
+            fs=fs, schema=schema, listsep=listsep, unnamed_root=unnamed_root
+        )
 
-    def __call__(self, source):
+    def __call__(self, source: Any) -> Any:
         return _file_to_partition(
             source,
             self.fs,
@@ -47,23 +82,40 @@ class _FromParquetFileWiseFn(_FromParquetFn):
             self.schema,
         )
 
-    def project_columns(self, columns):
+    def project_columns(self, columns: Sequence[str] | None) -> _FromParquetFileWiseFn:
         if columns is None:
             return self
-        return _FromParquetFileWiseFn(
+
+        new_schema = self.schema.select_columns(columns)
+        new = _FromParquetFileWiseFn(
             fs=self.fs,
-            schema=self.schema.select_columns(columns),
+            schema=new_schema,
             listsep=self.listsep,
             unnamed_root=self.unnamed_root,
         )
 
+        log.debug(f"project_columns received: {columns}")
+        log.debug(f"new schema is {repr(new_schema)}")
+        log.debug(f"new schema columns are: {new_schema.columns(self.listsep)}")
+        log.debug(new)
+
+        return new
+
 
 class _FromParquetFragmentWiseFn(_FromParquetFn):
-    def __init__(self, *, fs, schema, listsep="list.item", unnamed_root=False):
-        super().__init__(schema=schema, listsep=listsep, unnamed_root=unnamed_root)
-        self.fs = fs
+    def __init__(
+        self,
+        *,
+        fs: Any,
+        schema: Any,
+        listsep: str = "list.item",
+        unnamed_root: bool = False,
+    ) -> None:
+        super().__init__(
+            fs=fs, schema=schema, listsep=listsep, unnamed_root=unnamed_root
+        )
 
-    def __call__(self, pair):
+    def __call__(self, pair: Any) -> ak.Array:
         subrg, source = pair
         if isinstance(subrg, int):
             subrg = [[subrg]]
@@ -75,7 +127,10 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
             subrg=subrg,
         )
 
-    def project_columns(self, columns):
+    def project_columns(
+        self,
+        columns: Sequence[str] | None,
+    ) -> _FromParquetFragmentWiseFn:
         if columns is None:
             return self
         return _FromParquetFragmentWiseFn(
@@ -94,20 +149,34 @@ def from_parquet(
     filters=None,
     split_row_groups=None,
 ):
-    """Read parquet dataset into awkward array collection.
+    """Read parquet dataset into an :py:obj:`~dask_awkward.Array` collection.
 
-    url: str
-        location of data, including protocol
-    storage_options: dict
-        for creating filesystem
-    columns: list[str] or None
+    Parameters
+    ----------
+    url : str
+        Location of data, including protocol (e.g. ``s3://``)
+    storage_options : dict
+        For creating filesystem (see ``fsspec`` documentation).
+    ignore_metadata : bool
+        Ignore parquet metadata associated with the input dataset (the
+        ``_metadata`` file).
+    scan_files : bool
+        TBD
+    columns : list[str], optional
         Select columns to load
-    filters: list[list[tuple]]
-        parquet-style filters for excluding row groups based on column statistics
-    split_row_groups: bool | None
-        If True, each row group becomes a partition. If False, each file becomes
-        a partition. If None, the existence of a `_metadata` file and
-        ignore_metadata=False implies True, else False.
+    filters : list[list[tuple]], optional
+        Parquet-style filters for excluding row groups based on column statistics
+    split_row_groups: bool, optional
+        If True, each row group becomes a partition. If False, each
+        file becomes a partition. If None, the existence of a
+        ``_metadata`` file and ignore_metadata=False implies True,
+        else False.
+
+    Returns
+    -------
+    Array
+        Array collection from the parquet dataset.
+
     """
     fs, tok, paths = get_fs_token_paths(
         path, mode="rb", storage_options=storage_options
@@ -140,7 +209,9 @@ def from_parquet(
     if split_row_groups is None:
         split_row_groups = row_counts is not None and len(row_counts) > 1
 
-    meta = _Array(subform.length_zero_array(highlevel=False).to_typetracer())
+    meta = ak.Array(
+        subform.length_zero_array(highlevel=False).to_typetracer(forget_length=True)
+    )
 
     if split_row_groups is False or subrg is None:
         # file-wise
@@ -337,24 +408,29 @@ class _ToParquetFn:
 
 
 def to_parquet(data, path, storage_options=None, write_metadata=False, compute=True):
-    """Write data to parquet format
+    """Write data to parquet format.
 
     Parameters
     ----------
-    data: DaskAwrkardArray
-    path: str
+    data : dask_awkward.Array
+        Array to write to parquet.
+    path : str
         Root directory of location to write to
-    storage_options: dict
-        arguments to pass to fsspec for creating the filesystem
-    write_metadata: bool
+    storage_options : dict
+        Arguments to pass to fsspec for creating the filesystem (see
+        ``fsspec`` documentation).
+    write_metadata : bool
         Whether to create _metadata and _common_metadata files
-    compute: bool
+    compute : bool
         Whether to immediately start writing or to return the dask
         collection which can be computed at the user's discression.
 
     Returns
     -------
-    If compute=False, a dask Scalar representing the process
+    None or dask_awkward.Scalar
+        If `compute` is ``False``, a :py:class:`dask_awkward.Scalar`
+        representing the process will be returned, if `compute` is
+        ``True`` then the return is ``None``.
     """
     # TODO options we need:
     #  - compression per data type or per leaf column ("path.to.leaf": "zstd" format)
@@ -373,6 +449,7 @@ def to_parquet(data, path, storage_options=None, write_metadata=False, compute=T
         label="to-parquet",
         meta=data._meta,
     )
+    map_res.dask.layers[map_res.name].annotations = {"ak_output": True}
 
     dsk = {}
     if write_metadata:

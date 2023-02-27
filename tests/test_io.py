@@ -11,7 +11,7 @@ from dask.delayed import delayed
 try:
     import ujson as json
 except ImportError:
-    import json  # type: ignore
+    import json
 
 import dask_awkward as dak
 from dask_awkward.lib.testutils import assert_eq

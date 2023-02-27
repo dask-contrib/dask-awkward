@@ -298,10 +298,7 @@ def test_copy(daa):
         np.float64,
         np.complex64,
         np.complex128,
-        pytest.param(
-            np.datetime64,
-            marks=pytest.mark.xfail(reason="specific to generic units in numpy"),
-        ),
+        np.datetime64,
         np.timedelta64,
         np.float16,
     ],
@@ -309,9 +306,10 @@ def test_copy(daa):
 def test_full_like(daa, caa, thedtype):
     value = 12.6
     if thedtype is np.datetime64:
-        value = thedtype(int(12.6), "us")
+        value = thedtype(int(value), "us")
+        thedtype = np.dtype("datetime64[us]")
     elif thedtype is np.timedelta64:
-        value = thedtype(int(12.6))
+        value = thedtype(int(value))
 
     assert_eq(
         dak.full_like(daa, value, dtype=thedtype),

@@ -13,28 +13,42 @@ representing partitioned Awkward arrays. Read more about Awkward
 arrays at `their website <awkwardarray_>`_.
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Getting Started
 
-   install.rst
-   intro.rst
-   terminology.rst
-   limitations.rst
-   faq.rst
+   gs-install.rst
+   gs-intro.rst
+   gs-terminology.rst
+   gs-limitations.rst
+
+.. toctree::
+   :maxdepth: 1
+   :caption: How Tos
+
+   ht-configuration.rst
+   ht-io.rst
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Deeper Explanation
+
+   me-optimization.rst
+   me-faq.rst
 
 .. toctree::
    :maxdepth: 1
    :caption: API
 
-   api_array.rst
-   api_io.rst
-   api_reducers.rst
-   api_structure.rst
+   api-collections.rst
+   api-io.rst
+   api-reducers.rst
+   api-structure.rst
+   api-utilities.rst
 
 .. toctree::
    :maxdepth: 1
    :caption: Development
 
-   contributing.rst
+   dev-contributing.rst
 
 .. _awkwardarray: https://awkward-array.org/

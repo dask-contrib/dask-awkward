@@ -76,7 +76,7 @@ def test_count(daa: dak.Array, caa: ak.Array, axis: int | None) -> None:
 
 @pytest.mark.parametrize("axis", [None, 1, -1])
 def test_count_nonzero(daa: dak.Array, caa: ak.Array, axis: int | None) -> None:
-    ar = ak.count_nonzero(caa["points", "x"], axis=axis)
+    ar = ak.count_nonzero(caa["points"]["x"], axis=axis)
     dr = dak.count_nonzero(daa["points"]["x"], axis=axis)
     assert_eq(ar, dr)
 
@@ -101,7 +101,7 @@ def test_mean(daa: dak.Array, caa: ak.Array, axis: int | None, attr: str) -> Non
 @pytest.mark.parametrize("attr", ["x", "y"])
 def test_min(daa: dak.Array, caa: ak.Array, axis: int | None, attr: str) -> None:
     ar = ak.min(caa.points[attr], axis=axis)
-    dr = dak.min(daa["points", attr], axis=axis)
+    dr = dak.min(daa["points"][attr], axis=axis)
     assert_eq(ar, dr)
 
 

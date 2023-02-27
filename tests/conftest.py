@@ -3,7 +3,9 @@ from __future__ import annotations
 try:
     import ujson as json
 except ImportError:
-    import json  # type: ignore
+    import json
+
+from pathlib import Path
 
 import awkward as ak
 import fsspec
@@ -15,7 +17,7 @@ import dask_awkward.lib.testutils as daktu
 
 @pytest.fixture(scope="session")
 def single_record_file(tmpdir_factory: pytest.TempdirFactory) -> str:
-    fname = tmpdir_factory.mktemp("data") / "single_record.json"  # type: ignore
+    fname = Path(tmpdir_factory.mktemp("data")) / "single_record.json"
     record = [{"record": [1, 2, 3]}]
     with fsspec.open(fname, "w") as f:
         print(json.dumps(record), file=f)
@@ -25,7 +27,7 @@ def single_record_file(tmpdir_factory: pytest.TempdirFactory) -> str:
 @pytest.fixture(scope="session")
 def ndjson_points1(tmpdir_factory: pytest.TempdirFactory) -> str:
     array = daktu.awkward_xy_points()
-    fname = tmpdir_factory.mktemp("data") / "points_ndjson1.json"  # type: ignore
+    fname = Path(tmpdir_factory.mktemp("data")) / "points_ndjson1.json"
     with fsspec.open(fname, "w") as f:
         for entry in array.tolist():
             print(json.dumps({"points": entry}), file=f)
@@ -35,7 +37,7 @@ def ndjson_points1(tmpdir_factory: pytest.TempdirFactory) -> str:
 @pytest.fixture(scope="session")
 def ndjson_points2(tmpdir_factory: pytest.TempdirFactory) -> str:
     array = daktu.awkward_xy_points()
-    fname = tmpdir_factory.mktemp("data") / "points_ndjson2.json"  # type: ignore
+    fname = Path(tmpdir_factory.mktemp("data")) / "points_ndjson2.json"
     with fsspec.open(fname, "w") as f:
         for entry in array.tolist():
             print(json.dumps({"points": entry}), file=f)
@@ -117,7 +119,7 @@ def L3() -> list[list[dict[str, float]]]:
 
 
 @pytest.fixture(scope="session")
-def L4() -> list[list[dict[str, float]]]:
+def L4() -> list[list[dict[str, float]] | None]:
     return [
         [{"x": 1.9, "y": 9.0}, {"x": 2.0, "y": 8.2}, {"x": 9.9, "y": 9.0}],
         None,
@@ -138,6 +140,6 @@ def caa_parquet(caa: ak.Array, tmpdir_factory: pytest.TempdirFactory) -> str:
 def unnamed_root_parquet_file(tmpdir_factory: pytest.TempdirFactory) -> str:
     from dask_awkward.lib.testutils import unnamed_root_ds
 
-    fname = tmpdir_factory.mktemp("unnamed_parquet_data") / "file.parquet"  # type: ignore
+    fname = Path(tmpdir_factory.mktemp("unnamed_parquet_data")) / "file.parquet"
     ak.to_parquet(unnamed_root_ds(), str(fname), extensionarray=False, row_group_size=3)
     return str(fname)

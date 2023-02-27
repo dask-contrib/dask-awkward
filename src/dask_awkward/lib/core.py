@@ -31,7 +31,7 @@ from dask.utils import IndexCallable, funcname, key_split
 from numpy.lib.mixins import NDArrayOperatorsMixin
 from tlz import first
 
-from dask_awkward.lib.optimize import optimize as dak_optimize
+from dask_awkward.lib.optimize import all_optimizations
 from dask_awkward.typing import AwkwardDaskCollection
 from dask_awkward.utils import (
     DaskAwkwardNotImplemented,
@@ -127,7 +127,7 @@ class Scalar(DaskMethodsMixin):
         return self.name
 
     __dask_optimize__ = globalmethod(
-        dak_optimize, key="awkward_scalar_optimize", falsey=dont_optimize
+        all_optimizations, key="awkward_scalar_optimize", falsey=dont_optimize
     )
 
     __dask_scheduler__ = staticmethod(threaded_get)
@@ -216,8 +216,13 @@ class Scalar(DaskMethodsMixin):
         return f"dask.awkward<{key_split(self.name)}, type=Scalar, dtype={dt}>"
 
     def __getitem__(self, where: Any) -> Any:
+        token = tokenize(self, operator.getitem, where)
+        label = "getitem"
+        name = f"{label}-{token}"
         d = self.to_delayed(optimize_graph=True)
-        return d[where]
+        task = {name: (operator.getitem, d.key, where)}
+        hlg = HighLevelGraph.from_collections(name, task, dependencies=(d,))
+        return Delayed(name, hlg)
 
     def __getattr__(self, where: str) -> Any:
         d = self.to_delayed(optimize_graph=True)
@@ -433,6 +438,9 @@ def new_record_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Record:
         Resulting collection.
 
     """
+    out = Record(dsk, name, meta)
+    if meta.__doc__ != meta.__class__.__doc__:
+        out.__doc__ = meta.__doc__
     return Record(dsk, name, meta)
 
 
@@ -487,7 +495,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return self._rebuild, ()
 
     __dask_optimize__ = globalmethod(
-        dak_optimize, key="awkward_array_optimize", falsey=dont_optimize
+        all_optimizations, key="awkward_array_optimize", falsey=dont_optimize
     )
 
     __dask_scheduler__ = staticmethod(threaded_get)
@@ -604,12 +612,14 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     @property
     def layout(self) -> Content:
+        """awkward Array layout associated with the eventual computed result."""
         if self._meta is not None:
             return self._meta.layout
         raise ValueError("This collection's meta is None; unknown layout.")
 
     @property
     def behavior(self) -> dict:
+        """awkward Array behavior dictionary."""
         if self._meta is not None:
             return self._meta.behavior
         raise ValueError(
@@ -623,12 +633,14 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     @property
     def form(self) -> Form:
+        """awkward Array form associated with the eventual computed result."""
         if self._meta is not None:
             return self._meta.layout.form
         raise ValueError("This collection's meta is None; unknown form.")
 
     @property
     def type(self) -> ArrayType:
+        """awkward Array type associated with the eventual computed result."""
         t = ak.types.ArrayType(
             self._meta._layout.form.type_from_behavior(self._meta._behavior),
             0,
@@ -910,18 +922,43 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return self._getitem_single(where)
 
     def _call_behavior_method(self, method_name: str, *args: Any, **kwargs: Any) -> Any:
+        """Call a behavior method for an awkward array.
+        Please note that the raw dask_awkward arguments are forwarded to the
+        awkward Mixin class, and the user must deal with when to make calls
+        to map_partitions.
+        """
         if hasattr(self._meta, method_name):
-            return self.map_partitions(
-                _BehaviorMethodFn(method_name, **kwargs),
-                *args,
-                label=hyphenize(method_name),
+            array_context = kwargs.pop("__dask_array__", self)
+            return getattr(self._meta, method_name)(
+                *args, __dask_array__=array_context, **kwargs
             )
         raise AttributeError(
             f"Method {method_name} is not available to this collection."
         )
 
     def _call_behavior_property(self, property_name: str) -> Any:
-        if hasattr(self._meta, property_name):
+        """Call a property for an awkward array.
+        This also allows for some internal state to be tracked via behaviors
+        if a user follows the pattern:
+
+        class SomeMixin:
+            def get_the_property(self, __dask_array__ = None):
+                ...
+
+            the_property = property(get_the_property)
+
+        This pattern is caught and reissued as a method call to the "get_the_property"
+        method, passing self as __dask_array__.
+
+        If get_the_property is not defined, and the_property is decorated with
+        @property, then then no calling context is needed and the property is
+        mapped directly.
+        """
+        if hasattr(self._meta.__class__, property_name):
+            if hasattr(self._meta.__class__, f"get_{property_name}"):
+                return self._call_behavior_method(
+                    f"get_{property_name}",
+                )
             return self.map_partitions(
                 _BehaviorPropertyFn(property_name),
                 label=hyphenize(property_name),
@@ -932,15 +969,15 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     def _maybe_behavior_method(self, attr: str) -> bool:
         try:
-            res = getattr(self._meta, attr)
-            return callable(res)
+            res = getattr(self._meta.__class__, attr)
+            return (not isinstance(res, property)) and callable(res)
         except AttributeError:
             return False
 
     def _maybe_behavior_property(self, attr: str) -> bool:
         try:
-            res = getattr(self._meta, attr)
-            return not callable(res)
+            res = getattr(self._meta.__class__, attr)
+            return isinstance(res, property)
         except AttributeError:
             return False
 
@@ -1102,6 +1139,7 @@ def new_array_object(
     name: str,
     *,
     meta: ak.Array | None = None,
+    behavior: dict | None = None,
     npartitions: int | None = None,
     divisions: tuple[int | None, ...] | None = None,
 ) -> Array:
@@ -1152,16 +1190,26 @@ def new_array_object(
             actual_meta = empty_typetracer()
     else:
         if not isinstance(meta, ak.Array):
-            raise TypeError("meta must be an instance of an Awkward Array.")
+            raise TypeError(
+                f"meta must be an instance of an Awkward Array, not {type(meta)}."
+            )
         actual_meta = meta
 
-    return Array(dsk, name, actual_meta, divs)
+    if behavior is not None:
+        actual_meta.behavior = behavior
+
+    out = Array(dsk, name, actual_meta, divs)
+    if actual_meta.__doc__ != actual_meta.__class__.__doc__:
+        out.__doc__ = actual_meta.__doc__
+
+    return out
 
 
 def partitionwise_layer(
     func: Callable,
     name: str,
     *args: Any,
+    opt_touch_all: bool = False,
     **kwargs: Any,
 ) -> Blockwise:
     """Create a partitionwise graph layer.
@@ -1209,6 +1257,8 @@ def partitionwise_layer(
         concatenate=True,
         **kwargs,
     )
+    if opt_touch_all:
+        layer._opt_touch_all = True
     return layer
 
 
@@ -1219,6 +1269,7 @@ def map_partitions(
     token: str | None = None,
     meta: Any | None = None,
     output_divisions: int | None = None,
+    opt_touch_all: bool = False,
     **kwargs: Any,
 ) -> Array:
     """Map a callable across all partitions of any number of collections.
@@ -1254,6 +1305,9 @@ def map_partitions(
         value greater than 1 means the divisions were expanded by some
         operation. This argument is mainly for internal library
         function implementations.
+    opt_touch_all : bool
+        Touch all layers in this graph during typetracer based
+        optimization.
     **kwargs : Any
         Additional keyword arguments passed to the `fn`.
 
@@ -1292,7 +1346,13 @@ def map_partitions(
     token = token or tokenize(fn, *args, meta, **kwargs)
     label = label or funcname(fn)
     name = f"{label}-{token}"
-    lay = partitionwise_layer(fn, name, *args, **kwargs)
+    lay = partitionwise_layer(
+        fn,
+        name,
+        *args,
+        opt_touch_all=opt_touch_all,
+        **kwargs,
+    )
     deps = [a for a in args if is_dask_collection(a)] + [
         v for _, v in kwargs.items() if is_dask_collection(v)
     ]
@@ -1325,6 +1385,31 @@ def map_partitions(
             name=name,
             meta=meta,
             npartitions=deps[0].npartitions,
+        )
+
+
+def _from_iter(obj):
+    """Try to run ak.from_iter, but have fallbacks.
+
+    This function first tries to call ak.form_iter on the input (which
+    should be some iterable). We expect a list of Scalar typetracers
+    to fail, so if the call fails due to ValueError or TypeError then
+    we manually do some typetracer operations to return the proper
+    representation of the input iterable-of-typetracers.
+
+    """
+    try:
+        return ak.from_iter(obj)
+    except (ValueError, TypeError):
+        first_obj = obj[0]
+
+        if isinstance(first_obj, MaybeNone):
+            first_obj = first_obj.content
+
+        return ak.Array(
+            ak.Array(first_obj)
+            .layout.form.length_one_array()
+            .layout.to_typetracer(forget_length=True)
         )
 
 
@@ -1388,7 +1473,7 @@ def total_reduction_to_scalar(
         name=name_agg,
         name_input=chunked_result.name,
         npartitions_input=chunked_result.npartitions,
-        concat_func=ak.from_iter,
+        concat_func=_from_iter,
         tree_node_func=comb_fn,
         finalize_func=agg_fn,
         split_every=split_every,
@@ -1417,15 +1502,15 @@ def calculate_known_divisions(array: Array) -> tuple[int, ...]:
         Locations (indices) of division boundaries.
 
     """
-    with dask.config.set({"awkward.compute-unknown-meta": False}):
-        # if more than 1 partition use cumulative sum
-        if array.npartitions > 1:
-            nums = np.array(array.map_partitions(len).compute())
-            cs = list(np.cumsum(nums))
-            return tuple([0, *cs])
+    num = map_partitions(ak.num, array, axis=0, meta=empty_typetracer())
 
-        # if only 1 partition just get its length.
-        return (0, array.map_partitions(len).compute())
+    # if only 1 partition things are simple
+    if array.npartitions == 1:
+        return (0, num.compute())
+
+    # if more than 1 partition cumulative sum required
+    cs = list(np.cumsum(num.compute()))
+    return tuple([0, *cs])
 
 
 def _type(array: Array) -> Type | None:
@@ -1769,10 +1854,6 @@ def normalize_single_outer_inner_index(
 
 def typetracer_from_form(form: Form) -> ak.Array:
     """Create a typetracer Array from an awkward form.
-
-    This functions uses `form` along with :func:`awkward.from_buffers`
-    to create an awkward typetracer Array (an Array that does not
-    carry data).
 
     Parameters
     ----------

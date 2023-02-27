@@ -1,9 +1,9 @@
-Array
------
+Utilities
+---------
 
 .. currentmodule:: dask_awkward
 
 .. autosummary::
    :toctree: generated/
 
-   Array
+   necessary_columns
