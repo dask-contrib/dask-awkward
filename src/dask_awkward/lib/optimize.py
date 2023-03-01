@@ -229,7 +229,7 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
         layers[name] = _touch_and_call(layers[name])
 
     hlg = HighLevelGraph(layers, deps)
-    outlayer = list(hlg.layers.values())[-1]
+    outlayer = hlg.layers[hlg._toposort_layers()[-1]]
 
     try:
         out = get_sync(hlg, list(outlayer.keys())[0])
