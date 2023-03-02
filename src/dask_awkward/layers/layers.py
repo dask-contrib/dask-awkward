@@ -141,6 +141,12 @@ class AwkwardInputLayer(Blockwise):
             if len(columns) == 0:
                 columns = self._meta.fields[:1]
 
+            # requested columns to original order; adds on extra columns, which are probably
+            # wildcard ones
+            form_columns = self._meta.layout.form.columns()
+            original = [c for c in form_columns if c in columns]
+            new = [c for c in columns if c not in form_columns]
+            columns = original + new
             io_func = self.io_func.project_columns(columns)
             return AwkwardInputLayer(
                 name=self.name,

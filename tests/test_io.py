@@ -141,6 +141,32 @@ def test_delayed_single_node():
     assert_eq(c, a)
 
 
+def test_column_ordering(tmpdir):
+    fn = f"{tmpdir}/temp.json"
+    j = """{"a": [1, 2, 3], "b": [4, 5, 6]}"""
+    with open(fn, "w") as f:
+        f.write(j)
+    b = dak.from_json(fn)
+
+    def assert_1(arr):
+        # after loading
+        assert arr.fields == ["a", "b"]
+        return arr
+
+    def assert_2(arr):
+        # after reorder
+        assert arr.fields == ["b", "a"]
+        return arr
+
+    c = b.map_partitions(assert_1)[["b", "a"]].map_partitions(assert_2)
+
+    # arbitrary order here
+    assert set(list(dak.lib.necessary_columns(c).values())[0]) == {"b", "a"}
+
+    arr = c.compute()
+    assert arr.fields == ["b", "a"]  # output has required order
+
+
 def test_from_map_with_args_kwargs() -> None:
     import dask.core
 

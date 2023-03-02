@@ -22,6 +22,8 @@ def necessary_columns(*args: Any, traverse: bool = True) -> dict[str, list[str]]
     dict[str, list[str]]
         Mapping that pairs the input layers in the graph to the
         columns that have been determined necessary from that layer.
+        These are not necessarily in the same order as the original
+        input.
 
     Examples
     --------
