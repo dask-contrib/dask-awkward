@@ -143,7 +143,9 @@ class AwkwardInputLayer(Blockwise):
 
             # requested columns to original order; adds on extra columns, which are probably
             # wildcard ones
-            columns = [c for c in self.columns if c in columns] + [c for c in columns if c not in self.columns]
+            columns = [c for c in self.columns if c in columns] + [
+                c for c in columns if c not in self.columns
+            ]
             io_func = self.io_func.project_columns(columns)
             return AwkwardInputLayer(
                 name=self.name,
