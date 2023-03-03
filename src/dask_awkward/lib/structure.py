@@ -890,6 +890,8 @@ class _WithFieldFn:
         self.behavior = behavior
 
     def __call__(self, base: ak.Array, what: ak.Array) -> ak.Array:
+        if ak.backend(what) == "typetracer":
+            what.layout._touch_data(recursive=True)
         return ak.with_field(
             base,
             what,
