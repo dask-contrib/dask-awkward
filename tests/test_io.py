@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 from dask.array.utils import assert_eq as da_assert_eq
 from dask.delayed import delayed
+from numpy.typing import DTypeLike
 
 try:
     import ujson as json
@@ -288,13 +289,18 @@ def test_to_dask_array_multidim() -> None:
 
 @pytest.mark.parametrize("clear_divs", [True, False])
 @pytest.mark.parametrize("optimize_graph", [True, False])
-def test_to_dask_array_divs(clear_divs: bool, optimize_graph: bool) -> None:
-    a = ak.Array([1, 2, 3, 4, 5, 6, 7, 8])
+@pytest.mark.parametrize("dtype", [np.uint32, np.float64])
+def test_to_dask_array_divs(
+    clear_divs: bool,
+    optimize_graph: bool,
+    dtype: DTypeLike,
+) -> None:
+    a = ak.Array(np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype=dtype))
     b = dak.from_awkward(a, npartitions=3)
     if clear_divs:
         b.clear_divisions()
     c = b.to_dask_array(optimize_graph=optimize_graph)
-    d = np.array([1, 2, 3, 4, 5, 6, 7, 8])
+    d = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype=dtype)
     da_assert_eq(c, d)
 
 
