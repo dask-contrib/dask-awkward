@@ -32,4 +32,4 @@ Documentation
 -------------
 
 Documentation is hosted at
-[https://dask-awkward.readthedocs.io/](https://dask-awkward.readthedocs.io/en/latest/index.html).
+[https://dask-awkward.readthedocs.io/](https://dask-awkward.readthedocs.io/).
