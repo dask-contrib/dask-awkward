@@ -276,7 +276,11 @@ def to_dask_array(array: Array, optimize_graph: bool = True) -> DaskArray:
         new = map_partitions(ak.to_numpy, array, meta=empty_typetracer())
         graph = new.dask
         dtype = primitive_to_dtype(array._meta.layout.form.type.primitive)
-        chunks: tuple[tuple[float, ...], ...] = ((np.nan,) * array.npartitions,)
+        if array.known_divisions:
+            divs = np.array(array.divisions)
+            chunks = (tuple(divs[1:] - divs[:-1]),)
+        else:
+            chunks: tuple[tuple[float, ...], ...] = ((np.nan,) * array.npartitions,)
         return new_da_object(
             graph,
             new.name,
