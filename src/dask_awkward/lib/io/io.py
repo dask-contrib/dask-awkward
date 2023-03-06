@@ -246,7 +246,8 @@ def to_dask_array(
     ----------
     array : Array
         The dask awkward array collection.
-
+    dtype : DType
+        NumPy dtype for the resulting array.
     optimize_graph : bool
         Optimize the graph associated with `array` (the
         ``dask_awkward.Array``) before converting to
