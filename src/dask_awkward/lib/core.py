@@ -1102,10 +1102,15 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         return to_delayed(self, optimize_graph=optimize_graph)
 
-    def to_dask_array(self, optimize_graph: bool = True) -> DaskArray:
+    def to_dask_array(
+        self,
+        *,
+        dtype: Any = None,
+        optimize_graph: bool = True,
+    ) -> DaskArray:
         from dask_awkward.lib.io.io import to_dask_array
 
-        return to_dask_array(self, optimize_graph=optimize_graph)
+        return to_dask_array(self, dtype=dtype, optimize_graph=optimize_graph)
 
     def to_parquet(
         self,

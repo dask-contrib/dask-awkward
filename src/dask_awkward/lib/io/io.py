@@ -231,7 +231,12 @@ def to_dask_bag(array: Array) -> DaskBag:
     return Bag(array.dask, array.name, array.npartitions)
 
 
-def to_dask_array(array: Array, optimize_graph: bool = True) -> DaskArray:
+def to_dask_array(
+    array: Array,
+    *,
+    dtype: Any = None,
+    optimize_graph: bool = True,
+) -> DaskArray:
     """Convert awkward array collection to a Dask array collection.
 
     This conversion requires the awkward array to have a rectilinear
@@ -241,6 +246,8 @@ def to_dask_array(array: Array, optimize_graph: bool = True) -> DaskArray:
     ----------
     array : Array
         The dask awkward array collection.
+    dtype : DType
+        NumPy dtype for the resulting array.
     optimize_graph : bool
         Optimize the graph associated with `array` (the
         ``dask_awkward.Array``) before converting to
@@ -275,7 +282,7 @@ def to_dask_array(array: Array, optimize_graph: bool = True) -> DaskArray:
     if ndim == 1:
         new = map_partitions(ak.to_numpy, array, meta=empty_typetracer())
         graph = new.dask
-        dtype = primitive_to_dtype(array._meta.layout.form.type.primitive)
+        dtype = dtype or primitive_to_dtype(array._meta.layout.form.type.primitive)
         if array.known_divisions:
             divs = np.array(array.divisions)
             chunks = (tuple(divs[1:] - divs[:-1]),)
@@ -296,7 +303,7 @@ def to_dask_array(array: Array, optimize_graph: bool = True) -> DaskArray:
         while no_primitive:
             content = content.content
             no_primitive = not hasattr(content, "primitive")
-        dtype = primitive_to_dtype(content.primitive)
+        dtype = dtype or primitive_to_dtype(content.primitive)
 
         name = f"to-dask-array-{tokenize(array)}"
         nan_tuples_innerdims = ((np.nan,),) * (ndim - 1)
