@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pathlib
+
 import pytest
 
 pytest.importorskip("pyarrow")
@@ -181,3 +183,18 @@ def test_unnamed_root(
         columns=columns,
     )
     assert_eq(daa, caa, check_forms=False)
+
+
+@pytest.mark.parametrize("prefix", [None, "abc"])
+def test_to_parquet_with_prefix(
+    daa: dak.Array,
+    tmp_path: pathlib.Path,
+    prefix: str | None,
+) -> None:
+    dak.to_parquet(daa, str(tmp_path), prefix=prefix, compute=True)
+    l = list(tmp_path.glob("*"))
+    for ll in l:
+        if prefix is not None:
+            assert f"/{prefix}-part" in str(ll)
+        else:
+            assert "/part" in str(ll)
