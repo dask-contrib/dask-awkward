@@ -168,12 +168,19 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
             if len(columns) == 0:
                 columns = self._meta.fields[:1]
 
-            # requested columns to original order; adds on extra columns, which are probably
-            # wildcard ones
+            # original columns before column projection
             form_columns = self._meta.layout.form.columns()
+
+            # make sure that the requested columns match the order of
+            # the original columns; tack on "new" columns that are
+            # likely the wildcard columns.
             original = [c for c in form_columns if c in columns]
             new = [c for c in columns if c not in form_columns]
             columns = original + new
+
+            # set of all columns that will _not_ be read from disk.
+            removed = [c for c in form_columns if c in (set(form_columns) - set(columns))]
+
             io_func = self.io_func.project_columns(columns)
             return AwkwardInputLayer(
                 name=self.name,
