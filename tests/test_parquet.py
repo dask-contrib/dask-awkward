@@ -194,7 +194,8 @@ def test_to_parquet_with_prefix(
     dak.to_parquet(daa, str(tmp_path), prefix=prefix, compute=True)
     files = list(tmp_path.glob("*"))
     for ifile in files:
+        fname = ifile.parts[-1]
         if prefix is not None:
-            assert f"/{prefix}-part" in str(ifile)
+            assert fname.startswith(f"{prefix}")
         else:
-            assert "/part" in str(ifile)
+            assert fname.startswith("part")
