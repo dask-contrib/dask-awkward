@@ -192,9 +192,9 @@ def test_to_parquet_with_prefix(
     prefix: str | None,
 ) -> None:
     dak.to_parquet(daa, str(tmp_path), prefix=prefix, compute=True)
-    l = list(tmp_path.glob("*"))
-    for ll in l:
+    files = list(tmp_path.glob("*"))
+    for ifile in files:
         if prefix is not None:
-            assert f"/{prefix}-part" in str(ll)
+            assert f"/{prefix}-part" in str(ifile)
         else:
-            assert "/part" in str(ll)
+            assert "/part" in str(ifile)
