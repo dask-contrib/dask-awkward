@@ -14,9 +14,16 @@ from awkward.operations.ak_from_parquet import _load
 from dask.base import tokenize
 from dask.blockwise import BlockIndex
 from dask.highlevelgraph import HighLevelGraph
+from fsspec import AbstractFileSystem
 from fsspec.core import get_fs_token_paths
 
-from dask_awkward.lib.core import map_partitions, new_scalar_object, typetracer_array
+from dask_awkward.lib.core import (
+    Array,
+    Scalar,
+    map_partitions,
+    new_scalar_object,
+    typetracer_array,
+)
 from dask_awkward.lib.io.io import from_map
 
 log = logging.getLogger(__name__)
@@ -26,7 +33,7 @@ class _FromParquetFn:
     def __init__(
         self,
         *,
-        fs: Any,
+        fs: AbstractFileSystem,
         schema: Any,
         listsep: str = "list.item",
         unnamed_root: bool = False,
@@ -65,7 +72,7 @@ class _FromParquetFileWiseFn(_FromParquetFn):
     def __init__(
         self,
         *,
-        fs: Any,
+        fs: AbstractFileSystem,
         schema: Any,
         listsep: str = "list.item",
         unnamed_root: bool = False,
@@ -106,7 +113,7 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
     def __init__(
         self,
         *,
-        fs: Any,
+        fs: AbstractFileSystem,
         schema: Any,
         listsep: str = "list.item",
         unnamed_root: bool = False,
@@ -141,14 +148,14 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
 
 
 def from_parquet(
-    path,
-    storage_options=None,
-    ignore_metadata=True,
-    scan_files=False,
-    columns=None,
-    filters=None,
-    split_row_groups=None,
-):
+    path: Any,
+    storage_options: dict | None = None,
+    ignore_metadata: bool = True,
+    scan_files: bool = False,
+    columns: Sequence[str] | None = None,
+    filters: Any | None = None,
+    split_row_groups: Any | None = None,
+) -> Array:
     """Read parquet dataset into an :py:obj:`~dask_awkward.Array` collection.
 
     Parameters
@@ -376,18 +383,20 @@ def _write_partition(
 class _ToParquetFn:
     def __init__(
         self,
-        fs,
-        path,
-        return_metadata=False,
-        compression=None,
-        head=None,
-        npartitions=None,
+        fs: AbstractFileSystem,
+        path: Any,
+        return_metadata: bool = False,
+        compression: Any | None = None,
+        head: Any | None = None,
+        npartitions: int | None = None,
+        prefix: str | None = None,
     ):
         self.fs = fs
         self.path = path
         self.return_metadata = return_metadata
         self.compression = compression
         self.head = head
+        self.prefix = prefix
         self.zfill = (
             math.ceil(math.log(npartitions, 10)) if npartitions is not None else 1
         )
@@ -396,6 +405,8 @@ class _ToParquetFn:
 
     def __call__(self, data, block_index):
         filename = f"part{str(block_index[0]).zfill(self.zfill)}.parquet"
+        if self.prefix is not None:
+            filename = f"{self.prefix}-{filename}"
         return _write_partition(
             data,
             self.path,
@@ -407,7 +418,14 @@ class _ToParquetFn:
         )
 
 
-def to_parquet(data, path, storage_options=None, write_metadata=False, compute=True):
+def to_parquet(
+    data: Array,
+    path: Any,
+    storage_options: dict[str, Any] | None = None,
+    write_metadata: bool = False,
+    compute: bool = True,
+    prefix: str | None = None,
+) -> Scalar | None:
     """Write data to parquet format.
 
     Parameters
@@ -443,7 +461,7 @@ def to_parquet(data, path, storage_options=None, write_metadata=False, compute=T
     name = f"write-parquet-{tokenize(fs, data, path)}"
 
     map_res = map_partitions(
-        _ToParquetFn(fs, path=path, npartitions=data.npartitions),
+        _ToParquetFn(fs, path=path, npartitions=data.npartitions, prefix=prefix),
         data,
         BlockIndex((data.npartitions,)),
         label="to-parquet",
@@ -464,5 +482,6 @@ def to_parquet(data, path, storage_options=None, write_metadata=False, compute=T
     out = new_scalar_object(graph, final_name, meta=None)
     if compute:
         out.compute()
+        return None
     else:
         return out

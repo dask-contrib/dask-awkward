@@ -285,9 +285,9 @@ def to_dask_array(
         dtype = dtype or primitive_to_dtype(array._meta.layout.form.type.primitive)
         if array.known_divisions:
             divs = np.array(array.divisions)
-            chunks = (tuple(divs[1:] - divs[:-1]),)
+            chunks: tuple[tuple[float, ...], ...] = (tuple(divs[1:] - divs[:-1]),)
         else:
-            chunks: tuple[tuple[float, ...], ...] = ((np.nan,) * array.npartitions,)
+            chunks = ((np.nan,) * array.npartitions,)
         return new_da_object(
             graph,
             new.name,
