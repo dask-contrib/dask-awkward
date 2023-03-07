@@ -179,7 +179,9 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
             columns = original + new
 
             # set of all columns that will _not_ be read from disk.
-            removed = [c for c in form_columns if c in (set(form_columns) - set(columns))]
+            removed = [
+                c for c in form_columns if c in (set(form_columns) - set(columns))
+            ]
 
             io_func = self.io_func.project_columns(columns)
             return AwkwardInputLayer(
