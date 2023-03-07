@@ -179,7 +179,7 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
             columns = original + new
 
             # set of all columns that will _not_ be read from disk.
-            removed = [
+            removed = [  # noqa: F841
                 c for c in form_columns if c in (set(form_columns) - set(columns))
             ]
 
