@@ -405,41 +405,28 @@ class _ToJsonFn:
         path: str,
         npartitions: int,
         compression: str | None,
-        line_delimited: bool,
         **kwargs: Any,
     ) -> None:
         self.fs = fs
         self.path = path
-        self.just_dir = ".json" not in self.path
-        if self.just_dir:
-            if not self.fs.exists(path):
-                self.fs.mkdir(path)
-        self.wildcarded = "*" in self.path
+        if not self.fs.exists(path):
+            self.fs.mkdir(path)
         self.zfill = math.ceil(math.log(npartitions, 10))
         self.kwargs = kwargs
         self.compression = compression
         if self.compression == "infer":
             self.compression = infer_compression(self.path)
-        self.line_delimited = line_delimited
 
     def __call__(self, array: ak.Array, block_index: tuple[int]) -> None:
         part = str(block_index[0]).zfill(self.zfill)
+        filename = f"part{part}.json"
+        if self.compression is not None and self.compression != "infer":
+            compression = "gz" if self.compression == "gzip" else self.compression
+            filename = f"{filename}.{compression}"
 
-        if self.just_dir:
-            path = os.path.join(self.path, f"part{part}.json")
-        elif self.wildcarded:
-            path = self.path.replace("*", part)
-        else:
-            raise RuntimeError("Cannot construct output file path.")  # pragma: no cover
-
-        try:
-            with self.fs.open(path, mode="wt", compression=self.compression) as f:
-                ak.to_json(array, f, line_delimited=self.line_delimited, **self.kwargs)
-        except FileNotFoundError:
-            raise FileNotFoundError(
-                f"Parent directory for output file ({path}) "
-                "is not available, create it."
-            )
+        thispath = self.fs.sep.join([self.path, filename])
+        with self.fs.open(thispath, mode="wt", compression=self.compression) as f:
+            ak.to_json(array, f, line_delimited=True, **self.kwargs)
 
         return None
 
@@ -447,12 +434,35 @@ class _ToJsonFn:
 def to_json(
     array: Array,
     path: str,
-    line_delimited: bool = True,
     storage_options: dict[str, Any] | None = None,
     compute: bool = False,
-    compression: str | None = "infer",
+    compression: str | None = None,
     **kwargs: Any,
 ) -> Scalar:
+    """Write data to line delimited JSON.
+
+    Parameters
+    ----------
+    array : Array
+        dask-awkward Array collection to write to disk.
+    path : str
+         Root directory of location to write to.
+    storage_options : dict[str, Any], optional
+        filesystem-spec storage options.
+    compute : bool
+        If ``True`` immediately compute this collection.
+    compression : str, optional
+        filesystem-spec compression algorithm to use.
+    **kwargs : Any
+        Additional arguments passed to ``ak.to_json``
+
+    Returns
+    -------
+    None or dask_awkward.Scalar
+        Scalar which provides a lazy compute if `compute` is
+        ``False``, or ``None`` if `compute` is ``True``.
+
+    """
     storage_options = storage_options or {}
     fs, _ = url_to_fs(path, **storage_options)
     nparts = array.npartitions
@@ -462,7 +472,6 @@ def to_json(
             path,
             npartitions=nparts,
             compression=compression,
-            line_delimited=line_delimited,
             **kwargs,
         ),
         array,

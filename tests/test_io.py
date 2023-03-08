@@ -320,12 +320,13 @@ def test_to_bag(daa, caa):
         assert comprec.tolist() == entry.tolist()
 
 
-def test_to_json(daa, tmpdir_factory):
+@pytest.mark.parametrize("compression", ["xz", "gzip", "zip"])
+def test_to_json(daa, tmpdir_factory, compression):
     tdir = str(tmpdir_factory.mktemp("json_temp"))
 
     p1 = os.path.join(tdir, "z", "z")
 
-    dak.to_json(daa, p1, compute=True, line_delimited=True)
+    dak.to_json(daa, p1, compute=True)
     paths = list((Path(tdir) / "z" / "z").glob("part*.json"))
     assert len(paths) == daa.npartitions
     arrays = ak.concatenate([ak.from_json(p, line_delimited=True) for p in paths])
@@ -336,25 +337,11 @@ def test_to_json(daa, tmpdir_factory):
 
     s = dak.to_json(
         daa,
-        os.path.join(tdir, "file-*.json.gz"),
+        tdir,
+        compression=compression,
         compute=False,
-        line_delimited=True,
     )
     s.compute()
-    r = dak.from_json(os.path.join(tdir, "*.json.gz"))
+    suffix = "gz" if compression == "gzip" else compression
+    r = dak.from_json(os.path.join(tdir, f"*.json.{suffix}"))
     assert_eq(x, r)
-
-
-def test_to_json_raise_filenotfound(
-    daa: dak.Array,
-    tmpdir_factory: pytest.TempdirFactory,
-) -> None:
-    p = tmpdir_factory.mktemp("onelevel")
-    p2 = os.path.join(str(p), "two")
-    with pytest.raises(FileNotFoundError, match="Parent directory for output file"):
-        dak.to_json(
-            daa,
-            os.path.join(p2, "three", "four", "*.json"),
-            compute=True,
-            line_delimited=True,
-        )
