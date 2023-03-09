@@ -37,6 +37,7 @@ class _FromParquetFn:
         schema: Any,
         listsep: str = "list.item",
         unnamed_root: bool = False,
+        mock_dataless: Sequence[str] | None = None,
     ) -> None:
         self.fs = fs
         self.schema = schema
@@ -45,13 +46,18 @@ class _FromParquetFn:
         self.columns = self.schema.columns(self.listsep)
         if self.unnamed_root:
             self.columns = [f".{c}" for c in self.columns]
+        self.mock_dataless = mock_dataless
 
     @abc.abstractmethod
     def __call__(self, source: Any) -> ak.Array:
         ...
 
     @abc.abstractmethod
-    def project_columns(self, columns: Sequence[str] | None) -> _FromParquetFn:
+    def project_columns(
+        self,
+        columns: Sequence[str] | None,
+        mock_dataless: Sequence[str] | None = None,
+    ) -> _FromParquetFn:
         ...
 
     def __repr__(self) -> str:
@@ -60,7 +66,8 @@ class _FromParquetFn:
             f"  schema={repr(self.schema)}\n"
             f"  listsep={self.listsep}\n"
             f"  unnamed_root={self.unnamed_root}\n"
-            f"  self.columns={self.columns}\n)"
+            f"  columns={self.columns}\n"
+            f"  mock_dataless={self.mock_dataless}\n)"
         )
         return s
 
@@ -76,9 +83,14 @@ class _FromParquetFileWiseFn(_FromParquetFn):
         schema: Any,
         listsep: str = "list.item",
         unnamed_root: bool = False,
+        mock_dataless: Sequence[str] | None = None,
     ) -> None:
         super().__init__(
-            fs=fs, schema=schema, listsep=listsep, unnamed_root=unnamed_root
+            fs=fs,
+            schema=schema,
+            listsep=listsep,
+            unnamed_root=unnamed_root,
+            mock_dataless=mock_dataless,
         )
 
     def __call__(self, source: Any) -> Any:
@@ -89,7 +101,11 @@ class _FromParquetFileWiseFn(_FromParquetFn):
             self.schema,
         )
 
-    def project_columns(self, columns: Sequence[str] | None) -> _FromParquetFileWiseFn:
+    def project_columns(
+        self,
+        columns: Sequence[str] | None,
+        mock_dataless: Sequence[str] | None = None,
+    ) -> _FromParquetFileWiseFn:
         if columns is None:
             return self
 
@@ -99,6 +115,7 @@ class _FromParquetFileWiseFn(_FromParquetFn):
             schema=new_schema,
             listsep=self.listsep,
             unnamed_root=self.unnamed_root,
+            mock_dataless=mock_dataless,
         )
 
         log.debug(f"project_columns received: {columns}")
@@ -117,9 +134,14 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
         schema: Any,
         listsep: str = "list.item",
         unnamed_root: bool = False,
+        mock_dataless: Sequence[str] | None = None,
     ) -> None:
         super().__init__(
-            fs=fs, schema=schema, listsep=listsep, unnamed_root=unnamed_root
+            fs=fs,
+            schema=schema,
+            listsep=listsep,
+            unnamed_root=unnamed_root,
+            mock_dataless=mock_dataless,
         )
 
     def __call__(self, pair: Any) -> ak.Array:
@@ -137,6 +159,7 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
     def project_columns(
         self,
         columns: Sequence[str] | None,
+        mock_dataless: Sequence[str] | None = None,
     ) -> _FromParquetFragmentWiseFn:
         if columns is None:
             return self
@@ -144,6 +167,7 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
             fs=self.fs,
             schema=self.schema.select_columns(columns),
             unnamed_root=self.unnamed_root,
+            mock_dataless=mock_dataless,
         )
 
 
