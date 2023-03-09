@@ -102,7 +102,7 @@ class _FromParquetFileWiseFn(_FromParquetFn):
             self.schema,
         )
 
-        for entry in (self.mock_dataless or []):
+        for entry in self.mock_dataless or []:
             # split on "." so we get lists of strings for fields of fields
             entries = entry.split(".")
             if len(entries) == 1:
