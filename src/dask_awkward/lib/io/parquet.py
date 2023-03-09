@@ -9,6 +9,7 @@ from typing import Any, Sequence
 
 import awkward as ak
 import fsspec
+import numpy as np
 from awkward.operations import ak_from_parquet, to_arrow_table
 from awkward.operations.ak_from_parquet import _load
 from dask.base import tokenize
@@ -94,12 +95,31 @@ class _FromParquetFileWiseFn(_FromParquetFn):
         )
 
     def __call__(self, source: Any) -> Any:
-        return _file_to_partition(
+        a = _file_to_partition(
             source,
             self.fs,
             self.columns,
             self.schema,
         )
+        from tqdm import tqdm
+
+        mdl = self.mock_dataless or []
+        for entry in tqdm(mdl):
+            entries = entry.split(".")
+            if len(entries) == 1:
+                a = ak.with_field(
+                    a,
+                    np.broadcast_to(np.int64(0), (len(a),)),
+                    entries[0],
+                )
+            else:
+                a = ak.with_field(
+                    a,
+                    np.broadcast_to(np.int64(0), (len(a),)),
+                    entries,
+                )
+
+        return a
 
     def project_columns(
         self,
