@@ -101,10 +101,9 @@ class _FromParquetFileWiseFn(_FromParquetFn):
             self.columns,
             self.schema,
         )
-        from tqdm import tqdm
 
-        mdl = self.mock_dataless or []
-        for entry in tqdm(mdl):
+        for entry in (self.mock_dataless or []):
+            # split on "." so we get lists of strings for fields of fields
             entries = entry.split(".")
             if len(entries) == 1:
                 a = ak.with_field(
@@ -113,6 +112,7 @@ class _FromParquetFileWiseFn(_FromParquetFn):
                     entries[0],
                 )
             else:
+                ## This will error if the top level field is not already available
                 a = ak.with_field(
                     a,
                     np.broadcast_to(np.int64(0), (len(a),)),
