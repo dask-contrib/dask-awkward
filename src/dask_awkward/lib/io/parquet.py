@@ -24,7 +24,7 @@ from dask_awkward.lib.core import (
     new_scalar_object,
     typetracer_array,
 )
-from dask_awkward.lib.io.io import from_map
+from dask_awkward.lib.io.io import ImplementsFormTransformation, from_map
 
 log = logging.getLogger(__name__)
 
@@ -37,14 +37,37 @@ class _FromParquetFn:
         schema: Any,
         listsep: str = "list.item",
         unnamed_root: bool = False,
+        base_unnamed_root: bool = False,
+        form_mapping: ImplementsFormTransformation | None = None,
     ) -> None:
         self.fs = fs
         self.schema = schema
         self.listsep = listsep
         self.unnamed_root = unnamed_root
+        self.base_unnamed_root = base_unnamed_root
         self.columns = self.schema.columns(self.listsep)
         if self.unnamed_root:
             self.columns = [f".{c}" for c in self.columns]
+        self.base_columns = None
+        self.form_mapping = form_mapping
+
+        if self.form_mapping is not None:
+            (
+                schema_labelled,
+                report,
+            ) = ak._nplikes.typetracer.typetracer_with_report(self.rendered_form)
+            tt = ak.Array(schema_labelled)
+            for key in self.columns:
+                tt[tuple(key.split("."))].layout._touch_data(recursive=True)
+
+            self.base_columns = [
+                x
+                for x in self.form_mapping.extract_form_keys_base_columns(
+                    set(report.data_touched)
+                )
+            ]
+        if self.base_unnamed_root and self.base_columns is not None:
+            self.base_columns = [f".{c}" for c in self.base_columns]
 
     @abc.abstractmethod
     def __call__(self, source: Any) -> ak.Array:
@@ -60,7 +83,10 @@ class _FromParquetFn:
             f"  schema={repr(self.schema)}\n"
             f"  listsep={self.listsep}\n"
             f"  unnamed_root={self.unnamed_root}\n"
-            f"  self.columns={self.columns}\n)"
+            f"  base_unnamed_root={self.base_unnamed_root}\n"
+            f"  columns={self.columns}\n"
+            f"  base_columns={self.base_columns}\n"
+            f"  form_mapping={self.form_mapping}\n)\n"
         )
         return s
 
@@ -76,16 +102,39 @@ class _FromParquetFileWiseFn(_FromParquetFn):
         schema: Any,
         listsep: str = "list.item",
         unnamed_root: bool = False,
+        base_unnamed_root: bool = False,
+        form_mapping: ImplementsFormTransformation | None = None,
     ) -> None:
         super().__init__(
-            fs=fs, schema=schema, listsep=listsep, unnamed_root=unnamed_root
+            fs=fs,
+            schema=schema,
+            listsep=listsep,
+            unnamed_root=unnamed_root,
+            base_unnamed_root=base_unnamed_root,
+            form_mapping=form_mapping,
         )
 
     def __call__(self, source: Any) -> Any:
+        if self.form_mapping is not None:
+            actual_form = self.schema.select_columns(self.columns)
+
+            start, stop = 0, len(source)
+
+            mapping, buffer_key = self.form_mapping.create_column_mapping_and_key(
+                source, start, stop
+            )
+
+            return ak.from_buffers(
+                actual_form,
+                stop - start,
+                mapping,
+                buffer_key=buffer_key,
+                behavior=self.form_mapping.behavior,
+            )
         return _file_to_partition(
             source,
             self.fs,
-            self.columns,
+            self.columns if self.base_columns is None else self.base_columns,
             self.schema,
         )
 
@@ -99,6 +148,8 @@ class _FromParquetFileWiseFn(_FromParquetFn):
             schema=new_schema,
             listsep=self.listsep,
             unnamed_root=self.unnamed_root,
+            base_unnamed_root=self.base_unnamed_root,
+            form_mapping=self.form_mapping,
         )
 
         log.debug(f"project_columns received: {columns}")
@@ -117,19 +168,30 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
         schema: Any,
         listsep: str = "list.item",
         unnamed_root: bool = False,
+        base_unnamed_root: bool = False,
+        form_mapping: ImplementsFormTransformation | None = None,
     ) -> None:
         super().__init__(
-            fs=fs, schema=schema, listsep=listsep, unnamed_root=unnamed_root
+            fs=fs,
+            schema=schema,
+            listsep=listsep,
+            unnamed_root=unnamed_root,
+            base_unnamed_root=base_unnamed_root,
+            form_mapping=form_mapping,
         )
 
     def __call__(self, pair: Any) -> ak.Array:
         subrg, source = pair
+        if self.form_mapping is not None:
+            raise RuntimeError(
+                "_FromParquetFragmentWiseFn does not yet support form remapping."
+            )
         if isinstance(subrg, int):
             subrg = [[subrg]]
         return _file_to_partition(
             source,
             self.fs,
-            self.columns,
+            self.columns if self.base_columns is None else self.base_columns,
             self.schema,
             subrg=subrg,
         )
@@ -144,6 +206,7 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
             fs=self.fs,
             schema=self.schema.select_columns(columns),
             unnamed_root=self.unnamed_root,
+            base_unnamed_root=self.base_unnamed_root,
         )
 
 
@@ -155,6 +218,7 @@ def from_parquet(
     columns: Sequence[str] | None = None,
     filters: Any | None = None,
     split_row_groups: Any | None = None,
+    form_mapping: ImplementsFormTransformation | None = None,
 ) -> Array:
     """Read parquet dataset into an :py:obj:`~dask_awkward.Array` collection.
 
@@ -178,6 +242,10 @@ def from_parquet(
         file becomes a partition. If None, the existence of a
         ``_metadata`` file and ignore_metadata=False implies True,
         else False.
+    form_mapping: ImplementsFormTransformation, optional
+        If not none then apply this remapping function to the awkward form of the
+        input data. The form keys of the desired form should be available data in the
+        input form.
 
     Returns
     -------
@@ -206,18 +274,26 @@ def from_parquet(
 
     listsep = "list.item"
     unnamed_root = False
+    base_unnamed_root = False
     for c in parquet_columns:
         if ".list.element." in c:
             listsep = "list.element"
             break
         if c.startswith("."):
-            unnamed_root = True
+            if form_mapping is None:
+                unnamed_root = True
+            else:
+                base_unnamed_root = True
 
     if split_row_groups is None:
         split_row_groups = row_counts is not None and len(row_counts) > 1
 
+    if form_mapping is not None:
+        subform = form_mapping(subform)
+
     meta = ak.Array(
-        subform.length_zero_array(highlevel=False).to_typetracer(forget_length=True)
+        subform.length_zero_array(highlevel=False).to_typetracer(forget_length=True),
+        behavior=None if form_mapping is None else form_mapping.behavior,
     )
 
     if split_row_groups is False or subrg is None:
@@ -228,6 +304,8 @@ def from_parquet(
                 schema=subform,
                 listsep=listsep,
                 unnamed_root=unnamed_root,
+                base_unnamed_root=base_unnamed_root,
+                form_mapping=form_mapping,
             ),
             actual_paths,
             label=label,
@@ -262,6 +340,8 @@ def from_parquet(
                 schema=subform,
                 listsep=listsep,
                 unnamed_root=unnamed_root,
+                base_unnamed_root=base_unnamed_root,
+                form_mapping=form_mapping,
             ),
             pairs,
             label=label,
