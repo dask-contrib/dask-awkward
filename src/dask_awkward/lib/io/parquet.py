@@ -115,13 +115,25 @@ class _FromParquetFileWiseFn(_FromParquetFn):
         )
 
     def __call__(self, source: Any) -> Any:
+        print(source)
+        print(self.fs)
+        print(self.columns)
+        print(self.schema)
+
+        raw_record = _file_to_partition(
+            source,
+            self.fs,
+            self.columns if self.base_columns is None else self.base_columns,
+            self.schema,
+        )
+        
         if self.form_mapping is not None:
             actual_form = self.schema.select_columns(self.columns)
 
             start, stop = 0, len(source)
 
             mapping, buffer_key = self.form_mapping.create_column_mapping_and_key(
-                source, start, stop
+                raw_record, start, stop
             )
 
             return ak.from_buffers(
@@ -131,12 +143,7 @@ class _FromParquetFileWiseFn(_FromParquetFn):
                 buffer_key=buffer_key,
                 behavior=self.form_mapping.behavior,
             )
-        return _file_to_partition(
-            source,
-            self.fs,
-            self.columns if self.base_columns is None else self.base_columns,
-            self.schema,
-        )
+        return raw_record
 
     def project_columns(self, columns: Sequence[str] | None) -> _FromParquetFileWiseFn:
         if columns is None:
