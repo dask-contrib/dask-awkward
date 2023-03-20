@@ -234,6 +234,7 @@ class _CartesianFn:
         self.kwargs = kwargs
 
     def __call__(self, *arrays):
+        # TODO: remove backend check when typetracer support exists for this
         if ak.backend(*arrays) == "typetracer":
             for array in arrays:
                 array.layout._touch_data(recursive=True)
