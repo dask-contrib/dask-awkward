@@ -125,3 +125,10 @@ def test_record_getitem_scalar_results(daa: dak.Array, caa: ak.Array) -> None:
 
 def test_single_partition(daa: dak.Array, caa: ak.Array) -> None:
     assert_eq(daa["points"]["x"][-1][3:], caa["points"]["x"][-1][3:])
+
+
+def test_boolean_array_from_concatenated(daa: dak.Array) -> None:
+    caa = daa.compute()
+    d_concat = dak.concatenate([daa.points, daa.points], axis=1)
+    c_concat = ak.concatenate([caa.points, caa.points], axis=1)
+    assert_eq(d_concat[d_concat.x > 2], c_concat[c_concat.x > 2])
