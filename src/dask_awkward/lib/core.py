@@ -1851,10 +1851,10 @@ def normalize_single_outer_inner_index(
     if index < 0:
         index = divisions[-1] + index
     if len(divisions) == 2:
-        return (0, index)
+        return (0, int(index))
     partition_index = int(np.digitize(index, divisions)) - 1
     new_index = index - divisions[partition_index]
-    return (partition_index, new_index)
+    return (int(partition_index), int(new_index))
 
 
 def typetracer_from_form(form: Form) -> ak.Array:
