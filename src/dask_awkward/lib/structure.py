@@ -234,6 +234,17 @@ class _CartesianFn:
         self.kwargs = kwargs
 
     def __call__(self, *arrays):
+        # TODO: remove backend check when typetracer support exists for this
+        if ak.backend(*arrays) == "typetracer":
+            for array in arrays:
+                array.layout._touch_data(recursive=True)
+            return ak.cartesian(
+                list(
+                    array.layout.form.length_zero_array(behavior=array.behavior)
+                    for array in arrays
+                ),
+                **self.kwargs,
+            )
         return ak.cartesian(list(arrays), **self.kwargs)
 
 
@@ -434,7 +445,7 @@ def full_like(array, fill_value, highlevel=True, behavior=None, dtype=None):
     #  TODO: fix when available in awkward
     meta = typetracer_from_form(
         ak.full_like(
-            array._meta.layout.form.length_zero_array(),
+            array._meta.layout.form.length_zero_array(behavior=array.behavior),
             fill_value,
             highlevel=highlevel,
             behavior=behavior,
@@ -466,8 +477,8 @@ def isclose(
     #  TODO: fix this when https://github.com/scikit-hep/awkward/issues/2124 is addressed
     meta = typetracer_from_form(
         ak.isclose(
-            a._meta.layout.form.length_zero_array(),
-            b._meta.layout.form.length_zero_array(),
+            a._meta.layout.form.length_zero_array(behavior=a.behavior),
+            b._meta.layout.form.length_zero_array(behavior=b.behavior),
             rtol=rtol,
             atol=atol,
             equal_nan=equal_nan,
@@ -684,7 +695,7 @@ def run_lengths(array, highlevel=True, behavior=None):
     # TODO: fix typetracer error in awkward
     meta = typetracer_from_form(
         ak.run_lengths(
-            array._meta.layout.form.length_zero_array(),
+            array._meta.layout.form.length_zero_array(behavior=array.behavior),
             highlevel=highlevel,
             behavior=behavior,
         ).layout.form
@@ -708,7 +719,7 @@ def singletons(array, axis=0, highlevel=True, behavior=None):
     # TODO: remove this length-zero calculation once https://github.com/scikit-hep/awkward/issues/2123 is addressed
     meta = typetracer_from_form(
         ak.singletons(
-            array._meta.layout.form.length_zero_array(),
+            array._meta.layout.form.length_zero_array(behavior=array.behavior),
             axis=axis,
             highlevel=highlevel,
             behavior=behavior,
@@ -788,8 +799,8 @@ def unflatten(array, counts, axis=0, highlevel=True, behavior=None):
     #  TODO: remove after fixing issue in awkward
     meta = typetracer_from_form(
         ak.unflatten(
-            array._meta.layout.form.length_zero_array(),
-            counts._meta.layout.form.length_zero_array(),
+            array._meta.layout.form.length_zero_array(behavior=array.behavior),
+            counts._meta.layout.form.length_zero_array(behavior=counts.behavior),
             axis=axis,
             highlevel=highlevel,
             behavior=behavior,

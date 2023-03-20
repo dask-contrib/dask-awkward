@@ -1662,7 +1662,7 @@ def to_meta(objects: Sequence[Any]) -> tuple[Any, ...]:
 
 def length_zero_array_or_identity(obj: Any) -> Any:
     if is_awkward_collection(obj):
-        return obj._meta.layout.form.length_zero_array()
+        return obj._meta.layout.form.length_zero_array(behavior=obj.behavior)
     return obj
 
 
