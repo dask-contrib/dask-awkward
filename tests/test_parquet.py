@@ -20,7 +20,7 @@ arr = pa.array(data)
 ds = pa.Table.from_arrays([arr], names=["arr"])
 fs = fsspec.filesystem("file")
 sample = (
-    "https://github.com/scikit-hep/awkward-1.0/raw/main/tests/"
+    "https://github.com/scikit-hep/awkward/raw/main/tests/"
     "samples/nullable-record-primitives-simple.parquet"
 )
 deep = ak.Array({"arr": [{"a": [1, 2, 3], "b": [3, 4, 5]}] * 4})
