@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
 
-from dask_awkward.utils import LazyInputsDict
+from dask_awkward.utils import LazyInputsDict, label_form
 
 if TYPE_CHECKING:
     from awkward._nplikes.typetracer import TypeTracerReport
@@ -100,23 +100,12 @@ class AwkwardInputLayer(Blockwise):
         starting_form = copy.deepcopy(self._meta.layout.form)
         starting_layout = starting_form.length_zero_array(highlevel=False)
         new_meta = ak.Array(
-            starting_layout.to_typetracer(forget_length=True), behavior=self._behavior
+            starting_layout.to_typetracer(forget_length=True),
+            behavior=self._behavior,
         )
         form = new_meta.layout.form
 
-        def _label_form(form, start):
-            if form.is_record:
-                for field in form.fields:
-                    _label_form(form.content(field), f"{start}.{field}")
-            elif form.is_numpy:
-                form.form_key = start
-            elif form.is_list:
-                form.form_key = f"{start}.__list__"
-                _label_form(form.content, start)
-            else:
-                _label_form(form.content, start)
-
-        _label_form(form, self.name)
+        label_form(form, self.name)
 
         new_meta_labelled, report = ak._nplikes.typetracer.typetracer_with_report(form)
         new_meta_array = ak.Array(new_meta_labelled, behavior=self._behavior)

@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 T = TypeVar("T")
+
+
+if TYPE_CHECKING:
+    from awkward.forms.form import Form
 
 
 class DaskAwkwardNotImplemented(NotImplementedError):
@@ -119,3 +123,59 @@ def is_empty_slice(s: Any) -> bool:
     if s.step is not None:
         return False
     return True
+
+
+def label_form(form: Form, label: str, **kwargs: Any) -> None:
+    """Recursive function to apply key label to `form`.
+
+    Note
+    ----
+    This function does not require ``import awkward``.
+
+    Parameters
+    ----------
+    form : awkward.forms.form.Form
+        Awkward Array form object to mutate.
+    label : str
+        Label to apply. If recursion is triggered by passing in a
+        Record Form, the label is used as a prefix for a specific
+        field.
+
+    """
+
+    fcf = None
+    if form.is_record:
+        for field in form.fields:
+            if kwargs.get("debug", False):
+                fcf = (field, form.content(field))
+            else:
+                fcf = None
+            label_form(form.content(field), f"{label}.{field}", **kwargs)
+        return None
+    elif form.is_numpy:
+        form.form_key = label
+    elif form.is_list:
+        form.form_key = f"{label}.__list__"
+        label_form(form.content, label, **kwargs)
+    else:
+        label_form(form.content, label, **kwargs)
+
+    if kwargs.get("debug", False):
+        print("\n\n\n")
+        print("**LABEL**", label)
+        print(form)
+        if fcf is not None:
+            print(f"{fcf=}")
+        print()
+        print(f"{form.is_list=}")
+        print(f"{form.is_tuple=}")
+        print(f"{form.is_union=}")
+        print(f"{form.is_option=}")
+        print(f"{form.is_record=}")
+        print(f"{form.is_indexed=}")
+        print(f"{form.is_regular=}")
+        print(f"{form.is_unknown=}")
+        print(f"{form.is_identity_like=}")
+        print("--" * 25)
+
+    return None
