@@ -27,6 +27,7 @@ from dask_awkward.lib.core import (
     new_array_object,
     new_known_scalar,
     new_record_object,
+    new_scalar_object,
     normalize_single_outer_inner_index,
     to_meta,
     typetracer_array,
@@ -379,6 +380,12 @@ def test_bad_meta_backend_record(daa):
     with pytest.raises(TypeError, match="meta Record must have a typetracer backend"):
         a = daa.points[0]
         new_record_object(a.dask, a.name, meta=ak.Record({"x": 1}))
+
+
+def test_bad_meta_backend_scalar(daa):
+    with pytest.raises(TypeError, match="meta Scalar must have a typetracer backend"):
+        a = daa.points.x[0][0]
+        new_scalar_object(a.dask, a.name, meta=5)
 
 
 @pytest.mark.skipif(sys.platform.startswith("win"), reason="skip if windows")

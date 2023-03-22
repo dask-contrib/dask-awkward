@@ -276,6 +276,18 @@ def new_scalar_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Scalar:
     """
     if meta is None:
         meta = TypeTracerArray._new(dtype=np.dtype(None), shape=())
+
+    if isinstance(meta, MaybeNone):
+        pass
+    else:
+        try:
+            if ak.backend(meta) != "typetracer":
+                raise TypeError(
+                    f"meta Scalar must have a typetracer backend, not {ak.backend(meta)}"
+                )
+        except AttributeError:
+            raise TypeError("meta Scalar must have a typetracer backend; check failed")
+
     return Scalar(dsk, name, meta, known_value=None)
 
 
