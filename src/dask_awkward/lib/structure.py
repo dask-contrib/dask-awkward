@@ -238,12 +238,15 @@ class _CartesianFn:
         if ak.backend(*arrays) == "typetracer":
             for array in arrays:
                 array.layout._touch_data(recursive=True)
-            return ak.cartesian(
+            out = ak.cartesian(
                 list(
                     array.layout.form.length_zero_array(behavior=array.behavior)
                     for array in arrays
                 ),
                 **self.kwargs,
+            )
+            return ak.Array(
+                out.layout.to_typetracer(forget_length=True), behavior=out.behavior
             )
         return ak.cartesian(list(arrays), **self.kwargs)
 
