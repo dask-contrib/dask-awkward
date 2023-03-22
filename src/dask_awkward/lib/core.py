@@ -872,10 +872,10 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             return self._getitem_outer_int(where)
 
         elif isinstance(where, Array):
-            try:
-                dtype = where.layout.dtype.type
-            except AttributeError:
-                dtype = where.layout.content.dtype.type
+            layout = where.layout
+            while not hasattr(layout, "dtype"):
+                layout = layout.content
+            dtype = layout.dtype.type
             if issubclass(dtype, (np.bool_, bool, np.int64, np.int32, int)):
                 return self._getitem_outer_bool_or_int_lazy_array(where)
 
