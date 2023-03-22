@@ -6,10 +6,6 @@ from typing import TYPE_CHECKING, Any, TypeVar
 T = TypeVar("T")
 
 
-if TYPE_CHECKING:
-    from awkward.forms.form import Form
-
-
 class DaskAwkwardNotImplemented(NotImplementedError):
     NOT_SUPPORTED_MSG = """
 
