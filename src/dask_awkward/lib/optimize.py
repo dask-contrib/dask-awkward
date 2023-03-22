@@ -252,7 +252,7 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
                 "Valid options are 'warn', 'pass', or 'raise'."
             )
 
-    if isinstance(out, ak.Array):
+    if isinstance(out, (ak.Array, ak.Record)):
         out.layout._touch_data(recursive=True)
     return reports
 
