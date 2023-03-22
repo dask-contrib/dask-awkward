@@ -97,26 +97,17 @@ class AwkwardInputLayer(Blockwise):
         """
         import awkward as ak
 
+        from dask_awkward.lib.core import set_form_keys
+
         starting_form = copy.deepcopy(self._meta.layout.form)
         starting_layout = starting_form.length_zero_array(highlevel=False)
         new_meta = ak.Array(
-            starting_layout.to_typetracer(forget_length=True), behavior=self._behavior
+            starting_layout.to_typetracer(forget_length=True),
+            behavior=self._behavior,
         )
         form = new_meta.layout.form
 
-        def _label_form(form, start):
-            if form.is_record:
-                for field in form.fields:
-                    _label_form(form.content(field), f"{start}.{field}")
-            elif form.is_numpy:
-                form.form_key = start
-            elif form.is_list:
-                form.form_key = f"{start}.__list__"
-                _label_form(form.content, start)
-            else:
-                _label_form(form.content, start)
-
-        _label_form(form, self.name)
+        set_form_keys(form, key=self.name)
 
         new_meta_labelled, report = ak._nplikes.typetracer.typetracer_with_report(form)
         new_meta_array = ak.Array(new_meta_labelled, behavior=self._behavior)
