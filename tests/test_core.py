@@ -26,6 +26,7 @@ from dask_awkward.lib.core import (
     meta_or_identity,
     new_array_object,
     new_known_scalar,
+    new_record_object,
     normalize_single_outer_inner_index,
     to_meta,
     typetracer_array,
@@ -367,6 +368,17 @@ def test_compatible_partitions(ndjson_points_file: str) -> None:
 def test_bad_meta_type(ndjson_points_file: str, meta: Any) -> None:
     with pytest.raises(TypeError, match="meta must be an instance of an Awkward Array"):
         dak.from_json([ndjson_points_file] * 3, meta=meta)
+
+
+def test_bad_meta_backend_array(daa):
+    with pytest.raises(TypeError, match="meta Array must have a typetracer backend"):
+        a = daa.points.x.map_partitions(lambda x: x**2, meta=ak.Array([]))
+
+
+def test_bad_meta_backend_record(daa):
+    with pytest.raises(TypeError, match="meta Record must have a typetracer backend"):
+        a = daa.points[0]
+        new_record_object(a.dask, a.name, meta=ak.Record({}))
 
 
 @pytest.mark.skipif(sys.platform.startswith("win"), reason="skip if windows")
