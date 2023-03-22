@@ -378,7 +378,7 @@ def test_bad_meta_backend_array(daa):
 def test_bad_meta_backend_record(daa):
     with pytest.raises(TypeError, match="meta Record must have a typetracer backend"):
         a = daa.points[0]
-        new_record_object(a.dask, a.name, meta=ak.Record({}))
+        new_record_object(a.dask, a.name, meta=ak.Record({"x": 1}))
 
 
 @pytest.mark.skipif(sys.platform.startswith("win"), reason="skip if windows")
