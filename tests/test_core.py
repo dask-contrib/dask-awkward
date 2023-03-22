@@ -373,7 +373,7 @@ def test_bad_meta_type(ndjson_points_file: str, meta: Any) -> None:
 
 def test_bad_meta_backend_array(daa):
     with pytest.raises(TypeError, match="meta Array must have a typetracer backend"):
-        a = daa.points.x.map_partitions(lambda x: x**2, meta=ak.Array([]))
+        daa.points.x.map_partitions(lambda x: x**2, meta=ak.Array([]))
 
 
 def test_bad_meta_backend_record(daa):
