@@ -276,6 +276,18 @@ def new_scalar_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Scalar:
     """
     if meta is None:
         meta = TypeTracerArray._new(dtype=np.dtype(None), shape=())
+
+    if isinstance(meta, MaybeNone):
+        pass
+    else:
+        try:
+            if ak.backend(meta) != "typetracer":
+                raise TypeError(
+                    f"meta Scalar must have a typetracer backend, not {ak.backend(meta)}"
+                )
+        except AttributeError:
+            raise TypeError("meta Scalar must have a typetracer backend; check failed")
+
     return Scalar(dsk, name, meta, known_value=None)
 
 
@@ -441,6 +453,10 @@ def new_record_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Record:
     out = Record(dsk, name, meta)
     if meta.__doc__ != meta.__class__.__doc__:
         out.__doc__ = meta.__doc__
+    if ak.backend(meta) != "typetracer":
+        raise TypeError(
+            f"meta Record must have a typetracer backend, not {ak.backend(meta)}"
+        )
     return Record(dsk, name, meta)
 
 
@@ -1197,6 +1213,10 @@ def new_array_object(
         if not isinstance(meta, ak.Array):
             raise TypeError(
                 f"meta must be an instance of an Awkward Array, not {type(meta)}."
+            )
+        if ak.backend(meta) != "typetracer":
+            raise TypeError(
+                f"meta Array must have a typetracer backend, not {ak.backend(meta)}"
             )
         actual_meta = meta
 
