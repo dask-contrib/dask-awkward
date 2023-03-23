@@ -528,7 +528,6 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         self._meta = appended._meta
         self._dask = appended._dask
-self._name = appended._name
         self._name = appended._name
         print(ak.fields(self._meta))
 
