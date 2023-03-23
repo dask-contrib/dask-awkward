@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import keyword
 import logging
 import operator
@@ -521,7 +522,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             isinstance(where, str)
             or (isinstance(where, tuple) and all(isinstance(x, str) for x in where))
         ):
-            TypeError("only fields may be assigned in-place (by field name)")
+            raise TypeError("only fields may be assigned in-place (by field name)")
 
         if not isinstance(what, Array):
             raise DaskAwkwardNotImplemented(
@@ -959,15 +960,33 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     def _call_behavior_method(self, method_name: str, *args: Any, **kwargs: Any) -> Any:
         """Call a behavior method for an awkward array.
-        Please note that the raw dask_awkward arguments are forwarded to the
-        awkward Mixin class, and the user must deal with when to make calls
-        to map_partitions.
+        If the function signature has __dunder__ parameters it is assumed that the
+        user wants to do the map_partitions dispatch themselves and the _meta's
+        behavior is called.
+        If there are no __dunder__ parameters in the function call then the function
+        is wrapped in map_partitions automatically.
         """
         if hasattr(self._meta, method_name):
-            array_context = kwargs.pop("__dask_array__", self)
-            return getattr(self._meta, method_name)(
-                *args, __dask_array__=array_context, **kwargs
+            themethod = getattr(self._meta, method_name)
+            thesig = inspect.signature(themethod)
+            ndunder = sum(
+                [
+                    1
+                    if len(param) > 4
+                    and param.startswith("__")
+                    and param.endswith("__")
+                    else 0
+                    for param in thesig.parameters
+                ]
             )
+            if ndunder > 0:
+                return themethod(*args, **kwargs)
+            return self.map_partitions(
+                _BehaviorMethodFn(method_name, **kwargs),
+                *args,
+                label=hyphenize(method_name),
+            )
+
         raise AttributeError(
             f"Method {method_name} is not available to this collection."
         )
@@ -978,22 +997,32 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if a user follows the pattern:
 
         class SomeMixin:
-            def get_the_property(self, __dask_array__ = None):
-                ...
 
-            the_property = property(get_the_property)
+            @property
+            def the_property()
 
-        This pattern is caught and reissued as a method call to the "get_the_property"
-        method, passing self as __dask_array__.
+            @property
+            def a_property(array_context=None) # note: this can be any name
 
-        If get_the_property is not defined, and the_property is decorated with
-        @property, then then no calling context is needed and the property is
-        mapped directly.
+        This pattern is caught if the property has an argument that single
+        argument is assumed to be the array context (i.e. self) so that self-
+        referenced re-indexing operations can be hidden in properties. The
+        user must do the appropriate dispatch of map_partitions.
+
+        If there is no argument the property call is wrapped in map_partitions.
         """
         if hasattr(self._meta.__class__, property_name):
-            if hasattr(self._meta.__class__, f"get_{property_name}"):
-                return self._call_behavior_method(
-                    f"get_{property_name}",
+            thegetter = getattr(self._meta.__class__, property_name).fget.__get__(
+                self._meta
+            )
+            thesig = inspect.signature(thegetter)
+
+            if len(thesig.parameters) == 1:
+                binding = thesig.bind(self)
+                return thegetter(*binding.args, **binding.kwargs)
+            elif len(thesig.parameters) > 1:
+                raise RuntimeError(
+                    "Parametrized property cannot have more than one argument, the array context!"
                 )
             return self.map_partitions(
                 _BehaviorPropertyFn(property_name),
