@@ -172,7 +172,7 @@ def test_setitem(caa: ak.Array, daa: dak.Array) -> None:
     daa["xx"] = daa["points"]["x"]
     caa["xx"] = caa["points"]["x"]
 
-    assert_eq(caa["xx"], daa["xx"])
+    assert_eq(caa, daa)
 
 
 def test_with_parameter() -> None:
