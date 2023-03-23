@@ -168,6 +168,15 @@ def test_with_field(caa: ak.Array, daa: dak.Array) -> None:
     )
 
 
+def test_setitem(caa: ak.Array, daa: dak.Array) -> None:
+    daa["xx"] = daa["points"]["x"]
+    caa["xx"] = caa["points"]["x"]
+
+    daa["points", "z"] = np.sqrt(daa.points.x**2 + daa.points.y**2)
+    caa["points", "z"] = np.sqrt(caa.points.x**2 + caa.points.y**2)
+    assert_eq(caa, daa)
+
+
 def test_with_parameter() -> None:
     a = [[1, 2, 3], [], [4]]
     b = [[], [3], []]

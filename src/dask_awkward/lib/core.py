@@ -516,6 +516,26 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     __dask_scheduler__ = staticmethod(threaded_get)
 
+    def __setitem__(self, where: str, what: Any) -> None:
+        if not (
+            isinstance(where, str)
+            or (isinstance(where, tuple) and all(isinstance(x, str) for x in where))
+        ):
+            TypeError("only fields may be assigned in-place (by field name)")
+
+        if not isinstance(what, Array):
+            raise DaskAwkwardNotImplemented(
+                "Supplying anything other than a dak.Array to __setitem__ is not yet available!"
+            )
+
+        from dask_awkward.lib.structure import with_field
+
+        appended = with_field(self, what, where=where, behavior=self.behavior)
+
+        self._meta = appended._meta
+        self._dask = appended._dask
+        self._name = appended._name
+
     def _rebuild(
         self,
         dsk: HighLevelGraph,
