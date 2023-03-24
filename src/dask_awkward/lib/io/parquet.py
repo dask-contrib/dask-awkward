@@ -10,6 +10,7 @@ from typing import Any, Sequence
 import awkward as ak
 import fsspec
 import numpy as np
+from awkward.forms.form import Form
 from awkward.operations import ak_from_parquet, to_arrow_table
 from awkward.operations.ak_from_parquet import _load
 from dask.base import tokenize
@@ -38,7 +39,7 @@ class _FromParquetFn:
         schema: Any,
         listsep: str = "list.item",
         unnamed_root: bool = False,
-        mock_dataless: Sequence[str] | None = None,
+        original_form: Form | None = None,
     ) -> None:
         self.fs = fs
         self.schema = schema
@@ -47,7 +48,7 @@ class _FromParquetFn:
         self.columns = self.schema.columns(self.listsep)
         if self.unnamed_root:
             self.columns = [f".{c}" for c in self.columns]
-        self.mock_dataless = mock_dataless
+        self.original_form = original_form
 
     @abc.abstractmethod
     def __call__(self, source: Any) -> ak.Array:
@@ -57,7 +58,7 @@ class _FromParquetFn:
     def project_columns(
         self,
         columns: Sequence[str] | None,
-        mock_dataless: Sequence[str] | None = None,
+        orignal_form: Form | None = None,
     ) -> _FromParquetFn:
         ...
 
@@ -68,7 +69,6 @@ class _FromParquetFn:
             f"  listsep={self.listsep}\n"
             f"  unnamed_root={self.unnamed_root}\n"
             f"  columns={self.columns}\n"
-            f"  mock_dataless={self.mock_dataless}\n)"
         )
         return s
 
@@ -84,14 +84,14 @@ class _FromParquetFileWiseFn(_FromParquetFn):
         schema: Any,
         listsep: str = "list.item",
         unnamed_root: bool = False,
-        mock_dataless: Sequence[str] | None = None,
+        original_form: Form | None = None,
     ) -> None:
         super().__init__(
             fs=fs,
             schema=schema,
             listsep=listsep,
             unnamed_root=unnamed_root,
-            mock_dataless=mock_dataless,
+            original_form=original_form,
         )
 
     def __call__(self, source: Any) -> Any:
@@ -102,29 +102,34 @@ class _FromParquetFileWiseFn(_FromParquetFn):
             self.schema,
         )
 
-        for entry in self.mock_dataless or []:
-            # split on "." so we get lists of strings for fields of fields
-            entries = entry.split(".")
-            if len(entries) == 1:
-                a = ak.with_field(
-                    a,
-                    np.broadcast_to(np.int64(0), (len(a),)),
-                    entries[0],
-                )
-            else:
-                ## This will error if the top level field is not already available
-                a = ak.with_field(
-                    a,
-                    np.broadcast_to(np.int64(0), (len(a),)),
-                    entries,
-                )
+        if self.original_form is not None:
+            from dask_awkward.lib._utils import make_unused_columns_dataless
+
+            a = make_unused_columns_dataless(a, self.original_form)
+
+        # for entry in self.mock_dataless or []:
+        #     # split on "." so we get lists of strings for fields of fields
+        #     entries = entry.split(".")
+        #     if len(entries) == 1:
+        #         a = ak.with_field(
+        #             a,
+        #             np.broadcast_to(np.int64(0), (len(a),)),
+        #             entries[0],
+        #         )
+        #     else:
+        #         ## This will error if the top level field is not already available
+        #         a = ak.with_field(
+        #             a,
+        #             np.broadcast_to(np.int64(0), (len(a),)),
+        #             entries,
+        #         )
 
         return a
 
     def project_columns(
         self,
         columns: Sequence[str] | None,
-        mock_dataless: Sequence[str] | None = None,
+        original_form: Form | None = None,
     ) -> _FromParquetFileWiseFn:
         if columns is None:
             return self
@@ -135,7 +140,7 @@ class _FromParquetFileWiseFn(_FromParquetFn):
             schema=new_schema,
             listsep=self.listsep,
             unnamed_root=self.unnamed_root,
-            mock_dataless=mock_dataless,
+            original_form=original_form,
         )
 
         log.debug(f"project_columns received: {columns}")
@@ -154,14 +159,14 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
         schema: Any,
         listsep: str = "list.item",
         unnamed_root: bool = False,
-        mock_dataless: Sequence[str] | None = None,
+        original_form: Form | None = None,
     ) -> None:
         super().__init__(
             fs=fs,
             schema=schema,
             listsep=listsep,
             unnamed_root=unnamed_root,
-            mock_dataless=mock_dataless,
+            original_form=original_form,
         )
 
     def __call__(self, pair: Any) -> ak.Array:
@@ -179,7 +184,7 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
     def project_columns(
         self,
         columns: Sequence[str] | None,
-        mock_dataless: Sequence[str] | None = None,
+        original_form: Form | None = None,
     ) -> _FromParquetFragmentWiseFn:
         if columns is None:
             return self
@@ -187,7 +192,7 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
             fs=self.fs,
             schema=self.schema.select_columns(columns),
             unnamed_root=self.unnamed_root,
-            mock_dataless=mock_dataless,
+            original_form=original_form,
         )
 
 
