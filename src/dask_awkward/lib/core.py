@@ -999,7 +999,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         class SomeMixin:
 
             @property
-            def the_property()
+            def the_property(self):
+                ...
 
             @property
             def a_property(array_context=None) # note: this can be any name
