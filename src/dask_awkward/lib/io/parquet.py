@@ -17,13 +17,7 @@ from dask.highlevelgraph import HighLevelGraph
 from fsspec import AbstractFileSystem
 from fsspec.core import get_fs_token_paths
 
-from dask_awkward.lib.core import (
-    Array,
-    Scalar,
-    map_partitions,
-    new_scalar_object,
-    typetracer_array,
-)
+from dask_awkward.lib.core import Array, Scalar, map_partitions, new_scalar_object
 from dask_awkward.lib.io.io import ImplementsFormTransformation, from_map
 
 log = logging.getLogger(__name__)
@@ -55,10 +49,16 @@ class _FromParquetFn:
             (
                 schema_labelled,
                 report,
-            ) = ak._nplikes.typetracer.typetracer_with_report(self.rendered_form)
+            ) = ak._nplikes.typetracer.typetracer_with_report(self.schema)
             tt = ak.Array(schema_labelled)
             for key in self.columns:
-                tt[tuple(key.split("."))].layout._touch_data(recursive=True)
+                tt[
+                    tuple(
+                        token
+                        for token in key.split(".")
+                        if token not in listsep.split(".")
+                    )
+                ].layout._touch_data(recursive=True)
 
             self.base_columns = [
                 x
@@ -115,25 +115,30 @@ class _FromParquetFileWiseFn(_FromParquetFn):
         )
 
     def __call__(self, source: Any) -> Any:
-        print(source)
-        print(self.fs)
-        print(self.columns)
-        print(self.schema)
-
         raw_record = _file_to_partition(
             source,
             self.fs,
             self.columns if self.base_columns is None else self.base_columns,
             self.schema,
         )
-        
-        if self.form_mapping is not None:
-            actual_form = self.schema.select_columns(self.columns)
 
-            start, stop = 0, len(source)
+        if self.form_mapping is not None:
+            columns_no_listsep = []
+            for column in self.columns:
+                columns_no_listsep.append(
+                    ".".join(
+                        token
+                        for token in column.split(".")
+                        if token not in self.listsep.split(".")
+                    )
+                )
+
+            actual_form = self.schema.select_columns(columns_no_listsep)
+
+            start, stop = 0, len(raw_record)
 
             mapping, buffer_key = self.form_mapping.create_column_mapping_and_key(
-                raw_record, start, stop
+                raw_record, start, stop, interp_options=None
             )
 
             return ak.from_buffers(
@@ -317,7 +322,7 @@ def from_parquet(
             actual_paths,
             label=label,
             token=token,
-            meta=typetracer_array(meta),
+            meta=meta,
         )
     else:
         # row-group wise
@@ -354,7 +359,7 @@ def from_parquet(
             label=label,
             token=token,
             divisions=tuple(divisions),
-            meta=typetracer_array(meta),
+            meta=meta,
         )
 
 
