@@ -969,17 +969,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if hasattr(self._meta, method_name):
             themethod = getattr(self._meta, method_name)
             thesig = inspect.signature(themethod)
-            ndunder = sum(
-                [
-                    1
-                    if len(param) > 4
-                    and param.startswith("__")
-                    and param.endswith("__")
-                    else 0
-                    for param in thesig.parameters
-                ]
-            )
-            if ndunder > 0:
+            if "_dask_array_" in thesig.parameters:
                 return themethod(*args, **kwargs)
             return self.map_partitions(
                 _BehaviorMethodFn(method_name, **kwargs),
