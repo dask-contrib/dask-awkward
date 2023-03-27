@@ -5,7 +5,6 @@ import pytest
 distributed = pytest.importorskip("distributed")
 
 from pathlib import Path
-from typing import Any
 
 import awkward as ak
 import numpy as np
@@ -87,22 +86,9 @@ def test_from_delayed(loop, ndjson_points_file):  # noqa
 behaviors: dict = {}
 
 
-class _ClassMethodFn:
-    def __init__(self, attr: str, **kwargs: Any) -> None:
-        self.attr = attr
-
-    def __call__(self, coll: ak.Array, *args: Any, **kwargs: Any) -> ak.Array:
-        return getattr(coll, self.attr)(*args, **kwargs)
-
-
 @ak.mixin_class(behaviors)
 class Point:
-    def distance(self, other, __dask_array__=None):
-        if __dask_array__ is not None:
-            return __dask_array__.map_partitions(
-                _ClassMethodFn("distance"),
-                other,
-            )
+    def distance(self, other):
         return np.sqrt((self.x - other.x) ** 2 + (self.y - other.y) ** 2)
 
     @property
@@ -110,11 +96,7 @@ class Point:
         return self.x * self.x
 
     @ak.mixin_class_method(np.abs)
-    def point_abs(self, __dask_array__=None):
-        if __dask_array__ is not None:
-            return __dask_array__.map_partitions(
-                _ClassMethodFn("point_abs"),
-            )
+    def point_abs(self):
         return np.sqrt(self.x**2 + self.y**2)
 
 
