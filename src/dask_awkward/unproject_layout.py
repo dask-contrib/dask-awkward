@@ -1,38 +1,37 @@
 import math
 
-import numpy as np
-
 import awkward as ak
+import numpy as np
 from awkward._nplikes import nplike_of
-from awkward.forms import (
-    Form,
-    EmptyForm,
-    NumpyForm,
-    BitMaskedForm,
-    ByteMaskedForm,
-    IndexedForm,
-    IndexedOptionForm,
-    ListForm,
-    ListOffsetForm,
-    RegularForm,
-    UnmaskedForm,
-    RecordForm,
-    UnionForm,
-)
 from awkward.contents import (
-    Content,
-    EmptyArray,
-    NumpyArray,
     BitMaskedArray,
     ByteMaskedArray,
+    Content,
+    EmptyArray,
     IndexedArray,
     IndexedOptionArray,
     ListArray,
     ListOffsetArray,
-    RegularArray,
-    UnmaskedArray,
+    NumpyArray,
     RecordArray,
+    RegularArray,
     UnionArray,
+    UnmaskedArray,
+)
+from awkward.forms import (
+    BitMaskedForm,
+    ByteMaskedForm,
+    EmptyForm,
+    Form,
+    IndexedForm,
+    IndexedOptionForm,
+    ListForm,
+    ListOffsetForm,
+    NumpyForm,
+    RecordForm,
+    RegularForm,
+    UnionForm,
+    UnmaskedForm,
 )
 
 
