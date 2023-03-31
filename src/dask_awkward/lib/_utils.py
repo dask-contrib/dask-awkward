@@ -57,7 +57,6 @@ def make_unused_columns_dataless(
 ) -> ak.Array:
     from dask_awkward.lib.unproject_layout import unproject_layout
 
-
     a = unproject_layout(original_form, good_array.layout)
 
     return ak.Array(a)
