@@ -57,22 +57,4 @@ def make_unused_columns_dataless(
     good_array: ak.Array,
     original_form: Form,
 ) -> ak.Array:
-    original_form = copy.deepcopy(original_form)
-    good_form = copy.deepcopy(good_array.layout.form)
-    columns = good_array.layout.form.columns()
-    original_form_columns = original_form.columns()
-    removed = [
-        c
-        for c in original_form_columns
-        if c in (set(original_form_columns) - set(columns))
-    ]
-
-    set_form_keys(original_form, key="_mud")
-    set_form_keys(good_form, key="_mud")
-    set_form_keys(good_array.layout.form, key="_mud")
-
-    _, __, good_buffers = ak.to_buffers(good_array)
-
-    breakpoint()
-
     return good_array
