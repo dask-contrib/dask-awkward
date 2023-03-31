@@ -1,6 +1,6 @@
 import awkward as ak
 
-from dask_awkward.unproject_layout import unproject_layout
+from dask_awkward.lib.unproject_layout import unproject_layout
 
 
 def _compare_values(index, projected, x, unprojected):
