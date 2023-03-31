@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import copy
-
 import awkward as ak
 from awkward.forms.form import Form
 

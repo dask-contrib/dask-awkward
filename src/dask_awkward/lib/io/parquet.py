@@ -9,7 +9,6 @@ from typing import Any, Sequence
 
 import awkward as ak
 import fsspec
-import numpy as np
 from awkward.forms.form import Form
 from awkward.operations import ak_from_parquet, to_arrow_table
 from awkward.operations.ak_from_parquet import _load
