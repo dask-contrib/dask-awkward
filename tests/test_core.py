@@ -480,11 +480,11 @@ def test_normalize_single_outer_inner_index() -> None:
 
 
 def test_optimize_chain_single(daa):
-    from dask_awkward.lib.optimize import rewrite_column_chains
+    from dask_awkward.lib.optimize import rewrite_layer_chains
 
     arr = ((daa.points.x + 1) + 6).map_partitions(lambda x: x + 1)
 
-    dsk2 = rewrite_column_chains(arr.dask)
+    dsk2 = rewrite_layer_chains(arr.dask)
     out = arr.compute()
     arr._dask = dsk2
     out2 = arr.compute()

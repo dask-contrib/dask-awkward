@@ -206,7 +206,7 @@ def _touch_and_call(layer):
     return new_layer
 
 
-def rewrite_column_chains(dsk: HighLevelGraph) -> HighLevelGraph:
+def rewrite_layer_chains(dsk: HighLevelGraph) -> HighLevelGraph:
     # dask.optimization.fuse_liner for blockwise layers
     import copy
 
@@ -217,13 +217,15 @@ def rewrite_column_chains(dsk: HighLevelGraph) -> HighLevelGraph:
 
     layers = {}
     # find chains; each chain list is at least two keys long
+    dependents = dsk.dependents
     for lay, val in dsk.layers.items():
-        depen = dsk.dependents[lay]
+        depen = dependents[lay]
         # TODO: only recognise non-reductive layers here?
         if (
             isinstance(val, Blockwise)
             and len(depen) == 1
             and dsk.dependencies[list(depen)[0]] == {lay}
+            and isinstance(dsk.layers[list(depen)[0]], Blockwise)
         ):
             # one-to-one layer connection.
             # When start or mid-chain, layer is not copied into output
@@ -269,7 +271,7 @@ def rewrite_column_chains(dsk: HighLevelGraph) -> HighLevelGraph:
         outlayer.dsk = subgraph
         outlayer.indices = tuple(indices)
         outlayer.output_indices = layer0.output_indices
-        outlayer.inputs = layer0.inputs
+        outlayer.inputs = getattr(layer0, "inputs", set())
         outlayer.io_deps = layer0.io_deps
     return HighLevelGraph(layers, deps)
 
