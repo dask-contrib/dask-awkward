@@ -21,7 +21,7 @@ branch:
    $ git clone <url to your fork>
    $ cd dask-awkward
    $ git remote add upstream https://github.com/dask-contrib/dask-awkward
-   $ pip install -e .[complete]
+   $ pip install -e ".[complete]"
    $ git checkout -b name-your-branch upstream/mean
 
 Make your changes and be sure to add a test. Run ``pytest`` in the
