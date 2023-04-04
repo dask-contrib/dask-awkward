@@ -20,6 +20,7 @@ from dask_awkward.lib.core import (
 )
 
 if TYPE_CHECKING:
+    from dask.dataframe.core import DataFrame as DaskDataFrame
     from dask.array.core import Array as DaskArray
     from dask.bag.core import Bag as DaskBag
     from dask.delayed import Delayed
@@ -369,14 +370,38 @@ def from_dask_array(array: DaskArray, behavior: dict | None = None) -> Array:
         return new_array_object(hlg, name, divisions=divs, meta=meta, behavior=behavior)
 
 
-def to_dask_dataframe(array, optimize_graph: bool = True) -> Any:
+def to_dask_dataframe(array, optimize_graph: bool = True) -> DaskDataFrame:
+    """Convert dask-awkward Array collection to dask.dataframe DataFrame collection.
+
+    Parameters
+    ----------
+    array : dask_awkward.Array
+        Array collection to be converted.
+    optimize_graph : bool
+        If ``True``, optimize the Array collection task graph before
+        converting to DataFrame collection.
+
+    Returns
+    -------
+    dask.dataframe.DataFrame
+        Resulting DataFrame collection.
+
+    Examples
+    --------
+    FIXME: Add
+
+    """
     import dask
     from dask.dataframe.core import new_dd_object
 
-    token = tokenize(array, optimize_graph)
     if optimize_graph:
         (array,) = dask.optimize(array)
-    intermediate = map_partitions(ak.to_dataframe, array, meta=empty_typetracer())
+    intermediate = map_partitions(
+        ak.to_dataframe,
+        array,
+        meta=empty_typetracer(),
+        label="to-dataframe",
+    )
     meta = ak.to_dataframe(array._meta.layout.form.length_zero_array())
     if intermediate.known_divisions:
         divisions = list(intermediate.divisions)
