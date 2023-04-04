@@ -453,6 +453,7 @@ def to_json(
     compression: str | None = "infer",
     **kwargs: Any,
 ) -> Scalar:
+    """Write data to line delimited JSON."""
     storage_options = storage_options or {}
     fs, _ = url_to_fs(path, **storage_options)
     nparts = array.npartitions

@@ -61,7 +61,7 @@ def from_awkward(
     behavior: dict | None = None,
     label: str | None = None,
 ) -> Array:
-    """Create a Dask collection from a concrete awkward array.
+    """Create an Array collection from a concrete :class:`awkward.Array` object.
 
     Parameters
     ----------
@@ -114,7 +114,7 @@ class _FromListsFn:
 
 
 def from_lists(source: list[list[Any]], behavior: dict | None = None) -> Array:
-    """Create a Dask collection from a list of lists.
+    """Create an Array collection from a list of lists.
 
     Parameters
     ----------
@@ -157,7 +157,7 @@ def from_delayed(
     divisions: tuple[int | None, ...] | None = None,
     prefix: str = "from-delayed",
 ) -> Array:
-    """Create a Dask Awkward Array from Dask Delayed objects.
+    """Create an Array collection from a set of :class:`~dask.delayed.Delayed` objects.
 
     Parameters
     ----------
@@ -198,7 +198,7 @@ def from_delayed(
 
 
 def to_delayed(array: Array, optimize_graph: bool = True) -> list[Delayed]:
-    """Convert the collection to a list of delayed objects.
+    """Convert Arrray the collection to a list of :class:`~dask.delayed.Delayed` objects.
 
     One dask.delayed.Delayed object per partition.
 
@@ -227,6 +227,7 @@ def to_delayed(array: Array, optimize_graph: bool = True) -> list[Delayed]:
 
 
 def to_dask_bag(array: Array) -> DaskBag:
+    """Convert Array collection to a :class:`dask.bag.Bag` collection."""
     from dask.bag.core import Bag
 
     return Bag(array.dask, array.name, array.npartitions)
@@ -238,7 +239,7 @@ def to_dask_array(
     dtype: Any = None,
     optimize_graph: bool = True,
 ) -> DaskArray:
-    """Convert awkward array collection to a Dask array collection.
+    """Convert Array collection to a :class:`dask.array.Array` collection.
 
     This conversion requires the awkward array to have a rectilinear
     shape (that is, no lists of variable length lists).
@@ -371,7 +372,7 @@ def from_dask_array(array: DaskArray, behavior: dict | None = None) -> Array:
 
 
 def to_dask_dataframe(array, optimize_graph: bool = True) -> DaskDataFrame:
-    """Convert dask-awkward Array collection to dask.dataframe DataFrame collection.
+    """Convert :class:`dask_awkward.Array` collection to :class:`~dask.dataframe.DataFrame`.
 
     Parameters
     ----------
