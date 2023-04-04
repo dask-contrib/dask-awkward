@@ -747,6 +747,35 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         """
         return IndexCallable(self._partitions)
 
+    def __getitem__(self, where: Any) -> AwkwardDaskCollection:
+        """Select items from the collection.
+
+        Heavily under construction.
+
+        Arguments
+        ---------
+        where : many types supported
+            Selection criteria.
+
+        Returns
+        -------
+        Array | Record | Scalar
+            Resulting collection.
+
+        """
+
+        # don't accept lists containing integers.
+        if isinstance(where, list):
+            if any(isinstance(k, int) for k in where):
+                # this is something we'll likely never support so we
+                # do not use the DaskAwkwardNotImplemented exception.
+                raise RuntimeError("Lists containing integers are not supported.")
+
+        if isinstance(where, tuple):
+            return self._getitem_tuple(where)
+
+        return self._getitem_single(where)
+
     def _getitem_trivial_map_partitions(
         self,
         where: Any,
@@ -928,35 +957,6 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             return self.map_partitions(operator.getitem, where)
 
         raise DaskAwkwardNotImplemented(f"__getitem__ doesn't support where={where}.")
-
-    def __getitem__(self, where: Any) -> AwkwardDaskCollection:
-        """Select items from the collection.
-
-        Heavily under construction.
-
-        Arguments
-        ---------
-        where : many types supported
-            Selection criteria.
-
-        Returns
-        -------
-        Array | Record | Scalar
-            Resulting collection.
-
-        """
-
-        # don't accept lists containing integers.
-        if isinstance(where, list):
-            if any(isinstance(k, int) for k in where):
-                # this is something we'll likely never support so we
-                # do not use the DaskAwkwardNotImplemented exception.
-                raise RuntimeError("Lists containing integers are not supported.")
-
-        if isinstance(where, tuple):
-            return self._getitem_tuple(where)
-
-        return self._getitem_single(where)
 
     def _call_behavior_method(self, method_name: str, *args: Any, **kwargs: Any) -> Any:
         """Call a behavior method for an awkward array.
@@ -1182,6 +1182,10 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         from dask_awkward.lib.io.io import to_dask_bag
 
         return to_dask_bag(self)
+
+    @classmethod
+    def _nao(cls, *args, **kwargs):
+        return new_array_object(*args, **kwargs)
 
 
 def compute_typetracer(dsk: HighLevelGraph, name: str) -> ak.Array:
