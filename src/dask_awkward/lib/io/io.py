@@ -20,9 +20,9 @@ from dask_awkward.lib.core import (
 )
 
 if TYPE_CHECKING:
-    from dask.dataframe.core import DataFrame as DaskDataFrame
     from dask.array.core import Array as DaskArray
     from dask.bag.core import Bag as DaskBag
+    from dask.dataframe.core import DataFrame as DaskDataFrame
     from dask.delayed import Delayed
 
     from dask_awkward.lib.core import Array
