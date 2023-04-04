@@ -371,7 +371,11 @@ def from_dask_array(array: DaskArray, behavior: dict | None = None) -> Array:
         return new_array_object(hlg, name, divisions=divs, meta=meta, behavior=behavior)
 
 
-def to_dask_dataframe(array, optimize_graph: bool = True) -> DaskDataFrame:
+def to_dask_dataframe(
+    array,
+    optimize_graph: bool = True,
+    **kwargs: Any,
+) -> DaskDataFrame:
     """Convert :class:`dask_awkward.Array` collection to :class:`~dask.dataframe.DataFrame`.
 
     Parameters
@@ -381,15 +385,13 @@ def to_dask_dataframe(array, optimize_graph: bool = True) -> DaskDataFrame:
     optimize_graph : bool
         If ``True``, optimize the Array collection task graph before
         converting to DataFrame collection.
+    **kwargs : Any
+        Additional arguments passed to :func:`ak.to_dataframe`.
 
     Returns
     -------
     dask.dataframe.DataFrame
         Resulting DataFrame collection.
-
-    Examples
-    --------
-    FIXME: Add
 
     """
     import dask
@@ -402,15 +404,15 @@ def to_dask_dataframe(array, optimize_graph: bool = True) -> DaskDataFrame:
         array,
         meta=empty_typetracer(),
         label="to-dataframe",
+        **kwargs,
     )
-    meta = ak.to_dataframe(array._meta.layout.form.length_zero_array())
-    if intermediate.known_divisions:
-        divisions = list(intermediate.divisions)
-        divisions[-1] -= 1
-        divisions = tuple(divisions)
-    else:
-        divisions = intermediate.divisions
-    return new_dd_object(intermediate.dask, intermediate.name, meta, divisions)
+    meta = ak.to_dataframe(array._meta.layout.form.length_zero_array(), **kwargs)
+    return new_dd_object(
+        intermediate.dask,
+        intermediate.name,
+        meta,
+        intermediate.divisions,
+    )
 
 
 class PackedArgCallable:

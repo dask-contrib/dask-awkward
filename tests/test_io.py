@@ -360,12 +360,16 @@ def test_to_json_raise_filenotfound(
         )
 
 
-def test_to_dask_dataframe(daa: dak.Array, caa: ak.Array) -> None:
+@pytest.mark.parametrize("optimize_graph", [True, False])
+def test_to_dask_dataframe(daa: dak.Array, caa: ak.Array, optimize_graph: bool) -> None:
     pytest.importorskip("pandas")
 
     from dask.dataframe.utils import assert_eq
 
-    dd = dak.to_dask_dataframe(daa)
+    daa = daa["points", ["x", "y"]]
+    caa = caa["points", ["x", "y"]]
+
+    dd = dak.to_dask_dataframe(daa, optimize_graph=optimize_graph)
     df = ak.to_dataframe(caa)
 
     assert_eq(dd, df, check_index=False)
