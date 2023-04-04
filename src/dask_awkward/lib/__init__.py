@@ -12,6 +12,7 @@ from dask_awkward.lib.io.io import (
     from_map,
     to_dask_array,
     to_dask_bag,
+    to_dask_dataframe,
     to_delayed,
 )
 from dask_awkward.lib.io.json import from_json, to_json
