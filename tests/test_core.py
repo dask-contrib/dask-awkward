@@ -477,3 +477,15 @@ def test_normalize_single_outer_inner_index() -> None:
     for i, r in zip(indices, results):
         res = normalize_single_outer_inner_index(divisions, i)
         assert r == res
+
+
+def test_optimize_chain_single(daa):
+    from dask_awkward.lib.optimize import rewrite_column_chains
+
+    arr = ((daa.points.x + 1) + 6).map_partitions(lambda x: x + 1)
+
+    dsk2 = rewrite_column_chains(arr.dask)
+    out = arr.compute()
+    arr._dask = dsk2
+    out2 = arr.compute()
+    assert out.tolist() == out2.tolist()

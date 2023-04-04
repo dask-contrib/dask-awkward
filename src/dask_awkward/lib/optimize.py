@@ -7,7 +7,7 @@ from collections.abc import Hashable, Mapping
 from typing import TYPE_CHECKING, Any
 
 import dask.config
-from dask.blockwise import fuse_roots, optimize_blockwise
+from dask.blockwise import Blockwise, fuse_roots, optimize_blockwise
 from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
 from dask.local import get_sync
@@ -204,6 +204,77 @@ def _touch_and_call(layer):
         mp[k] = (_touch_and_call_fn,) + mp[k]
     new_layer.mapping = mp
     return new_layer
+
+
+def rewrite_column_chains(dsk: HighLevelGraph) -> HighLevelGraph:
+    # dask.optimization.fuse_liner for blockwise layers
+    import copy
+
+    chains = []
+    start = False
+    this_chain = []
+    deps = dsk.dependencies.copy()
+
+    layers = {}
+    # find chains; each chain list is at least two keys long
+    for lay, val in dsk.layers.items():
+        depen = dsk.dependents[lay]
+        # TODO: only recognise non-reductive layers here?
+        if (
+            isinstance(val, Blockwise)
+            and len(depen) == 1
+            and dsk.dependencies[list(depen)[0]] == {lay}
+        ):
+            # one-to-one layer connection.
+            # When start or mid-chain, layer is not copied into output
+            if start:
+                this_chain.append(lay)
+            else:
+                this_chain = [lay]
+                start = True
+        elif start:
+            this_chain.append(lay)
+            chains.append(this_chain)
+            start = False
+            layers[lay] = copy.copy(
+                val
+            )  # shallow copy: will set attributes, not a mutate
+        else:
+            layers[lay] = val  # passthrough unchanged
+
+    if start:
+        # special case for very last layer
+        this_chain.append(lay)
+        chains.append(this_chain)
+        layers[lay] = copy.copy(val)  # shallow copy: will set attributes, not a mutate
+
+    # do rewrite
+    for chain in chains:
+        # inputs are the inputs of chain[0]
+        # outputs are the outputs of chain[-1]
+        # .dsk is composed from the .dsk of each layer
+        outkey = chain[-1]
+        layer0 = dsk.layers[chain[0]]
+        outlayer = layers[outkey]
+        outlayer.numblocks = layer0.numblocks
+        deps[outkey] = deps[chain[0]]
+        [deps.pop(ch) for ch in chain[:-1]]
+
+        subgraph = layer0.dsk.copy()
+        indices = list(layer0.indices)
+        for chain_member in chain[1:]:
+            layer = dsk.layers[chain_member]
+            func, *args = layer.dsk[chain_member]
+            args2 = [list(layer.numblocks)[0]]
+            for arg in args[1:]:
+                if isinstance(arg, str) and arg.startswith("__dask_blockwise__"):
+                    ind = int(arg[18:])
+                    indices.append(layer.indices[ind])
+                    args2.append(f"__dask_blockwise__{len(indices) - 1}")
+            subgraph[chain_member] = (func,) + tuple(args2)
+        outlayer.dsk = subgraph
+        outlayer.indices = tuple(indices)
+    return HighLevelGraph(layers, deps)
 
 
 def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
