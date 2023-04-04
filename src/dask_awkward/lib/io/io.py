@@ -369,6 +369,24 @@ def from_dask_array(array: DaskArray, behavior: dict | None = None) -> Array:
         return new_array_object(hlg, name, divisions=divs, meta=meta, behavior=behavior)
 
 
+def to_dask_dataframe(array, optimize_graph: bool = True) -> Any:
+    import dask
+    from dask.dataframe.core import new_dd_object
+
+    token = tokenize(array, optimize_graph)
+    if optimize_graph:
+        (array,) = dask.optimize(array)
+    intermediate = map_partitions(ak.to_dataframe, array, meta=empty_typetracer())
+    meta = ak.to_dataframe(array._meta.layout.form.length_zero_array())
+    if intermediate.known_divisions:
+        divisions = list(intermediate.divisions)
+        divisions[-1] -= 1
+        divisions = tuple(divisions)
+    else:
+        divisions = intermediate.divisions
+    return new_dd_object(intermediate.dask, intermediate.name, meta, divisions)
+
+
 class PackedArgCallable:
     """Wrap a callable such that packed arguments can be unrolled.
 
