@@ -489,3 +489,11 @@ def test_optimize_chain_single(daa):
     arr._dask = dsk2
     out2 = arr.compute()
     assert out.tolist() == out2.tolist()
+
+
+def test_optimize_chain_multiple():
+    ds = dak.from_parquet("s3://ddavistemp/hpq", storage_options={"anon": True})
+    ds = ds.partitions[[0, 1, 2]]
+    result = (ds.muons.pt**2 - ds.muons.eta) + 1
+
+    assert len(result.compute()) > 0

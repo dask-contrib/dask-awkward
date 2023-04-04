@@ -42,6 +42,10 @@ def all_optimizations(
     else:
         # Perform dask-awkward specific optimizations.
         dsk = optimize(dsk, keys=keys)
+
+        # blockwise layer chaining optimization.
+        dsk = rewrite_layer_chains(dsk)
+
         # Perform Blockwise optimizations for HLG input
         dsk = optimize_blockwise(dsk, keys=keys)
         # fuse nearby layers
