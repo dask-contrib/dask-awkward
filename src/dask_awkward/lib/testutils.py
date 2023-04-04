@@ -113,14 +113,28 @@ def make_xy_point() -> dict[str, int]:
     return {"x": _RG.randint(0, 10), "y": _RG.randint(0, 10)}
 
 
+def make_xy_point_str() -> dict[str, str]:
+    return {"x": str(_RG.randint(0, 10)), "y": str(_RG.randint(0, 10))}
+
+
 def list_of_xy_points(n: int) -> list[dict[str, int]]:
     return [make_xy_point() for _ in range(n)]
+
+
+def list_of_xy_points_str(n: int) -> list[dict[str, str]]:
+    return [make_xy_point_str() for _ in range(n)]
 
 
 def awkward_xy_points(lengths: tuple[int, ...] | None = None) -> ak.Array:
     if lengths is None:
         lengths = (3, 0, 2, 1, 3)
     return ak.Array([list_of_xy_points(n) for n in lengths])
+
+
+def awkward_xy_points_str(lengths: tuple[int, ...] | None = None) -> ak.Array:
+    if lengths is None:
+        lengths = (3, 0, 2, 1, 3)
+    return ak.Array([list_of_xy_points_str(n) for n in lengths])
 
 
 def list1() -> list:
