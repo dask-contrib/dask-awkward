@@ -242,12 +242,6 @@ def rewrite_column_chains(dsk: HighLevelGraph) -> HighLevelGraph:
         else:
             layers[lay] = val  # passthrough unchanged
 
-    if start:
-        # special case for very last layer
-        this_chain.append(lay)
-        chains.append(this_chain)
-        layers[lay] = copy.copy(val)  # shallow copy: will set attributes, not a mutate
-
     # do rewrite
     for chain in chains:
         # inputs are the inputs of chain[0]
