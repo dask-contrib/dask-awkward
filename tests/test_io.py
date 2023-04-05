@@ -375,7 +375,9 @@ def test_to_dataframe(daa: dak.Array, caa: ak.Array, optimize_graph: bool) -> No
     assert_eq(dd, df, check_index=False)
 
 
-@pytest.mark.xfail(reason="ak.to_pandas on length_zero_array is casting things to float")
+@pytest.mark.xfail(
+    reason="ak.to_pandas on length_zero_array is casting things to float"
+)
 @pytest.mark.parametrize("optimize_graph", [True, False])
 def test_to_dataframe_str(
     daa_str: dak.Array, caa_str: ak.Array, optimize_graph: bool
