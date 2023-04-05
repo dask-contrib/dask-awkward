@@ -892,6 +892,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             if issubclass(dtype, (np.bool_, bool, np.int64, np.int32, int)):
                 return self._getitem_outer_bool_or_int_lazy_array(where)
 
+        elif where[0] is Ellipsis:
+            return self._getitem_trivial_map_partitions(where)
+
         raise DaskAwkwardNotImplemented(
             f"Array.__getitem__ doesn't support multi object: {where}"
         )

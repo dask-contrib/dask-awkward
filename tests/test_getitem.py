@@ -4,6 +4,7 @@ import operator
 from collections.abc import Callable
 
 import awkward as ak
+import numpy as np
 import pytest
 
 import dask_awkward as dak
@@ -132,3 +133,10 @@ def test_boolean_array_from_concatenated(daa: dak.Array) -> None:
     d_concat = dak.concatenate([daa.points, daa.points], axis=1)
     c_concat = ak.concatenate([caa.points, caa.points], axis=1)
     assert_eq(d_concat[d_concat.x > 2], c_concat[c_concat.x > 2])
+
+
+def test_firstarg_ellipsis() -> None:
+    # Making a triply nested array
+    caa = ak.from_regular(np.random.random(size=(5, 5, 5)))
+    daa = dak.from_awkward(caa, npartitions=2)
+    assert_eq(daa[..., 1:3], caa[..., 1:3])
