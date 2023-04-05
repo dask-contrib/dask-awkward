@@ -43,9 +43,10 @@ documentation. To generate the documentation run
 
 .. code-block::
 
-   make html
+   $ make html
 
-Inside of the ``docs/`` directory.
+Inside of the ``docs/`` directory to see how the documentation will be
+rendered.
 
 .. _issuetracker: https://github.com/dask-contrib/dask-awkward/issues
 .. _precommit: https://pre-commit.com/
