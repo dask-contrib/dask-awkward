@@ -371,7 +371,7 @@ def from_dask_array(array: DaskArray, behavior: dict | None = None) -> Array:
         return new_array_object(hlg, name, divisions=divs, meta=meta, behavior=behavior)
 
 
-def to_dask_dataframe(
+def to_dataframe(
     array,
     optimize_graph: bool = True,
     **kwargs: Any,
