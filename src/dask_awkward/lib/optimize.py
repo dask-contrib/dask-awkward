@@ -227,6 +227,7 @@ def rewrite_layer_chains(dsk: HighLevelGraph) -> HighLevelGraph:
         if not isinstance(val, Blockwise):
             # shortcut to avoid making comparisons
             layers[lay] = val  # passthrough unchanged
+            continue
         children = dependents[lay]
         chain = [lay]
         lay0 = lay
