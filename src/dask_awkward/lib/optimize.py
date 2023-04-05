@@ -215,36 +215,48 @@ def rewrite_layer_chains(dsk: HighLevelGraph) -> HighLevelGraph:
     import copy
 
     chains = []
-    start = False
-    this_chain = []
     deps = dsk.dependencies.copy()
 
     layers = {}
     # find chains; each chain list is at least two keys long
     dependents = dsk.dependents
-    for lay, val in dsk.layers.items():
-        depen = dependents[lay]
-        # TODO: only recognise non-reductive layers here?
-        if (
-            isinstance(val, Blockwise)
-            and len(depen) == 1
-            and dsk.dependencies[list(depen)[0]] == {lay}
-            and isinstance(dsk.layers[list(depen)[0]], Blockwise)
+    all_layers = set(dsk.layers)
+    while all_layers:
+        lay = all_layers.pop()
+        val = dsk.layers[lay]
+        if not isinstance(val, Blockwise):
+            # shortcut to avoid making comparisons
+            layers[lay] = val  # passthrough unchanged
+        children = dependents[lay]
+        chain = [lay]
+        lay0 = lay
+        while (
+            len(children) == 1
+            and dsk.dependencies[list(children)[0]] == {lay}
+            and isinstance(dsk.layers[list(children)[0]], Blockwise)
         ):
-            # one-to-one layer connection.
-            # When start or mid-chain, layer is not copied into output
-            if start:
-                this_chain.append(lay)
-            else:
-                this_chain = [lay]
-                start = True
-        elif start:
-            this_chain.append(lay)
-            chains.append(this_chain)
-            start = False
-            layers[lay] = copy.copy(
-                val
-            )  # shallow copy: will set attributes, not a mutate
+            # walk forwards
+            lay = list(children)[0]
+            chain.append(lay)
+            all_layers.remove(lay)
+            children = dependents[lay]
+        lay = lay0
+        parents = dsk.dependencies[lay]
+        while (
+            len(parents) == 1
+            and dependents[list(parents)[0]] == {lay}
+            and isinstance(dsk.layers[list(parents)[0]], Blockwise)
+        ):
+            # walk backwards
+            lay = list(parents)[0]
+            chain.insert(0, lay)
+            all_layers.remove(lay)
+            parents = dsk.dependencies[lay]
+        if len(chain) > 1:
+            chains.append(chain)
+            layers[chain[-1]] = copy.copy(
+                dsk.layers[chain[-1]]
+            )  # shallow copy to be mutated
         else:
             layers[lay] = val  # passthrough unchanged
 
@@ -273,10 +285,14 @@ def rewrite_layer_chains(dsk: HighLevelGraph) -> HighLevelGraph:
                     args2.append(f"__dask_blockwise__{len(indices) - 1}")
             subgraph[chain_member] = (func,) + tuple(args2)
         outlayer.dsk = subgraph
+        if hasattr(outlayer, "_dims"):
+            del outlayer._dims
         outlayer.indices = tuple(indices)
         outlayer.output_indices = layer0.output_indices
         outlayer.inputs = getattr(layer0, "inputs", set())
         outlayer.io_deps = layer0.io_deps
+        if hasattr(outlayer, "_cached_dict"):
+            del outlayer._cached_dict  # reset, since original can be mutated
     return HighLevelGraph(layers, deps)
 
 
