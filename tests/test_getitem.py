@@ -135,8 +135,25 @@ def test_boolean_array_from_concatenated(daa: dak.Array) -> None:
     assert_eq(d_concat[d_concat.x > 2], c_concat[c_concat.x > 2])
 
 
-def test_firstarg_ellipsis() -> None:
+def test_firstarg_ellipsis_3d() -> None:
     # Making a triply nested array
-    caa = ak.from_regular(np.random.random(size=(5, 5, 5)))
-    daa = dak.from_awkward(caa, npartitions=2)
+    caa = ak.from_regular(np.random.random(size=(9, 5, 5)))
+    daa = dak.from_awkward(caa, npartitions=3)
     assert_eq(daa[..., 1:3], caa[..., 1:3])
+    assert_eq(daa[..., 0:, 2:4], caa[..., 0:, 2:4])
+
+
+def test_firstarg_ellipsis_2d() -> None:
+    caa = ak.from_regular(np.random.random(size=(9, 5)))
+    daa = dak.from_awkward(caa, npartitions=3)
+    assert_eq(daa[..., 1:3], caa[..., 1:3])
+
+
+def test_firstarg_ellipsis_bad() -> None:
+    caa = ak.Array({"x": [1, 2, 3, 4]})
+    daa = dak.from_awkward(caa, npartitions=2)
+    with pytest.raises(
+        DaskAwkwardNotImplemented,
+        match="sliced axes is greater than",
+    ):
+        daa[..., 0]
