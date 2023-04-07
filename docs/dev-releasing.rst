@@ -4,14 +4,15 @@ Releasing
 Tagging a version
 -----------------
 
-We use calendar versioning (CalVer)of the format: ``YYYY.MM.X`` where
-``X`` is incremented as needed depending on how many release have
-already occured in the same year and month. For example, if the most
-recent release is the first release from March of 2023 it would be
-``2023.3.0``, the next release (no matter what day in that month)
+We use calendar versioning (CalVer) with the format: ``YYYY.MM.X``
+where ``X`` is incremented as needed depending on how many release
+have already occurred in the same year and month. For example, if the
+most recent release is the first release from March of 2023 it would
+be ``2023.3.0``, the next release (no matter what day in that month)
 would be ``2023.3.1``.
 
-Check the latest tag
+Check the latest tag with git (or just visit the GitHub repository
+tags list):
 
 .. code-block::
 
