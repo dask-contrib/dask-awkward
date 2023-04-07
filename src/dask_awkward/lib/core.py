@@ -517,7 +517,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     __dask_scheduler__ = staticmethod(threaded_get)
 
-    def __setitem__(self, where: str, what: Any) -> None:
+    def __setitem__(self, where: Any, what: Any) -> None:
         if not (
             isinstance(where, str)
             or (isinstance(where, tuple) and all(isinstance(x, str) for x in where))

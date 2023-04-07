@@ -13,7 +13,7 @@ from numpy.typing import DTypeLike
 try:
     import ujson as json
 except ImportError:
-    import json
+    import json  # type: ignore[no-redef]
 
 import dask_awkward as dak
 from dask_awkward.lib.testutils import assert_eq
