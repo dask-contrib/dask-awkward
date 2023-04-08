@@ -9,22 +9,22 @@ readme = "README.md"
 license = {text = "BSD-3-Clause"}
 requires-python = ">=3.8"
 authors = [
-    { name = "Doug Davis", email = "ddavis@ddavis.io" },
-    { name = "Martin Durant", email = "mdurant@anaconda.com" },
+  { name = "Doug Davis", email = "ddavis@ddavis.io" },
+  { name = "Martin Durant", email = "mdurant@anaconda.com" },
 ]
 maintainers = [
-    { name = "Doug Davis", email = "ddavis@ddavis.io" },
-    { name = "Martin Durant", email = "mdurant@anaconda.com" },
+  { name = "Doug Davis", email = "ddavis@ddavis.io" },
+  { name = "Martin Durant", email = "mdurant@anaconda.com" },
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
-    "License :: OSI Approved :: BSD License",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Topic :: Scientific/Engineering",
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: BSD License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Topic :: Scientific/Engineering",
 ]
 dependencies = [
     "awkward >=2.1.2",
@@ -38,31 +38,31 @@ Homepage = "https://github.com/dask-contrib/dask-awkward"
 
 [project.optional-dependencies]
 complete = [
-    "aiohttp",
-    "pyarrow",
-    "pytest >=6.0",
-    "pytest-cov >=3.0.0",
-    "requests >=2.27.1",
+  "aiohttp",
+  "pyarrow",
+  "pytest >=6.0",
+  "pytest-cov >=3.0.0",
+  "requests >=2.27.1",
 ]
 docs = [
-    "dask-sphinx-theme >=3.0.2",
-    "pyarrow",
-    "sphinx-design",
-    "pytest >=6.0",
-    "pytest-cov >=3.0.0",
-    "requests >=2.27.1",
+  "dask-sphinx-theme >=3.0.2",
+  "pyarrow",
+  "sphinx-design",
+  "pytest >=6.0",
+  "pytest-cov >=3.0.0",
+  "requests >=2.27.1",
 ]
 io = [
-    "aiohttp",
-    "pyarrow",
+  "aiohttp",
+  "pyarrow",
 ]
 test = [
-    "aiohttp",
-    "distributed",
-    "pyarrow",
-    "pytest >=6.0",
-    "pytest-cov >=3.0.0",
-    "requests >=2.27.1",
+  "aiohttp",
+  "distributed",
+  "pyarrow",
+  "pytest >=6.0",
+  "pytest-cov >=3.0.0",
+  "requests >=2.27.1",
 ]
 
 [project.entry-points."dask.sizeof"]
@@ -85,15 +85,15 @@ write_to = "src/dask_awkward/_version.py"
 minversion = "6.0"
 testpaths = ["tests"]
 addopts = [
-    "-v",
-    "-ra",
-    "--showlocals",
-    "--strict-markers",
-    "--strict-config",
+  "-v",
+  "-ra",
+  "--showlocals",
+  "--strict-markers",
+  "--strict-config",
 ]
 log_cli_level = "DEBUG"
 filterwarnings = [
-    "ignore:There is no current event loop",
+  "ignore:There is no current event loop",
 ]
 
 [tool.isort]
@@ -108,49 +108,55 @@ warn_unused_configs = true
 show_error_codes = true
 allow_incomplete_defs = false
 allow_untyped_decorators = false
-ignore_missing_imports = true
 no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 warn_unreachable = true
 
+[[tool.mypy.overrides]]
+  module = ["awkward.*"]
+  ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["IPython.*"]
-ignore_missing_imports = true
+  module = ["IPython.*"]
+  ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["fsspec.*"]
-ignore_missing_imports = true
+  module = ["fsspec.*"]
+  ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["ujson.*"]
-ignore_missing_imports = true
+  module = ["pyarrow.*"]
+  ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+  module = ["tlz.*"]
+  ignore_missing_imports = true
 
 [tool.pyright]
 include = ["src"]
-pythonVersion = "3.8"
+pythonVersion = "3.9"
 reportPrivateImportUsage = false
 
 [tool.coverage.report]
 exclude_lines = [
-    "pragma: no cover",
-    "if TYPE_CHECKING:",
-    "except ImportError:",
-    "NotImplementedError",
-    "DaskAwkwardNotImplemented",
-    "_ipython_key_completions_",
-    "Only highlevel=True is supported",
-    "\\.\\.\\.$",
+  "pragma: no cover",
+  "if TYPE_CHECKING:",
+  "except ImportError:",
+  "NotImplementedError",
+  "DaskAwkwardNotImplemented",
+  "_ipython_key_completions_",
+  "Only highlevel=True is supported",
+  "\\.\\.\\.$",
 ]
 fail_under = 90
 show_missing = true
 
 [tool.coverage.run]
 omit = [
-     "*/tests/test_*.py",
-     "*/tests/__init__.py",
-     "*/version.py",
+  "*/tests/test_*.py",
+  "*/tests/__init__.py",
+  "*/version.py",
 ]
 source = ["src/"]
 
