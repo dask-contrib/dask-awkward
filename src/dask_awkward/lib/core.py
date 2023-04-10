@@ -517,7 +517,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     __dask_scheduler__ = staticmethod(threaded_get)
 
-    def __setitem__(self, where: str, what: Any) -> None:
+    def __setitem__(self, where: Any, what: Any) -> None:
         if not (
             isinstance(where, str)
             or (isinstance(where, tuple) and all(isinstance(x, str) for x in where))
@@ -891,6 +891,16 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 dtype = where[0].layout.content.dtype.type
             if issubclass(dtype, (np.bool_, bool, np.int64, np.int32, int)):
                 return self._getitem_outer_bool_or_int_lazy_array(where)
+
+        elif where[0] is Ellipsis:
+            if len(where) <= self.ndim:
+                return self._getitem_trivial_map_partitions(where)
+
+            raise DaskAwkwardNotImplemented(
+                "Array slicing doesn't currently support Ellipsis where "
+                "the total number of sliced axes is greater than the "
+                "dimensionality of the array."
+            )
 
         raise DaskAwkwardNotImplemented(
             f"Array.__getitem__ doesn't support multi object: {where}"
