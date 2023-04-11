@@ -70,3 +70,15 @@ Now we just upload these files to PyPI with ``twine``:
 
 The GitHub ``regro-cf-autotick-bot`` account will automatically create
 a pull request to release a new version on ``conda-forge``.
+
+Create GitHub Release
+---------------------
+
+Once the release is tagged and both the source and wheel distributions
+are on PyPI, visit the GitHub repository releases_ page and click on
+``Draft new release``. Create a new release with the same name as the
+new tag. Click on the option to automatically generate release notes
+(from the commits that are part of the release). Give those notes a
+read and polish the automatically generated text as necessary.
+
+.. _releases: https://github.com/dask-contrib/dask-awkward/releases
