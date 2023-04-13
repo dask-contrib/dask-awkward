@@ -22,11 +22,11 @@ class Point:
     @ak.mixin_class_method(np.abs)
     def point_abs(self):
         return np.sqrt(self.x**2 + self.y**2)
-    
+
     @property
     def non_dask_property(self, _dask_array_=None):
         return "this is a non-dask property"
-    
+
     def non_dask_method(self, _dask_array_=None):
         return _dask_array_
 
@@ -51,9 +51,9 @@ def test_property_behavior(daa_p1: dak.Array, caa_p1: ak.Array) -> None:
     assert_eq(daa.x2, caa.x2)
 
     assert daa.behavior == caa.behavior
-    
+
     assert daa.non_dask_property == caa.non_dask_property
-    
+
     assert daa.non_dask_method() == daa
 
 
