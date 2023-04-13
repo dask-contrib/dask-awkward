@@ -54,7 +54,7 @@ def test_property_behavior(daa_p1: dak.Array, caa_p1: ak.Array) -> None:
 
     assert daa.non_dask_property == caa.non_dask_property
 
-    assert daa.non_dask_method() == daa
+    assert repr(daa.non_dask_method()) == repr(daa)
 
 
 def test_nonexistent_behavior(daa_p1: dak.Array, daa_p2: dak.Array) -> None:
