@@ -892,7 +892,7 @@ class _WithFieldFn:
     def __call__(self, base: ak.Array, what: ak.Array) -> ak.Array:
         # TODO: remove backend handling when touch is handled automatically
         if ak.backend(what) == "typetracer":
-            what.layout._touch_data(recursive=True)
+            what.layout._touch_data(recursive=False)
         return ak.with_field(
             base,
             what,
