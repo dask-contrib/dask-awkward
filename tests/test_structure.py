@@ -249,6 +249,29 @@ def test_where(caa, daa, mergebool):
         ),
     )
 
+    assert_eq(
+        dak.where(
+            daa.points.x > daa.points.y, daa.points.x, 9999.0, mergebool=mergebool
+        ),
+        ak.where(
+            caa.points.x > caa.points.y, caa.points.x, 9999.0, mergebool=mergebool
+        ),
+    )
+
+    assert_eq(
+        dak.where(
+            daa.points.x > daa.points.y, 9999.0, daa.points.y, mergebool=mergebool
+        ),
+        ak.where(
+            caa.points.x > caa.points.y, 9999.0, caa.points.y, mergebool=mergebool
+        ),
+    )
+
+    assert_eq(
+        dak.where(daa.points.x > daa.points.y, 8888.0, 9999.0, mergebool=mergebool),
+        ak.where(caa.points.x > caa.points.y, 8888.0, 9999.0, mergebool=mergebool),
+    )
+
 
 def test_isclose(daa, caa):
     assert_eq(

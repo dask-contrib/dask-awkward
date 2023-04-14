@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 import awkward as ak
 import numpy as np
 from awkward._nplikes.typetracer import TypeTracerArray
+from dask.base import is_dask_collection
 
 from dask_awkward.lib.core import (
     Array,
@@ -828,6 +829,27 @@ class _WhereFn:
         self.behavior = behavior
 
     def __call__(self, condition: ak.Array, x: ak.Array, y: ak.Array) -> ak.Array:
+        if ak.backend(condition) == "typetracer":
+            lz_condition = condition.layout.form.length_zero_array(
+                behavior=condition.behavior
+            )
+            lz_x = x
+            if isinstance(x, ak.Array):
+                lz_x = x.layout.form.length_zero_array(behavior=x.behavior)
+            lz_y = y
+            if isinstance(y, ak.Array):
+                lz_y = y.layout.form.length_zero_array(behavior=y.behavior)
+            out = ak.where(
+                lz_condition,
+                lz_x,
+                lz_y,
+                mergebool=self.mergebool,
+                highlevel=self.highlevel,
+                behavior=self.behavior,
+            )
+            return ak.Array(
+                out.layout.to_typetracer(forget_length=True), behavior=out.behavior
+            )
         return ak.where(
             condition,
             x,
@@ -849,8 +871,18 @@ def where(
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
-    if not compatible_partitions(condition, x, y):
-        raise IncompatiblePartitions("where", condition, x, y)
+
+    maybe_dask_args = [condition, x, y]
+    dask_args = tuple(arg for arg in maybe_dask_args if is_dask_collection(arg))
+
+    if not isinstance(condition, Array):
+        raise ValueError(
+            "The condition argugment to where must be a dask_awkward.Array"
+        )
+
+    if not compatible_partitions(*dask_args):
+        raise IncompatiblePartitions("where", *dask_args)
+
     return map_partitions(
         _WhereFn(mergebool=mergebool, highlevel=highlevel, behavior=behavior),
         condition,
@@ -888,7 +920,14 @@ class _WithFieldFn:
 def with_field(base, what, where=None, highlevel=True, behavior=None):
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
-    if not compatible_partitions(base, what):
+
+    if not isinstance(base, Array):
+        raise ValueError("Base argument in with_field must be a dask_awkward.Array")
+
+    maybe_dask_args = [base, what]
+    dask_args = tuple(arg for arg in maybe_dask_args if is_dask_collection(arg))
+
+    if not compatible_partitions(*dask_args):
         raise IncompatiblePartitions("with_field", base, what)
     return map_partitions(
         _WithFieldFn(where=where, highlevel=highlevel, behavior=behavior),
