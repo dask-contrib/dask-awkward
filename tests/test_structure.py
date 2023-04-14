@@ -174,6 +174,28 @@ def test_with_field(caa: ak.Array, daa: dak.Array) -> None:
         dak.with_field(daa["points"], daa["points"]["x"], where="xx"),
     )
 
+    assert_eq(
+        ak.with_field(caa["points"], 1, where="xx"),
+        dak.with_field(daa["points"], 1, where="xx"),
+    )
+
+    assert_eq(
+        ak.with_field(caa["points"], 1.0, where="xx"),
+        dak.with_field(daa["points"], 1.0, where="xx"),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Base argument in with_field must be a dask_awkward.Array",
+    ):
+        _ = dak.with_field([{"foo": 1.0}, {"foo": 2.0}], daa.points.x, where="x")
+
+    with pytest.raises(
+        ValueError,
+        match="with_field cannot accept string, bytes, list, or dict values yet",
+    ):
+        _ = dak.with_field(daa["points"], "hi there", where="q")
+
 
 def test_setitem(caa: ak.Array, daa: dak.Array) -> None:
     daa["xx"] = daa["points"]["x"]
@@ -182,6 +204,12 @@ def test_setitem(caa: ak.Array, daa: dak.Array) -> None:
     daa["points", "z"] = np.sqrt(daa.points.x**2 + daa.points.y**2)
     caa["points", "z"] = np.sqrt(caa.points.x**2 + caa.points.y**2)
     assert_eq(caa, daa)
+
+    with pytest.raises(
+        DaskAwkwardNotImplemented,
+        match="Supplying anything other than a dak.Array, or Number to __setitem__ is not yet available!\n\nIf you would like this unsupported call to be supported by\ndask-awkward please open an issue at:\nhttps://github.com/dask-contrib/dask-awkward.",
+    ):
+        daa["points", "q"] = "hi there"
 
 
 def test_with_parameter() -> None:

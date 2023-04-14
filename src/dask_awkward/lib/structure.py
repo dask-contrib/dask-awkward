@@ -3,6 +3,7 @@ from __future__ import annotations
 import builtins
 import warnings
 from collections.abc import Sequence
+from numbers import Number
 from typing import TYPE_CHECKING, Any
 
 import awkward as ak
@@ -829,6 +830,7 @@ class _WhereFn:
         self.behavior = behavior
 
     def __call__(self, condition: ak.Array, x: ak.Array, y: ak.Array) -> ak.Array:
+        # TODO: remove backend handling when touch/non-array arg is handled automatically
         if ak.backend(condition) == "typetracer":
             lz_condition = condition.layout.form.length_zero_array(
                 behavior=condition.behavior
@@ -904,9 +906,26 @@ class _WithFieldFn:
         self.behavior = behavior
 
     def __call__(self, base: ak.Array, what: ak.Array) -> ak.Array:
-        # TODO: remove backend handling when touch is handled automatically
-        if ak.backend(what) == "typetracer":
-            what.layout._touch_data(recursive=False)
+        # TODO: remove backend handling when touch/non-array arg is handled automatically
+        if ak.backend(base) == "typetracer":
+            what_is_tt = False
+            if isinstance(what, ak.Array) and ak.backend(what) == "typetracer":
+                what_is_tt = True
+                what.layout._touch_data(recursive=False)
+            if not what_is_tt:
+                zl_base = base.layout.form.length_zero_array(behavior=base.behavior)
+                zl_out = ak.with_field(
+                    zl_base,
+                    what,
+                    where=self.where,
+                    highlevel=self.highlevel,
+                    behavior=self.behavior,
+                )
+                return ak.Array(
+                    zl_out.layout.to_typetracer(forget_length=True),
+                    behavior=zl_out.behavior,
+                )
+
         return ak.with_field(
             base,
             what,
@@ -923,6 +942,11 @@ def with_field(base, what, where=None, highlevel=True, behavior=None):
 
     if not isinstance(base, Array):
         raise ValueError("Base argument in with_field must be a dask_awkward.Array")
+
+    if not isinstance(what, (Array, Number)):
+        raise ValueError(
+            "with_field cannot accept string, bytes, list, or dict values yet"
+        )
 
     maybe_dask_args = [base, what]
     dask_args = tuple(arg for arg in maybe_dask_args if is_dask_collection(arg))

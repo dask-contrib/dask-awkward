@@ -526,9 +526,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         ):
             raise TypeError("only fields may be assigned in-place (by field name)")
 
-        if not isinstance(what, Array):
+        if not isinstance(what, (Array, Number)):
             raise DaskAwkwardNotImplemented(
-                "Supplying anything other than a dak.Array to __setitem__ is not yet available!"
+                "Supplying anything other than a dak.Array, or Number to __setitem__ is not yet available!"
             )
 
         from dask_awkward.lib.structure import with_field
