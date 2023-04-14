@@ -980,6 +980,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             themethod = getattr(self._meta, method_name)
             thesig = inspect.signature(themethod)
             if "_dask_array_" in thesig.parameters:
+                if "_dask_array_" not in kwargs:
+                    kwargs["_dask_array_"] = self
                 return themethod(*args, **kwargs)
             return self.map_partitions(
                 _BehaviorMethodFn(method_name, **kwargs),

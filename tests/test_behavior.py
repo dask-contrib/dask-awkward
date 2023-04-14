@@ -23,6 +23,13 @@ class Point:
     def point_abs(self):
         return np.sqrt(self.x**2 + self.y**2)
 
+    @property
+    def non_dask_property(self, _dask_array_=None):
+        return "this is a non-dask property"
+
+    def non_dask_method(self, _dask_array_=None):
+        return _dask_array_
+
 
 def test_distance_behavior(
     daa_p1: dak.Array,
@@ -44,6 +51,10 @@ def test_property_behavior(daa_p1: dak.Array, caa_p1: ak.Array) -> None:
     assert_eq(daa.x2, caa.x2)
 
     assert daa.behavior == caa.behavior
+
+    assert daa.non_dask_property == caa.non_dask_property
+
+    assert repr(daa.non_dask_method()) == repr(daa)
 
 
 def test_nonexistent_behavior(daa_p1: dak.Array, daa_p2: dak.Array) -> None:
