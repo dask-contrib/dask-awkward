@@ -235,6 +235,7 @@ def rewrite_layer_chains(dsk: HighLevelGraph) -> HighLevelGraph:
             len(children) == 1
             and dsk.dependencies[list(children)[0]] == {lay}
             and isinstance(dsk.layers[list(children)[0]], Blockwise)
+            and len(dsk.layers[lay]) == len(dsk.layers[list(children)[0]])
         ):
             # walk forwards
             lay = list(children)[0]
@@ -247,6 +248,7 @@ def rewrite_layer_chains(dsk: HighLevelGraph) -> HighLevelGraph:
             len(parents) == 1
             and dependents[list(parents)[0]] == {lay}
             and isinstance(dsk.layers[list(parents)[0]], Blockwise)
+            and len(dsk.layers[lay]) == len(dsk.layers[list(parents)[0]])
         ):
             # walk backwards
             lay = list(parents)[0]
