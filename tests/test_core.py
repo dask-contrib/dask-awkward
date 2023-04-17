@@ -11,7 +11,7 @@ import pytest
 try:
     import ujson as json
 except ImportError:
-    import json
+    import json  # type: ignore[no-redef]
 
 import sys
 

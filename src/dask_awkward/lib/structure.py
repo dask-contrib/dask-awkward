@@ -234,20 +234,6 @@ class _CartesianFn:
         self.kwargs = kwargs
 
     def __call__(self, *arrays):
-        # TODO: remove backend check when typetracer support exists for this
-        if ak.backend(*arrays) == "typetracer":
-            for array in arrays:
-                array.layout._touch_data(recursive=True)
-            out = ak.cartesian(
-                list(
-                    array.layout.form.length_zero_array(behavior=array.behavior)
-                    for array in arrays
-                ),
-                **self.kwargs,
-            )
-            return ak.Array(
-                out.layout.to_typetracer(forget_length=True), behavior=out.behavior
-            )
         return ak.cartesian(list(arrays), **self.kwargs)
 
 
@@ -906,7 +892,7 @@ class _WithFieldFn:
     def __call__(self, base: ak.Array, what: ak.Array) -> ak.Array:
         # TODO: remove backend handling when touch is handled automatically
         if ak.backend(what) == "typetracer":
-            what.layout._touch_data(recursive=True)
+            what.layout._touch_data(recursive=False)
         return ak.with_field(
             base,
             what,

@@ -134,6 +134,8 @@ def _projectable_input_layer_names(dsk: HighLevelGraph) -> list[str]:
         n
         for n, v in dsk.layers.items()
         if isinstance(v, AwkwardInputLayer) and hasattr(v.io_func, "project_columns")
+        # following condition means dep/pickled layers cannot be optimised
+        and hasattr(v, "_meta")
     ]
 
 
@@ -187,10 +189,10 @@ def _mock_output(layer):
     assert len(layer.dsk) == 1
 
     new_layer = copy.deepcopy(layer)
-    mp = new_layer.mapping.copy()
+    mp = new_layer.dsk.copy()
     for k in iter(mp.keys()):
         mp[k] = (_touch_all_data,) + mp[k][1:]
-    new_layer.mapping = mp
+    new_layer.dsk = mp
     return new_layer
 
 
@@ -203,10 +205,10 @@ def _touch_and_call(layer):
     assert len(layer.dsk) == 1
 
     new_layer = copy.deepcopy(layer)
-    mp = new_layer.mapping.copy()
+    mp = new_layer.dsk.copy()
     for k in iter(mp.keys()):
         mp[k] = (_touch_and_call_fn,) + mp[k]
-    new_layer.mapping = mp
+    new_layer.dsk = mp
     return new_layer
 
 
