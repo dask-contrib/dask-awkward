@@ -32,6 +32,7 @@ from dask.utils import IndexCallable, funcname, key_split
 from numpy.lib.mixins import NDArrayOperatorsMixin
 from tlz import first
 
+from dask_awkward.layers import AwkwardBlockwiseLayer
 from dask_awkward.lib.optimize import all_optimizations
 from dask_awkward.typing import AwkwardDaskCollection
 from dask_awkward.utils import (
@@ -48,7 +49,6 @@ if TYPE_CHECKING:
     from awkward.types.type import Type
     from dask.array.core import Array as DaskArray
     from dask.bag.core import Bag as DaskBag
-    from dask.blockwise import Blockwise
     from numpy.typing import DTypeLike
 
 
@@ -488,7 +488,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if hasattr(dsk, "layers"):
             # i.e., NOT matrializes/persisted state
             # output typetracer
-            list(dsk.layers.values())[-1]._meta = meta  # type: ignore
+            lay = list(dsk.layers.values())[-1]
+            if isinstance(lay, AwkwardBlockwiseLayer):
+                lay._meta = meta  # type: ignore
         self._name: str = name
         self._divisions: tuple[int | None, ...] = divisions
         self._meta: ak.Array = meta
@@ -1288,7 +1290,7 @@ def partitionwise_layer(
     *args: Any,
     opt_touch_all: bool = False,
     **kwargs: Any,
-) -> Blockwise:
+) -> AwkwardBlockwiseLayer:
     """Create a partitionwise graph layer.
 
     Parameters
@@ -1334,6 +1336,7 @@ def partitionwise_layer(
         concatenate=True,
         **kwargs,
     )
+    layer = AwkwardBlockwiseLayer.from_blockwise(layer)
     if opt_touch_all:
         layer._opt_touch_all = True
     return layer

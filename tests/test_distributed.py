@@ -70,11 +70,12 @@ async def test_compute_gen_cluster(
     assert res.tolist() == ak.num(caa.points.x, axis=1).tolist()
 
 
-def test_from_delayed(loop, ndjson_points_file):  # noqa
-    def make_a_concrete(file: str) -> ak.Array:
-        with open(file) as f:
-            return ak.from_json(f.read(), line_delimited=True)
+def make_a_concrete(file: str) -> ak.Array:
+    with open(file) as f:
+        return ak.from_json(f.read(), line_delimited=True)
 
+
+def test_from_delayed(loop, ndjson_points_file):  # noqa
     with cluster() as (s, [a, b]):
         with Client(s["address"], loop=loop) as client:
             make_a_delayed = delayed(make_a_concrete, pure=True)
