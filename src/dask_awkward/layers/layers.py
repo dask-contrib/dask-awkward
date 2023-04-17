@@ -22,6 +22,13 @@ class AwkwardBlockwiseLayer(Blockwise):
         ob.__dict__.update(layer.__dict__)
         return ob
 
+    def mock(self):
+        layer = copy.copy(self)
+        nb = layer.numblocks
+        layer.numblocks = {k: tuple(1 for _ in v) for k, v in nb.items()}
+        layer.__dict__.pop("_dims", None)
+        return layer
+
     def __getstate__(self) -> dict:
         d = self.__dict__.copy()
         try:
@@ -143,7 +150,7 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         new_input_layer = AwkwardInputLayer(
             name=self.name,
             columns=self.columns,
-            inputs=[None] * int(list(self.numblocks.values())[0][0]),
+            inputs=[None][: int(list(self.numblocks.values())[0][0])],
             io_func=lambda *_, **__: new_meta_array,
             label=self.label,
             produces_tasks=self.produces_tasks,

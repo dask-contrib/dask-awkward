@@ -220,6 +220,14 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
     reports = {}
 
     # make labelled report
+    projectable = _projectable_input_layer_names(dsk)
+    for name, lay in dsk.layers.copy().items():
+        if name in projectable:
+            layers[name], report = lay.mock()
+            reports[name] = report
+        elif hasattr(lay, "mock"):
+            layers[name] = lay.mock()
+
     for name in _projectable_input_layer_names(dsk):
         layers[name], report = layers[name].mock()
         reports[name] = report
