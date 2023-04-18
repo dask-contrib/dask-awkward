@@ -28,7 +28,7 @@ classifiers = [
 ]
 dependencies = [
   "awkward >=2.1.3",
-  "dask >=2022.02.1",
+  "dask >=2023.04.0",
 ]
 dynamic = ["version"]
 

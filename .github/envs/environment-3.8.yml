@@ -9,6 +9,4 @@ dependencies:
   - requests
   - pytest
   - pyarrow
-  - pip
-  - pip:
-    - awkward==2.0.0rc4
+  - awkward
