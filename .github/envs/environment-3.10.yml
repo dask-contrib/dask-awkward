@@ -1,0 +1,12 @@
+name: test-environment
+channels:
+  - conda-forge
+dependencies:
+  # required dependencies
+  - python=3.10
+  - dask
+  - aiohttp
+  - requests
+  - pytest
+  - pyarrow
+  - awkward
