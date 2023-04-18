@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import pickle
 from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any
 
@@ -12,7 +13,35 @@ if TYPE_CHECKING:
     from awkward._nplikes.typetracer import TypeTracerReport
 
 
-class AwkwardInputLayer(Blockwise):
+class AwkwardBlockwiseLayer(Blockwise):
+    """Just like upstream Blockwise, except we override pickling"""
+
+    @classmethod
+    def from_blockwise(cls, layer) -> AwkwardBlockwiseLayer:
+        ob = object.__new__(cls)
+        ob.__dict__.update(layer.__dict__)
+        return ob
+
+    def __getstate__(self) -> dict:
+        d = self.__dict__.copy()
+        try:
+            pickle.dumps(d["_meta"])
+        except (ValueError, TypeError, KeyError):
+            d.pop(
+                "_meta", None
+            )  # must be a typetracer, does not pickle and not needed on scheduler
+        return d
+
+    def __repr__(self) -> str:
+        return "Awkward" + super().__repr__()
+
+
+class AwkwardInputLayer(AwkwardBlockwiseLayer):
+    """A layer known to perform IO and produce Awkward arrays
+
+    We specialise this so that we have a way to prune column selection on load
+    """
+
     def __init__(
         self,
         *,
