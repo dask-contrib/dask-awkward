@@ -4,14 +4,15 @@ Releasing
 Tagging a version
 -----------------
 
-We use calendar versioning (CalVer)of the format: ``YYYY.MM.X`` where
-``X`` is incremented as needed depending on how many release have
-already occured in the same year and month. For example, if the most
-recent release is the first release from March of 2023 it would be
-``2023.3.0``, the next release (no matter what day in that month)
-would be ``2023.3.1``.
+We use calendar versioning (CalVer) with the format: ``YYYY.MM.X``
+where ``X`` is incremented depending on how many releases have already
+occurred in the same year and month. For example, if the most recent
+release is the first release from March of 2023 it would be
+``2023.3.0``, the next release (on any day in that month) would be
+``2023.3.1``.
 
-Check the latest tag
+Check the latest tag with git (or just visit the GitHub repository
+tags list):
 
 .. code-block::
 
@@ -27,45 +28,34 @@ Create a new tag that follows our CalVer convention (using
 
    $ git tag -a -m "2023.3.1" 2023.3.1
 
-Push the tag to GitHub (assuming ``origin`` points to the
+Push the tag to GitHub (assuming ``upstream`` points to the
 ``dask-contrib/dask-awkward`` remote):
 
 .. code-block::
 
-   $ git push origin 2023.3.1
+   $ git push upstream 2023.3.1
 
-Making the release
-------------------
+PyPI upload
+-----------
 
-To make a release of ``dask-awkward`` we just need the ``build`` and
-``twine`` packages:
+We use a GitHub action to upload releases to PyPI when tags are pushed
+to GitHub. It should take just a few minutes after pushing the tag.
 
-.. code-block::
+Create GitHub Release
+---------------------
 
-   $ pip install build twine
+Once the release is tagged and both the source and wheel distributions
+are on PyPI, visit the GitHub repository releases_ page and click on
+``Draft new release``. Create a new release with the same name as the
+new tag. Click on the option to automatically generate release notes
+(from the commits that are part of the release). Give those notes a
+read and polish the automatically generated text as necessary.
 
-The build-system that we use (``hatch`` with ``hatch-vcs``) will
-automatically set a version based on the latest tag in the repository;
-after making the tag we just need to generate the source distribution
-and wheel, this is handled by the ``build`` package:
+.. _releases: https://github.com/dask-contrib/dask-awkward/releases
 
-.. code-block::
+Merge conda-forge version update
+--------------------------------
 
-   $ python -m build
-
-Now a new ``dist/`` directory will appear, which contains the files
-(continuing to use our example version `2023.3.1``):
-
-.. code-block::
-
-   dask_awkward-2023.3.1.tar.gz
-   dask_awkward-2023.3.1-py3-none-any.whl
-
-Now we just upload these files to PyPI with ``twine``:
-
-.. code-block::
-
-   $ twine upload dist/dask_awkward-2023.3.1*
-
-The GitHub ``regro-cf-autotick-bot`` account will automatically create
-a pull request to release a new version on ``conda-forge``.
+The conda-forge ``regro-cf-autotick-bot`` will create a PR after
+detecting the new release on PyPI. You should be able to just merge
+the PR when CI passes.

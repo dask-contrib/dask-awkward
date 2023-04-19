@@ -32,6 +32,7 @@ from dask.utils import IndexCallable, funcname, key_split
 from numpy.lib.mixins import NDArrayOperatorsMixin
 from tlz import first
 
+from dask_awkward.layers import AwkwardBlockwiseLayer
 from dask_awkward.lib.optimize import all_optimizations
 from dask_awkward.typing import AwkwardDaskCollection
 from dask_awkward.utils import (
@@ -48,7 +49,6 @@ if TYPE_CHECKING:
     from awkward.types.type import Type
     from dask.array.core import Array as DaskArray
     from dask.bag.core import Bag as DaskBag
-    from dask.blockwise import Blockwise
     from numpy.typing import DTypeLike
 
 
@@ -488,7 +488,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if hasattr(dsk, "layers"):
             # i.e., NOT matrializes/persisted state
             # output typetracer
-            list(dsk.layers.values())[-1]._meta = meta  # type: ignore
+            lay = list(dsk.layers.values())[-1]
+            if isinstance(lay, AwkwardBlockwiseLayer):
+                lay._meta = meta  # type: ignore
         self._name: str = name
         self._divisions: tuple[int | None, ...] = divisions
         self._meta: ak.Array = meta
@@ -517,7 +519,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     __dask_scheduler__ = staticmethod(threaded_get)
 
-    def __setitem__(self, where: str, what: Any) -> None:
+    def __setitem__(self, where: Any, what: Any) -> None:
         if not (
             isinstance(where, str)
             or (isinstance(where, tuple) and all(isinstance(x, str) for x in where))
@@ -921,6 +923,16 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             if issubclass(dtype, (np.bool_, bool, np.int64, np.int32, int)):
                 return self._getitem_outer_bool_or_int_lazy_array(where)
 
+        elif where[0] is Ellipsis:
+            if len(where) <= self.ndim:
+                return self._getitem_trivial_map_partitions(where)
+
+            raise DaskAwkwardNotImplemented(
+                "Array slicing doesn't currently support Ellipsis where "
+                "the total number of sliced axes is greater than the "
+                "dimensionality of the array."
+            )
+
         raise DaskAwkwardNotImplemented(
             f"Array.__getitem__ doesn't support multi object: {where}"
         )
@@ -970,6 +982,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             themethod = getattr(self._meta, method_name)
             thesig = inspect.signature(themethod)
             if "_dask_array_" in thesig.parameters:
+                if "_dask_array_" not in kwargs:
+                    kwargs["_dask_array_"] = self
                 return themethod(*args, **kwargs)
             return self.map_partitions(
                 _BehaviorMethodFn(method_name, **kwargs),
@@ -1280,7 +1294,7 @@ def partitionwise_layer(
     *args: Any,
     opt_touch_all: bool = False,
     **kwargs: Any,
-) -> Blockwise:
+) -> AwkwardBlockwiseLayer:
     """Create a partitionwise graph layer.
 
     Parameters
@@ -1326,6 +1340,7 @@ def partitionwise_layer(
         concatenate=True,
         **kwargs,
     )
+    layer = AwkwardBlockwiseLayer.from_blockwise(layer)
     if opt_touch_all:
         layer._opt_touch_all = True
     return layer
