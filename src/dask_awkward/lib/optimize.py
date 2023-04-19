@@ -173,9 +173,6 @@ def _touch_all_data(*args, **kwargs):
     """Mock writing an ak.Array to disk by touching data buffers."""
     import awkward as ak
 
-    print("touch all data")
-    print(args)
-    print(kwargs)
     for arg in args + tuple(kwargs.values()):
         if isinstance(arg, ak.Array):
             arg.layout._touch_data(recursive=True)
@@ -194,16 +191,11 @@ def _mock_output(layer):
 
 
 def _touch_and_call_fn(fn, *args, **kwargs):
-    print("in touch and call")
-    print(fn)
-    print(args)
-    print(kwargs)
     _touch_all_data(*args, **kwargs)
     return fn(*args, **kwargs)
 
 
 def _touch_and_call(layer):
-    print(layer)
     assert len(layer.dsk) == 1
 
     new_layer = copy.deepcopy(layer)
@@ -269,7 +261,6 @@ def _necessary_columns(dsk: HighLevelGraph) -> dict[str, list[str]]:
     """Pair layer names with lists of necessary columns."""
     kv = {}
     for name, report in _get_column_reports(dsk).items():
-        breakpoint()
         cols = {_ for _ in report.data_touched if _ is not None}
         select = []
         for col in sorted(cols):

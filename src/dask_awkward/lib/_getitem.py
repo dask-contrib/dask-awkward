@@ -10,16 +10,6 @@ from dask.highlevelgraph import HighLevelGraph, Layer
 from dask_awkward.lib.core import Array
 
 
-def rewind_one_layer(collection):
-    hlg = collection.dask
-    tsl = hlg._toposort_layers()
-    second_to_last_name = tsl[-2]
-    last_name = tsl[-1]
-
-    layers = hlg.layers.copy()
-    deps = hlg.dependencies.copy()
-
-
 def last_layer(obj: Array | HighLevelGraph) -> tuple[str, Layer]:
     if isinstance(obj, Array):
         obj = obj.dask
