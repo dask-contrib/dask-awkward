@@ -148,6 +148,13 @@ def test_is_none(axis: int) -> None:
     assert_eq(d, e)
 
 
+def test_local_index(daa, caa):
+    assert_eq(
+        dak.local_index(daa, axis=1),
+        ak.local_index(caa, axis=1),
+    )
+
+
 @pytest.mark.parametrize("axis", [1, -1, 2, -2])
 @pytest.mark.parametrize("target", [5, 10, 1])
 def test_pad_none(axis: int, target: int) -> None:
