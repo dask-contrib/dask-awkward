@@ -431,17 +431,6 @@ def full_like(array, fill_value, highlevel=True, behavior=None, dtype=None):
             dak.flatten/dak.unflatten"""
         )
 
-    #  TODO: fix when available in awkward
-    meta = typetracer_from_form(
-        ak.full_like(
-            array._meta.layout.form.length_zero_array(behavior=array.behavior),
-            fill_value,
-            highlevel=highlevel,
-            behavior=behavior,
-            dtype=dtype,
-        ).layout.form
-    )
-
     return map_partitions(
         ak.full_like,
         array,
@@ -449,7 +438,6 @@ def full_like(array, fill_value, highlevel=True, behavior=None, dtype=None):
         highlevel=highlevel,
         behavior=behavior,
         dtype=dtype,
-        meta=meta,
     )
 
 
