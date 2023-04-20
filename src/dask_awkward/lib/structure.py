@@ -666,22 +666,12 @@ def run_lengths(array, highlevel=True, behavior=None):
             "run_lengths can produce incorrect results for one dimensional arrays!"
         )
 
-    # TODO: fix typetracer error in awkward
-    meta = typetracer_from_form(
-        ak.run_lengths(
-            array._meta.layout.form.length_zero_array(behavior=array.behavior),
-            highlevel=highlevel,
-            behavior=behavior,
-        ).layout.form
-    )
-
     return map_partitions(
         ak.run_lengths,
         array,
         highlevel=highlevel,
         behavior=behavior,
         label="run-lengths",
-        meta=meta,
     )
 
 
