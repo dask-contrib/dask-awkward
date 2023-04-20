@@ -506,7 +506,18 @@ def is_none(array, axis=0, highlevel=True, behavior=None):
 
 @borrow_docstring(ak.local_index)
 def local_index(array, axis=-1, highlevel=True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+    if axis == 0:
+        DaskAwkwardNotImplemented("axis=0 for local_index is not supported")
+    if axis and axis != 0:
+        return map_partitions(
+            ak.local_index,
+            array,
+            axis=axis,
+            highlevel=highlevel,
+            behavior=behavior,
+        )
 
 
 @borrow_docstring(ak.mask)
