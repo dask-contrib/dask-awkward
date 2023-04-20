@@ -711,29 +711,36 @@ def run_lengths(array, highlevel=True, behavior=None):
     )
 
 
+class _SingletonsFn:
+    def __init__(self, axis, **kwargs):
+        self.axis = axis
+        self.kwargs = kwargs
+
+    def __call__(self, array):
+        # TODO: remove this length-zero calculation once https://github.com/scikit-hep/awkward/issues/2123 is addressed
+        if ak.backend(array) == "typetracer":
+            array.layout._touch_data(recursive=False)
+            zl_out = ak.singletons(
+                array.layout.form.length_zero_array(behavior=array.behavior),
+                axis=self.axis,
+                **self.kwargs,
+            )
+            return ak.Array(
+                zl_out.layout.to_typetracer(forget_length=True),
+                behavior=zl_out.behavior,
+            )
+        return ak.singletons(array, axis=self.axis, **self.kwargs)
+
+
 @borrow_docstring(ak.singletons)
 def singletons(array, axis=0, highlevel=True, behavior=None):
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
 
-    # TODO: remove this length-zero calculation once https://github.com/scikit-hep/awkward/issues/2123 is addressed
-    meta = typetracer_from_form(
-        ak.singletons(
-            array._meta.layout.form.length_zero_array(behavior=array.behavior),
-            axis=axis,
-            highlevel=highlevel,
-            behavior=behavior,
-        ).layout.form
-    )
-
     return map_partitions(
-        ak.singletons,
+        _SingletonsFn(axis, highlevel=highlevel, behavior=behavior),
         array,
-        axis=axis,
-        highlevel=highlevel,
-        behavior=behavior,
         label="singletons",
-        meta=meta,
     )
 
 
