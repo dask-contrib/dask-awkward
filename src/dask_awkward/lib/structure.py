@@ -451,19 +451,6 @@ def isclose(
     if not compatible_partitions(a, b):
         raise IncompatiblePartitions("isclose", a, b)
 
-    #  TODO: fix this when https://github.com/scikit-hep/awkward/issues/2124 is addressed
-    meta = typetracer_from_form(
-        ak.isclose(
-            a._meta.layout.form.length_zero_array(behavior=a.behavior),
-            b._meta.layout.form.length_zero_array(behavior=b.behavior),
-            rtol=rtol,
-            atol=atol,
-            equal_nan=equal_nan,
-            highlevel=highlevel,
-            behavior=behavior,
-        ).layout.form
-    )
-
     return map_partitions(
         ak.isclose,
         a,
@@ -474,7 +461,6 @@ def isclose(
         highlevel=highlevel,
         behavior=behavior,
         label="is-close",
-        meta=meta,
     )
 
 
