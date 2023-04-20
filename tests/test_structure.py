@@ -148,6 +148,13 @@ def test_is_none(axis: int) -> None:
     assert_eq(d, e)
 
 
+def test_local_index(daa, caa):
+    assert_eq(
+        dak.local_index(daa, axis=1),
+        ak.local_index(caa, axis=1),
+    )
+
+
 @pytest.mark.parametrize("axis", [1, -1, 2, -2])
 @pytest.mark.parametrize("target", [5, 10, 1])
 def test_pad_none(axis: int, target: int) -> None:
@@ -250,12 +257,31 @@ def test_isclose(daa, caa):
     )
 
 
-def test_singletons(L4):
-    caa = ak.Array(L4)
-    daa = dak.from_awkward(caa, 1)
+def test_singletons(daa, L4):
+    import warnings
+
+    warnings.simplefilter("error")
+    caa_L4 = ak.Array(L4)
+    daa_L4 = dak.from_awkward(caa_L4, 1)
     assert_eq(
-        dak.singletons(daa),
-        ak.singletons(caa),
+        dak.singletons(daa_L4),
+        ak.singletons(caa_L4),
+    )
+
+    dak.to_parquet(daa, "test-singletons/")
+
+    fpq_daa = dak.from_parquet("test-singletons/")
+    fpq_caa = ak.from_parquet("test-singletons/")
+
+    temp_zip = dak.zip({"x": fpq_daa.points.x, "y": fpq_daa.points.y})
+
+    argmin_check = dak.singletons(dak.argmin(temp_zip.x, axis=1))
+
+    assert_eq(
+        argmin_check,
+        ak.singletons(
+            ak.argmin(ak.zip({"x": fpq_caa.points.x, "y": fpq_caa.points.y}).x, axis=1)
+        ),
     )
 
 
