@@ -2,18 +2,12 @@ from __future__ import annotations
 
 import copy
 import operator
-from pprint import pprint
 
 from dask.blockwise import Blockwise
 from dask.highlevelgraph import HighLevelGraph, Layer
 
-from dask_awkward.lib.core import Array
 
-
-def last_layer(obj: Array | HighLevelGraph) -> tuple[str, Layer]:
-    if isinstance(obj, Array):
-        obj = obj.dask
-
+def last_layer(obj: HighLevelGraph) -> tuple[str, Layer]:
     name = obj._toposort_layers()[-1]
     return name, obj.layers[name]
 
@@ -31,13 +25,14 @@ def rewrite_last_getitem(hlg: HighLevelGraph, new_key: str) -> HighLevelGraph:
         return hlg
 
     fn_args = llayer.indices[-1][0]
-    pprint(fn_args)
     if isinstance(fn_args, tuple):
         if not all(isinstance(x, str) for x in fn_args):
-            return None
+            return hlg
         new_indices = (tuple(list(fn_args) + [new_key]), None)
-    elif isinstance(fn_args, str):
+    elif isinstance(fn_args, (str, int)):
         new_indices = ((fn_args, new_key), None)
+    else:
+        return hlg
 
     layers = hlg.layers.copy()
     deps = hlg.dependencies.copy()

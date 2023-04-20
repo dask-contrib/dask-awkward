@@ -765,7 +765,6 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             Resulting collection.
 
         """
-
         # don't accept lists containing integers.
         if isinstance(where, list):
             if any(isinstance(k, int) for k in where):
@@ -784,6 +783,12 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         meta: Any | None = None,
         label: str | None = None,
     ) -> Any:
+        from dask_awkward.lib._getitem import (
+            is_getitem_layer,
+            last_layer,
+            rewrite_last_getitem,
+        )
+
         if meta is None and self._meta is not None:
             if isinstance(where, tuple):
                 metad = to_meta(where)
@@ -791,6 +796,10 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             else:
                 m = to_meta([where])[0]
                 meta = self._meta[m]
+        # TODO: put behind config barrier
+        if is_getitem_layer(last_layer(self.dask)[1]):
+            hlg = rewrite_last_getitem(self.dask, where)
+            return new_array_object(hlg, self.name, meta=meta, divisions=self.divisions)
         return map_partitions(
             operator.getitem,
             self,

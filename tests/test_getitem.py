@@ -157,3 +157,12 @@ def test_firstarg_ellipsis_bad() -> None:
         match="sliced axes is greater than",
     ):
         daa[..., 0]
+
+
+def test_getitem_getitem_optimize(daa):
+    lay1 = daa.dask
+    lay2 = daa.points.dask
+    lay3 = daa.points.x.dask
+    assert len(lay1.layers) == 1
+    assert len(lay2.layers) == 2
+    assert len(lay3.layers) == 2
