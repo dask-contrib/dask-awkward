@@ -35,6 +35,8 @@ def test_visualize_works(daa):
 
 
 def test_basic_root_works(daa):
+    pytest.importorskip("hist")
+    pytest.importorskip("uproot")
     import hist.dask as hda
     import uproot
 
