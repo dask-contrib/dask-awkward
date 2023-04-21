@@ -242,6 +242,8 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
     outlayer = hlg.layers[hlg._toposort_layers()[-1]]
 
     try:
+        for layer in hlg.layers.values():
+            layer.__dict__.pop("_cached_dict", None)
         out = get_sync(hlg, list(outlayer.keys())[0])
     except Exception as err:
         on_fail = dask.config.get("awkward.optimization.on-fail")

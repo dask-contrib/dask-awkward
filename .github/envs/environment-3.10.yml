@@ -10,3 +10,5 @@ dependencies:
   - pytest
   - pyarrow
   - awkward
+  - dask-histogram
+  - uproot
