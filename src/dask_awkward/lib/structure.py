@@ -830,28 +830,6 @@ class _WhereFn:
         self.behavior = behavior
 
     def __call__(self, condition: ak.Array, x: ak.Array, y: ak.Array) -> ak.Array:
-        # TODO: remove backend handling when touch/non-array arg is handled automatically
-        if ak.backend(condition) == "typetracer":
-            lz_condition = condition.layout.form.length_zero_array(
-                behavior=condition.behavior
-            )
-            lz_x = x
-            if isinstance(x, ak.Array):
-                lz_x = x.layout.form.length_zero_array(behavior=x.behavior)
-            lz_y = y
-            if isinstance(y, ak.Array):
-                lz_y = y.layout.form.length_zero_array(behavior=y.behavior)
-            out = ak.where(
-                lz_condition,
-                lz_x,
-                lz_y,
-                mergebool=self.mergebool,
-                highlevel=self.highlevel,
-                behavior=self.behavior,
-            )
-            return ak.Array(
-                out.layout.to_typetracer(forget_length=True), behavior=out.behavior
-            )
         return ak.where(
             condition,
             x,
@@ -906,26 +884,6 @@ class _WithFieldFn:
         self.behavior = behavior
 
     def __call__(self, base: ak.Array, what: ak.Array) -> ak.Array:
-        # TODO: remove backend handling when touch/non-array arg is handled automatically
-        if ak.backend(base) == "typetracer":
-            what_is_tt = False
-            if isinstance(what, ak.Array) and ak.backend(what) == "typetracer":
-                what_is_tt = True
-                what.layout._touch_data(recursive=False)
-            if not what_is_tt:
-                zl_base = base.layout.form.length_zero_array(behavior=base.behavior)
-                zl_out = ak.with_field(
-                    zl_base,
-                    what,
-                    where=self.where,
-                    highlevel=self.highlevel,
-                    behavior=self.behavior,
-                )
-                return ak.Array(
-                    zl_out.layout.to_typetracer(forget_length=True),
-                    behavior=zl_out.behavior,
-                )
-
         return ak.with_field(
             base,
             what,
