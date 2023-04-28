@@ -17,7 +17,6 @@ from dask_awkward.lib.core import (
     map_partitions,
     new_known_scalar,
     total_reduction_to_scalar,
-    typetracer_from_form,
 )
 from dask_awkward.utils import (
     DaskAwkwardNotImplemented,
@@ -919,7 +918,7 @@ def with_name(
         _WithNameFn(name=name, behavior=behavior),
         array,
         label="with-name",
-        output_divisions=1
+        output_divisions=1,
     )
 
 
