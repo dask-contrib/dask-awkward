@@ -556,6 +556,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         self._meta = empty_typetracer()
 
     def repartition(self, npartitions=None, divisions=None, rows_per_partition=None):
+        from copy import copy
+
         from dask_awkward.lib.structure import repartition_layer
 
         if sum(bool(_) for _ in [npartitions, divisions, rows_per_partition]) != 1:
@@ -569,6 +571,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             divisions.append(nrows)
         layer = repartition_layer(self, divisions)
         hlg = self.dask.copy()
+        hlg.layers.update({k: copy(v) for k, v in self.dask.layers.items()})
         hlg.layers[layer.outkey] = layer
         return new_array_object(
             hlg,
