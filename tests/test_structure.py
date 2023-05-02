@@ -481,3 +481,8 @@ def test_values_astype(daa, caa):
         dak.values_astype(daa, np.float32),
         ak.values_astype(caa, np.float32),
     )
+
+
+def test_repartition(daa):
+    daa1 = daa.repartition(npartitions=1)
+    assert_eq(daa, daa1, check_divisions=False)

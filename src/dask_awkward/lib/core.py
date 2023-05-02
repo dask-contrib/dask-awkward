@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 import keyword
 import logging
+import math
 import operator
 import sys
 import warnings
@@ -553,6 +554,29 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     def reset_meta(self) -> None:
         """Assign an empty typetracer array as the collection metadata."""
         self._meta = empty_typetracer()
+
+    def repartition(self, npartitions=None, divisions=None, rows_per_partition=None):
+        from dask_awkward.lib.structure import repartition_layer
+
+        if sum(bool(_) for _ in [npartitions, divisions, rows_per_partition]) != 1:
+            raise ValueError("Please specify exactly one of the inputs")
+        self.eager_compute_divisions()
+        nrows = self.divisions[-1]
+        if npartitions:
+            rows_per_partition = math.ceil(nrows / npartitions)
+        if rows_per_partition:
+            divisions = list(range(0, nrows, rows_per_partition))
+            divisions.append(nrows)
+        layer = repartition_layer(self, divisions)
+        hlg = self.dask.copy()
+        hlg.layers[layer.outkey] = layer
+        return new_array_object(
+            hlg,
+            layer.outkey,
+            meta=self._meta,
+            behavior=self.behavior,
+            divisions=divisions,
+        )
 
     def __len__(self) -> int:
         if not self.known_divisions:

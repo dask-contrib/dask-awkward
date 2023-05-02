@@ -4,12 +4,12 @@ import builtins
 import warnings
 from collections.abc import Sequence
 from numbers import Number
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Hashable, Iterable, Mapping
 
 import awkward as ak
 import numpy as np
 from awkward._nplikes.typetracer import TypeTracerArray
-from dask.base import is_dask_collection
+from dask.base import is_dask_collection, tokenize
 
 from dask_awkward.lib.core import (
     Array,
@@ -1122,3 +1122,111 @@ def zip(
         raise DaskAwkwardNotImplemented(
             "only sized iterables are supported by dak.zip (dict, list, or tuple)"
         )
+
+
+from dask.highlevelgraph import Layer
+
+
+def _repartition_func(*stuff):
+    *data, slices = stuff
+    data = [
+        d[sl[0] : sl[1]] if sl is not None else d
+        for d, sl in builtins.zip(data, slices)
+    ]
+    return ak.concatenate(data)
+
+
+class RepartitionLayer(Layer):
+    def __init__(
+        self,
+        inkey,
+        outkey,
+        parts: tuple[tuple[int]],
+        slices: tuple[tuple[tuple[int] | None]],
+    ):
+        self.inkey = inkey
+        self.outkey = outkey
+        self.parts = parts
+        self.slices = slices
+        assert len(parts) == len(slices)
+        self.nkeys = len(parts)
+        self.annotations = None  # TODO
+        self.collection_annotations = None  # TODO
+
+    def is_materialized(self) -> bool:
+        return False
+
+    def get_output_keys(self) -> set:
+        return set(self)
+
+    def get_dependencies(self, item: Hashable, all_hlg_keys: Iterable) -> set:
+        key, part = item
+        assert key == self.outkey
+        parts = self.parts[part]
+        return {(self.inkey, p) for p in parts}
+
+    def cull(
+        self, keys: set, all_hlg_keys: Iterable
+    ) -> tuple[Layer, Mapping[Hashable, set]]:
+        outparts = []
+        outslices = []
+        deps = {}
+        for item in keys:
+            key, part = item
+            outparts.append(self.parts[part])
+            outslices.append(self.slices[part])
+            deps[item] = self.get_dependencies(item, None)
+        return RepartitionLayer(self.inkey, self.outkey, outparts, outslices), deps
+
+    def __getitem__(self, item):
+        key, part = item
+        assert key == self.outkey
+        parts = self.parts[part]
+        slices = self.slices[part]
+        return (_repartition_func,) + tuple((self.inkey, p) for p in parts) + (slices,)
+
+    def __iter__(self):
+        return iter((self.outkey, i) for i in range(self.nkeys))
+
+    def __repr__(self):
+        return f"<RepartitionLayer {self.outkey}, {self.nkeys} tasks>"
+
+    def __len__(self):
+        return self.nkeys
+
+
+def repartition_layer(arr, divisions):
+    # outputs to fill
+    parts = []
+    slices = []
+
+    indivs = arr.divisions
+    i = 0
+    j = 0
+    for start, end in builtins.zip(divisions[:-1], divisions[1:]):
+        pp = []
+        ss = []
+        while indivs[i] < start:
+            i += 1
+        j = i
+        while indivs[j] < end:
+            j += 1
+        if i == j:
+            pp.append(i)
+            ss.append((start - indivs[i], end - indivs[i]))
+        else:
+            pp.append(i)
+            ss.append((start - indivs[i], None))
+            for k in range(i + 1, j):
+                pp.append(k)
+                ss.append(None)
+            if indivs[j] != end:
+                pp.append(j)
+                ss.append((None, end - indivs[j]))
+        parts.append(pp)
+        slices.append(ss)
+
+    token = tokenize(arr.name, divisions)
+    key = f"repartition-{token}"
+    layer = RepartitionLayer(arr.name, key, parts, slices)
+    return layer
