@@ -483,6 +483,20 @@ def test_values_astype(daa, caa):
     )
 
 
-def test_repartition(daa):
+def test_repartition_whole(daa):
     daa1 = daa.repartition(npartitions=1)
+    assert daa1.npartitions == 1
     assert_eq(daa, daa1, check_divisions=False)
+
+
+def test_repartition_no_change(daa):
+    daa1 = daa.repartition(divisions=(0, 5, 10, 15))
+    assert daa1.npartitions == 3
+    assert_eq(daa, daa1, check_divisions=False)
+
+
+def test_repartition_split_all(daa):
+    daa1 = daa.repartition(rows_per_partition=1)
+    assert daa1.npartitions == len(daa)
+    out = daa1.compute(optimize_graph=False)
+    assert out.tolist() == daa.compute().tolist()

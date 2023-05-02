@@ -1143,6 +1143,7 @@ class RepartitionLayer(Layer):
         outkey,
         parts: tuple[tuple[int]],
         slices: tuple[tuple[tuple[int] | None]],
+        # meta
     ):
         self.inkey = inkey
         self.outkey = outkey
@@ -1167,7 +1168,7 @@ class RepartitionLayer(Layer):
 
     def cull(
         self, keys: set, all_hlg_keys: Iterable
-    ) -> tuple[Layer, Mapping[Hashable, set]]:
+    ) -> tuple[RepartitionLayer, Mapping[Hashable, set]]:
         outparts = []
         outslices = []
         deps = {}
@@ -1177,6 +1178,9 @@ class RepartitionLayer(Layer):
             outslices.append(self.slices[part])
             deps[item] = self.get_dependencies(item, None)
         return RepartitionLayer(self.inkey, self.outkey, outparts, outslices), deps
+
+    def mock(self):
+        return RepartitionLayer(self.inkey, self.outkey, [[self.parts[0][0]]], [[None]])
 
     def __getitem__(self, item):
         key, part = item
@@ -1202,27 +1206,30 @@ def repartition_layer(arr, divisions):
 
     indivs = arr.divisions
     i = 0
-    j = 0
     for start, end in builtins.zip(divisions[:-1], divisions[1:]):
         pp = []
         ss = []
-        while indivs[i] < start:
+        while indivs[i] <= start:
             i += 1
         j = i
+        i -= 1
         while indivs[j] < end:
             j += 1
-        if i == j:
-            pp.append(i)
-            ss.append((start - indivs[i], end - indivs[i]))
-        else:
-            pp.append(i)
-            ss.append((start - indivs[i], None))
-            for k in range(i + 1, j):
-                pp.append(k)
-                ss.append(None)
-            if indivs[j] != end:
-                pp.append(j)
-                ss.append((None, end - indivs[j]))
+        for k in range(i, j):
+            if start < indivs[k]:
+                st = None
+            elif start < indivs[k + 1]:
+                st = start - indivs[k]
+            else:
+                continue
+            if end < indivs[k]:
+                continue
+            elif end < indivs[k + 1]:
+                en = end - indivs[k]
+            else:
+                en = None
+            pp.append(k)
+            ss.append((st, en))
         parts.append(pp)
         slices.append(ss)
 
