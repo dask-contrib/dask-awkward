@@ -273,7 +273,7 @@ def rewrite_layer_chains(dsk: HighLevelGraph) -> HighLevelGraph:
         outkey = chain[-1]
         layer0 = dsk.layers[chain[0]]
         outlayer = layers[outkey]
-        outlayer.numblocks = layer0.numblocks
+        numblocks = [nb[0] for nb in layer0.numblocks.values() if nb[0] is not None][0]
         deps[outkey] = deps[chain[0]]
         [deps.pop(ch) for ch in chain[:-1]]
 
@@ -281,25 +281,30 @@ def rewrite_layer_chains(dsk: HighLevelGraph) -> HighLevelGraph:
         indices = list(layer0.indices)
         parent = chain[0]
 
+        outlayer.io_deps = layer0.io_deps
         for chain_member in chain[1:]:
             layer = dsk.layers[chain_member]
+            for k in layer.io_deps:
+                outlayer.io_deps[k] = layer.io_deps[k]
             func, *args = layer.dsk[chain_member]
-            args2 = _recursive_replace(args, layer, parent)
+            args2 = _recursive_replace(args, layer, parent, indices)
             subgraph[chain_member] = (func,) + tuple(args2)
             parent = chain_member
+        outlayer.numblocks = {i[0]: (numblocks,) for i in indices if i[1] is not None}
         outlayer.dsk = subgraph
         if hasattr(outlayer, "_dims"):
             del outlayer._dims
-        outlayer.indices = tuple(indices)
-        outlayer.output_indices = layer0.output_indices
+        outlayer.indices = tuple(
+            (i[0], (".0",) if i[1] is not None else None) for i in indices
+        )
+        outlayer.output_indices = (".0",)
         outlayer.inputs = getattr(layer0, "inputs", set())
-        outlayer.io_deps = layer0.io_deps
         if hasattr(outlayer, "_cached_dict"):
             del outlayer._cached_dict  # reset, since original can be mutated
     return HighLevelGraph(layers, deps)
 
 
-def _recursive_replace(args, layer, parent):
+def _recursive_replace(args, layer, parent, indices):
     args2 = []
     for arg in args:
         if isinstance(arg, str) and arg.startswith("__dask_blockwise__"):
@@ -307,16 +312,18 @@ def _recursive_replace(args, layer, parent):
             if layer.indices[ind][1] is None:
                 # this is a simple arg
                 args2.append(layer.indices[ind][0])
-            else:
-                # arg refers to layer with tasks
+            elif layer.indices[ind][0] == parent:
+                # arg refers to output of previous layer
                 args2.append(parent)
+            else:
+                # arg refers to things defined in io_deps
+                indices.append(layer.indices[ind])
+                args2.append(f"__dask_blockwise__{len(indices) - 1}")
         elif isinstance(arg, list):
-            args2.append(_recursive_replace(arg, layer, parent))
+            args2.append(_recursive_replace(arg, layer, parent, indices))
         elif isinstance(arg, tuple):
-            args2.append(tuple(_recursive_replace(arg, layer, parent)))
-        elif isinstance(arg, dict):
-            vals = _recursive_replace(arg.values())
-            args2.append({k: v for k, v in zip(arg, vals)})
+            args2.append(tuple(_recursive_replace(arg, layer, parent, indices)))
+        # elif isinstance(arg, dict):
         else:
             args2.append(arg)
     return args2
