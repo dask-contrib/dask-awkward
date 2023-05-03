@@ -43,9 +43,6 @@ def all_optimizations(
         # Perform dask-awkward specific optimizations.
         dsk = optimize(dsk, keys=keys)
 
-        # blockwise layer chaining optimization.
-        dsk = rewrite_layer_chains(dsk)
-
         # Perform Blockwise optimizations for HLG input
         dsk = optimize_blockwise(dsk, keys=keys)
         # fuse nearby layers
@@ -70,6 +67,10 @@ def optimize(
     """
     if dask.config.get("awkward.optimization.enabled", default=False):
         dsk = optimize_columns(dsk)  # type: ignore
+
+        # blockwise layer chaining optimization.
+        dsk = rewrite_layer_chains(dsk)
+
     return dsk
 
 
