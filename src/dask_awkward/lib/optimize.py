@@ -279,16 +279,14 @@ def rewrite_layer_chains(dsk: HighLevelGraph) -> HighLevelGraph:
 
         subgraph = layer0.dsk.copy()
         indices = list(layer0.indices)
+        parent = chain[0]
+
         for chain_member in chain[1:]:
             layer = dsk.layers[chain_member]
             func, *args = layer.dsk[chain_member]
-            args2 = [list(layer.numblocks)[0]]
-            for arg in args[1:]:
-                if isinstance(arg, str) and arg.startswith("__dask_blockwise__"):
-                    ind = int(arg[18:])
-                    indices.append(layer.indices[ind])
-                    args2.append(f"__dask_blockwise__{len(indices) - 1}")
+            args2 = _recursive_replace(args, layer, parent)
             subgraph[chain_member] = (func,) + tuple(args2)
+            parent = chain_member
         outlayer.dsk = subgraph
         if hasattr(outlayer, "_dims"):
             del outlayer._dims
@@ -299,6 +297,29 @@ def rewrite_layer_chains(dsk: HighLevelGraph) -> HighLevelGraph:
         if hasattr(outlayer, "_cached_dict"):
             del outlayer._cached_dict  # reset, since original can be mutated
     return HighLevelGraph(layers, deps)
+
+
+def _recursive_replace(args, layer, parent):
+    args2 = []
+    for arg in args:
+        if isinstance(arg, str) and arg.startswith("__dask_blockwise__"):
+            ind = int(arg[18:])
+            if layer.indices[ind][1] is None:
+                # this is a simple arg
+                args2.append(layer.indices[ind][0])
+            else:
+                # arg refers to layer with tasks
+                args2.append(parent)
+        elif isinstance(arg, list):
+            args2.append(_recursive_replace(arg, layer, parent))
+        elif isinstance(arg, tuple):
+            args2.append(tuple(_recursive_replace(arg, layer, parent)))
+        elif isinstance(arg, dict):
+            vals = _recursive_replace(arg.values())
+            args2.append({k: v for k, v in zip(arg, vals)})
+        else:
+            args2.append(arg)
+    return args2
 
 
 def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
