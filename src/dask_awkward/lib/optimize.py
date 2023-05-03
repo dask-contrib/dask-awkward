@@ -341,6 +341,14 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
     reports = {}
 
     # make labelled report
+    projectable = _projectable_input_layer_names(dsk)
+    for name, lay in dsk.layers.copy().items():
+        if name in projectable:
+            layers[name], report = lay.mock()
+            reports[name] = report
+        elif hasattr(lay, "mock"):
+            layers[name] = lay.mock()
+
     for name in _projectable_input_layer_names(dsk):
         layers[name], report = layers[name].mock()
         reports[name] = report
@@ -355,6 +363,8 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
     outlayer = hlg.layers[hlg._toposort_layers()[-1]]
 
     try:
+        for layer in hlg.layers.values():
+            layer.__dict__.pop("_cached_dict", None)
         out = get_sync(hlg, list(outlayer.keys())[0])
     except Exception as err:
         on_fail = dask.config.get("awkward.optimization.on-fail")
