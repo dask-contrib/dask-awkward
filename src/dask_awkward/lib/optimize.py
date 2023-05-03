@@ -228,10 +228,6 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
         elif hasattr(lay, "mock"):
             layers[name] = lay.mock()
 
-    for name in _projectable_input_layer_names(dsk):
-        layers[name], report = layers[name].mock()
-        reports[name] = report
-
     for name in _ak_output_layer_names(dsk):
         layers[name] = _mock_output(layers[name])
 
