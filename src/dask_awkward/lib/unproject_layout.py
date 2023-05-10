@@ -2,7 +2,6 @@ import math
 
 import awkward as ak
 import numpy as np
-from awkward._nplikes import nplike_of
 from awkward.contents import (
     BitMaskedArray,
     ByteMaskedArray,
@@ -36,9 +35,9 @@ from awkward.forms import (
 
 
 class DummyIndex:
-    def __init__(self, length, nplike):
+    def __init__(self, length, backend):
         self._length = length
-        self._nplike = nplike
+        self._nplike = backend
 
     def __len__(self):
         return self._length
@@ -92,8 +91,8 @@ dtype_of = {
 }
 
 
-def dummy_buffer(shape, dtype, nplike):
-    return nplike.broadcast_to(nplike.asarray([0], dtype=dtype), shape)
+def dummy_buffer(shape, dtype, backend):
+    return backend.broadcast_to(backend.asarray([0], dtype=dtype), shape)
 
 
 def compatible(form: Form, layout: Content) -> bool:
@@ -149,7 +148,7 @@ def compatible(form: Form, layout: Content) -> bool:
         return False
 
 
-def _unproject_layout(form, layout, length, nplike):
+def _unproject_layout(form, layout, length, backend):
     if layout is None:
         # construct the "minimum necessary" layout
         # maintaining length constraints if there are any, 0 otherwise
@@ -162,15 +161,15 @@ def _unproject_layout(form, layout, length, nplike):
                 dummy_buffer(
                     (length,) + form.inner_shape,
                     ak.types.numpytype.primitive_to_dtype(form.primitive),
-                    nplike,
+                    backend.nplike,
                 ),
                 parameters=form.parameters,
             )
 
         elif isinstance(form, BitMaskedForm):
             return BitMaskedArray(
-                index_of[form.mask](int(math.ceil(length / 8.0)), nplike),
-                _unproject_layout(form.content, None, length, nplike),
+                index_of[form.mask](int(math.ceil(length / 8.0)), backend.index_nplike),
+                _unproject_layout(form.content, None, length, backend),
                 form.valid_when,
                 length,
                 form.lsb_order,
@@ -179,44 +178,44 @@ def _unproject_layout(form, layout, length, nplike):
 
         elif isinstance(form, ByteMaskedForm):
             return ByteMaskedArray(
-                index_of[form.mask](length, nplike),
-                _unproject_layout(form.content, None, length, nplike),
+                index_of[form.mask](length, backend.index_nplike),
+                _unproject_layout(form.content, None, length, backend),
                 form.valid_when,
                 parameters=form.parameters,
             )
 
         elif isinstance(form, IndexedForm):
             return IndexedArray(
-                index_of[form.index](length, nplike),
-                _unproject_layout(form.content, None, 0, nplike),
+                index_of[form.index](length, backend.index_nplike),
+                _unproject_layout(form.content, None, 0, backend),
                 parameters=form.parameters,
             )
 
         elif isinstance(form, IndexedOptionForm):
             return IndexedOptionArray(
-                index_of[form.index](length, nplike),
-                _unproject_layout(form.content, None, 0, nplike),
+                index_of[form.index](length, backend.index_nplike),
+                _unproject_layout(form.content, None, 0, backend),
                 parameters=form.parameters,
             )
 
         elif isinstance(form, ListForm):
             return ListArray(
-                index_of[form.starts](length, nplike),
-                index_of[form.stops](length, nplike),
-                _unproject_layout(form.content, None, 0, nplike),
+                index_of[form.starts](length, backend.index_nplike),
+                index_of[form.stops](length, backend.index_nplike),
+                _unproject_layout(form.content, None, 0, backend),
                 parameters=form.parameters,
             )
 
         elif isinstance(form, ListOffsetForm):
             return ListOffsetArray(
-                index_of[form.offsets](length + 1, nplike),
-                _unproject_layout(form.content, None, 0, nplike),
+                index_of[form.offsets](length + 1, backend.index_nplike),
+                _unproject_layout(form.content, None, 0, backend),
                 parameters=form.parameters,
             )
 
         elif isinstance(form, RegularForm):
             return RegularArray(
-                _unproject_layout(form.content, None, length * form.size, nplike),
+                _unproject_layout(form.content, None, length * form.size, backend),
                 form.size,
                 length,
                 parameters=form.parameters,
@@ -224,14 +223,14 @@ def _unproject_layout(form, layout, length, nplike):
 
         elif isinstance(form, UnmaskedForm):
             return UnmaskedArray(
-                _unproject_layout(form.content, None, length, nplike),
+                _unproject_layout(form.content, None, length, backend),
                 parameters=form.parameters,
             )
 
         elif isinstance(form, RecordForm):
             return RecordArray(
                 [
-                    _unproject_layout(content, None, length, nplike)
+                    _unproject_layout(content, None, length, backend)
                     for content in form.contents
                 ],
                 None if form.is_tuple else form.fields,
@@ -241,10 +240,10 @@ def _unproject_layout(form, layout, length, nplike):
 
         elif isinstance(form, UnionForm):
             return UnionArray(
-                index_of[form.tags](length, nplike),
-                index_of[form.index](length, nplike),
+                index_of[form.tags](length, backend.index_nplike),
+                index_of[form.index](length, backend.index_nplike),
                 [
-                    _unproject_layout(content, None, 0, nplike)
+                    _unproject_layout(content, None, 0, backend)
                     for content in form.contents
                 ],
                 parameters=form.parameters,
@@ -276,7 +275,7 @@ def _unproject_layout(form, layout, length, nplike):
             # 1 content
             return layout.copy(
                 content=_unproject_layout(
-                    form.content, layout.content, layout.content.length, nplike
+                    form.content, layout.content, layout.content.length, backend
                 )
             )
 
@@ -291,12 +290,12 @@ def _unproject_layout(form, layout, length, nplike):
                             form.content(field),
                             layout_content,
                             layout_content.length,
-                            nplike,
+                            backend,
                         )
                     )
                 else:
                     contents.append(
-                        _unproject_layout(form.content(field), None, length, nplike)
+                        _unproject_layout(form.content(field), None, length, backend)
                     )
 
             return RecordArray(
@@ -310,7 +309,7 @@ def _unproject_layout(form, layout, length, nplike):
             # arbitrarily many contents, possibly with missing fields
             available = dict(enumerate(layout.contents))
 
-            newtags = nplike.empty_like(layout.tags.data)
+            newtags = backend.empty_like(layout.tags.data)
             contents = []
             for newtag, subform in enumerate(form.contents):
                 for oldtag, sublayout in available.items():
@@ -320,7 +319,7 @@ def _unproject_layout(form, layout, length, nplike):
                         del available[oldtag]
                         break
                 else:
-                    contents.append(_unproject_layout(subform, None, 0, nplike))
+                    contents.append(_unproject_layout(subform, None, 0, backend))
 
             return UnionArray(
                 ak.index.Index8(newtags),
@@ -338,10 +337,10 @@ def _unproject_layout(form, layout, length, nplike):
         for newtag, subform in enumerate(form.contents):
             if compatible(subform, layout):
                 contents.append(layout)
-                newtags = nplike.full(layout.length, newtag, dtype=np.int8)
-                newindex = nplike.arange(layout.length, dtype=dtype_of[form.index])
+                newtags = backend.full(layout.length, newtag, dtype=np.int8)
+                newindex = backend.arange(layout.length, dtype=dtype_of[form.index])
             else:
-                contents.append(_unproject_layout(subform, None, 0, nplike))
+                contents.append(_unproject_layout(subform, None, 0, backend))
 
         assert newtags is not None and newindex is not None
         return UnionArray(
@@ -358,4 +357,4 @@ def _unproject_layout(form, layout, length, nplike):
 
 
 def unproject_layout(form: Form, layout: Content) -> Content:
-    return _unproject_layout(form, layout, layout.length, nplike_of(layout))
+    return _unproject_layout(form, layout, layout.length, layout.backend)
