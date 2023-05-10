@@ -135,6 +135,9 @@ def compatible(form: Form, layout: Content) -> bool:
                     return False
             return True
 
+    elif isinstance(layout, UnmaskedArray) and form.is_option:
+        return compatible(form.content, layout.content)
+
     elif isinstance(form, UnionForm):
         for subform in form.contents:
             if compatible(subform, layout):
@@ -330,6 +333,42 @@ def _unproject_layout(form, layout, length, backend):
 
         else:
             raise AssertionError(f"unrecognized Form type: {type(form)}")
+
+    # UnmaskedArray, non-UnmaskedArray form
+    elif isinstance(layout, UnmaskedArray) and form.is_option:
+        if isinstance(form, BitMaskedForm):
+            return BitMaskedArray(
+                ak.index.IndexU8.zeros(length, backend.index_nplike),
+                _unproject_layout(
+                    form.content, layout.content, layout.content.length, backend
+                ),
+                form.valid_when,
+                layout.length,
+                form.lsb_order,
+                parameters=layout._parameters,
+            )
+        elif isinstance(form, ByteMaskedForm):
+            return ByteMaskedArray(
+                ak.index.Index8.zeros(length, backend.index_nplike),
+                _unproject_layout(
+                    form.content, layout.content, layout.content.length, backend
+                ),
+                form.valid_when,
+                parameters=layout._parameters,
+            )
+        elif isinstance(form, IndexedOptionForm):
+            return IndexedOptionArray(
+                ak.index.Index64(
+                    backend.index_nplike.arange(layout.length, dtype=np.int64),
+                    nplike=backend.index_nplike,
+                ),
+                _unproject_layout(
+                    form.content, layout.content, layout.content.length, backend
+                ),
+                parameters=layout._parameters,
+            )
+        else:
+            raise TypeError(form)
 
     elif isinstance(form, UnionForm):
         newtags, newindex = None, None
