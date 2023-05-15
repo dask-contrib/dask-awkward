@@ -7,12 +7,12 @@ from collections.abc import Hashable, Mapping
 from typing import TYPE_CHECKING, Any
 
 import dask.config
-from dask.blockwise import Blockwise, fuse_roots, optimize_blockwise
+from dask.blockwise import fuse_roots, optimize_blockwise
 from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
 from dask.local import get_sync
 
-from dask_awkward.layers import AwkwardInputLayer
+from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardInputLayer
 
 log = logging.getLogger(__name__)
 
@@ -227,7 +227,7 @@ def rewrite_layer_chains(dsk: HighLevelGraph) -> HighLevelGraph:
     while all_layers:
         lay = all_layers.pop()
         val = dsk.layers[lay]
-        if not isinstance(val, Blockwise):
+        if not isinstance(val, AwkwardBlockwiseLayer):
             # shortcut to avoid making comparisons
             layers[lay] = val  # passthrough unchanged
             continue
@@ -237,7 +237,7 @@ def rewrite_layer_chains(dsk: HighLevelGraph) -> HighLevelGraph:
         while (
             len(children) == 1
             and dsk.dependencies[list(children)[0]] == {lay}
-            and isinstance(dsk.layers[list(children)[0]], Blockwise)
+            and isinstance(dsk.layers[list(children)[0]], AwkwardBlockwiseLayer)
             and len(dsk.layers[lay]) == len(dsk.layers[list(children)[0]])
         ):
             # walk forwards
@@ -250,7 +250,7 @@ def rewrite_layer_chains(dsk: HighLevelGraph) -> HighLevelGraph:
         while (
             len(parents) == 1
             and dependents[list(parents)[0]] == {lay}
-            and isinstance(dsk.layers[list(parents)[0]], Blockwise)
+            and isinstance(dsk.layers[list(parents)[0]], AwkwardBlockwiseLayer)
             and len(dsk.layers[lay]) == len(dsk.layers[list(parents)[0]])
         ):
             # walk backwards
