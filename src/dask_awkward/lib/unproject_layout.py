@@ -370,6 +370,11 @@ def _unproject_layout(form, layout, length, backend):
         else:
             raise TypeError(form)
 
+    # Something added an option to our layout. This can happen when reading a subset of
+    # columns from a Parquet file (perhaps https://github.com/apache/arrow/issues/30043)
+    elif isinstance(layout, UnmaskedArray) and not form.is_option:
+        return _unproject_layout(form, layout.content, layout.content.length, backend)
+
     elif isinstance(form, UnionForm):
         newtags, newindex = None, None
         contents = []
