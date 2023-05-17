@@ -482,3 +482,29 @@ def test_normalize_single_outer_inner_index() -> None:
     for i, r in zip(indices, results):
         res = normalize_single_outer_inner_index(divisions, i)
         assert r == res
+
+
+def test_optimize_chain_single(daa):
+    import dask
+
+    from dask_awkward.lib.optimize import rewrite_layer_chains
+
+    arr = ((daa.points.x + 1) + 6).map_partitions(lambda x: x + 1)
+
+    # first a simple test by calling the one optimisation directly
+    dsk2 = rewrite_layer_chains(arr.dask)
+    (out,) = dask.compute(arr, optimize_graph=False)
+    arr._dask = dsk2
+    (out2,) = dask.compute(arr, optimize_graph=False)
+    assert out.tolist() == out2.tolist()
+
+    # and now with optimise as part of the usual pipeline
+    arr = ((daa.points.x + 1) + 6).map_partitions(lambda x: x + 1)
+    out = arr.compute()
+    assert out.tolist() == out2.tolist()
+
+
+def test_optimize_chain_multiple(daa):
+    result = (daa.points.x**2 - daa.points.y) + 1
+
+    assert len(result.compute()) > 0

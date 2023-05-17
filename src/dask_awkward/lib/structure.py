@@ -17,7 +17,6 @@ from dask_awkward.lib.core import (
     map_partitions,
     new_known_scalar,
     total_reduction_to_scalar,
-    typetracer_from_form,
 )
 from dask_awkward.utils import (
     DaskAwkwardNotImplemented,
@@ -498,17 +497,16 @@ def local_index(array, axis=-1, highlevel=True, behavior=None):
 
 @borrow_docstring(ak.mask)
 def mask(array, mask, valid_when=True, highlevel=True, behavior=None):
-    # if not compatible_partitions(array, mask):
-    #     raise IncompatiblePartitions("mask", array, mask)
-    # return map_partitions(
-    #     ak.mask,
-    #     array,
-    #     mask,
-    #     valid_when=valid_when,
-    #     highlevel=highlevel,
-    #     behavior=behavior,
-    # )
-    raise DaskAwkwardNotImplemented("TODO")
+    if not compatible_partitions(array, mask):
+        raise IncompatiblePartitions("mask", array, mask)
+    return map_partitions(
+        ak.mask,
+        array,
+        mask,
+        valid_when=valid_when,
+        highlevel=highlevel,
+        behavior=behavior,
+    )
 
 
 @borrow_docstring(ak.nan_to_num)
@@ -683,18 +681,6 @@ class _SingletonsFn:
         self.kwargs = kwargs
 
     def __call__(self, array):
-        # TODO: remove this length-zero calculation once https://github.com/scikit-hep/awkward/issues/2123 is addressed
-        if ak.backend(array) == "typetracer":
-            array.layout._touch_data(recursive=False)
-            zl_out = ak.singletons(
-                array.layout.form.length_zero_array(behavior=array.behavior),
-                axis=self.axis,
-                **self.kwargs,
-            )
-            return ak.Array(
-                zl_out.layout.to_typetracer(forget_length=True),
-                behavior=zl_out.behavior,
-            )
         return ak.singletons(array, axis=self.axis, **self.kwargs)
 
 
@@ -769,17 +755,6 @@ def unflatten(array, counts, axis=0, highlevel=True, behavior=None):
         otherwise this unflatten operation will fail when computed!"""
     )
 
-    #  TODO: remove after fixing issue in awkward
-    meta = typetracer_from_form(
-        ak.unflatten(
-            array._meta.layout.form.length_zero_array(behavior=array.behavior),
-            counts._meta.layout.form.length_zero_array(behavior=counts.behavior),
-            axis=axis,
-            highlevel=highlevel,
-            behavior=behavior,
-        ).layout.form
-    )
-
     return map_partitions(
         ak.unflatten,
         array,
@@ -787,7 +762,6 @@ def unflatten(array, counts, axis=0, highlevel=True, behavior=None):
         axis=axis,
         highlevel=highlevel,
         behavior=behavior,
-        meta=meta,
         label="unflatten",
     )
 
@@ -939,25 +913,11 @@ def with_name(
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
 
-    #  TODO: remove once fixed in awkward
-    meta = ak.Array(
-        typetracer_from_form(
-            ak.with_name(
-                array._meta.layout.form.length_zero_array(),
-                name,
-                highlevel=highlevel,
-                behavior=behavior,
-            ).layout.form
-        ),
-        behavior=behavior if behavior is not None else array._meta.behavior,
-    )
-
     return map_partitions(
         _WithNameFn(name=name, behavior=behavior),
         array,
         label="with-name",
         output_divisions=1,
-        meta=meta,
     )
 
 

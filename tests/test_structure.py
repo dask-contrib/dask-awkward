@@ -155,6 +155,13 @@ def test_local_index(daa, caa):
     )
 
 
+def test_mask(daa, caa):
+    mask = ak.any(caa.points.x > 3, axis=1)
+    dmask = dak.any(daa.points.x > 3, axis=1)
+
+    assert_eq(dak.mask(daa, dmask), ak.mask(caa, mask))
+
+
 @pytest.mark.parametrize("axis", [1, -1, 2, -2])
 @pytest.mark.parametrize("target", [5, 10, 1])
 def test_pad_none(axis: int, target: int) -> None:
