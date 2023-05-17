@@ -507,3 +507,10 @@ def test_repartition_split_all(daa):
     assert daa1.npartitions == len(daa)
     out = daa1.compute(optimize_graph=False)
     assert out.tolist() == daa.compute().tolist()
+
+
+def test_repartition_uneven(daa):
+    daa1 = daa.repartition(divisions=(0, 7, 8, 11, 12))
+    assert daa1.npartitions == 4
+    out = daa1.compute(optimize_graph=False)
+    assert out.tolist() == daa.compute()[:12].tolist()
