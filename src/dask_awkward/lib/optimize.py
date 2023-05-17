@@ -363,8 +363,6 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
         for layer in hlg.layers.values():
             layer.__dict__.pop("_cached_dict", None)
         out = get_sync(hlg, list(outlayer.keys())[0])
-        for layer in hlg.layers.values():
-            layer.__dict__.pop("_cached_dict", None)
     except Exception as err:
         on_fail = dask.config.get("awkward.optimization.on-fail")
         # this is the default, throw a warning but skip the optimization.

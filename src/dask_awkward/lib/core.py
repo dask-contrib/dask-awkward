@@ -573,6 +573,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         hlg = self.dask.copy()
         hlg.layers.update({k: copy(v) for k, v in self.dask.layers.items()})
         hlg.layers[layer.outkey] = layer
+        hlg.dependents[self.name] = {layer.outkey}
+        hlg.dependencies[layer.outkey] = {self.name}
         return new_array_object(
             hlg,
             layer.outkey,

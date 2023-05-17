@@ -1,3 +1,7 @@
-from dask_awkward.layers.layers import AwkwardBlockwiseLayer, AwkwardInputLayer
+from dask_awkward.layers.layers import (
+    AwkwardBlockwiseLayer,
+    AwkwardInputLayer,
+    AwkwardRepartitionLayer,
+)
 
-__all__ = ("AwkwardInputLayer", "AwkwardBlockwiseLayer")
+__all__ = ("AwkwardInputLayer", "AwkwardBlockwiseLayer", "AwkwardRepartitionLayer")

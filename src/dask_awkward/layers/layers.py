@@ -3,9 +3,9 @@ from __future__ import annotations
 import copy
 import pickle
 from collections.abc import Callable, Mapping
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Hashable, Iterable
 
-from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
+from dask.blockwise import Blockwise, BlockwiseDepDict, Layer, blockwise_token
 
 from dask_awkward.utils import LazyInputsDict
 
@@ -188,3 +188,84 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
                 behavior=self._behavior,
             )
         return self
+
+
+class AwkwardRepartitionLayer(Layer):
+    def __init__(
+        self,
+        inkey,
+        outkey,
+        parts: tuple[tuple[int]],
+        slices: tuple[tuple[tuple[int] | None]],
+        # meta
+    ):
+        self.inkey = inkey
+        self.outkey = outkey
+        self.parts = parts
+        self.slices = slices
+        assert len(parts) == len(slices)
+        self.nkeys = len(parts)
+        self.annotations = None  # TODO
+        self.collection_annotations = None  # TODO
+
+    def is_materialized(self) -> bool:
+        return False
+
+    def get_output_keys(self) -> set:
+        return set(self)
+
+    def get_dependencies(self, item: Hashable, all_hlg_keys: Iterable) -> set:
+        key, part = item
+        assert key == self.outkey
+        parts = self.parts[part]
+        return {(self.inkey, p) for p in parts}
+
+    def cull(
+        self, keys: set, all_hlg_keys: Iterable
+    ) -> tuple[AwkwardRepartitionLayer, Mapping[Hashable, set]]:
+        outparts = []
+        outslices = []
+        deps = {}
+        for item in keys:
+            key, part = item
+            outparts.append(self.parts[part])
+            outslices.append(self.slices[part])
+            deps[item] = self.get_dependencies(item, None)
+        return (
+            AwkwardRepartitionLayer(self.inkey, self.outkey, outparts, outslices),
+            deps,
+        )
+
+    def mock(self):
+        return AwkwardRepartitionLayer(
+            self.inkey, self.outkey, [[self.parts[0][0]]], [[None]]
+        )
+
+    def __getitem__(self, item):
+        key, part = item
+        assert key == self.outkey
+        parts = self.parts[part]
+        slices = self.slices[part]
+        return (_repartition_func,) + tuple((self.inkey, p) for p in parts) + (slices,)
+
+    def __iter__(self):
+        return iter((self.outkey, i) for i in range(self.nkeys))
+
+    def __repr__(self):
+        return f"<AwkwardRepartitionLayer {self.outkey}, {self.nkeys} tasks>"
+
+    def __len__(self):
+        return self.nkeys
+
+
+def _repartition_func(*stuff):
+    import builtins
+
+    import awkward as ak
+
+    *data, slices = stuff
+    data = [
+        d[sl[0] : sl[1]] if sl is not None else d
+        for d, sl in builtins.zip(data, slices)
+    ]
+    return ak.concatenate(data)
