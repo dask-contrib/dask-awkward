@@ -562,7 +562,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         if sum(bool(_) for _ in [npartitions, divisions, rows_per_partition]) != 1:
             raise ValueError("Please specify exactly one of the inputs")
-        self.eager_compute_divisions()
+        if not self.known_divisions:
+            self.eager_compute_divisions()
         nrows = self.divisions[-1]
         if npartitions:
             rows_per_partition = math.ceil(nrows / npartitions)
@@ -722,6 +723,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return np.array(self.__dask_keys__(), dtype=object)
 
     def _partitions(self, index: Any) -> Array:
+        # TODO: this produces a materialized layer, but could work like repartition() and slice()
         if not isinstance(index, tuple):
             index = (index,)
         token = tokenize(self, index)
@@ -740,6 +742,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         # if a single partition was requested we trivially know the new divisions.
         if len(raw) == 1 and isinstance(raw[0], int) and self.known_divisions:
+            # TODO: don't we always know the divisions?
             new_divisions = (
                 0,
                 self.divisions[raw[0] + 1] - self.divisions[raw[0]],  # type: ignore
