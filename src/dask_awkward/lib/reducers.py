@@ -6,7 +6,11 @@ import awkward as ak
 import numpy as np
 from awkward._nplikes.typetracer import TypeTracerArray
 
-from dask_awkward.lib.core import map_partitions, total_reduction_to_scalar, axis_0_reduction
+from dask_awkward.lib.core import (
+    axis_0_reduction,
+    map_partitions,
+    total_reduction_to_scalar,
+)
 from dask_awkward.utils import DaskAwkwardNotImplemented, borrow_docstring
 
 if TYPE_CHECKING:
