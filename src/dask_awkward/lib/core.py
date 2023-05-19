@@ -1600,6 +1600,7 @@ def axis_0_reduction(
 
     from dask.layers import DataFrameTreeReduction
 
+    chunked_kwargs = {"reducer": reducer, "mask_identity": mask_identity}
     tree_node_kwargs = chunked_kwargs
     concat_kwargs = {}
     finalize_kwargs = {
