@@ -71,7 +71,7 @@ def _finalize_array(results: Sequence[Any]) -> Any:
 
     # sometimes we just check the length of partitions so all results
     # will be integers, just make an array out of that.
-    elif isinstance(results, tuple) and all(
+    elif isinstance(results, (tuple, list)) and all(
         isinstance(r, (int, np.integer)) for r in results
     ):
         return ak.Array(list(results))
