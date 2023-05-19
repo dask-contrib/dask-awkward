@@ -1524,9 +1524,10 @@ PartialPositionalReductionType = tuple[ak.Array, ak.Array]
 
 # Exterior reductions need starts!
 def _chunk_reducer_positional(
-    chunk: ak.Array, start: int, *, reducer: Callable, mask_identity: bool
+    chunk: ak.Array, start: int, *, reducer: Callable
 ) -> PartialPositionalReductionType:
     index = reducer(chunk, axis=0, keepdims=True, mask_identity=True)
+    # Adjust the index to be absolute w.r.t the original array
     return index + start, chunk[index]
 
 
@@ -1566,9 +1567,10 @@ def _finalise_reducer_positional(
     final_index_index = reducer(partial_value, keepdims=True, mask_identity=True)
     final_index = partial_index[final_index_index]
 
+    # The return type of positional reducers is unaffected by option-type values
+    # i.e., we can safely remove the mask if it is not required
     if not mask_identity:
         final_index = ak.fill_none(final_index, -1, axis=0)
-
     if not keepdims:
         final_index = final_index[0]
     return final_index
@@ -1592,6 +1594,8 @@ def axis_0_reduction(
         concat_fn = _concat_reducer_positional
         finalize_fn = _finalise_reducer_positional
 
+        chunked_kwargs = {"reducer": reducer}
+
         # TODO HACK!
         from dask_awkward import from_awkward
 
@@ -1606,9 +1610,10 @@ def axis_0_reduction(
         finalize_fn = _finalise_reducer
         tree_node_args = []
 
+        chunked_kwargs = {"reducer": reducer, "mask_identity": mask_identity}
+
     from dask.layers import DataFrameTreeReduction
 
-    chunked_kwargs = {"reducer": reducer, "mask_identity": mask_identity}
     tree_node_kwargs = chunked_kwargs
     concat_kwargs = {}
     finalize_kwargs = {
