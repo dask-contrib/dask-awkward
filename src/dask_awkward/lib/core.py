@@ -1494,37 +1494,46 @@ def _from_iter(obj):
         )
 
 
-def _chunk_reducer_non_positional(
-    chunk: ak.Array, *, reducer: Callable, mask_identity: bool
-) -> ak.Array:
+PartialReductionType = ak.Array
+
+
+def _chunk_reducer(
+    chunk: ak.Array | PartialReductionType, *, reducer: Callable, mask_identity: bool
+) -> PartialReductionType:
     return reducer(chunk, axis=0, keepdims=True, mask_identity=mask_identity)
 
 
-def _concat_reducer_non_positional(
-    partials: list[ak.Array],
+def _concat_reducer(
+    partials: list[PartialReductionType],
 ) -> ak.Array:
     return ak.concatenate(partials, axis=0)
 
 
-def _finalise_reducer_non_positional(
-    partial: ak.Array, *, reducer: Callable, mask_identity: bool, keepdims: bool
+def _finalise_reducer(
+    partial: PartialReductionType,
+    *,
+    reducer: Callable,
+    mask_identity: bool,
+    keepdims: bool,
 ) -> ak.Array:
     return reducer(partial, axis=0, keepdims=keepdims, mask_identity=mask_identity)
 
 
-PartialResultType = tuple[ak.Array, ak.Array]
+PartialPositionalReductionType = tuple[ak.Array, ak.Array]
 
 
 # Exterior reductions need starts!
 def _chunk_reducer_positional(
     chunk: ak.Array, start: int, *, reducer: Callable, mask_identity: bool
-) -> PartialResultType:
+) -> PartialPositionalReductionType:
     index = reducer(chunk, axis=0, keepdims=True, mask_identity=True)
     return index + start, chunk[index]
 
 
 # All reductions need concatenation
-def _concat_reducer_positional(partials: list[PartialResultType]) -> PartialResultType:
+def _concat_reducer_positional(
+    partials: list[PartialPositionalReductionType],
+) -> PartialPositionalReductionType:
     partial_indices, partial_values = zip(*partials)
     return (
         ak.concatenate(partial_indices, axis=0),
@@ -1534,8 +1543,8 @@ def _concat_reducer_positional(partials: list[PartialResultType]) -> PartialResu
 
 # Interior reductions don't need starts
 def _tree_node_reducer_positional(
-    partial: PartialResultType, *, reducer: Callable
-) -> PartialResultType:
+    partial: PartialPositionalReductionType, *, reducer: Callable
+) -> PartialPositionalReductionType:
     # partial comes from concat
     partial_index, partial_value = partial
     final_index_index = reducer(partial_value, keepdims=True, mask_identity=True)
@@ -1547,7 +1556,7 @@ def _tree_node_reducer_positional(
 
 
 def _finalise_reducer_positional(
-    partial: PartialResultType,
+    partial: PartialPositionalReductionType,
     *,
     reducer: Callable,
     mask_identity: bool,
@@ -1592,10 +1601,10 @@ def axis_0_reduction(
         starts = ak.Array(array.divisions)[:-1]
         tree_node_args = [from_awkward(starts, npartitions=len(starts))]
     else:
-        chunked_fn = _chunk_reducer_non_positional
-        tree_node_fn = _chunk_reducer_non_positional
-        concat_fn = _concat_reducer_non_positional
-        finalize_fn = _finalise_reducer_non_positional
+        chunked_fn = _chunk_reducer
+        tree_node_fn = _chunk_reducer
+        concat_fn = _concat_reducer
+        finalize_fn = _finalise_reducer
         tree_node_args = []
 
     from dask.layers import DataFrameTreeReduction
@@ -1633,7 +1642,6 @@ def axis_0_reduction(
         *tree_node_args,
         meta=empty_typetracer(),
     )
-    print(tree_node_args)
 
     if split_every is None:
         split_every = 8
