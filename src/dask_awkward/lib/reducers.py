@@ -6,7 +6,7 @@ import awkward as ak
 import numpy as np
 from awkward._nplikes.typetracer import TypeTracerArray
 
-from dask_awkward.lib.core import map_partitions, total_reduction_to_scalar
+from dask_awkward.lib.core import map_partitions, total_reduction_to_scalar, axis_0_reduction
 from dask_awkward.utils import DaskAwkwardNotImplemented, borrow_docstring
 
 if TYPE_CHECKING:
@@ -388,20 +388,11 @@ def sum(
     keepdims: bool = False,
     mask_identity: bool = False,
 ) -> Any:
-    if axis == 0 or axis == -1 * array.ndim:
+    if axis == -1 * array.ndim:
         raise DaskAwkwardNotImplemented(
             f"axis={axis} is not supported for this array yet."
         )
-    if axis and axis != 0:
-        return map_partitions(
-            ak.sum,
-            array,
-            output_divisions=1,
-            axis=axis,
-            keepdims=keepdims,
-            mask_identity=mask_identity,
-        )
-    elif axis is None:
+    if axis is None:
         return total_reduction_to_scalar(
             label="sum",
             array=array,
@@ -413,11 +404,24 @@ def sum(
             meta=ak.sum(array._meta, axis=None),
         )
     elif axis == 0:
-        raise DaskAwkwardNotImplemented(
-            f"axis={axis} is not supported for this array yet."
+        return axis_0_reduction(
+            label="sum",
+            array=array,
+            reducer=ak.sum,
+            is_positional=False,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+            meta=ak.sum(array._meta, axis=0),
         )
     else:
-        raise ValueError("axis must be none or an integer")
+        return map_partitions(
+            ak.sum,
+            array,
+            output_divisions=1,
+            axis=axis,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+        )
 
 
 class _VarFn:

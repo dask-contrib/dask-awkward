@@ -641,7 +641,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     @property
     def known_divisions(self) -> bool:
-        """True of the divisions are known (absence of ``None`` in the tuple)."""
+        """True if the divisions are known (absence of ``None`` in the tuple)."""
         return len(self.divisions) > 0 and None not in self.divisions
 
     @property
@@ -1491,6 +1491,118 @@ def _from_iter(obj):
             .layout.form.length_one_array()
             .layout.to_typetracer(forget_length=True)
         )
+
+
+def _chunk_reducer_non_positional(
+    chunk: ak.Array, *, reducer: Callable, mask_identity: bool
+) -> ak.Array:
+    result = reducer(chunk, axis=0, keepdims=True, mask_identity=mask_identity)
+    print(f"CHUNK[{chunk.ndim}] into {result.ndim}")
+    return result
+
+
+def _combine_reducer_non_positional(
+    partials: list[ak.Array],
+) -> ak.Array:
+    result = ak.concatenate(partials, axis=0)
+    print(f"COMBINE {[p.ndim for p in partials]} info {result.ndim}")
+    return result
+
+
+def _finalise_reducer_non_positional(
+    partial: ak.Array,
+    *,
+    reducer: Callable,
+    mask_identity: bool,
+    keepdims: bool,
+    starts: ak.Array | None,
+) -> ak.Array:
+    print(f"FINALISE[{partial.ndim}]")
+    return reducer(partial, axis=0, keepdims=keepdims, mask_identity=mask_identity)
+
+
+def axis_0_reduction(
+    *,
+    label: str,
+    array: Array,
+    meta: Any,
+    is_positional: bool,
+    keepdims: bool,
+    mask_identity: bool,
+    reducer: Callable,
+    token: str | None = None,
+    dtype: Any | None = None,
+    split_every: int | bool | None = None,
+):
+    if not is_positional:
+        chunked_fn = _chunk_reducer_non_positional
+        comb_fn = _combine_reducer_non_positional
+        agg_fn = _finalise_reducer_non_positional
+        starts = None
+    else:
+        if not array.known_divisions:
+            array.eager_compute_divisions()
+        starts = ak.Array(array.divisions)
+        raise NotImplementedError
+
+    from dask.layers import DataFrameTreeReduction
+
+    chunked_kwargs = {"reducer": reducer, "mask_identity": mask_identity}
+    comb_kwargs = {}
+    agg_kwargs = {
+        "reducer": reducer,
+        "mask_identity": mask_identity,
+        "keepdims": keepdims,
+        "starts": starts,
+    }
+    token = token or tokenize(
+        array,
+        reducer,
+        label,
+        dtype,
+        split_every,
+        chunked_kwargs,
+        comb_kwargs,
+        agg_kwargs,
+    )
+    name_comb = f"{label}-combine-{token}"
+    name_agg = f"{label}-agg-{token}"
+
+    chunked_fn = partial(chunked_fn, **chunked_kwargs)
+    comb_fn = partial(comb_fn, **comb_kwargs)
+    agg_fn = partial(agg_fn, **agg_kwargs)
+
+    chunked_result = map_partitions(
+        chunked_fn,
+        array,
+        meta=empty_typetracer(),
+    )
+
+    if split_every is None:
+        split_every = 8
+    elif split_every is False:
+        split_every = sys.maxsize
+    else:
+        pass
+
+    dftr = DataFrameTreeReduction(
+        name=name_agg,
+        name_input=chunked_result.name,
+        npartitions_input=chunked_result.npartitions,
+        concat_func=_from_iter,
+        tree_node_func=comb_fn,
+        finalize_func=agg_fn,
+        split_every=split_every,
+        tree_node_name=name_comb,
+    )
+
+    graph = HighLevelGraph.from_collections(
+        name_agg, dftr, dependencies=(chunked_result,)
+    )
+    if isinstance(meta, ak.highlevel.Array):
+        return new_array_object(graph, name_agg, meta=meta)
+    else:
+        return new_scalar_object(graph, name_agg, meta=meta)
 
 
 def total_reduction_to_scalar(
