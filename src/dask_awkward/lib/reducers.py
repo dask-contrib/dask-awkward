@@ -6,7 +6,11 @@ import awkward as ak
 import numpy as np
 from awkward._nplikes.typetracer import TypeTracerArray
 
-from dask_awkward.lib.core import map_partitions, total_reduction_to_scalar, axis_0_reduction
+from dask_awkward.lib.core import (
+    map_partitions,
+    total_reduction_to_scalar,
+    axis_0_reduction,
+)
 from dask_awkward.utils import DaskAwkwardNotImplemented, borrow_docstring
 
 if TYPE_CHECKING:
@@ -80,7 +84,9 @@ def argmax(
     keepdims: bool = False,
     mask_identity: bool = True,
 ) -> Any:
-    if axis and axis >= 1:
+    if axis is None:
+        raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
+    elif axis >= 1:
         return map_partitions(
             ak.argmax,
             array,
@@ -89,7 +95,23 @@ def argmax(
             keepdims=keepdims,
             mask_identity=mask_identity,
         )
-    raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
+    elif axis == 0:
+        return axis_0_reduction(
+            label="argmax",
+            array=array,
+            reducer=ak.argmax,
+            is_positional=True,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+            meta=ak.argmax(
+                array._meta,
+                axis=0,
+                keepdims=keepdims,
+                mask_identity=mask_identity,
+            ),
+        )
+    else:
+        raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
 
 
 @borrow_docstring(ak.argmin)
@@ -401,7 +423,12 @@ def sum(
                 "axis": None,
                 "mask_identity": mask_identity,
             },
-            meta=ak.sum(array._meta, axis=None),
+            meta=ak.sum(
+                array._meta,
+                axis=None,
+                keepdims=keepdims,
+                mask_identity=mask_identity,
+            ),
         )
     elif axis == 0:
         return axis_0_reduction(
@@ -411,7 +438,12 @@ def sum(
             is_positional=False,
             keepdims=keepdims,
             mask_identity=mask_identity,
-            meta=ak.sum(array._meta, axis=0),
+            meta=ak.sum(
+                array._meta,
+                axis=0,
+                keepdims=keepdims,
+                mask_identity=mask_identity,
+            ),
         )
     else:
         return map_partitions(

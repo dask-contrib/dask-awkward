@@ -1478,6 +1478,7 @@ def _from_iter(obj):
     representation of the input iterable-of-typetracers.
 
     """
+    breakpoint()
     try:
         return ak.from_iter(obj)
     except (ValueError, TypeError):
@@ -1496,29 +1497,72 @@ def _from_iter(obj):
 def _chunk_reducer_non_positional(
     chunk: ak.Array, *, reducer: Callable, mask_identity: bool
 ) -> ak.Array:
-    result = reducer(chunk, axis=0, keepdims=True, mask_identity=mask_identity)
-    print(f"CHUNK[{chunk.ndim}] into {result.ndim}")
-    return result
+    return reducer(chunk, axis=0, keepdims=True, mask_identity=mask_identity)
 
 
-def _combine_reducer_non_positional(
+def _concat_reducer_non_positional(
     partials: list[ak.Array],
 ) -> ak.Array:
-    result = ak.concatenate(partials, axis=0)
-    print(f"COMBINE {[p.ndim for p in partials]} info {result.ndim}")
-    return result
+    return ak.concatenate(partials, axis=0)
 
 
 def _finalise_reducer_non_positional(
-    partial: ak.Array,
+    partial: ak.Array, *, reducer: Callable, mask_identity: bool, keepdims: bool
+) -> ak.Array:
+    return reducer(partial, axis=0, keepdims=keepdims, mask_identity=mask_identity)
+
+
+PartialResultType = tuple[ak.Array, ak.Array]
+
+
+# Exterior reductions need starts!
+def _chunk_reducer_positional(
+    chunk: ak.Array, start: int, *, reducer: Callable, mask_identity: bool
+) -> PartialResultType:
+    index = reducer(chunk, axis=0, keepdims=True, mask_identity=True)
+    return index + start, chunk[index]
+
+
+# All reductions need concatenation
+def _concat_reducer_positional(partials: list[PartialResultType]) -> PartialResultType:
+    partial_indices, partial_values = zip(*partials)
+    return (
+        ak.concatenate(partial_indices, axis=0),
+        ak.concatenate(partial_values, axis=0),
+    )
+
+
+# Interior reductions don't need starts
+def _tree_node_reducer_positional(
+    partial: PartialResultType, *, reducer: Callable
+) -> PartialResultType:
+    # partial comes from concat
+    partial_index, partial_value = partial
+    final_index_index = reducer(partial_value, keepdims=True, mask_identity=True)
+    # Indices are already absolute!
+    return (
+        partial_index[final_index_index],
+        partial_value[final_index_index],
+    )
+
+
+def _finalise_reducer_positional(
+    partial: PartialResultType,
     *,
     reducer: Callable,
     mask_identity: bool,
     keepdims: bool,
-    starts: ak.Array | None,
-) -> ak.Array:
-    print(f"FINALISE[{partial.ndim}]")
-    return reducer(partial, axis=0, keepdims=keepdims, mask_identity=mask_identity)
+):
+    partial_index, partial_value = partial
+    final_index_index = reducer(partial_value, keepdims=True, mask_identity=True)
+    final_index = partial_index[final_index_index]
+
+    if not mask_identity:
+        final_index = ak.fill_none(final_index, -1, axis=0)
+
+    if not keepdims:
+        final_index = final_index[0]
+    return final_index
 
 
 def axis_0_reduction(
@@ -1534,26 +1578,34 @@ def axis_0_reduction(
     dtype: Any | None = None,
     split_every: int | bool | None = None,
 ):
-    if not is_positional:
-        chunked_fn = _chunk_reducer_non_positional
-        comb_fn = _combine_reducer_non_positional
-        agg_fn = _finalise_reducer_non_positional
-        starts = None
-    else:
+    if is_positional:
+        chunked_fn = _chunk_reducer_positional
+        tree_node_fn = _tree_node_reducer_positional
+        concat_fn = _concat_reducer_positional
+        finalize_fn = _finalise_reducer_positional
+
+        # TODO HACK!
+        from dask_awkward import from_awkward
+
         if not array.known_divisions:
             array.eager_compute_divisions()
-        starts = ak.Array(array.divisions)
-        raise NotImplementedError
+        starts = ak.Array(array.divisions)[:-1]
+        tree_node_args = [from_awkward(starts, npartitions=len(starts))]
+    else:
+        chunked_fn = _chunk_reducer_non_positional
+        tree_node_fn = _chunk_reducer_non_positional
+        concat_fn = _concat_reducer_non_positional
+        finalize_fn = _finalise_reducer_non_positional
+        tree_node_args = []
 
     from dask.layers import DataFrameTreeReduction
 
-    chunked_kwargs = {"reducer": reducer, "mask_identity": mask_identity}
-    comb_kwargs = {}
-    agg_kwargs = {
+    tree_node_kwargs = chunked_kwargs
+    concat_kwargs = {}
+    finalize_kwargs = {
         "reducer": reducer,
         "mask_identity": mask_identity,
         "keepdims": keepdims,
-        "starts": starts,
     }
     token = token or tokenize(
         array,
@@ -1562,21 +1614,25 @@ def axis_0_reduction(
         dtype,
         split_every,
         chunked_kwargs,
-        comb_kwargs,
-        agg_kwargs,
+        tree_node_kwargs,
+        concat_kwargs,
+        finalize_kwargs,
     )
-    name_comb = f"{label}-combine-{token}"
-    name_agg = f"{label}-agg-{token}"
+    name_tree_node = f"{label}-tree-node-{token}"
+    name_finalize = f"{label}-finalize-{token}"
 
     chunked_fn = partial(chunked_fn, **chunked_kwargs)
-    comb_fn = partial(comb_fn, **comb_kwargs)
-    agg_fn = partial(agg_fn, **agg_kwargs)
+    tree_node_fn = partial(tree_node_fn, **tree_node_kwargs)
+    concat_fn = partial(concat_fn, **concat_kwargs)
+    finalize_fn = partial(finalize_fn, **finalize_kwargs)
 
     chunked_result = map_partitions(
         chunked_fn,
         array,
+        *tree_node_args,
         meta=empty_typetracer(),
     )
+    print(tree_node_args)
 
     if split_every is None:
         split_every = 8
@@ -1586,23 +1642,23 @@ def axis_0_reduction(
         pass
 
     dftr = DataFrameTreeReduction(
-        name=name_agg,
+        name=name_finalize,
         name_input=chunked_result.name,
         npartitions_input=chunked_result.npartitions,
-        concat_func=_from_iter,
-        tree_node_func=comb_fn,
-        finalize_func=agg_fn,
+        concat_func=concat_fn,
+        tree_node_func=tree_node_fn,
+        finalize_func=finalize_fn,
         split_every=split_every,
-        tree_node_name=name_comb,
+        tree_node_name=name_tree_node,
     )
 
     graph = HighLevelGraph.from_collections(
-        name_agg, dftr, dependencies=(chunked_result,)
+        name_finalize, dftr, dependencies=(chunked_result,)
     )
     if isinstance(meta, ak.highlevel.Array):
-        return new_array_object(graph, name_agg, meta=meta)
+        return new_array_object(graph, name_finalize, meta=meta, npartitions=1)
     else:
-        return new_scalar_object(graph, name_agg, meta=meta)
+        return new_scalar_object(graph, name_finalize, meta=meta)
 
 
 def total_reduction_to_scalar(
