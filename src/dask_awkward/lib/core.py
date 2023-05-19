@@ -1578,7 +1578,6 @@ def axis_0_reduction(
     *,
     label: str,
     array: Array,
-    meta: Any,
     is_positional: bool,
     keepdims: bool,
     mask_identity: bool,
@@ -1663,6 +1662,12 @@ def axis_0_reduction(
 
     graph = HighLevelGraph.from_collections(
         name_finalize, dftr, dependencies=(chunked_result,)
+    )
+    meta = reducer(
+        array._meta,
+        axis=0,
+        keepdims=keepdims,
+        mask_identity=mask_identity,
     )
     if isinstance(meta, ak.highlevel.Array):
         return new_array_object(graph, name_finalize, meta=meta, npartitions=1)

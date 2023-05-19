@@ -95,7 +95,7 @@ def argmax(
             keepdims=keepdims,
             mask_identity=mask_identity,
         )
-    elif axis == 0:
+    else:
         return axis_0_reduction(
             label="argmax",
             array=array,
@@ -103,15 +103,7 @@ def argmax(
             is_positional=True,
             keepdims=keepdims,
             mask_identity=mask_identity,
-            meta=ak.argmax(
-                array._meta,
-                axis=0,
-                keepdims=keepdims,
-                mask_identity=mask_identity,
-            ),
         )
-    else:
-        raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
 
 
 @borrow_docstring(ak.argmin)
@@ -121,7 +113,9 @@ def argmin(
     keepdims: bool = False,
     mask_identity: bool = True,
 ) -> Any:
-    if axis and axis >= 1:
+    if axis is None:
+        raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
+    elif axis >= 1:
         return map_partitions(
             ak.argmin,
             array,
@@ -130,7 +124,15 @@ def argmin(
             keepdims=keepdims,
             mask_identity=mask_identity,
         )
-    raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
+    else:
+        return axis_0_reduction(
+            label="argmin",
+            array=array,
+            reducer=ak.argmin,
+            is_positional=True,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+        )
 
 
 @borrow_docstring(ak.corr)
@@ -310,19 +312,9 @@ def min(
     initial: float | None = None,
     mask_identity: bool = True,
 ) -> Any:
-    if axis == 0 or axis == -1 * array.ndim:
+    if axis == -1 * array.ndim:
         raise DaskAwkwardNotImplemented(
             f"axis={axis} is not supported for this array yet."
-        )
-    if axis and axis != 0:
-        return map_partitions(
-            ak.min,
-            array,
-            output_divisions=1,
-            axis=axis,
-            keepdims=keepdims,
-            initial=initial,
-            mask_identity=mask_identity,
         )
     if axis is None:
         return total_reduction_to_scalar(
@@ -333,10 +325,31 @@ def min(
                 "axis": None,
                 "mask_identity": mask_identity,
             },
-            meta=ak.min(array._meta, axis=None),
+            meta=ak.min(
+                array._meta,
+                axis=None,
+                keepdims=keepdims,
+                mask_identity=mask_identity,
+            ),
+        )
+    elif axis == 0:
+        return axis_0_reduction(
+            label="min",
+            array=array,
+            reducer=ak.min,
+            is_positional=False,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
         )
     else:
-        raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
+        return map_partitions(
+            ak.min,
+            array,
+            output_divisions=1,
+            axis=axis,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+        )
 
 
 @borrow_docstring(ak.moment)
@@ -353,7 +366,44 @@ def moment(
 
 @borrow_docstring(ak.prod)
 def prod(array, axis=None, keepdims=False, mask_identity=False):
-    raise DaskAwkwardNotImplemented("TODO")
+    if axis == -1 * array.ndim:
+        raise DaskAwkwardNotImplemented(
+            f"axis={axis} is not supported for this array yet."
+        )
+    if axis is None:
+        return total_reduction_to_scalar(
+            label="prod",
+            array=array,
+            chunked_fn=ak.prod,
+            chunked_kwargs={
+                "axis": None,
+                "mask_identity": mask_identity,
+            },
+            meta=ak.prod(
+                array._meta,
+                axis=None,
+                keepdims=keepdims,
+                mask_identity=mask_identity,
+            ),
+        )
+    elif axis == 0:
+        return axis_0_reduction(
+            label="prod",
+            array=array,
+            reducer=ak.prod,
+            is_positional=False,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+        )
+    else:
+        return map_partitions(
+            ak.prod,
+            array,
+            output_divisions=1,
+            axis=axis,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+        )
 
 
 @borrow_docstring(ak.ptp)
@@ -438,12 +488,6 @@ def sum(
             is_positional=False,
             keepdims=keepdims,
             mask_identity=mask_identity,
-            meta=ak.sum(
-                array._meta,
-                axis=0,
-                keepdims=keepdims,
-                mask_identity=mask_identity,
-            ),
         )
     else:
         return map_partitions(
