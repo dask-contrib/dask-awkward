@@ -1497,19 +1497,19 @@ def _from_iter(obj):
 PartialReductionType = ak.Array
 
 
-def _chunk_reducer(
+def _chunk_reducer_trivial(
     chunk: ak.Array | PartialReductionType, *, reducer: Callable, mask_identity: bool
 ) -> PartialReductionType:
     return reducer(chunk, axis=0, keepdims=True, mask_identity=mask_identity)
 
 
-def _concat_reducer(
+def _concat_reducer_trivial(
     partials: list[PartialReductionType],
 ) -> ak.Array:
     return ak.concatenate(partials, axis=0)
 
 
-def _finalise_reducer(
+def _finalise_reducer_trivial(
     partial: PartialReductionType,
     *,
     reducer: Callable,
@@ -1584,10 +1584,16 @@ def axis_0_reduction(
     keepdims: bool,
     mask_identity: bool,
     reducer: Callable,
+    combiner: Callable | None = None,
     token: str | None = None,
     dtype: Any | None = None,
     split_every: int | bool | None = None,
 ):
+    if combiner is None:
+        combiner = reducer
+    if is_positional:
+        assert combiner is reducer
+
     if is_positional:
         chunked_fn = _chunk_reducer_positional
         tree_node_fn = _tree_node_reducer_positional
@@ -1603,21 +1609,22 @@ def axis_0_reduction(
             array.eager_compute_divisions()
         starts = ak.Array(array.divisions)[:-1]
         tree_node_args = [from_awkward(starts, npartitions=len(starts))]
+        tree_node_kwargs = chunked_kwargs
     else:
-        chunked_fn = _chunk_reducer
-        tree_node_fn = _chunk_reducer
-        concat_fn = _concat_reducer
-        finalize_fn = _finalise_reducer
+        chunked_fn = _chunk_reducer_trivial
+        tree_node_fn = _chunk_reducer_trivial
+        concat_fn = _concat_reducer_trivial
+        finalize_fn = _finalise_reducer_trivial
         tree_node_args = []
 
         chunked_kwargs = {"reducer": reducer, "mask_identity": mask_identity}
+        tree_node_kwargs = {"reducer": combiner, "mask_identity": mask_identity}
 
     from dask.layers import DataFrameTreeReduction
 
-    tree_node_kwargs = chunked_kwargs
     concat_kwargs = {}
     finalize_kwargs = {
-        "reducer": reducer,
+        "reducer": combiner,
         "mask_identity": mask_identity,
         "keepdims": keepdims,
     }

@@ -154,20 +154,11 @@ def count(
     keepdims: bool = False,
     mask_identity: bool = False,
 ) -> Any:
-    if axis == 0 or axis == -1 * array.ndim:
+    if axis == -1 * array.ndim:
         raise DaskAwkwardNotImplemented(
             f"axis={axis} is not supported for this array yet."
         )
-    if axis and axis != 0:
-        return map_partitions(
-            ak.count,
-            array,
-            output_divisions=1,
-            axis=axis,
-            keepdims=keepdims,
-            mask_identity=mask_identity,
-        )
-    elif axis is None:
+    if axis is None:
         return total_reduction_to_scalar(
             label="count",
             array=array,
@@ -179,8 +170,25 @@ def count(
             agg_fn=ak.sum,
             agg_kwargs={"axis": None},
         )
+    elif axis == 0 or axis == -1 * array.ndim:
+        return axis_0_reduction(
+            label="count",
+            array=array,
+            reducer=ak.count,
+            combiner=ak.sum,
+            is_positional=False,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+        )
     else:
-        raise ValueError("axis must be None or an integer.")
+        return map_partitions(
+            ak.count,
+            array,
+            output_divisions=1,
+            axis=axis,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+        )
 
 
 @borrow_docstring(ak.count_nonzero)
@@ -190,20 +198,11 @@ def count_nonzero(
     keepdims: bool = False,
     mask_identity: bool = False,
 ) -> Any:
-    if axis == 0 or axis == -1 * array.ndim:
+    if axis == -1 * array.ndim:
         raise DaskAwkwardNotImplemented(
             f"axis={axis} is not supported for this array yet."
         )
-    if axis and axis != 0:
-        return map_partitions(
-            ak.count_nonzero,
-            array,
-            output_divisions=1,
-            axis=1,
-            keepdims=keepdims,
-            mask_identity=mask_identity,
-        )
-    elif axis is None:
+    if axis is None:
         return total_reduction_to_scalar(
             label="count_nonzero",
             array=array,
@@ -215,8 +214,25 @@ def count_nonzero(
             agg_fn=ak.sum,
             agg_kwargs={"axis": None},
         )
+    elif axis == 0 or axis == -1 * array.ndim:
+        return axis_0_reduction(
+            label="count_nonzero",
+            array=array,
+            reducer=ak.count_nonzero,
+            combiner=ak.sum,
+            is_positional=False,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+        )
     else:
-        raise ValueError("axis must be None or an integer.")
+        return map_partitions(
+            ak.count_nonzero,
+            array,
+            output_divisions=1,
+            axis=axis,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+        )
 
 
 @borrow_docstring(ak.covar)
@@ -251,20 +267,6 @@ def max(
     initial: float | None = None,
     mask_identity: bool = True,
 ) -> Any:
-    if axis == 0 or axis == -1 * array.ndim:
-        raise DaskAwkwardNotImplemented(
-            f"axis={axis} is not supported for this array yet."
-        )
-    if axis and axis != 0:
-        return map_partitions(
-            ak.max,
-            array,
-            output_divisions=1,
-            axis=axis,
-            keepdims=keepdims,
-            initial=initial,
-            mask_identity=mask_identity,
-        )
     if axis is None:
         return total_reduction_to_scalar(
             label="max",
@@ -274,10 +276,31 @@ def max(
                 "axis": None,
                 "mask_identity": mask_identity,
             },
-            meta=ak.max(array._meta, axis=None),
+            meta=ak.max(
+                array._meta,
+                axis=None,
+                keepdims=keepdims,
+                mask_identity=mask_identity,
+            ),
+        )
+    elif axis == 0 or axis == -1 * array.ndim:
+        return axis_0_reduction(
+            label="max",
+            array=array,
+            reducer=ak.max,
+            is_positional=False,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
         )
     else:
-        raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
+        return map_partitions(
+            ak.max,
+            array,
+            output_divisions=1,
+            axis=axis,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+        )
 
 
 @borrow_docstring(ak.mean)
@@ -332,7 +355,7 @@ def min(
                 mask_identity=mask_identity,
             ),
         )
-    elif axis == 0:
+    elif axis == 0 or axis == -1 * array.ndim:
         return axis_0_reduction(
             label="min",
             array=array,
@@ -386,7 +409,7 @@ def prod(array, axis=None, keepdims=False, mask_identity=False):
                 mask_identity=mask_identity,
             ),
         )
-    elif axis == 0:
+    elif axis == 0 or axis == -1 * array.ndim:
         return axis_0_reduction(
             label="prod",
             array=array,
@@ -480,7 +503,7 @@ def sum(
                 mask_identity=mask_identity,
             ),
         )
-    elif axis == 0:
+    elif axis == 0 or axis == -1 * array.ndim:
         return axis_0_reduction(
             label="sum",
             array=array,
