@@ -497,17 +497,16 @@ def local_index(array, axis=-1, highlevel=True, behavior=None):
 
 @borrow_docstring(ak.mask)
 def mask(array, mask, valid_when=True, highlevel=True, behavior=None):
-    # if not compatible_partitions(array, mask):
-    #     raise IncompatiblePartitions("mask", array, mask)
-    # return map_partitions(
-    #     ak.mask,
-    #     array,
-    #     mask,
-    #     valid_when=valid_when,
-    #     highlevel=highlevel,
-    #     behavior=behavior,
-    # )
-    raise DaskAwkwardNotImplemented("TODO")
+    if not compatible_partitions(array, mask):
+        raise IncompatiblePartitions("mask", array, mask)
+    return map_partitions(
+        ak.mask,
+        array,
+        mask,
+        valid_when=valid_when,
+        highlevel=highlevel,
+        behavior=behavior,
+    )
 
 
 @borrow_docstring(ak.nan_to_num)

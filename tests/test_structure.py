@@ -155,6 +155,13 @@ def test_local_index(daa, caa):
     )
 
 
+def test_mask(daa, caa):
+    mask = ak.any(caa.points.x > 3, axis=1)
+    dmask = dak.any(daa.points.x > 3, axis=1)
+
+    assert_eq(dak.mask(daa, dmask), ak.mask(caa, mask))
+
+
 @pytest.mark.parametrize("axis", [1, -1, 2, -2])
 @pytest.mark.parametrize("target", [5, 10, 1])
 def test_pad_none(axis: int, target: int) -> None:
@@ -308,8 +315,10 @@ def test_isclose(daa, caa):
     )
 
 
-def test_singletons(daa, L4):
+def test_singletons(daa, L4, tmp_path):
     import warnings
+
+    path = str(tmp_path)
 
     warnings.simplefilter("error")
     caa_L4 = ak.Array(L4)
@@ -319,10 +328,10 @@ def test_singletons(daa, L4):
         ak.singletons(caa_L4),
     )
 
-    dak.to_parquet(daa, "test-singletons/")
+    dak.to_parquet(daa, path)
 
-    fpq_daa = dak.from_parquet("test-singletons/")
-    fpq_caa = ak.from_parquet("test-singletons/")
+    fpq_daa = dak.from_parquet(path)
+    fpq_caa = ak.from_parquet(path)
 
     temp_zip = dak.zip({"x": fpq_daa.points.x, "y": fpq_daa.points.y})
 
