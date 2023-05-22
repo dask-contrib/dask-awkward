@@ -1518,7 +1518,7 @@ def _finalise_reducer_trivial(
     return reducer(partial, axis=0, keepdims=keepdims, mask_identity=mask_identity)
 
 
-PartialPositionalReductionType = tuple[ak.Array, ak.Array]
+PartialPositionalReductionType = "tuple[ak.Array, ak.Array]"
 
 
 # Exterior reductions need starts!
