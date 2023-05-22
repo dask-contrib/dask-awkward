@@ -1478,7 +1478,6 @@ def _from_iter(obj):
     representation of the input iterable-of-typetracers.
 
     """
-    breakpoint()
     try:
         return ak.from_iter(obj)
     except (ValueError, TypeError):
