@@ -46,7 +46,32 @@ def all(
     keepdims: bool = False,
     mask_identity: bool = False,
 ) -> Any:
-    if axis and axis != 0:
+    if axis is None:
+        return total_reduction_to_scalar(
+            label="all",
+            array=array,
+            chunked_fn=ak.all,
+            chunked_kwargs={
+                "axis": None,
+                "mask_identity": mask_identity,
+            },
+            meta=ak.sum(
+                array._meta,
+                axis=None,
+                keepdims=keepdims,
+                mask_identity=mask_identity,
+            ),
+        )
+    elif axis == 0 or axis == -1 * array.ndim:
+        return axis_0_reduction(
+            label="all",
+            array=array,
+            reducer=ak.all,
+            is_positional=False,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+        )
+    else:
         return map_partitions(
             ak.all,
             array,
@@ -55,7 +80,6 @@ def all(
             keepdims=keepdims,
             mask_identity=mask_identity,
         )
-    raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
 
 
 @borrow_docstring(ak.any)
@@ -65,7 +89,32 @@ def any(
     keepdims: bool = False,
     mask_identity: bool = False,
 ) -> Any:
-    if axis and axis != 0:
+    if axis is None:
+        return total_reduction_to_scalar(
+            label="any",
+            array=array,
+            chunked_fn=ak.any,
+            chunked_kwargs={
+                "axis": None,
+                "mask_identity": mask_identity,
+            },
+            meta=ak.sum(
+                array._meta,
+                axis=None,
+                keepdims=keepdims,
+                mask_identity=mask_identity,
+            ),
+        )
+    elif axis == 0 or axis == -1 * array.ndim:
+        return axis_0_reduction(
+            label="any",
+            array=array,
+            reducer=ak.any,
+            is_positional=False,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+        )
+    else:
         return map_partitions(
             ak.any,
             array,
@@ -74,7 +123,6 @@ def any(
             keepdims=keepdims,
             mask_identity=mask_identity,
         )
-    raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
 
 
 @borrow_docstring(ak.argmax)
@@ -154,10 +202,6 @@ def count(
     keepdims: bool = False,
     mask_identity: bool = False,
 ) -> Any:
-    if axis == -1 * array.ndim:
-        raise DaskAwkwardNotImplemented(
-            f"axis={axis} is not supported for this array yet."
-        )
     if axis is None:
         return total_reduction_to_scalar(
             label="count",
@@ -198,10 +242,6 @@ def count_nonzero(
     keepdims: bool = False,
     mask_identity: bool = False,
 ) -> Any:
-    if axis == -1 * array.ndim:
-        raise DaskAwkwardNotImplemented(
-            f"axis={axis} is not supported for this array yet."
-        )
     if axis is None:
         return total_reduction_to_scalar(
             label="count_nonzero",
@@ -335,10 +375,6 @@ def min(
     initial: float | None = None,
     mask_identity: bool = True,
 ) -> Any:
-    if axis == -1 * array.ndim:
-        raise DaskAwkwardNotImplemented(
-            f"axis={axis} is not supported for this array yet."
-        )
     if axis is None:
         return total_reduction_to_scalar(
             label="min",
@@ -389,10 +425,6 @@ def moment(
 
 @borrow_docstring(ak.prod)
 def prod(array, axis=None, keepdims=False, mask_identity=False):
-    if axis == -1 * array.ndim:
-        raise DaskAwkwardNotImplemented(
-            f"axis={axis} is not supported for this array yet."
-        )
     if axis is None:
         return total_reduction_to_scalar(
             label="prod",
@@ -483,10 +515,6 @@ def sum(
     keepdims: bool = False,
     mask_identity: bool = False,
 ) -> Any:
-    if axis == -1 * array.ndim:
-        raise DaskAwkwardNotImplemented(
-            f"axis={axis} is not supported for this array yet."
-        )
     if axis is None:
         return total_reduction_to_scalar(
             label="sum",
