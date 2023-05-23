@@ -35,9 +35,9 @@ from awkward.forms import (
 
 
 class DummyIndex:
-    def __init__(self, length, backend):
+    def __init__(self, length, nplike):
         self._length = length
-        self._nplike = backend
+        self._nplike = nplike
 
     def __len__(self):
         return self._length
@@ -45,6 +45,16 @@ class DummyIndex:
     @property
     def length(self):
         return self._length
+
+    def __getitem__(self, index):
+        if isinstance(index, slice):
+            assert self._nplike.known_data
+            start, stop, step = index.indices(self._length)
+            return type(self)((stop - start + 1) // self._length, self._nplike)
+        else:
+            raise TypeError(
+                f"{type(self).__name__} supports only slice indices, not {index!r}"
+            )
 
 
 class DummyIndex8(DummyIndex, ak.index.Index8):
