@@ -25,7 +25,11 @@ from dask_awkward.lib.core import (
     new_scalar_object,
     typetracer_array,
 )
-from dask_awkward.lib.io.io import from_map
+from dask_awkward.lib.io.io import (
+    LayoutUnprojectableMixin,
+    from_map,
+    with_original_form,
+)
 
 log = logging.getLogger(__name__)
 
@@ -75,7 +79,7 @@ class _FromParquetFn:
         return self.__repr__()
 
 
-class _FromParquetFileWiseFn(_FromParquetFn):
+class _FromParquetFileWiseFn(_FromParquetFn, LayoutUnprojectableMixin):
     def __init__(
         self,
         *,
@@ -93,37 +97,24 @@ class _FromParquetFileWiseFn(_FromParquetFn):
             original_form=original_form,
         )
 
+    @with_original_form
     def __call__(self, source: Any) -> Any:
-        a = _file_to_partition(
+        array = _file_to_partition(
             source,
             self.fs,
             self.columns,
             self.schema,
         )
+        return array
 
-        if self.original_form is not None:
-            from dask_awkward.lib._utils import make_unused_columns_dataless
-
-            a = make_unused_columns_dataless(a, self.original_form)
-
-        # for entry in self.mock_dataless or []:
-        #     # split on "." so we get lists of strings for fields of fields
-        #     entries = entry.split(".")
-        #     if len(entries) == 1:
-        #         a = ak.with_field(
-        #             a,
-        #             np.broadcast_to(np.int64(0), (len(a),)),
-        #             entries[0],
-        #         )
-        #     else:
-        #         ## This will error if the top level field is not already available
-        #         a = ak.with_field(
-        #             a,
-        #             np.broadcast_to(np.int64(0), (len(a),)),
-        #             entries,
-        #         )
-
-        return a
+    # def __call2(self, source: Any) -> Any:
+    #     array = _file_to_partition(
+    #         source,
+    #         self.fs,
+    #         self.columns,
+    #         self.schema,
+    #     )
+    #     return self.unproject_layout(array)
 
     def project_columns(
         self,
