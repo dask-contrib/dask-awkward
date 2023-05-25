@@ -474,5 +474,7 @@ def _prune_wildcards(columns: list[str], meta: AwkwardArray) -> list[str]:
         else:
             if imeta.fields:
                 good_columns.append(f"{col[:-2]}.{imeta.fields[0]}")
+            else:
+                good_columns.append(col[:-2])
 
     return good_columns
