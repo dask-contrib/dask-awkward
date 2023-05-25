@@ -156,7 +156,7 @@ def from_parquet(
     filters: Any | None = None,
     split_row_groups: Any | None = None,
 ) -> Array:
-    """Read parquet dataset into an :py:obj:`~dask_awkward.Array` collection.
+    """Create an Array collection from a Parquet dataset.
 
     Parameters
     ----------
@@ -426,7 +426,7 @@ def to_parquet(
     compute: bool = True,
     prefix: str | None = None,
 ) -> Scalar | None:
-    """Write data to parquet format.
+    """Write data to Parquet format.
 
     Parameters
     ----------
