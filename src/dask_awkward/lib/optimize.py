@@ -12,7 +12,7 @@ from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
 from dask.local import get_sync
 
-from dask_awkward.layers import AwkwardInputLayer
+from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardInputLayer
 
 log = logging.getLogger(__name__)
 
@@ -42,6 +42,7 @@ def all_optimizations(
     else:
         # Perform dask-awkward specific optimizations.
         dsk = optimize(dsk, keys=keys)
+
         # Perform Blockwise optimizations for HLG input
         dsk = optimize_blockwise(dsk, keys=keys)
         # fuse nearby layers
@@ -66,6 +67,10 @@ def optimize(
     """
     if dask.config.get("awkward.optimization.enabled", default=False):
         dsk = optimize_columns(dsk)  # type: ignore
+
+        # blockwise layer chaining optimization.
+        dsk = rewrite_layer_chains(dsk)
+
     return dsk
 
 
@@ -130,6 +135,8 @@ def _projectable_input_layer_names(dsk: HighLevelGraph) -> list[str]:
         n
         for n, v in dsk.layers.items()
         if isinstance(v, AwkwardInputLayer) and hasattr(v.io_func, "project_columns")
+        # following condition means dep/pickled layers cannot be optimised
+        and hasattr(v, "_meta")
     ]
 
 
@@ -183,10 +190,10 @@ def _mock_output(layer):
     assert len(layer.dsk) == 1
 
     new_layer = copy.deepcopy(layer)
-    mp = new_layer.mapping.copy()
+    mp = new_layer.dsk.copy()
     for k in iter(mp.keys()):
         mp[k] = (_touch_all_data,) + mp[k][1:]
-    new_layer.mapping = mp
+    new_layer.dsk = mp
     return new_layer
 
 
@@ -199,11 +206,128 @@ def _touch_and_call(layer):
     assert len(layer.dsk) == 1
 
     new_layer = copy.deepcopy(layer)
-    mp = new_layer.mapping.copy()
+    mp = new_layer.dsk.copy()
     for k in iter(mp.keys()):
         mp[k] = (_touch_and_call_fn,) + mp[k]
-    new_layer.mapping = mp
+    new_layer.dsk = mp
     return new_layer
+
+
+def rewrite_layer_chains(dsk: HighLevelGraph) -> HighLevelGraph:
+    # dask.optimization.fuse_liner for blockwise layers
+    import copy
+
+    chains = []
+    deps = dsk.dependencies.copy()
+
+    layers = {}
+    # find chains; each chain list is at least two keys long
+    dependents = dsk.dependents
+    all_layers = set(dsk.layers)
+    while all_layers:
+        lay = all_layers.pop()
+        val = dsk.layers[lay]
+        if not isinstance(val, AwkwardBlockwiseLayer):
+            # shortcut to avoid making comparisons
+            layers[lay] = val  # passthrough unchanged
+            continue
+        children = dependents[lay]
+        chain = [lay]
+        lay0 = lay
+        while (
+            len(children) == 1
+            and dsk.dependencies[list(children)[0]] == {lay}
+            and isinstance(dsk.layers[list(children)[0]], AwkwardBlockwiseLayer)
+            and len(dsk.layers[lay]) == len(dsk.layers[list(children)[0]])
+        ):
+            # walk forwards
+            lay = list(children)[0]
+            chain.append(lay)
+            all_layers.remove(lay)
+            children = dependents[lay]
+        lay = lay0
+        parents = dsk.dependencies[lay]
+        while (
+            len(parents) == 1
+            and dependents[list(parents)[0]] == {lay}
+            and isinstance(dsk.layers[list(parents)[0]], AwkwardBlockwiseLayer)
+            and len(dsk.layers[lay]) == len(dsk.layers[list(parents)[0]])
+        ):
+            # walk backwards
+            lay = list(parents)[0]
+            chain.insert(0, lay)
+            all_layers.remove(lay)
+            parents = dsk.dependencies[lay]
+        if len(chain) > 1:
+            chains.append(chain)
+            layers[chain[-1]] = copy.copy(
+                dsk.layers[chain[-1]]
+            )  # shallow copy to be mutated
+        else:
+            layers[lay] = val  # passthrough unchanged
+
+    # do rewrite
+    for chain in chains:
+        # inputs are the inputs of chain[0]
+        # outputs are the outputs of chain[-1]
+        # .dsk is composed from the .dsk of each layer
+        outkey = chain[-1]
+        layer0 = dsk.layers[chain[0]]
+        outlayer = layers[outkey]
+        numblocks = [nb[0] for nb in layer0.numblocks.values() if nb[0] is not None][0]
+        deps[outkey] = deps[chain[0]]
+        [deps.pop(ch) for ch in chain[:-1]]
+
+        subgraph = layer0.dsk.copy()
+        indices = list(layer0.indices)
+        parent = chain[0]
+
+        outlayer.io_deps = layer0.io_deps
+        for chain_member in chain[1:]:
+            layer = dsk.layers[chain_member]
+            for k in layer.io_deps:
+                outlayer.io_deps[k] = layer.io_deps[k]
+            func, *args = layer.dsk[chain_member]
+            args2 = _recursive_replace(args, layer, parent, indices)
+            subgraph[chain_member] = (func,) + tuple(args2)
+            parent = chain_member
+        outlayer.numblocks = {i[0]: (numblocks,) for i in indices if i[1] is not None}
+        outlayer.dsk = subgraph
+        if hasattr(outlayer, "_dims"):
+            del outlayer._dims
+        outlayer.indices = tuple(
+            (i[0], (".0",) if i[1] is not None else None) for i in indices
+        )
+        outlayer.output_indices = (".0",)
+        outlayer.inputs = getattr(layer0, "inputs", set())
+        if hasattr(outlayer, "_cached_dict"):
+            del outlayer._cached_dict  # reset, since original can be mutated
+    return HighLevelGraph(layers, deps)
+
+
+def _recursive_replace(args, layer, parent, indices):
+    args2 = []
+    for arg in args:
+        if isinstance(arg, str) and arg.startswith("__dask_blockwise__"):
+            ind = int(arg[18:])
+            if layer.indices[ind][1] is None:
+                # this is a simple arg
+                args2.append(layer.indices[ind][0])
+            elif layer.indices[ind][0] == parent:
+                # arg refers to output of previous layer
+                args2.append(parent)
+            else:
+                # arg refers to things defined in io_deps
+                indices.append(layer.indices[ind])
+                args2.append(f"__dask_blockwise__{len(indices) - 1}")
+        elif isinstance(arg, list):
+            args2.append(_recursive_replace(arg, layer, parent, indices))
+        elif isinstance(arg, tuple):
+            args2.append(tuple(_recursive_replace(arg, layer, parent, indices)))
+        # elif isinstance(arg, dict):
+        else:
+            args2.append(arg)
+    return args2
 
 
 def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
@@ -218,9 +342,13 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
     reports = {}
 
     # make labelled report
-    for name in _projectable_input_layer_names(dsk):
-        layers[name], report = layers[name].mock()
-        reports[name] = report
+    projectable = _projectable_input_layer_names(dsk)
+    for name, lay in dsk.layers.copy().items():
+        if name in projectable:
+            layers[name], report = lay.mock()
+            reports[name] = report
+        elif hasattr(lay, "mock"):
+            layers[name] = lay.mock()
 
     for name in _ak_output_layer_names(dsk):
         layers[name] = _mock_output(layers[name])
@@ -232,6 +360,8 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
     outlayer = hlg.layers[hlg._toposort_layers()[-1]]
 
     try:
+        for layer in hlg.layers.values():
+            layer.__dict__.pop("_cached_dict", None)
         out = get_sync(hlg, list(outlayer.keys())[0])
     except Exception as err:
         on_fail = dask.config.get("awkward.optimization.on-fail")

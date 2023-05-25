@@ -3,11 +3,13 @@ from __future__ import annotations
 import builtins
 import warnings
 from collections.abc import Sequence
+from numbers import Number
 from typing import TYPE_CHECKING, Any
 
 import awkward as ak
 import numpy as np
 from awkward._nplikes.typetracer import TypeTracerArray
+from dask.base import is_dask_collection
 
 from dask_awkward.lib.core import (
     Array,
@@ -15,7 +17,6 @@ from dask_awkward.lib.core import (
     map_partitions,
     new_known_scalar,
     total_reduction_to_scalar,
-    typetracer_from_form,
 )
 from dask_awkward.utils import (
     DaskAwkwardNotImplemented,
@@ -234,20 +235,6 @@ class _CartesianFn:
         self.kwargs = kwargs
 
     def __call__(self, *arrays):
-        # TODO: remove backend check when typetracer support exists for this
-        if ak.backend(*arrays) == "typetracer":
-            for array in arrays:
-                array.layout._touch_data(recursive=True)
-            out = ak.cartesian(
-                list(
-                    array.layout.form.length_zero_array(behavior=array.behavior)
-                    for array in arrays
-                ),
-                **self.kwargs,
-            )
-            return ak.Array(
-                out.layout.to_typetracer(forget_length=True), behavior=out.behavior
-            )
         return ak.cartesian(list(arrays), **self.kwargs)
 
 
@@ -445,17 +432,6 @@ def full_like(array, fill_value, highlevel=True, behavior=None, dtype=None):
             dak.flatten/dak.unflatten"""
         )
 
-    #  TODO: fix when available in awkward
-    meta = typetracer_from_form(
-        ak.full_like(
-            array._meta.layout.form.length_zero_array(behavior=array.behavior),
-            fill_value,
-            highlevel=highlevel,
-            behavior=behavior,
-            dtype=dtype,
-        ).layout.form
-    )
-
     return map_partitions(
         ak.full_like,
         array,
@@ -463,7 +439,6 @@ def full_like(array, fill_value, highlevel=True, behavior=None, dtype=None):
         highlevel=highlevel,
         behavior=behavior,
         dtype=dtype,
-        meta=meta,
     )
 
 
@@ -477,19 +452,6 @@ def isclose(
     if not compatible_partitions(a, b):
         raise IncompatiblePartitions("isclose", a, b)
 
-    #  TODO: fix this when https://github.com/scikit-hep/awkward/issues/2124 is addressed
-    meta = typetracer_from_form(
-        ak.isclose(
-            a._meta.layout.form.length_zero_array(behavior=a.behavior),
-            b._meta.layout.form.length_zero_array(behavior=b.behavior),
-            rtol=rtol,
-            atol=atol,
-            equal_nan=equal_nan,
-            highlevel=highlevel,
-            behavior=behavior,
-        ).layout.form
-    )
-
     return map_partitions(
         ak.isclose,
         a,
@@ -500,7 +462,6 @@ def isclose(
         highlevel=highlevel,
         behavior=behavior,
         label="is-close",
-        meta=meta,
     )
 
 
@@ -520,22 +481,32 @@ def is_none(array, axis=0, highlevel=True, behavior=None):
 
 @borrow_docstring(ak.local_index)
 def local_index(array, axis=-1, highlevel=True, behavior=None):
-    raise DaskAwkwardNotImplemented("TODO")
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+    if axis == 0:
+        DaskAwkwardNotImplemented("axis=0 for local_index is not supported")
+    if axis and axis != 0:
+        return map_partitions(
+            ak.local_index,
+            array,
+            axis=axis,
+            highlevel=highlevel,
+            behavior=behavior,
+        )
 
 
 @borrow_docstring(ak.mask)
 def mask(array, mask, valid_when=True, highlevel=True, behavior=None):
-    # if not compatible_partitions(array, mask):
-    #     raise IncompatiblePartitions("mask", array, mask)
-    # return map_partitions(
-    #     ak.mask,
-    #     array,
-    #     mask,
-    #     valid_when=valid_when,
-    #     highlevel=highlevel,
-    #     behavior=behavior,
-    # )
-    raise DaskAwkwardNotImplemented("TODO")
+    if not compatible_partitions(array, mask):
+        raise IncompatiblePartitions("mask", array, mask)
+    return map_partitions(
+        ak.mask,
+        array,
+        mask,
+        valid_when=valid_when,
+        highlevel=highlevel,
+        behavior=behavior,
+    )
 
 
 @borrow_docstring(ak.nan_to_num)
@@ -695,23 +666,22 @@ def run_lengths(array, highlevel=True, behavior=None):
             "run_lengths can produce incorrect results for one dimensional arrays!"
         )
 
-    # TODO: fix typetracer error in awkward
-    meta = typetracer_from_form(
-        ak.run_lengths(
-            array._meta.layout.form.length_zero_array(behavior=array.behavior),
-            highlevel=highlevel,
-            behavior=behavior,
-        ).layout.form
-    )
-
     return map_partitions(
         ak.run_lengths,
         array,
         highlevel=highlevel,
         behavior=behavior,
         label="run-lengths",
-        meta=meta,
     )
+
+
+class _SingletonsFn:
+    def __init__(self, axis, **kwargs):
+        self.axis = axis
+        self.kwargs = kwargs
+
+    def __call__(self, array):
+        return ak.singletons(array, axis=self.axis, **self.kwargs)
 
 
 @borrow_docstring(ak.singletons)
@@ -719,24 +689,10 @@ def singletons(array, axis=0, highlevel=True, behavior=None):
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
 
-    # TODO: remove this length-zero calculation once https://github.com/scikit-hep/awkward/issues/2123 is addressed
-    meta = typetracer_from_form(
-        ak.singletons(
-            array._meta.layout.form.length_zero_array(behavior=array.behavior),
-            axis=axis,
-            highlevel=highlevel,
-            behavior=behavior,
-        ).layout.form
-    )
-
     return map_partitions(
-        ak.singletons,
+        _SingletonsFn(axis, highlevel=highlevel, behavior=behavior),
         array,
-        axis=axis,
-        highlevel=highlevel,
-        behavior=behavior,
         label="singletons",
-        meta=meta,
     )
 
 
@@ -799,17 +755,6 @@ def unflatten(array, counts, axis=0, highlevel=True, behavior=None):
         otherwise this unflatten operation will fail when computed!"""
     )
 
-    #  TODO: remove after fixing issue in awkward
-    meta = typetracer_from_form(
-        ak.unflatten(
-            array._meta.layout.form.length_zero_array(behavior=array.behavior),
-            counts._meta.layout.form.length_zero_array(behavior=counts.behavior),
-            axis=axis,
-            highlevel=highlevel,
-            behavior=behavior,
-        ).layout.form
-    )
-
     return map_partitions(
         ak.unflatten,
         array,
@@ -817,7 +762,6 @@ def unflatten(array, counts, axis=0, highlevel=True, behavior=None):
         axis=axis,
         highlevel=highlevel,
         behavior=behavior,
-        meta=meta,
         label="unflatten",
     )
 
@@ -881,8 +825,18 @@ def where(
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
-    if not compatible_partitions(condition, x, y):
-        raise IncompatiblePartitions("where", condition, x, y)
+
+    maybe_dask_args = [condition, x, y]
+    dask_args = tuple(arg for arg in maybe_dask_args if is_dask_collection(arg))
+
+    if not isinstance(condition, Array):
+        raise ValueError(
+            "The condition argugment to where must be a dask_awkward.Array"
+        )
+
+    if not compatible_partitions(*dask_args):
+        raise IncompatiblePartitions("where", *dask_args)
+
     return map_partitions(
         _WhereFn(mergebool=mergebool, highlevel=highlevel, behavior=behavior),
         condition,
@@ -904,9 +858,6 @@ class _WithFieldFn:
         self.behavior = behavior
 
     def __call__(self, base: ak.Array, what: ak.Array) -> ak.Array:
-        # TODO: remove backend handling when touch is handled automatically
-        if ak.backend(what) == "typetracer":
-            what.layout._touch_data(recursive=True)
         return ak.with_field(
             base,
             what,
@@ -920,7 +871,19 @@ class _WithFieldFn:
 def with_field(base, what, where=None, highlevel=True, behavior=None):
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
-    if not compatible_partitions(base, what):
+
+    if not isinstance(base, Array):
+        raise ValueError("Base argument in with_field must be a dask_awkward.Array")
+
+    if not isinstance(what, (Array, Number)):
+        raise ValueError(
+            "with_field cannot accept string, bytes, list, or dict values yet"
+        )
+
+    maybe_dask_args = [base, what]
+    dask_args = tuple(arg for arg in maybe_dask_args if is_dask_collection(arg))
+
+    if not compatible_partitions(*dask_args):
         raise IncompatiblePartitions("with_field", base, what)
     return map_partitions(
         _WithFieldFn(where=where, highlevel=highlevel, behavior=behavior),
@@ -950,25 +913,11 @@ def with_name(
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
 
-    #  TODO: remove once fixed in awkward
-    meta = ak.Array(
-        typetracer_from_form(
-            ak.with_name(
-                array._meta.layout.form.length_zero_array(),
-                name,
-                highlevel=highlevel,
-                behavior=behavior,
-            ).layout.form
-        ),
-        behavior=behavior if behavior is not None else array._meta.behavior,
-    )
-
     return map_partitions(
         _WithNameFn(name=name, behavior=behavior),
         array,
         label="with-name",
         output_divisions=1,
-        meta=meta,
     )
 
 

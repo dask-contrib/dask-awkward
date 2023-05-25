@@ -32,6 +32,7 @@ from dask.utils import IndexCallable, funcname, key_split
 from numpy.lib.mixins import NDArrayOperatorsMixin
 from tlz import first
 
+from dask_awkward.layers import AwkwardBlockwiseLayer
 from dask_awkward.lib.optimize import all_optimizations
 from dask_awkward.typing import AwkwardDaskCollection
 from dask_awkward.utils import (
@@ -48,7 +49,6 @@ if TYPE_CHECKING:
     from awkward.types.type import Type
     from dask.array.core import Array as DaskArray
     from dask.bag.core import Bag as DaskBag
-    from dask.blockwise import Blockwise
     from numpy.typing import DTypeLike
 
 
@@ -488,7 +488,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if hasattr(dsk, "layers"):
             # i.e., NOT matrializes/persisted state
             # output typetracer
-            list(dsk.layers.values())[-1]._meta = meta  # type: ignore
+            lay = list(dsk.layers.values())[-1]
+            if isinstance(lay, AwkwardBlockwiseLayer):
+                lay._meta = meta  # type: ignore
         self._name: str = name
         self._divisions: tuple[int | None, ...] = divisions
         self._meta: ak.Array = meta
@@ -524,9 +526,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         ):
             raise TypeError("only fields may be assigned in-place (by field name)")
 
-        if not isinstance(what, Array):
+        if not isinstance(what, (Array, Number)):
             raise DaskAwkwardNotImplemented(
-                "Supplying anything other than a dak.Array to __setitem__ is not yet available!"
+                "Supplying anything other than a dak.Array, or Number to __setitem__ is not yet available!"
             )
 
         from dask_awkward.lib.structure import with_field
@@ -980,6 +982,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             themethod = getattr(self._meta, method_name)
             thesig = inspect.signature(themethod)
             if "_dask_array_" in thesig.parameters:
+                if "_dask_array_" not in kwargs:
+                    kwargs["_dask_array_"] = self
                 return themethod(*args, **kwargs)
             return self.map_partitions(
                 _BehaviorMethodFn(method_name, **kwargs),
@@ -1286,7 +1290,7 @@ def partitionwise_layer(
     *args: Any,
     opt_touch_all: bool = False,
     **kwargs: Any,
-) -> Blockwise:
+) -> AwkwardBlockwiseLayer:
     """Create a partitionwise graph layer.
 
     Parameters
@@ -1332,6 +1336,7 @@ def partitionwise_layer(
         concatenate=True,
         **kwargs,
     )
+    layer = AwkwardBlockwiseLayer.from_blockwise(layer)
     if opt_touch_all:
         layer._opt_touch_all = True
     return layer
@@ -1732,7 +1737,10 @@ def to_meta(objects: Sequence[Any]) -> tuple[Any, ...]:
 
 def length_zero_array_or_identity(obj: Any) -> Any:
     if is_awkward_collection(obj):
-        return obj._meta.layout.form.length_zero_array(behavior=obj.behavior)
+        return ak.Array(
+            obj._meta.layout.form.length_zero_array(highlevel=False),
+            behavior=obj.behavior,
+        )
     return obj
 
 

@@ -11,7 +11,7 @@ from dask.base import flatten, tokenize
 from dask.highlevelgraph import HighLevelGraph
 from dask.utils import funcname
 
-from dask_awkward.layers import AwkwardInputLayer
+from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardInputLayer
 from dask_awkward.lib.core import (
     empty_typetracer,
     map_partitions,
@@ -361,6 +361,7 @@ def from_dask_array(array: DaskArray, behavior: dict | None = None) -> Array:
         numblocks=numblocks,
         concatenate=True,
     )
+    layer = AwkwardBlockwiseLayer.from_blockwise(layer)
     hlg = HighLevelGraph.from_collections(name, layer, dependencies=[array])
     if np.any(np.isnan(array.chunks)):
         return new_array_object(
