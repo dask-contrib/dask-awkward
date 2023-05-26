@@ -34,7 +34,7 @@ from awkward.forms import (
     UnionForm,
     UnmaskedForm,
 )
-from awkward.typetracer import PlaceholderArray
+from awkward.typetracer import PlaceholderArray, unknown_length
 
 
 index_of = {
@@ -141,7 +141,11 @@ def _unproject_layout(form, layout, length, backend):
         elif isinstance(form, BitMaskedForm):
             return BitMaskedArray(
                 dummy_index_of(
-                    form.mask, int(math.ceil(length / 8.0)), backend.index_nplike
+                    form.mask,
+                    unknown_length
+                    if length is unknown_length
+                    else math.ceil(length / 8.0),
+                    backend.index_nplike,
                 ),
                 _unproject_layout(form.content, None, length, backend),
                 form.valid_when,
@@ -161,14 +165,14 @@ def _unproject_layout(form, layout, length, backend):
         elif isinstance(form, IndexedForm):
             return IndexedArray(
                 dummy_index_of(form.index, length, backend.index_nplike),
-                _unproject_layout(form.content, None, 0, backend),
+                _unproject_layout(form.content, None, unknown_length, backend),
                 parameters=form.parameters,
             )
 
         elif isinstance(form, IndexedOptionForm):
             return IndexedOptionArray(
                 dummy_index_of(form.index, length, backend.index_nplike),
-                _unproject_layout(form.content, None, 0, backend),
+                _unproject_layout(form.content, None, unknown_length, backend),
                 parameters=form.parameters,
             )
 
@@ -176,14 +180,14 @@ def _unproject_layout(form, layout, length, backend):
             return ListArray(
                 dummy_index_of(form.starts, length, backend.index_nplike),
                 dummy_index_of(form.stops, length, backend.index_nplike),
-                _unproject_layout(form.content, None, 0, backend),
+                _unproject_layout(form.content, None, unknown_length, backend),
                 parameters=form.parameters,
             )
 
         elif isinstance(form, ListOffsetForm):
             return ListOffsetArray(
                 dummy_index_of(form.offsets, length + 1, backend.index_nplike),
-                _unproject_layout(form.content, None, 0, backend),
+                _unproject_layout(form.content, None, unknown_length, backend),
                 parameters=form.parameters,
             )
 
@@ -217,7 +221,7 @@ def _unproject_layout(form, layout, length, backend):
                 dummy_index_of(form.tags, length, backend.index_nplike),
                 dummy_index_of(form.index, length, backend.index_nplike),
                 [
-                    _unproject_layout(content, None, 0, backend)
+                    _unproject_layout(content, None, unknown_length, backend)
                     for content in form.contents
                 ],
                 parameters=form.parameters,
