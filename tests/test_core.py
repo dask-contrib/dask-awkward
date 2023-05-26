@@ -184,8 +184,18 @@ def test_typestr(daa: Array) -> None:
 def test_head(daa: Array):
     out = daa.head(1)
     assert out.tolist() == daa.compute()[:1].tolist()
+
     out = daa.head(6)  # first partition only has 5 rows
     assert out.tolist() == daa.compute()[:5].tolist()
+
+    out = daa.head(1, compute=False)
+    assert isinstance(out, dak.lib.Array)
+    assert out.divisions == (None, None)  # since where not known
+
+    daa.eager_compute_divisions()
+    out = daa.head(1, compute=False)
+    assert isinstance(out, dak.lib.Array)
+    assert out.divisions == (0, 1)
 
 
 def test_record_collection(daa: Array) -> None:

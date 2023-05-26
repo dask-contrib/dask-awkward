@@ -1206,9 +1206,13 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         By default this is then processed eagerly and returned.
         """
-        out = self.partitions[0].map_partitions(lambda x: x[:nrow], meta=self._meta)
+        out: Array = self.partitions[0].map_partitions(
+            lambda x: x[:nrow], meta=self._meta
+        )
         if compute:
             return out.compute()
+        if self.known_divisions:
+            out._divisions = (0, min(nrow, self.divisions[1]))
         return out
 
 
