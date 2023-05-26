@@ -181,6 +181,13 @@ def test_typestr(daa: Array) -> None:
     assert len(daa._typestr(max=20)) == 20 + extras
 
 
+def test_head(daa: Array):
+    out = daa.head(1)
+    assert out.tolist() == daa.compute()[:1].tolist()
+    out = daa.head(6)  # first partition only has 5 rows
+    assert out.tolist() == daa.compute()[:5].tolist()
+
+
 def test_record_collection(daa: Array) -> None:
     assert type(daa[0]) is Record
     aa = daa.compute()

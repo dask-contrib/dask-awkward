@@ -1197,6 +1197,20 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         return to_dask_bag(self)
 
+    def head(self, nrow=10, compute=True):
+        """First few rows of the array
+
+        These rows are taken only from the first partition for simplicity. If that partition
+        has fewer rows than ``nrow``, no attempt is made to fetch more from subsequent
+        partitions.
+
+        By default this is then processed eagerly and returned.
+        """
+        out = self.partitions[0].map_partitions(lambda x: x[:nrow], meta=self._meta)
+        if compute:
+            return out.compute()
+        return out
+
 
 def compute_typetracer(dsk: HighLevelGraph, name: str) -> ak.Array:
     key = (name, 0)
