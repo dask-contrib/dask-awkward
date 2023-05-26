@@ -10,7 +10,7 @@ from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
 from dask_awkward.utils import LazyInputsDict
 
 if TYPE_CHECKING:
-    from awkward._nplikes.typetracer import TypeTracerReport
+    from awkward.typetracer import TypeTracerReport
 
 
 class AwkwardBlockwiseLayer(Blockwise):
@@ -145,7 +145,7 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
 
         set_form_keys(form, key=self.name)
 
-        new_meta_labelled, report = ak._nplikes.typetracer.typetracer_with_report(form)
+        new_meta_labelled, report = ak.typetracer.typetracer_with_report(form)
         new_meta_array = ak.Array(new_meta_labelled, behavior=self._behavior)
         new_input_layer = AwkwardInputLayer(
             name=self.name,
