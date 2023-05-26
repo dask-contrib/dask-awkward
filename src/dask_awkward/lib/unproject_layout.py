@@ -1,3 +1,4 @@
+from __future__ import annotations
 import math
 
 import awkward as ak
@@ -34,71 +35,105 @@ from awkward.forms import (
 )
 
 
-class DummyIndex:
-    def __init__(self, length, nplike):
-        self._length = length
-        self._nplike = nplike
-
-    def __len__(self):
-        return self._length
+class DummyArrayLike:
+    def __init__(self, dtype, shape):
+        assert isinstance(dtype, np.dtype)
+        self._dtype = dtype
+        self._shape = shape
 
     @property
-    def length(self):
-        return self._length
+    def dtype(self):
+        return self._dtype
+
+    @property
+    def ndim(self) -> int:
+        return len(self._shape)
+
+    @property
+    def shape(self) -> tuple[int, ...]:
+        return self._shape
+
+    @property
+    def size(self) -> int:
+        size = 1
+        for item in self._shape:
+            size *= item
+        return size
+
+    @property
+    def T(self):
+        return type(self)(self._dtype, self._shape[::-1])
 
     def __getitem__(self, index):
         if isinstance(index, slice):
-            assert self._nplike.known_data
-            start, stop, step = index.indices(self._length)
-            return type(self)((stop - start + 1) // self._length, self._nplike)
+            start, stop, step = index.indices(self._shape[0])
+            new_shape = ((stop - start) // step,)
+            return type(self)(self._dtype, new_shape)
         else:
             raise TypeError(
                 f"{type(self).__name__} supports only slice indices, not {index!r}"
             )
 
+    def __setitem__(self, key, value):
+        raise RuntimeError
 
-class DummyIndex8(DummyIndex, ak.index.Index8):
+    def __bool__(self) -> bool:
+        raise RuntimeError
+
+    def __int__(self) -> int:
+        raise RuntimeError
+
+    def __index__(self) -> int:
+        raise RuntimeError
+
+    def __len__(self) -> int:
+        return self._shape[0]
+
+    __iter__ = None
+
     @property
-    def dtype(self):
-        return np.dtype(np.int8)
+    def itemsize(self):
+        return self._dtype.itemsize
 
-
-class DummyIndexU8(DummyIndex, ak.index.Index8):
-    @property
-    def dtype(self):
-        return np.dtype(np.uint8)
-
-
-class DummyIndex32(DummyIndex, ak.index.Index8):
-    @property
-    def dtype(self):
-        return np.dtype(np.int32)
-
-
-class DummyIndexU32(DummyIndex, ak.index.Index8):
-    @property
-    def dtype(self):
-        return np.dtype(np.uint32)
-
-
-class DummyIndex64(DummyIndex, ak.index.Index8):
-    @property
-    def dtype(self):
-        return np.dtype(np.int64)
+    def view(self, dtype: dtype):
+        dtype = np.dtype(dtype)
+        if (
+            self.itemsize != dtype.itemsize
+            and len(self._shape) >= 1
+            and self._shape[-1] is not None
+        ):
+            last = int(
+                round(self._shape[-1] * self.itemsize / np.dtype(dtype).itemsize)
+            )
+            shape = self._shape[:-1] + (last,)
+        else:
+            shape = self._shape
+        return self._new(
+            dtype, shape=shape, form_key=self._form_key, report=self._report
+        )
 
 
 index_of = {
-    "i8": DummyIndex8,
-    "u8": DummyIndexU8,
-    "i32": DummyIndex32,
-    "u32": DummyIndexU32,
-    "i64": DummyIndex64,
+    "i8": ak.index.Index8,
+    "u8": ak.index.IndexU8,
+    "i32": ak.index.Index32,
+    "u32": ak.index.IndexU32,
+    "i64": ak.index.Index64,
 }
 dtype_of = {
-    "i32": np.int32,
-    "u32": np.uint32,
-    "i64": np.int64,
+    "i8": np.dtype(np.int8),
+    "u8": np.dtype(np.uint8),
+    "i32": np.dtype(np.int32),
+    "u32": np.dtype(np.uint32),
+    "i64": np.dtype(np.int64),
+    "i32": np.dtype(np.uint64),
 }
+
+
+def dummy_index_of(typecode: str, length: int, nplike) -> ak.index.Index:
+    index_cls = index_of[typecode]
+    dtype = dtype_of[typecode]
+    return index_cls(DummyArrayLike(dtype, (length,)), nplike=nplike)
 
 
 def dummy_buffer(shape, dtype, backend):
@@ -171,17 +206,18 @@ def _unproject_layout(form, layout, length, backend):
 
         elif isinstance(form, NumpyForm):
             return NumpyArray(
-                dummy_buffer(
-                    (length,) + form.inner_shape,
+                DummyArrayLike(
                     ak.types.numpytype.primitive_to_dtype(form.primitive),
-                    backend.nplike,
+                    (length,) + form.inner_shape,
                 ),
                 parameters=form.parameters,
             )
 
         elif isinstance(form, BitMaskedForm):
             return BitMaskedArray(
-                index_of[form.mask](int(math.ceil(length / 8.0)), backend.index_nplike),
+                dummy_index_of(
+                    form.mask, int(math.ceil(length / 8.0)), backend.index_nplike
+                ),
                 _unproject_layout(form.content, None, length, backend),
                 form.valid_when,
                 length,
@@ -191,7 +227,7 @@ def _unproject_layout(form, layout, length, backend):
 
         elif isinstance(form, ByteMaskedForm):
             return ByteMaskedArray(
-                index_of[form.mask](length, backend.index_nplike),
+                dummy_index_of(form.mask, length, backend.index_nplike),
                 _unproject_layout(form.content, None, length, backend),
                 form.valid_when,
                 parameters=form.parameters,
@@ -199,29 +235,29 @@ def _unproject_layout(form, layout, length, backend):
 
         elif isinstance(form, IndexedForm):
             return IndexedArray(
-                index_of[form.index](length, backend.index_nplike),
+                dummy_index_of(form.index, length, backend.index_nplike),
                 _unproject_layout(form.content, None, 0, backend),
                 parameters=form.parameters,
             )
 
         elif isinstance(form, IndexedOptionForm):
             return IndexedOptionArray(
-                index_of[form.index](length, backend.index_nplike),
+                dummy_index_of(form.index, length, backend.index_nplike),
                 _unproject_layout(form.content, None, 0, backend),
                 parameters=form.parameters,
             )
 
         elif isinstance(form, ListForm):
             return ListArray(
-                index_of[form.starts](length, backend.index_nplike),
-                index_of[form.stops](length, backend.index_nplike),
+                dummy_index_of(form.starts, length, backend.index_nplike),
+                dummy_index_of(form.stops, length, backend.index_nplike),
                 _unproject_layout(form.content, None, 0, backend),
                 parameters=form.parameters,
             )
 
         elif isinstance(form, ListOffsetForm):
             return ListOffsetArray(
-                index_of[form.offsets](length + 1, backend.index_nplike),
+                dummy_index_of(form.offsets, length + 1, backend.index_nplike),
                 _unproject_layout(form.content, None, 0, backend),
                 parameters=form.parameters,
             )
@@ -253,8 +289,8 @@ def _unproject_layout(form, layout, length, backend):
 
         elif isinstance(form, UnionForm):
             return UnionArray(
-                index_of[form.tags](length, backend.index_nplike),
-                index_of[form.index](length, backend.index_nplike),
+                dummy_index_of(form.tags, length, backend.index_nplike),
+                dummy_index_of(form.index, length, backend.index_nplike),
                 [
                     _unproject_layout(content, None, 0, backend)
                     for content in form.contents
