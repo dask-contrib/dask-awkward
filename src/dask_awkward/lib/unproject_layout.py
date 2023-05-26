@@ -36,7 +36,6 @@ from awkward.forms import (
 )
 from awkward.typetracer import PlaceholderArray, unknown_length
 
-
 index_of = {
     "i8": ak.index.Index8,
     "u8": ak.index.IndexU8,
