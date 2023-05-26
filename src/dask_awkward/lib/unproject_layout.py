@@ -34,84 +34,7 @@ from awkward.forms import (
     UnionForm,
     UnmaskedForm,
 )
-
-
-class DummyArrayLike:
-    def __init__(self, dtype, shape):
-        assert isinstance(dtype, np.dtype)
-        self._dtype = dtype
-        self._shape = shape
-
-    @property
-    def dtype(self):
-        return self._dtype
-
-    @property
-    def ndim(self) -> int:
-        return len(self._shape)
-
-    @property
-    def shape(self) -> tuple[int, ...]:
-        return self._shape
-
-    @property
-    def size(self) -> int:
-        size = 1
-        for item in self._shape:
-            size *= item
-        return size
-
-    @property
-    def T(self):
-        return type(self)(self._dtype, self._shape[::-1])
-
-    def __getitem__(self, index):
-        if isinstance(index, slice):
-            start, stop, step = index.indices(self._shape[0])
-            new_shape = ((stop - start) // step,)
-            return type(self)(self._dtype, new_shape)
-        else:
-            raise TypeError(
-                f"{type(self).__name__} supports only slice indices, not {index!r}"
-            )
-
-    def __setitem__(self, key, value):
-        raise RuntimeError
-
-    def __bool__(self) -> bool:
-        raise RuntimeError
-
-    def __int__(self) -> int:
-        raise RuntimeError
-
-    def __index__(self) -> int:
-        raise RuntimeError
-
-    def __len__(self) -> int:
-        return self._shape[0]
-
-    __iter__ = None
-
-    @property
-    def itemsize(self):
-        return self._dtype.itemsize
-
-    def view(self, dtype: dtype):
-        dtype = np.dtype(dtype)
-        if (
-            self.itemsize != dtype.itemsize
-            and len(self._shape) >= 1
-            and self._shape[-1] is not None
-        ):
-            last = int(
-                round(self._shape[-1] * self.itemsize / np.dtype(dtype).itemsize)
-            )
-            shape = self._shape[:-1] + (last,)
-        else:
-            shape = self._shape
-        return self._new(
-            dtype, shape=shape, form_key=self._form_key, report=self._report
-        )
+from awkward.typetracer import PlaceholderArray
 
 
 index_of = {
@@ -127,14 +50,14 @@ dtype_of = {
     "i32": np.dtype(np.int32),
     "u32": np.dtype(np.uint32),
     "i64": np.dtype(np.int64),
-    "i32": np.dtype(np.uint64),
+    "u64": np.dtype(np.uint64),
 }
 
 
 def dummy_index_of(typecode: str, length: int, nplike) -> ak.index.Index:
     index_cls = index_of[typecode]
     dtype = dtype_of[typecode]
-    return index_cls(DummyArrayLike(dtype, (length,)), nplike=nplike)
+    return index_cls(PlaceholderArray(nplike, (length,), dtype), nplike=nplike)
 
 
 def dummy_buffer(shape, dtype, backend):
@@ -207,9 +130,10 @@ def _unproject_layout(form, layout, length, backend):
 
         elif isinstance(form, NumpyForm):
             return NumpyArray(
-                DummyArrayLike(
-                    ak.types.numpytype.primitive_to_dtype(form.primitive),
+                PlaceholderArray(
+                    backend.nplike,
                     (length,) + form.inner_shape,
+                    ak.types.numpytype.primitive_to_dtype(form.primitive),
                 ),
                 parameters=form.parameters,
             )
