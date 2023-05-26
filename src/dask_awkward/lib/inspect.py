@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import numpy as np
 from dask.base import unpack_collections
 from dask.highlevelgraph import HighLevelGraph
 
@@ -78,3 +79,27 @@ def necessary_columns(*args: Any, traverse: bool = True) -> dict[str, list[str]]
             out[key] = update
 
     return out
+
+
+def sample(arr, factor: int | None = None, probability: float | None = None):
+    """Decimate the data to a smaller number of rows
+
+    Must give either factor or probability
+
+    Parameters
+    ----------
+    arr: dask-awkward array
+    factor: if given, every Nth row will be kept. The counting restarts for each
+        partition, so reducing the row count by an exact factor is not guaranteed
+    probability: a number between 0 and 1, giving the chance of any particular
+        row surviving. For instance, for probability=0.1, roughly 1-in-10
+        rows will remain.
+    """
+    if not (factor is None) ^ (probability is None):
+        raise ValueError("Give exactly one of factor or probability")
+    if factor:
+        return arr.map_partitions(lambda x: x[::factor], meta=arr._meta)
+    else:
+        return arr.map_partitions(
+            lambda x: x[np.random.random(len(x)) < probability], meta=arr._meta
+        )

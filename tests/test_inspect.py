@@ -55,3 +55,20 @@ def test_basic_root_works(daa):
     )
 
     dask.compute(q1_hist)
+
+
+def test_sample(daa):
+    with pytest.raises(ValueError):
+        dak.sample(daa)
+    with pytest.raises(ValueError):
+        dak.sample(daa, 1, 1)
+
+    out = dak.sample(daa, factor=2)
+    assert out.npartitions == daa.npartitions
+    assert out.compute().tolist()[:5] == daa.compute()[[0, 2, 4, 5, 7]].tolist()
+
+    out = dak.sample(daa, probability=0.5)
+    assert out.npartitions == daa.npartitions
+    arr = out.compute()
+    assert 0.3 < (len(arr) / len(daa)) < 0.7
+    assert all(a in daa.compute().tolist() for a in arr.tolist())
