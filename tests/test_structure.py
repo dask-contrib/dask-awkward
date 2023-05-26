@@ -505,12 +505,12 @@ def test_repartition_no_change(daa):
 def test_repartition_split_all(daa):
     daa1 = daa.repartition(rows_per_partition=1)
     assert daa1.npartitions == len(daa)
-    out = daa1.compute(optimize_graph=False)
+    out = daa1.compute()
     assert out.tolist() == daa.compute().tolist()
 
 
 def test_repartition_uneven(daa):
     daa1 = daa.repartition(divisions=(0, 7, 8, 11, 12))
     assert daa1.npartitions == 4
-    out = daa1.compute(optimize_graph=False)
+    out = daa1.compute()
     assert out.tolist() == daa.compute()[:12].tolist()

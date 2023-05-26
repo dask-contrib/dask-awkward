@@ -10,8 +10,8 @@ import awkward as ak
 import numpy as np
 from awkward._nplikes.typetracer import TypeTracerArray
 from dask.base import is_dask_collection, tokenize
+from dask.highlevelgraph import HighLevelGraph
 
-from dask_awkward.layers import AwkwardRepartitionLayer
 from dask_awkward.lib.core import (
     Array,
     compatible_partitions,
@@ -1085,14 +1085,29 @@ def zip(
         )
 
 
-def repartition_layer(arr, divisions):
-    # outputs to fill
-    parts = []
-    slices = []
+def _repartition_func(*stuff):
+    import builtins
+
+    import awkward as ak
+
+    *data, slices = stuff
+    data = [
+        d[sl[0] : sl[1]] if sl is not None else d
+        for d, sl in builtins.zip(data, slices)
+    ]
+    return ak.concatenate(data)
+
+
+def repartition_layer(arr: Array, divisions: list[int, ...]):
+    from dask_awkward.lib.core import new_array_object
+
+    token = tokenize(arr.name, divisions)
+    key = f"repartition-{token}"
+    dask = {}
 
     indivs = arr.divisions
     i = 0
-    for start, end in builtins.zip(divisions[:-1], divisions[1:]):
+    for index, (start, end) in enumerate(builtins.zip(divisions[:-1], divisions[1:])):
         pp = []
         ss = []
         while indivs[i] <= start:
@@ -1116,10 +1131,18 @@ def repartition_layer(arr, divisions):
                 en = None
             pp.append(k)
             ss.append((st, en))
-        parts.append(pp)
-        slices.append(ss)
-
-    token = tokenize(arr.name, divisions)
-    key = f"repartition-{token}"
-    layer = AwkwardRepartitionLayer(arr.name, key, parts, slices)
-    return layer
+        dask[(key, index)] = (
+            (_repartition_func,) + tuple((arr.name, part) for part in pp) + (ss,)
+        )
+    graph = HighLevelGraph.from_collections(
+        key,
+        dask,
+        dependencies=[arr],
+    )
+    return new_array_object(
+        graph,
+        key,
+        meta=arr._meta,
+        behavior=arr.behavior,
+        divisions=divisions,
+    )
