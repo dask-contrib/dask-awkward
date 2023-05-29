@@ -219,6 +219,51 @@ def test_scalar_getitem_getattr() -> None:
     assert s.c.compute() == t.c
 
 
+@pytest.mark.parametrize(
+    "where",
+    [
+        slice(0, 10),
+        slice(0, 11),
+        slice(1, 10),
+        slice(1, 11),
+        slice(1, 3),
+        slice(6, 12),
+        slice(0, 10, 2),
+        slice(0, 11, 2),
+        slice(1, 14, 2),
+        slice(1, 11, 2),
+        slice(1, 3, 3),
+        slice(None, None, 3),
+    ],
+)
+def test_getitem_zero_slice_single(daa: Array, where):
+    out = daa[where]
+    assert out.compute().tolist() == daa[where].compute().tolist()
+
+
+@pytest.mark.parametrize(
+    "where",
+    [
+        slice(0, 10),
+        slice(0, 11),
+        slice(1, 10),
+        slice(1, 11),
+        slice(1, 3),
+        slice(6, 12),
+        slice(0, 10, 2),
+        slice(0, 11, 2),
+        slice(1, 14, 2),
+        slice(1, 11, 2),
+        slice(1, 3, 3),
+        slice(None, None, 3),
+    ],
+)
+@pytest.mark.parametrize("rest", [slice(None, None, None), slice(0, 1)])
+def test_getitem_zero_slice_tuple(daa: Array, where, rest):
+    out = daa[where, rest]
+    assert out.compute().tolist() == daa[where, rest].compute().tolist()
+
+
 def test_is_typetracer(daa: Array) -> None:
     assert not is_typetracer(daa)
     assert not is_typetracer(daa[0])

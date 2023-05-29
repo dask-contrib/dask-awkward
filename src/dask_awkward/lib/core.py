@@ -872,6 +872,61 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         else:
             return new_scalar_object(hlg, name, meta=new_meta)
 
+    def _getitem_slice_on_zero(self, where: tuple[slice, ...]):
+        # normalise
+        sl: slice = where[0]
+        rest = tuple(where[1:])
+        step = sl.step or 1
+        start = sl.start or 0
+        stop = sl.stop or self.divisions[-1]
+        start = start if start >= 0 else self.divisions[-1] + start
+        stop = stop if stop >= 0 else self.divisions[-1] + stop
+        if step < 0:
+            raise DaskAwkwardNotImplemented("negative step slice on zeroth dimension")
+
+        # setup
+        token = tokenize(self, where)
+        name = f"getitem-{token}"
+        if not self.known_divisions:
+            self.eager_compute_divisions()
+        remainder = 0
+        outpart = 0
+        divisions = [0]
+        dask = {}
+        # make low-level graph
+        for i in range(self.npartitions):
+            if start > self.divisions[i + 1]:
+                # first partition not found
+                continue
+            if stop < self.divisions[i]:
+                # no more partitions with valid rows
+                break
+            slice_start = max(start - self.divisions[i] + remainder, 0)
+            slice_end = min(stop - self.divisions[i], self.divisions[i + 1])
+            if slice_end == slice_start and (self.divisions[i + 1] - self.divisions[i]):
+                # in case of zero-row last partition
+                break
+            dask[(name, outpart)] = (
+                _zero_getitem,
+                (self.name, i),
+                slice(slice_start, slice_end, step),
+                rest,
+            )
+            outpart += 1
+            remainder += (self.divisions[i + 1] - self.divisions[i]) % step
+            divisions.append(
+                (self.divisions[i + 1] - self.divisions[i]) // step + divisions[-1]
+            )
+            remainder = remainder % step
+        hlg = HighLevelGraph.from_collections(name, dask, dependencies=[self])
+        return new_array_object(
+            hlg,
+            name,
+            meta=self._meta,
+            behavior=self.behavior,
+            divisions=tuple(divisions),
+        )
+
     def _getitem_tuple(self, where: tuple[Any, ...]) -> Array:
         if isinstance(where[0], int):
             return self._getitem_outer_int(where)
@@ -885,6 +940,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         elif isinstance(where[0], slice) and is_empty_slice(where[0]):
             return self._getitem_trivial_map_partitions(where)
 
+        elif isinstance(where[0], slice):
+            return self._getitem_slice_on_zero(where)
         # boolean array
         elif isinstance(where[0], Array):
             try:
@@ -915,6 +972,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         elif isinstance(where, list):
             return self._getitem_outer_str_or_list(where)
+
+        elif isinstance(where, slice):
+            return self._getitem_slice_on_zero((where,))
 
         # a single integer
         elif isinstance(where, int):
@@ -1214,6 +1274,10 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if self.known_divisions:
             out._divisions = (0, min(nrow, self.divisions[1]))
         return out
+
+
+def _zero_getitem(arr: ak.Array, zeroth: slice, rest: tuple[slice, ...]) -> ak.Array:
+    return arr.__getitem__((zeroth,) + rest)
 
 
 def compute_typetracer(dsk: HighLevelGraph, name: str) -> ak.Array:
