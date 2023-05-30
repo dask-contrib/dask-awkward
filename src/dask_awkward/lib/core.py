@@ -559,9 +559,6 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         from dask_awkward.lib.structure import repartition_layer
         from dask.highlevelgraph import MaterializedLayer
 
-        token = tokenize(self, npartitions, divisions, rows_per_partition)
-        key = f"repartition-{token}"
-
         if sum(bool(_) for _ in [npartitions, divisions, rows_per_partition]) != 1:
             raise ValueError("Please specify exactly one of the inputs")
         if not self.known_divisions:
@@ -572,6 +569,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if rows_per_partition:
             divisions = list(range(0, nrows, rows_per_partition))
             divisions.append(nrows)
+
+        token = tokenize(self, divisions)
+        key = f"repartition-{token}"
 
         new_layer = repartition_layer(self, key, divisions)
         new_layer = MaterializedLayer(new_layer)
