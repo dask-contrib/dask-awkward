@@ -201,10 +201,7 @@ def _mock_output(layer):
     return new_layer
 
 
-def _do_nothing_return_array(*args, **kwargs):
-    import awkward as ak
-
-    assert isinstance(args[0], ak.Array)
+def _do_nothing_return_array(*args, **_):
     return args[0]
 
 
