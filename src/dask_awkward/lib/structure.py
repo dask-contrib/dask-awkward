@@ -1098,12 +1098,8 @@ def _repartition_func(*stuff):
     return ak.concatenate(data)
 
 
-def repartition_layer(arr: Array, divisions: list[int, ...]):
-    from dask_awkward.lib.core import new_array_object
-
-    token = tokenize(arr.name, divisions)
-    key = f"repartition-{token}"
-    dask = {}
+def repartition_layer(arr: Array, key: str, divisions: list[int, ...]):
+    layer = {}
 
     indivs = arr.divisions
     i = 0
@@ -1131,18 +1127,7 @@ def repartition_layer(arr: Array, divisions: list[int, ...]):
                 en = None
             pp.append(k)
             ss.append((st, en))
-        dask[(key, index)] = (
+        layer[(key, index)] = (
             (_repartition_func,) + tuple((arr.name, part) for part in pp) + (ss,)
         )
-    graph = HighLevelGraph.from_collections(
-        key,
-        dask,
-        dependencies=[arr],
-    )
-    return new_array_object(
-        graph,
-        key,
-        meta=arr._meta,
-        behavior=arr.behavior,
-        divisions=divisions,
-    )
+    return layer

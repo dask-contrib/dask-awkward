@@ -557,6 +557,10 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     def repartition(self, npartitions=None, divisions=None, rows_per_partition=None):
         from dask_awkward.lib.structure import repartition_layer
+        from dask.highlevelgraph import MaterializedLayer
+
+        token = tokenize(self, npartitions, divisions, rows_per_partition)
+        key = f"repartition-{token}"
 
         if sum(bool(_) for _ in [npartitions, divisions, rows_per_partition]) != 1:
             raise ValueError("Please specify exactly one of the inputs")
@@ -568,7 +572,20 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if rows_per_partition:
             divisions = list(range(0, nrows, rows_per_partition))
             divisions.append(nrows)
-        return repartition_layer(self, divisions)
+
+        new_layer = repartition_layer(self, key, divisions)
+        new_layer = MaterializedLayer(new_layer)
+        new_layer._opt_mock_materialized = True
+        new_graph = HighLevelGraph.from_collections(
+            key, new_layer, dependencies=(self,)
+        )
+        return new_array_object(
+            new_graph,
+            key,
+            meta=self._meta,
+            behavior=self.behavior,
+            divisions=divisions,
+        )
 
     def __len__(self) -> int:
         if not self.known_divisions:

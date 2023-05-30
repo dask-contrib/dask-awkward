@@ -168,6 +168,10 @@ def _opt_touch_all_layer_names(dsk: HighLevelGraph) -> list[str]:
     # return _layers_with_annotation(dsk, "ak_touch_all")
 
 
+def _opt_mock_materialized_layer_names(dsk: HighLevelGraph) -> list[str]:
+    return [n for n, v in dsk.layers.items() if hasattr(v, "_opt_mock_materialized")]
+
+
 def _has_projectable_awkward_io_layer(dsk: HighLevelGraph) -> bool:
     """Check if a graph at least one AwkwardInputLayer that is project-able."""
     for _, v in dsk.layers.items():
@@ -194,6 +198,21 @@ def _mock_output(layer):
     for k in iter(mp.keys()):
         mp[k] = (_touch_all_data,) + mp[k][1:]
     new_layer.dsk = mp
+    return new_layer
+
+
+def _do_nothing_return_array(*args, **kwargs):
+    import awkward as ak
+
+    assert isinstance(args[0], ak.Array)
+    return args[0]
+
+
+def _mock_materialized(layer):
+    """Update a layer to do nothing."""
+    new_layer = copy.deepcopy(layer)
+    for k in iter(new_layer.keys()):
+        new_layer.mapping[k] = (_do_nothing_return_array,) + new_layer[k][1:]
     return new_layer
 
 
@@ -355,6 +374,9 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
 
     for name in _opt_touch_all_layer_names(dsk):
         layers[name] = _touch_and_call(layers[name])
+
+    for name in _opt_mock_materialized_layer_names(dsk):
+        layers[name] = _mock_materialized(layers[name])
 
     hlg = HighLevelGraph(layers, deps)
     outlayer = hlg.layers[hlg._toposort_layers()[-1]]
