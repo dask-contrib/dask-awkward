@@ -1545,10 +1545,7 @@ def _next_chunk_partition_offset(chunk: ak.Array, is_axis_none: bool):
         return len(chunk)
 
 
-# Exterior reductions need starts!
-def _chunk_reducer_positional(
-    chunk: ak.Array, is_axis_none: bool, *, reducer: Callable
-) -> PartialPositionalReductionType:
+def _prepare_axis_none(chunk: ak.Array):
     # TODO: this is private Awkward code. We should figure out how to export it
     # if needed
     (layout,) = ak._do.remove_structure(
@@ -1558,10 +1555,15 @@ def _chunk_reducer_positional(
         keepdims=True,
         allow_records=False,
     )
-    chunk = ak.Array(layout, behavior=chunk.behavior)
+    return ak.Array(layout, behavior=chunk.behavior)
 
+
+# Exterior reductions need starts!
+def _chunk_reducer_positional(
+    chunk: ak.Array, is_axis_none: bool, *, reducer: Callable
+) -> PartialPositionalReductionType:
     index = reducer(
-        chunk, axis=None if is_axis_none else 0, keepdims=True, mask_identity=True
+        chunk, axis=-1 if is_axis_none else 0, keepdims=True, mask_identity=True
     )
     # Adjust the index to be absolute w.r.t the original array
     return index, chunk[index], _next_chunk_partition_offset(chunk, is_axis_none)
@@ -1705,6 +1707,11 @@ def non_trivial_reduction(
     tree_node_fn = partial(tree_node_fn, **tree_node_kwargs)
     concat_fn = partial(concat_fn, **concat_kwargs)
     finalize_fn = partial(finalize_fn, **finalize_kwargs)
+
+    # For axis=None, let's remove the structure to make the internal operations
+    # axis=-1
+    if axis is None:
+        array = map_partitions(_prepare_axis_none, array, meta=empty_typetracer())
 
     chunked_result = map_partitions(
         chunked_fn,
