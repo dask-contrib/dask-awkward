@@ -6,9 +6,9 @@ import logging
 import operator
 import sys
 import warnings
-from itertools import accumulate, islice
 from collections.abc import Callable, Hashable, Mapping, Sequence
 from functools import cached_property, partial
+from itertools import accumulate, islice
 from numbers import Number
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
@@ -1498,7 +1498,11 @@ PartialReductionType = ak.Array
 
 
 def _chunk_reducer_trivial(
-    chunk: ak.Array | PartialReductionType, axis: int | None, *, reducer: Callable, mask_identity: bool
+    chunk: ak.Array | PartialReductionType,
+    axis: int | None,
+    *,
+    reducer: Callable,
+    mask_identity: bool,
 ) -> PartialReductionType:
     return reducer(chunk, keepdims=True, axis=axis, mask_identity=mask_identity)
 

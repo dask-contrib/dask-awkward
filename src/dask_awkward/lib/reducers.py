@@ -4,10 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 import awkward as ak
 
-from dask_awkward.lib.core import (
-    non_trivial_reduction,
-    map_partitions
-)
+from dask_awkward.lib.core import map_partitions, non_trivial_reduction
 from dask_awkward.utils import DaskAwkwardNotImplemented, borrow_docstring
 
 if TYPE_CHECKING:
