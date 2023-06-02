@@ -35,6 +35,16 @@ def ndjson_points1(tmpdir_factory: pytest.TempdirFactory) -> str:
 
 
 @pytest.fixture(scope="session")
+def ndjson_points1_str(tmpdir_factory: pytest.TempdirFactory) -> str:
+    array = daktu.awkward_xy_points_str()
+    fname = Path(tmpdir_factory.mktemp("data")) / "points_ndjson1.json"
+    with fsspec.open(fname, "w") as f:
+        for entry in array.tolist():
+            print(json.dumps({"points": entry}), file=f)
+    return str(fname)
+
+
+@pytest.fixture(scope="session")
 def ndjson_points2(tmpdir_factory: pytest.TempdirFactory) -> str:
     array = daktu.awkward_xy_points()
     fname = Path(tmpdir_factory.mktemp("data")) / "points_ndjson2.json"
@@ -50,13 +60,30 @@ def ndjson_points_file(ndjson_points1: str) -> str:
 
 
 @pytest.fixture(scope="session")
+def ndjson_points_file_str(ndjson_points1_str: str) -> str:
+    return ndjson_points1_str
+
+
+@pytest.fixture(scope="session")
 def daa(ndjson_points1: str) -> dak.Array:
     return dak.from_json([ndjson_points1] * 3)
 
 
 @pytest.fixture(scope="session")
+def daa_str(ndjson_points1_str: str) -> dak.Array:
+    return dak.from_json([ndjson_points1_str] * 3)
+
+
+@pytest.fixture(scope="session")
 def caa(ndjson_points1: str) -> ak.Array:
     with open(ndjson_points1, "rb") as f:
+        a = ak.from_json(f, line_delimited=True)
+    return ak.concatenate([a, a, a])
+
+
+@pytest.fixture(scope="session")
+def caa_str(ndjson_points1_str: str) -> ak.Array:
+    with open(ndjson_points1_str, "rb") as f:
         a = ak.from_json(f, line_delimited=True)
     return ak.concatenate([a, a, a])
 
