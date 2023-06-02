@@ -3,13 +3,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import awkward as ak
-import numpy as np
-from awkward._nplikes.typetracer import TypeTracerArray
 
 from dask_awkward.lib.core import (
-    axis_0_reduction,
-    map_partitions,
-    total_reduction_to_scalar,
+    non_trivial_reduction,
+    map_partitions
 )
 from dask_awkward.utils import DaskAwkwardNotImplemented, borrow_docstring
 
@@ -46,24 +43,9 @@ def all(
     keepdims: bool = False,
     mask_identity: bool = False,
 ) -> Any:
-    if axis is None:
-        return total_reduction_to_scalar(
-            label="all",
-            array=array,
-            chunked_fn=ak.all,
-            chunked_kwargs={
-                "axis": None,
-                "mask_identity": mask_identity,
-            },
-            meta=ak.sum(
-                array._meta,
-                axis=None,
-                keepdims=keepdims,
-                mask_identity=mask_identity,
-            ),
-        )
-    elif axis == 0 or axis == -1 * array.ndim:
-        return axis_0_reduction(
+    if axis is None or axis == 0 or axis == -1 * array.ndim:
+        return non_trivial_reduction(
+            axis=axis,
             label="all",
             array=array,
             reducer=ak.all,
@@ -89,24 +71,9 @@ def any(
     keepdims: bool = False,
     mask_identity: bool = False,
 ) -> Any:
-    if axis is None:
-        return total_reduction_to_scalar(
-            label="any",
-            array=array,
-            chunked_fn=ak.any,
-            chunked_kwargs={
-                "axis": None,
-                "mask_identity": mask_identity,
-            },
-            meta=ak.sum(
-                array._meta,
-                axis=None,
-                keepdims=keepdims,
-                mask_identity=mask_identity,
-            ),
-        )
-    elif axis == 0 or axis == -1 * array.ndim:
-        return axis_0_reduction(
+    if axis is None or axis == 0 or axis == -1 * array.ndim:
+        return non_trivial_reduction(
+            axis=axis,
             label="any",
             array=array,
             reducer=ak.any,
@@ -132,23 +99,22 @@ def argmax(
     keepdims: bool = False,
     mask_identity: bool = True,
 ) -> Any:
-    if axis is None:
-        raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
-    elif axis >= 1:
+    if axis is None or axis == 0 or axis == -1 * array.ndim:
+        return non_trivial_reduction(
+            axis=axis,
+            label="argmax",
+            array=array,
+            reducer=ak.argmax,
+            is_positional=True,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+        )
+    else:
         return map_partitions(
             ak.argmax,
             array,
             output_divisions=1,
             axis=axis,
-            keepdims=keepdims,
-            mask_identity=mask_identity,
-        )
-    else:
-        return axis_0_reduction(
-            label="argmax",
-            array=array,
-            reducer=ak.argmax,
-            is_positional=True,
             keepdims=keepdims,
             mask_identity=mask_identity,
         )
@@ -161,23 +127,22 @@ def argmin(
     keepdims: bool = False,
     mask_identity: bool = True,
 ) -> Any:
-    if axis is None:
-        raise DaskAwkwardNotImplemented(f"axis={axis} is a TODO")
-    elif axis >= 1:
+    if axis is None or axis == 0 or axis == -1 * array.ndim:
+        return non_trivial_reduction(
+            axis=axis,
+            label="argmin",
+            array=array,
+            reducer=ak.argmin,
+            is_positional=True,
+            keepdims=keepdims,
+            mask_identity=mask_identity,
+        )
+    else:
         return map_partitions(
             ak.argmin,
             array,
             output_divisions=1,
             axis=axis,
-            keepdims=keepdims,
-            mask_identity=mask_identity,
-        )
-    else:
-        return axis_0_reduction(
-            label="argmin",
-            array=array,
-            reducer=ak.argmin,
-            is_positional=True,
             keepdims=keepdims,
             mask_identity=mask_identity,
         )
@@ -202,20 +167,9 @@ def count(
     keepdims: bool = False,
     mask_identity: bool = False,
 ) -> Any:
-    if axis is None:
-        return total_reduction_to_scalar(
-            label="count",
-            array=array,
-            meta=TypeTracerArray._new(dtype=np.int64, shape=()),
-            chunked_fn=ak.count,
-            chunked_kwargs={"axis": 1},
-            comb_fn=ak.sum,
-            comb_kwargs={"axis": None},
-            agg_fn=ak.sum,
-            agg_kwargs={"axis": None},
-        )
-    elif axis == 0 or axis == -1 * array.ndim:
-        return axis_0_reduction(
+    if axis is None or axis == 0 or axis == -1 * array.ndim:
+        return non_trivial_reduction(
+            axis=axis,
             label="count",
             array=array,
             reducer=ak.count,
@@ -242,20 +196,9 @@ def count_nonzero(
     keepdims: bool = False,
     mask_identity: bool = False,
 ) -> Any:
-    if axis is None:
-        return total_reduction_to_scalar(
-            label="count_nonzero",
-            array=array,
-            meta=TypeTracerArray._new(dtype=np.int64, shape=()),
-            chunked_fn=ak.count_nonzero,
-            chunked_kwargs={"axis": 1},
-            comb_fn=ak.sum,
-            comb_kwargs={"axis": None},
-            agg_fn=ak.sum,
-            agg_kwargs={"axis": None},
-        )
-    elif axis == 0 or axis == -1 * array.ndim:
-        return axis_0_reduction(
+    if axis is None or axis == 0 or axis == -1 * array.ndim:
+        return non_trivial_reduction(
+            axis=axis,
             label="count_nonzero",
             array=array,
             reducer=ak.count_nonzero,
@@ -307,24 +250,9 @@ def max(
     initial: float | None = None,
     mask_identity: bool = True,
 ) -> Any:
-    if axis is None:
-        return total_reduction_to_scalar(
-            label="max",
-            array=array,
-            chunked_fn=ak.max,
-            chunked_kwargs={
-                "axis": None,
-                "mask_identity": mask_identity,
-            },
-            meta=ak.max(
-                array._meta,
-                axis=None,
-                keepdims=keepdims,
-                mask_identity=mask_identity,
-            ),
-        )
-    elif axis == 0 or axis == -1 * array.ndim:
-        return axis_0_reduction(
+    if axis is None or axis == 0 or axis == -1 * array.ndim:
+        return non_trivial_reduction(
+            axis=axis,
             label="max",
             array=array,
             reducer=ak.max,
@@ -375,24 +303,9 @@ def min(
     initial: float | None = None,
     mask_identity: bool = True,
 ) -> Any:
-    if axis is None:
-        return total_reduction_to_scalar(
-            label="min",
-            array=array,
-            chunked_fn=ak.min,
-            chunked_kwargs={
-                "axis": None,
-                "mask_identity": mask_identity,
-            },
-            meta=ak.min(
-                array._meta,
-                axis=None,
-                keepdims=keepdims,
-                mask_identity=mask_identity,
-            ),
-        )
-    elif axis == 0 or axis == -1 * array.ndim:
-        return axis_0_reduction(
+    if axis is None or axis == 0 or axis == -1 * array.ndim:
+        return non_trivial_reduction(
+            axis=axis,
             label="min",
             array=array,
             reducer=ak.min,
@@ -425,24 +338,9 @@ def moment(
 
 @borrow_docstring(ak.prod)
 def prod(array, axis=None, keepdims=False, mask_identity=False):
-    if axis is None:
-        return total_reduction_to_scalar(
-            label="prod",
-            array=array,
-            chunked_fn=ak.prod,
-            chunked_kwargs={
-                "axis": None,
-                "mask_identity": mask_identity,
-            },
-            meta=ak.prod(
-                array._meta,
-                axis=None,
-                keepdims=keepdims,
-                mask_identity=mask_identity,
-            ),
-        )
-    elif axis == 0 or axis == -1 * array.ndim:
-        return axis_0_reduction(
+    if axis is None or axis == 0 or axis == -1 * array.ndim:
+        return non_trivial_reduction(
+            axis=axis,
             label="prod",
             array=array,
             reducer=ak.prod,
@@ -515,24 +413,9 @@ def sum(
     keepdims: bool = False,
     mask_identity: bool = False,
 ) -> Any:
-    if axis is None:
-        return total_reduction_to_scalar(
-            label="sum",
-            array=array,
-            chunked_fn=ak.sum,
-            chunked_kwargs={
-                "axis": None,
-                "mask_identity": mask_identity,
-            },
-            meta=ak.sum(
-                array._meta,
-                axis=None,
-                keepdims=keepdims,
-                mask_identity=mask_identity,
-            ),
-        )
-    elif axis == 0 or axis == -1 * array.ndim:
-        return axis_0_reduction(
+    if axis is None or axis == 0 or axis == -1 * array.ndim:
+        return non_trivial_reduction(
+            axis=axis,
             label="sum",
             array=array,
             reducer=ak.sum,
