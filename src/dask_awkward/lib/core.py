@@ -1499,12 +1499,17 @@ PartialReductionType = ak.Array
 
 def _chunk_reducer_trivial(
     chunk: ak.Array | PartialReductionType,
-    axis: int | None,
+    is_axis_none: bool,
     *,
     reducer: Callable,
     mask_identity: bool,
 ) -> PartialReductionType:
-    return reducer(chunk, keepdims=True, axis=axis, mask_identity=mask_identity)
+    return reducer(
+        chunk,
+        keepdims=True,
+        axis=None if is_axis_none else 0,
+        mask_identity=mask_identity,
+    )
 
 
 def _concat_reducer_trivial(
@@ -1516,20 +1521,25 @@ def _concat_reducer_trivial(
 
 def _finalise_reducer_trivial(
     partial: PartialReductionType,
-    axis: int | None,
+    is_axis_none: bool,
     *,
     reducer: Callable,
     mask_identity: bool,
     keepdims: bool,
 ) -> ak.Array:
-    return reducer(partial, axis=axis, keepdims=keepdims, mask_identity=mask_identity)
+    return reducer(
+        partial,
+        axis=None if is_axis_none else 0,
+        keepdims=keepdims,
+        mask_identity=mask_identity,
+    )
 
 
 PartialPositionalReductionType = "tuple[ak.Array, ak.Array, int]"
 
 
-def _next_chunk_partition_offset(chunk: ak.Array, axis: int | None):
-    if axis is None:
+def _next_chunk_partition_offset(chunk: ak.Array, is_axis_none: bool):
+    if is_axis_none:
         return len(ak.ravel(chunk))
     else:
         return len(chunk)
@@ -1537,11 +1547,11 @@ def _next_chunk_partition_offset(chunk: ak.Array, axis: int | None):
 
 # Exterior reductions need starts!
 def _chunk_reducer_positional(
-    chunk: ak.Array, axis: int | None, *, reducer: Callable
+    chunk: ak.Array, is_axis_none: bool, *, reducer: Callable
 ) -> PartialPositionalReductionType:
     # TODO: this is private Awkward code. We should figure out how to export it
     # if needed
-    layout, = ak._do.remove_structure(
+    (layout,) = ak._do.remove_structure(
         ak.to_layout(chunk),
         flatten_records=False,
         drop_nones=False,
@@ -1550,9 +1560,11 @@ def _chunk_reducer_positional(
     )
     chunk = ak.Array(layout, behavior=chunk.behavior)
 
-    index = reducer(chunk, axis=axis, keepdims=True, mask_identity=True)
+    index = reducer(
+        chunk, axis=None if is_axis_none else 0, keepdims=True, mask_identity=True
+    )
     # Adjust the index to be absolute w.r.t the original array
-    return index, chunk[index], _next_chunk_partition_offset(chunk, axis)
+    return index, chunk[index], _next_chunk_partition_offset(chunk, is_axis_none)
 
 
 # All reductions need concatenation
@@ -1591,7 +1603,7 @@ def _tree_node_reducer_positional(
 
 def _finalise_reducer_positional(
     partial: PartialPositionalReductionType,
-    axis: int | None,
+    is_axis_none: bool,
     *,
     reducer: Callable,
     mask_identity: bool,
@@ -1608,7 +1620,7 @@ def _finalise_reducer_positional(
     if not mask_identity:
         final_index = ak.fill_none(final_index, -1, axis=-1)
     if not keepdims:
-        if axis is None:
+        if is_axis_none:
             final_index = ak.ravel(final_index)[0]
         else:
             final_index = final_index[0]
@@ -1646,7 +1658,7 @@ def non_trivial_reduction(
         concat_fn = _concat_reducer_positional
         finalize_fn = _finalise_reducer_positional
 
-        chunked_kwargs = {"reducer": reducer, "axis": axis}
+        chunked_kwargs = {"reducer": reducer, "is_axis_none": axis is None}
         tree_node_kwargs = {"reducer": reducer}
 
     else:
@@ -1657,12 +1669,12 @@ def non_trivial_reduction(
 
         chunked_kwargs = {
             "reducer": reducer,
-            "axis": axis,
+            "is_axis_none": axis is None,
             "mask_identity": mask_identity,
         }
         tree_node_kwargs = {
             "reducer": combiner,
-            "axis": -1,
+            "is_axis_none": axis is None,
             "mask_identity": mask_identity,
         }
 
@@ -1673,7 +1685,7 @@ def non_trivial_reduction(
         "reducer": combiner,
         "mask_identity": mask_identity,
         "keepdims": keepdims,
-        "axis": axis,
+        "is_axis_none": axis is None,
     }
     token = token or tokenize(
         array,
