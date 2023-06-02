@@ -1538,14 +1538,14 @@ def _finalise_reducer_trivial(
 PartialPositionalReductionType = "tuple[ak.Array, ak.Array, int]"
 
 
-def _next_chunk_partition_offset(chunk: ak.Array, is_axis_none: bool):
+def _next_chunk_partition_offset(chunk: ak.Array, is_axis_none: bool) -> int:
     if is_axis_none:
         return len(ak.ravel(chunk))
     else:
         return len(chunk)
 
 
-def _prepare_axis_none(chunk: ak.Array):
+def _prepare_axis_none_chunk(chunk: ak.Array) -> ak.Array:
     # TODO: this is private Awkward code. We should figure out how to export it
     # if needed
     (layout,) = ak._do.remove_structure(
@@ -1711,7 +1711,7 @@ def non_trivial_reduction(
     # For axis=None, let's remove the structure to make the internal operations
     # axis=-1
     if axis is None:
-        array = map_partitions(_prepare_axis_none, array, meta=empty_typetracer())
+        array = map_partitions(_prepare_axis_none_chunk, array, meta=empty_typetracer())
 
     chunked_result = map_partitions(
         chunked_fn,
