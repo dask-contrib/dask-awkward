@@ -1586,12 +1586,12 @@ def _concat_reducer_positional(
 
 # Interior reductions don't need starts
 def _tree_node_reducer_positional(
-    partial: PartialPositionalReductionType, *, reducer: Callable
+    partial: PartialPositionalReductionType, is_axis_none: bool, *, reducer: Callable
 ) -> PartialPositionalReductionType:
     # `partial` comes from `concat`
     partial_index, partial_value, partial_length = partial
     final_index_index = reducer(
-        partial_value, axis=-1, keepdims=True, mask_identity=True
+        partial_value, axis=-1 if is_axis_none else 0, keepdims=True, mask_identity=True
     )
     # Indices are already absolute!
     return (
@@ -1659,7 +1659,7 @@ def non_trivial_reduction(
         finalize_fn = _finalise_reducer_positional
 
         chunked_kwargs = {"reducer": reducer, "is_axis_none": axis is None}
-        tree_node_kwargs = {"reducer": reducer}
+        tree_node_kwargs = {"reducer": reducer, "is_axis_none": axis is None}
 
     else:
         chunked_fn = _chunk_reducer_trivial
