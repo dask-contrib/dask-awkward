@@ -1507,7 +1507,7 @@ def _chunk_reducer_trivial(
     return reducer(
         chunk,
         keepdims=True,
-        axis=None if is_axis_none else 0,
+        axis=-1 if is_axis_none else 0,
         mask_identity=mask_identity,
     )
 
