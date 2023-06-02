@@ -7,7 +7,7 @@ import dask_awkward as dak
 from dask_awkward.lib.testutils import assert_eq
 
 
-@pytest.mark.parametrize("axis", [1, -1])
+@pytest.mark.parametrize("axis", [1, -1, 0, None])
 @pytest.mark.parametrize("keepdims", [True, False])
 @pytest.mark.parametrize("mask_identity", [True, False])
 @pytest.mark.parametrize("testval", [-1, 3, 100])
