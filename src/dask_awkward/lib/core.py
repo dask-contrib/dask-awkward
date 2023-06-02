@@ -1539,9 +1539,18 @@ def _next_chunk_partition_offset(chunk: ak.Array, axis: int | None):
 def _chunk_reducer_positional(
     chunk: ak.Array, axis: int | None, *, reducer: Callable
 ) -> PartialPositionalReductionType:
+    # TODO: this is private Awkward code. We should figure out how to export it
+    # if needed
+    layout, = ak._do.remove_structure(
+        ak.to_layout(chunk),
+        flatten_records=False,
+        drop_nones=False,
+        keepdims=True,
+        allow_records=False,
+    )
+    chunk = ak.Array(layout, behavior=chunk.behavior)
+
     index = reducer(chunk, axis=axis, keepdims=True, mask_identity=True)
-    # TODO: chunk needs to be flattened in the same way that reducer(chunk, axis=None, keepdims=True)
-    # does in order to preserve the index-ability
     # Adjust the index to be absolute w.r.t the original array
     return index, chunk[index], _next_chunk_partition_offset(chunk, axis)
 
