@@ -8,7 +8,7 @@ import sys
 import warnings
 from collections.abc import Callable, Hashable, Mapping, Sequence
 from functools import cached_property, partial
-from itertools import accumulate, islice
+from itertools import accumulate
 from numbers import Number
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
