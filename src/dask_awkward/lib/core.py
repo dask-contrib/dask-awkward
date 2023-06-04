@@ -1712,11 +1712,15 @@ def non_trivial_reduction(
     # For axis=None, let's remove the structure to make the internal operations
     # axis=-1
     if axis is None:
-        array = map_partitions(_prepare_axis_none_chunk, array, meta=empty_typetracer())
+        prepared_array = map_partitions(
+            _prepare_axis_none_chunk, array, meta=empty_typetracer()
+        )
+    else:
+        prepared_array = array
 
     chunked_result = map_partitions(
         chunked_fn,
-        array,
+        prepared_array,
         meta=empty_typetracer(),
     )
 
