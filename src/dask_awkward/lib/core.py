@@ -682,8 +682,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     def type(self) -> ArrayType:
         """awkward Array type associated with the eventual computed result."""
         t = ak.types.ArrayType(
-            self._meta._layout.form.type_from_behavior(self._meta._behavior),
+            self._meta._layout.form.type,
             0,
+            behavior=self._meta._behavior,
         )
         t._length = "??"
         return t
