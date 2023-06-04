@@ -1559,6 +1559,16 @@ def _prepare_axis_none_chunk(chunk: ak.Array) -> ak.Array:
     return ak.Array(layout, behavior=chunk.behavior)
 
 
+def _ragged_index(container: ak.Array, index: ak.Array) -> ak.Array:
+    def apply(layout: ak.contents.Content, **kwargs) -> ak.contents.Content | None:
+        if layout.is_numpy:
+            flat_container = ak.ravel(container, highlevel=False)
+            return flat_container[layout]
+
+    # Take list structure from `index`
+    return ak.transform(apply, index)
+
+
 # Exterior reductions need starts!
 def _chunk_reducer_positional(
     chunk: ak.Array, is_axis_none: bool, *, reducer: Callable
@@ -1567,7 +1577,11 @@ def _chunk_reducer_positional(
         chunk, axis=-1 if is_axis_none else 0, keepdims=True, mask_identity=True
     )
     # Adjust the index to be absolute w.r.t the original array
-    return index, chunk[index], _next_chunk_partition_offset(chunk, is_axis_none)
+    return (
+        index,
+        _ragged_index(chunk, index),
+        _next_chunk_partition_offset(chunk, is_axis_none),
+    )
 
 
 # All reductions need concatenation
@@ -1598,8 +1612,8 @@ def _tree_node_reducer_positional(
     )
     # Indices are already absolute!
     return (
-        partial_index[final_index_index],
-        partial_value[final_index_index],
+        _ragged_index(partial_index, final_index_index),
+        _ragged_index(partial_value, final_index_index),
         partial_length,
     )
 
@@ -1616,7 +1630,7 @@ def _finalise_reducer_positional(
     final_index_index = reducer(
         partial_value, axis=-1, keepdims=True, mask_identity=True
     )
-    final_index = partial_index[final_index_index]
+    final_index = _ragged_index(partial_index, final_index_index)
 
     # The return type of positional reducers is unaffected by option-type values
     # i.e., we can safely remove the mask if it is not required
@@ -1712,15 +1726,14 @@ def non_trivial_reduction(
     # For axis=None, let's remove the structure to make the internal operations
     # axis=-1
     if axis is None:
-        prepared_array = map_partitions(
-            _prepare_axis_none_chunk, array, meta=empty_typetracer()
-        )
+        prepared_array = map_partitions(_prepare_axis_none_chunk, array)
     else:
         prepared_array = array
 
     chunked_result = map_partitions(
         chunked_fn,
         prepared_array,
+        # TODO: fix this meta
         meta=empty_typetracer(),
     )
 
