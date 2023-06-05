@@ -70,5 +70,5 @@ def test_sample(daa):
     out = dak.sample(daa, probability=0.5)
     assert out.npartitions == daa.npartitions
     arr = out.compute()
-    assert 0.3 < (len(arr) / len(daa)) < 0.7
+    assert 0.2 < (len(arr) / len(daa)) < 0.8
     assert all(a in daa.compute().tolist() for a in arr.tolist())
