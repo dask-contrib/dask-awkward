@@ -33,7 +33,7 @@ from numpy.lib.mixins import NDArrayOperatorsMixin
 from tlz import first
 
 from dask_awkward.layers import AwkwardBlockwiseLayer
-from dask_awkward.lib.optimize import all_optimizations
+from dask_awkward.lib.optimize import all_optimizations, mock_materialized_layer
 from dask_awkward.typing import AwkwardDaskCollection
 from dask_awkward.utils import (
     DaskAwkwardNotImplemented,
@@ -919,6 +919,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             )
             remainder = remainder % step
         hlg = HighLevelGraph.from_collections(name, dask, dependencies=[self])
+        hlg.layers[name].mock = mock_materialized_layer(hlg.layers[name], self.name)
         return new_array_object(
             hlg,
             name,

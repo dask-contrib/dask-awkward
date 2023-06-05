@@ -476,3 +476,26 @@ def _prune_wildcards(columns: list[str], meta: AwkwardArray) -> list[str]:
                 good_columns.append(f"{col[:-2]}.{imeta.fields[0]}")
 
     return good_columns
+
+
+def mock_materialized_layer(layer, previous_layer_name):
+    from dask.highlevelgraph import MaterializedLayer
+
+    def f():
+        mapping = layer.mapping.copy()
+        name = next(iter(mapping))[0]
+
+        if (name, 0) in mapping:
+            task = mapping[(name, 0)]
+            task = [
+                (previous_layer_name, 0)
+                if isinstance(v, tuple) and len(v) == 2 and v[0] == previous_layer_name
+                else v
+                for v in task
+            ]
+            return MaterializedLayer({(name, 0): task})
+
+        # failed to cull during column opt
+        return layer
+
+    return f
