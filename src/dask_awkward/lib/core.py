@@ -1601,7 +1601,6 @@ def _concat_reducer_positional(
     )
 
 
-# Interior reductions don't need starts
 def _tree_node_reducer_positional(
     partial: PartialPositionalReductionType, is_axis_none: bool, *, reducer: Callable
 ) -> PartialPositionalReductionType:
@@ -1730,13 +1729,6 @@ def non_trivial_reduction(
     else:
         prepared_array = array
 
-    chunked_result = map_partitions(
-        chunked_fn,
-        prepared_array,
-        # TODO: fix this meta
-        meta=empty_typetracer(),
-    )
-
     if split_every is None:
         split_every = 8
     elif split_every is False:
@@ -1744,10 +1736,13 @@ def non_trivial_reduction(
     else:
         pass
 
+    name_chunked = f"{label}-prepare-{token}"
+    chunked = partitionwise_layer(chunked_fn, name_chunked, prepared_array)
+
     dftr = DataFrameTreeReduction(
         name=name_finalize,
-        name_input=chunked_result.name,
-        npartitions_input=chunked_result.npartitions,
+        name_input=name_chunked,
+        npartitions_input=prepared_array.npartitions,
         concat_func=concat_fn,
         tree_node_func=tree_node_fn,
         finalize_func=finalize_fn,
@@ -1755,9 +1750,16 @@ def non_trivial_reduction(
         tree_node_name=name_tree_node,
     )
 
-    graph = HighLevelGraph.from_collections(
-        name_finalize, dftr, dependencies=(chunked_result,)
-    )
+    # Build graph
+    prepared_array_graph = prepared_array.__dask_graph__()
+    layers = {name_finalize: dftr, name_chunked: chunked, **prepared_array_graph.layers}
+    dependencies = {
+        name_finalize: {name_chunked},
+        name_chunked: {prepared_array.name},
+        **prepared_array_graph.dependencies,
+    }
+    graph = HighLevelGraph(layers, dependencies)
+
     meta = reducer(
         array._meta,
         axis=axis,
