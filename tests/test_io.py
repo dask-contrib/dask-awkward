@@ -13,7 +13,7 @@ from numpy.typing import DTypeLike
 try:
     import ujson as json
 except ImportError:
-    import json
+    import json  # type: ignore[no-redef]
 
 import dask_awkward as dak
 from dask_awkward.lib.testutils import assert_eq
@@ -345,3 +345,53 @@ def test_to_json(daa, tmpdir_factory, compression):
     suffix = "gz" if compression == "gzip" else compression
     r = dak.from_json(os.path.join(tdir, f"*.json.{suffix}"))
     assert_eq(x, r)
+
+
+def test_to_json_raise_filenotfound(
+    daa: dak.Array,
+    tmpdir_factory: pytest.TempdirFactory,
+) -> None:
+    p = tmpdir_factory.mktemp("onelevel")
+    p2 = os.path.join(str(p), "two")
+    with pytest.raises(FileNotFoundError, match="Parent directory for output file"):
+        dak.to_json(
+            daa,
+            os.path.join(p2, "three", "four", "*.json"),
+            compute=True,
+            line_delimited=True,
+        )
+
+
+@pytest.mark.parametrize("optimize_graph", [True, False])
+def test_to_dataframe(daa: dak.Array, caa: ak.Array, optimize_graph: bool) -> None:
+    pytest.importorskip("pandas")
+
+    from dask.dataframe.utils import assert_eq
+
+    daa = daa["points", ["x", "y"]]
+    caa = caa["points", ["x", "y"]]
+
+    dd = dak.to_dataframe(daa, optimize_graph=optimize_graph)
+    df = ak.to_dataframe(caa)
+
+    assert_eq(dd, df, check_index=False)
+
+
+@pytest.mark.xfail(
+    reason="ak.to_pandas on length_zero_array is casting things to float"
+)
+@pytest.mark.parametrize("optimize_graph", [True, False])
+def test_to_dataframe_str(
+    daa_str: dak.Array, caa_str: ak.Array, optimize_graph: bool
+) -> None:
+    pytest.importorskip("pandas")
+
+    from dask.dataframe.utils import assert_eq
+
+    daa = daa_str["points", ["x", "y"]]
+    caa = caa_str["points", ["x", "y"]]
+
+    dd = dak.to_dataframe(daa, optimize_graph=optimize_graph)
+    df = ak.to_dataframe(caa)
+
+    assert_eq(dd, df, check_index=False)

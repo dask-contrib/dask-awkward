@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import keyword
 import logging
 import operator
@@ -31,6 +32,7 @@ from dask.utils import IndexCallable, funcname, key_split
 from numpy.lib.mixins import NDArrayOperatorsMixin
 from tlz import first
 
+from dask_awkward.layers import AwkwardBlockwiseLayer
 from dask_awkward.lib.optimize import all_optimizations
 from dask_awkward.typing import AwkwardDaskCollection
 from dask_awkward.utils import (
@@ -47,7 +49,6 @@ if TYPE_CHECKING:
     from awkward.types.type import Type
     from dask.array.core import Array as DaskArray
     from dask.bag.core import Bag as DaskBag
-    from dask.blockwise import Blockwise
     from numpy.typing import DTypeLike
 
 
@@ -276,6 +277,18 @@ def new_scalar_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Scalar:
     """
     if meta is None:
         meta = TypeTracerArray._new(dtype=np.dtype(None), shape=())
+
+    if isinstance(meta, MaybeNone):
+        pass
+    else:
+        try:
+            if ak.backend(meta) != "typetracer":
+                raise TypeError(
+                    f"meta Scalar must have a typetracer backend, not {ak.backend(meta)}"
+                )
+        except AttributeError:
+            raise TypeError("meta Scalar must have a typetracer backend; check failed")
+
     return Scalar(dsk, name, meta, known_value=None)
 
 
@@ -441,6 +454,10 @@ def new_record_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Record:
     out = Record(dsk, name, meta)
     if meta.__doc__ != meta.__class__.__doc__:
         out.__doc__ = meta.__doc__
+    if ak.backend(meta) != "typetracer":
+        raise TypeError(
+            f"meta Record must have a typetracer backend, not {ak.backend(meta)}"
+        )
     return Record(dsk, name, meta)
 
 
@@ -471,7 +488,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if hasattr(dsk, "layers"):
             # i.e., NOT matrializes/persisted state
             # output typetracer
-            list(dsk.layers.values())[-1]._meta = meta  # type: ignore
+            lay = list(dsk.layers.values())[-1]
+            if isinstance(lay, AwkwardBlockwiseLayer):
+                lay._meta = meta  # type: ignore
         self._name: str = name
         self._divisions: tuple[int | None, ...] = divisions
         self._meta: ak.Array = meta
@@ -499,6 +518,26 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     )
 
     __dask_scheduler__ = staticmethod(threaded_get)
+
+    def __setitem__(self, where: Any, what: Any) -> None:
+        if not (
+            isinstance(where, str)
+            or (isinstance(where, tuple) and all(isinstance(x, str) for x in where))
+        ):
+            raise TypeError("only fields may be assigned in-place (by field name)")
+
+        if not isinstance(what, (Array, Number)):
+            raise DaskAwkwardNotImplemented(
+                "Supplying anything other than a dak.Array, or Number to __setitem__ is not yet available!"
+            )
+
+        from dask_awkward.lib.structure import with_field
+
+        appended = with_field(self, what, where=where, behavior=self.behavior)
+
+        self._meta = appended._meta
+        self._dask = appended._dask
+        self._name = appended._name
 
     def _rebuild(
         self,
@@ -642,8 +681,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     def type(self) -> ArrayType:
         """awkward Array type associated with the eventual computed result."""
         t = ak.types.ArrayType(
-            self._meta._layout.form.type_from_behavior(self._meta._behavior),
+            self._meta._layout.form.type,
             0,
+            behavior=self._meta._behavior,
         )
         t._length = "??"
         return t
@@ -855,6 +895,16 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             if issubclass(dtype, (np.bool_, bool, np.int64, np.int32, int)):
                 return self._getitem_outer_bool_or_int_lazy_array(where)
 
+        elif where[0] is Ellipsis:
+            if len(where) <= self.ndim:
+                return self._getitem_trivial_map_partitions(where)
+
+            raise DaskAwkwardNotImplemented(
+                "Array slicing doesn't currently support Ellipsis where "
+                "the total number of sliced axes is greater than the "
+                "dimensionality of the array."
+            )
+
         raise DaskAwkwardNotImplemented(
             f"Array.__getitem__ doesn't support multi object: {where}"
         )
@@ -872,10 +922,10 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             return self._getitem_outer_int(where)
 
         elif isinstance(where, Array):
-            try:
-                dtype = where.layout.dtype.type
-            except AttributeError:
-                dtype = where.layout.content.dtype.type
+            layout = where.layout
+            while not hasattr(layout, "dtype"):
+                layout = layout.content
+            dtype = layout.dtype.type
             if issubclass(dtype, (np.bool_, bool, np.int64, np.int32, int)):
                 return self._getitem_outer_bool_or_int_lazy_array(where)
 
@@ -923,15 +973,25 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     def _call_behavior_method(self, method_name: str, *args: Any, **kwargs: Any) -> Any:
         """Call a behavior method for an awkward array.
-        Please note that the raw dask_awkward arguments are forwarded to the
-        awkward Mixin class, and the user must deal with when to make calls
-        to map_partitions.
+        If the function signature has __dunder__ parameters it is assumed that the
+        user wants to do the map_partitions dispatch themselves and the _meta's
+        behavior is called.
+        If there are no __dunder__ parameters in the function call then the function
+        is wrapped in map_partitions automatically.
         """
         if hasattr(self._meta, method_name):
-            array_context = kwargs.pop("__dask_array__", self)
-            return getattr(self._meta, method_name)(
-                *args, __dask_array__=array_context, **kwargs
+            themethod = getattr(self._meta, method_name)
+            thesig = inspect.signature(themethod)
+            if "_dask_array_" in thesig.parameters:
+                if "_dask_array_" not in kwargs:
+                    kwargs["_dask_array_"] = self
+                return themethod(*args, **kwargs)
+            return self.map_partitions(
+                _BehaviorMethodFn(method_name, **kwargs),
+                *args,
+                label=hyphenize(method_name),
             )
+
         raise AttributeError(
             f"Method {method_name} is not available to this collection."
         )
@@ -942,22 +1002,33 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if a user follows the pattern:
 
         class SomeMixin:
-            def get_the_property(self, __dask_array__ = None):
+
+            @property
+            def the_property(self):
                 ...
 
-            the_property = property(get_the_property)
+            @property
+            def a_property(array_context=None) # note: this can be any name
 
-        This pattern is caught and reissued as a method call to the "get_the_property"
-        method, passing self as __dask_array__.
+        This pattern is caught if the property has an argument that single
+        argument is assumed to be the array context (i.e. self) so that self-
+        referenced re-indexing operations can be hidden in properties. The
+        user must do the appropriate dispatch of map_partitions.
 
-        If get_the_property is not defined, and the_property is decorated with
-        @property, then then no calling context is needed and the property is
-        mapped directly.
+        If there is no argument the property call is wrapped in map_partitions.
         """
         if hasattr(self._meta.__class__, property_name):
-            if hasattr(self._meta.__class__, f"get_{property_name}"):
-                return self._call_behavior_method(
-                    f"get_{property_name}",
+            thegetter = getattr(self._meta.__class__, property_name).fget.__get__(
+                self._meta
+            )
+            thesig = inspect.signature(thegetter)
+
+            if len(thesig.parameters) == 1:
+                binding = thesig.bind(self)
+                return thegetter(*binding.args, **binding.kwargs)
+            elif len(thesig.parameters) > 1:
+                raise RuntimeError(
+                    "Parametrized property cannot have more than one argument, the array context!"
                 )
             return self.map_partitions(
                 _BehaviorPropertyFn(property_name),
@@ -1198,6 +1269,10 @@ def new_array_object(
             raise TypeError(
                 f"meta must be an instance of an Awkward Array, not {type(meta)}."
             )
+        if ak.backend(meta) != "typetracer":
+            raise TypeError(
+                f"meta Array must have a typetracer backend, not {ak.backend(meta)}"
+            )
         actual_meta = meta
 
     if behavior is not None:
@@ -1216,7 +1291,7 @@ def partitionwise_layer(
     *args: Any,
     opt_touch_all: bool = False,
     **kwargs: Any,
-) -> Blockwise:
+) -> AwkwardBlockwiseLayer:
     """Create a partitionwise graph layer.
 
     Parameters
@@ -1262,6 +1337,7 @@ def partitionwise_layer(
         concatenate=True,
         **kwargs,
     )
+    layer = AwkwardBlockwiseLayer.from_blockwise(layer)
     if opt_touch_all:
         layer._opt_touch_all = True
     return layer
@@ -1662,7 +1738,10 @@ def to_meta(objects: Sequence[Any]) -> tuple[Any, ...]:
 
 def length_zero_array_or_identity(obj: Any) -> Any:
     if is_awkward_collection(obj):
-        return obj._meta.layout.form.length_zero_array()
+        return ak.Array(
+            obj._meta.layout.form.length_zero_array(highlevel=False),
+            behavior=obj.behavior,
+        )
     return obj
 
 
@@ -1851,10 +1930,10 @@ def normalize_single_outer_inner_index(
     if index < 0:
         index = divisions[-1] + index
     if len(divisions) == 2:
-        return (0, index)
+        return (0, int(index))
     partition_index = int(np.digitize(index, divisions)) - 1
     new_index = index - divisions[partition_index]
-    return (partition_index, new_index)
+    return (int(partition_index), int(new_index))
 
 
 def typetracer_from_form(form: Form) -> ak.Array:
@@ -1873,3 +1952,50 @@ def typetracer_from_form(form: Form) -> ak.Array:
     """
     layout = form.length_zero_array(highlevel=False)
     return ak.Array(layout.to_typetracer(forget_length=True))
+
+
+def set_form_keys(form: Form, *, key: str) -> Form:
+    """Recursive function to apply key labels to `form`.
+
+    Parameters
+    ----------
+    form : awkward.forms.form.Form
+        Awkward Array form object to mutate.
+    key : str
+        Label to apply. If recursion is triggered by passing in a
+        Record Form, the key is used as a prefix for a specific
+        field.
+
+    Returns
+    -------
+    awkward.forms.form.Form
+        Mutated Form object.
+
+    """
+
+    # If the form is a record we need to loop over all fields in the
+    # record and set form that include the field name; this will keep
+    # recursing as well.
+    if form.is_record:
+        for field in form.fields:
+            full_key = f"{key}.{field}"
+            set_form_keys(form.content(field), key=full_key)
+
+    # If the form is a list (e.g. ListOffsetArray) we append a
+    # __list__ suffix to notify the optimization pass that we only
+    # touched the offsets and not the data buffer for this kind of
+    # identified form; keep recursing
+    elif form.is_list:
+        form.form_key = f"{key}.__list__"
+        set_form_keys(form.content, key=key)
+
+    # NumPy like array is easy
+    elif form.is_numpy:
+        form.form_key = key
+
+    # Anything else grab the content and keep recursing
+    else:
+        set_form_keys(form.content, key=key)
+
+    # Return the now mutated Form object.
+    return form

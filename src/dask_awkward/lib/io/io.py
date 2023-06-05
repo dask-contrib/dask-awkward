@@ -11,7 +11,7 @@ from dask.base import flatten, tokenize
 from dask.highlevelgraph import HighLevelGraph
 from dask.utils import funcname
 
-from dask_awkward.layers import AwkwardInputLayer
+from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardInputLayer
 from dask_awkward.lib.core import (
     empty_typetracer,
     map_partitions,
@@ -22,6 +22,7 @@ from dask_awkward.lib.core import (
 if TYPE_CHECKING:
     from dask.array.core import Array as DaskArray
     from dask.bag.core import Bag as DaskBag
+    from dask.dataframe.core import DataFrame as DaskDataFrame
     from dask.delayed import Delayed
 
     from dask_awkward.lib.core import Array
@@ -60,7 +61,7 @@ def from_awkward(
     behavior: dict | None = None,
     label: str | None = None,
 ) -> Array:
-    """Create a Dask collection from a concrete awkward array.
+    """Create an Array collection from a concrete :class:`awkward.Array` object.
 
     Parameters
     ----------
@@ -113,7 +114,7 @@ class _FromListsFn:
 
 
 def from_lists(source: list[list[Any]], behavior: dict | None = None) -> Array:
-    """Create a Dask collection from a list of lists.
+    """Create an Array collection from a list of lists.
 
     Parameters
     ----------
@@ -156,7 +157,7 @@ def from_delayed(
     divisions: tuple[int | None, ...] | None = None,
     prefix: str = "from-delayed",
 ) -> Array:
-    """Create a Dask Awkward Array from Dask Delayed objects.
+    """Create an Array collection from a set of :class:`~dask.delayed.Delayed` objects.
 
     Parameters
     ----------
@@ -197,7 +198,7 @@ def from_delayed(
 
 
 def to_delayed(array: Array, optimize_graph: bool = True) -> list[Delayed]:
-    """Convert the collection to a list of delayed objects.
+    """Convert Arrray the collection to a list of :class:`~dask.delayed.Delayed` objects.
 
     One dask.delayed.Delayed object per partition.
 
@@ -226,6 +227,7 @@ def to_delayed(array: Array, optimize_graph: bool = True) -> list[Delayed]:
 
 
 def to_dask_bag(array: Array) -> DaskBag:
+    """Convert Array collection to a :class:`dask.bag.Bag` collection."""
     from dask.bag.core import Bag
 
     return Bag(array.dask, array.name, array.npartitions)
@@ -237,7 +239,7 @@ def to_dask_array(
     dtype: Any = None,
     optimize_graph: bool = True,
 ) -> DaskArray:
-    """Convert awkward array collection to a Dask array collection.
+    """Convert Array collection to a :class:`dask.array.Array` collection.
 
     This conversion requires the awkward array to have a rectilinear
     shape (that is, no lists of variable length lists).
@@ -359,6 +361,7 @@ def from_dask_array(array: DaskArray, behavior: dict | None = None) -> Array:
         numblocks=numblocks,
         concatenate=True,
     )
+    layer = AwkwardBlockwiseLayer.from_blockwise(layer)
     hlg = HighLevelGraph.from_collections(name, layer, dependencies=[array])
     if np.any(np.isnan(array.chunks)):
         return new_array_object(
@@ -367,6 +370,52 @@ def from_dask_array(array: DaskArray, behavior: dict | None = None) -> Array:
     else:
         divs = (0, *np.cumsum(array.chunks))
         return new_array_object(hlg, name, divisions=divs, meta=meta, behavior=behavior)
+
+
+def to_dataframe(
+    array,
+    optimize_graph: bool = True,
+    **kwargs: Any,
+) -> DaskDataFrame:
+    """Convert :class:`dask_awkward.Array` collection to :class:`~dask.dataframe.DataFrame`.
+
+    Parameters
+    ----------
+    array : dask_awkward.Array
+        Array collection to be converted.
+    optimize_graph : bool
+        If ``True``, optimize the Array collection task graph before
+        converting to DataFrame collection.
+    **kwargs : Any
+        Additional arguments passed to :func:`ak.to_dataframe`.
+
+    Returns
+    -------
+    dask.dataframe.DataFrame
+        Resulting DataFrame collection.
+
+    """
+    import dask
+    from dask.dataframe.core import new_dd_object
+
+    if optimize_graph:
+        (array,) = dask.optimize(array)
+    intermediate = map_partitions(
+        ak.to_dataframe,
+        array,
+        meta=empty_typetracer(),
+        label="to-dataframe",
+        **kwargs,
+    )
+    meta = ak.to_dataframe(
+        array._meta.layout.form.length_zero_array(highlevel=False), **kwargs
+    )
+    return new_dd_object(
+        intermediate.dask,
+        intermediate.name,
+        meta,
+        intermediate.divisions,
+    )
 
 
 class PackedArgCallable:

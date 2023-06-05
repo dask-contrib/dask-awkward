@@ -27,6 +27,7 @@ arrays at `their website <awkwardarray_>`_.
 
    ht-configuration.rst
    ht-io.rst
+   ht-behaviors.rst
 
 .. toctree::
    :maxdepth: 1
@@ -50,5 +51,6 @@ arrays at `their website <awkwardarray_>`_.
    :caption: Development
 
    dev-contributing.rst
+   dev-releasing.rst
 
 .. _awkwardarray: https://awkward-array.org/

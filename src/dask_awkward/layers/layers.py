@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import pickle
 from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any
 
@@ -9,10 +10,45 @@ from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
 from dask_awkward.utils import LazyInputsDict
 
 if TYPE_CHECKING:
-    from awkward._nplikes.typetracer import TypeTracerReport
+    from awkward.typetracer import TypeTracerReport
 
 
-class AwkwardInputLayer(Blockwise):
+class AwkwardBlockwiseLayer(Blockwise):
+    """Just like upstream Blockwise, except we override pickling"""
+
+    @classmethod
+    def from_blockwise(cls, layer) -> AwkwardBlockwiseLayer:
+        ob = object.__new__(cls)
+        ob.__dict__.update(layer.__dict__)
+        return ob
+
+    def mock(self):
+        layer = copy.copy(self)
+        nb = layer.numblocks
+        layer.numblocks = {k: tuple(1 for _ in v) for k, v in nb.items()}
+        layer.__dict__.pop("_dims", None)
+        return layer
+
+    def __getstate__(self) -> dict:
+        d = self.__dict__.copy()
+        try:
+            pickle.dumps(d["_meta"])
+        except (ValueError, TypeError, KeyError):
+            d.pop(
+                "_meta", None
+            )  # must be a typetracer, does not pickle and not needed on scheduler
+        return d
+
+    def __repr__(self) -> str:
+        return "Awkward" + super().__repr__()
+
+
+class AwkwardInputLayer(AwkwardBlockwiseLayer):
+    """A layer known to perform IO and produce Awkward arrays
+
+    We specialise this so that we have a way to prune column selection on load
+    """
+
     def __init__(
         self,
         *,
@@ -97,33 +133,24 @@ class AwkwardInputLayer(Blockwise):
         """
         import awkward as ak
 
+        from dask_awkward.lib.core import set_form_keys
+
         starting_form = copy.deepcopy(self._meta.layout.form)
         starting_layout = starting_form.length_zero_array(highlevel=False)
         new_meta = ak.Array(
-            starting_layout.to_typetracer(forget_length=True), behavior=self._behavior
+            starting_layout.to_typetracer(forget_length=True),
+            behavior=self._behavior,
         )
         form = new_meta.layout.form
 
-        def _label_form(form, start):
-            if form.is_record:
-                for field in form.fields:
-                    _label_form(form.content(field), f"{start}.{field}")
-            elif form.is_numpy:
-                form.form_key = start
-            elif form.is_list:
-                form.form_key = f"{start}.__list__"
-                _label_form(form.content, start)
-            else:
-                _label_form(form.content, start)
+        set_form_keys(form, key=self.name)
 
-        _label_form(form, self.name)
-
-        new_meta_labelled, report = ak._nplikes.typetracer.typetracer_with_report(form)
+        new_meta_labelled, report = ak.typetracer.typetracer_with_report(form)
         new_meta_array = ak.Array(new_meta_labelled, behavior=self._behavior)
         new_input_layer = AwkwardInputLayer(
             name=self.name,
             columns=self.columns,
-            inputs=[None] * int(list(self.numblocks.values())[0][0]),
+            inputs=[None][: int(list(self.numblocks.values())[0][0])],
             io_func=lambda *_, **__: new_meta_array,
             label=self.label,
             produces_tasks=self.produces_tasks,
