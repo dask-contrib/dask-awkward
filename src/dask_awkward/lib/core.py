@@ -32,8 +32,8 @@ from dask.utils import IndexCallable, funcname, key_split
 from numpy.lib.mixins import NDArrayOperatorsMixin
 from tlz import first
 
-from dask_awkward.layers import AwkwardBlockwiseLayer
-from dask_awkward.lib.optimize import all_optimizations, mock_materialized_layer
+from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardMaterializedLayer
+from dask_awkward.lib.optimize import all_optimizations
 from dask_awkward.typing import AwkwardDaskCollection
 from dask_awkward.utils import (
     DaskAwkwardNotImplemented,
@@ -705,7 +705,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         dsk = {(name, i): tuple(key) for i, key in enumerate(new_keys)}
         graph = HighLevelGraph.from_collections(
             name,
-            dsk,
+            AwkwardMaterializedLayer(dsk, previous_layer_name=self.name),
             dependencies=[self],
         )
 
@@ -864,7 +864,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         }
         hlg = HighLevelGraph.from_collections(
             name,
-            dsk,
+            AwkwardMaterializedLayer(dsk, previous_layer_name=self.name),
             dependencies=[partition],
         )
         if isinstance(new_meta, ak.Record):
@@ -925,8 +925,11 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 (self.divisions[i + 1] - self.divisions[i]) // step + divisions[-1]
             )
             remainder = remainder % step
-        hlg = HighLevelGraph.from_collections(name, dask, dependencies=[self])
-        hlg.layers[name].mock = mock_materialized_layer(hlg.layers[name], self.name)
+        hlg = HighLevelGraph.from_collections(
+            name,
+            AwkwardMaterializedLayer(dask, previous_layer_name=self.name),
+            dependencies=[self],
+        )
         return new_array_object(
             hlg,
             name,
