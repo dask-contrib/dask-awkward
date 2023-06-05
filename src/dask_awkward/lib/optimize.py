@@ -483,6 +483,9 @@ def mock_materialized_layer(layer, previous_layer_name):
 
     def f():
         mapping = layer.mapping.copy()
+        if not mapping:
+            # no partitions at all
+            return layer
         name = next(iter(mapping))[0]
 
         if (name, 0) in mapping:

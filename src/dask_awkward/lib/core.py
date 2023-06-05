@@ -878,6 +878,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         rest = tuple(where[1:])
         step = sl.step or 1
         start = sl.start or 0
+
+        if not self.known_divisions:
+            self.eager_compute_divisions()
         stop = sl.stop or self.divisions[-1]
         start = start if start >= 0 else self.divisions[-1] + start
         stop = stop if stop >= 0 else self.divisions[-1] + stop
@@ -887,8 +890,6 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         # setup
         token = tokenize(self, where)
         name = f"getitem-{token}"
-        if not self.known_divisions:
-            self.eager_compute_divisions()
         remainder = 0
         outpart = 0
         divisions = [0]
@@ -898,13 +899,19 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             if start > self.divisions[i + 1]:
                 # first partition not found
                 continue
-            if stop < self.divisions[i]:
+            if stop < self.divisions[i] and dask:
                 # no more partitions with valid rows
+                # does **NOT** exit if there are no partitions yet, to make sure there is always
+                # at least one, needed to get metadata of empty output right
                 break
             slice_start = max(start - self.divisions[i] + remainder, 0)
             slice_end = min(stop - self.divisions[i], self.divisions[i + 1])
-            if slice_end == slice_start and (self.divisions[i + 1] - self.divisions[i]):
-                # in case of zero-row last partition
+            if (
+                slice_end == slice_start
+                and (self.divisions[i + 1] - self.divisions[i])
+                and dask
+            ):
+                # in case of zero-row last partition (if not only partition)
                 break
             dask[(name, outpart)] = (
                 _zero_getitem,
@@ -971,6 +978,11 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if isinstance(where, str):
             return self._getitem_outer_str_or_list(where, label=where)
 
+        # an empty slice
+
+        elif is_empty_slice(where):
+            return self
+
         elif isinstance(where, list):
             return self._getitem_outer_str_or_list(where)
 
@@ -988,10 +1000,6 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             dtype = layout.dtype.type
             if issubclass(dtype, (np.bool_, bool, np.int64, np.int32, int)):
                 return self._getitem_outer_bool_or_int_lazy_array(where)
-
-        # an empty slice
-        elif is_empty_slice(where):
-            return self
 
         # a single ellipsis
         elif where is Ellipsis:
