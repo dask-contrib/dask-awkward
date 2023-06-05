@@ -188,7 +188,7 @@ def from_parquet(
     fs, tok, paths = get_fs_token_paths(
         path, mode="rb", storage_options=storage_options
     )
-    label = "read-parquet"
+    label = "from-parquet"
     token = tokenize(
         tok, paths, ignore_metadata, columns, filters, scan_files, split_row_groups
     )

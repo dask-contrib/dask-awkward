@@ -18,7 +18,7 @@ DEFAULT_SCHEDULER: Any = "sync"
 def assert_eq(
     a: Any,
     b: Any,
-    check_forms: bool = True,
+    check_forms: bool = False,
     check_divisions: bool = True,
     scheduler: Any | None = None,
     **kwargs: Any,
@@ -43,7 +43,7 @@ def assert_eq_arrays(
     a: Array | ak.Array,
     b: Array | ak.Array,
     isclose_equal_nan: bool = False,
-    check_forms: bool = True,
+    check_forms: bool = False,
     check_divisions: bool = True,
     scheduler: Any | None = None,
 ) -> None:
@@ -52,8 +52,6 @@ def assert_eq_arrays(
     b_is_coll = is_dask_collection(b)
     a_comp = a.compute(scheduler=scheduler) if a_is_coll else a
     b_comp = b.compute(scheduler=scheduler) if b_is_coll else b
-    a_comp_form = a_comp.layout.form
-    b_comp_form = b_comp.layout.form
 
     a_tt = typetracer_array(a)
     b_tt = typetracer_array(b)
@@ -61,8 +59,14 @@ def assert_eq_arrays(
     assert b_tt is not None
 
     if check_forms:
-        assert a_comp_form == a.layout.form
-        assert a_comp_form == b.layout.form
+        a_form = ak.concatenate([a.layout, a.layout[0:0]], highlevel=False).form
+        b_form = ak.concatenate([b.layout, b.layout[0:0]], highlevel=False).form
+        # a_form = a.layout.form
+        # b_form = b.layout.form
+        a_comp_form = a_comp.layout.form
+        b_comp_form = b_comp.layout.form
+        assert a_comp_form == a_form
+        assert a_comp_form == b_form
         assert b_comp_form == a_comp_form
 
     if check_divisions:

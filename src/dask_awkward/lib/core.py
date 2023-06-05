@@ -841,7 +841,15 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 pidx, where = normalize_single_outer_inner_index(self.divisions, where)  # type: ignore
             partition = self.partitions[pidx]
             if partition._meta is not None:
-                new_meta = partition._meta[where]
+                # new_meta = partition._meta[where]
+                new_meta = make_unknown_length(partition._meta)[where]
+                # new_meta = ak.Array(
+                #     ak.to_backend(
+                #         partition._meta,
+                #         "typetracer",
+                #         highlevel=False,
+                #     ).to_typetracer(forget_length=True)
+                # )[where]
 
         # if we know a new array is going to be made, just call the
         # trivial inner on the new partition.
@@ -2093,3 +2101,13 @@ def set_form_keys(form: Form, *, key: str) -> Form:
 
     # Return the now mutated Form object.
     return form
+
+
+def make_unknown_length(array: ak.Array) -> ak.Array:
+    return ak.Array(
+        ak.to_backend(
+            array,
+            "typetracer",
+            highlevel=False,
+        ).to_typetracer(forget_length=True)
+    )

@@ -48,7 +48,7 @@ def test_clear_divisions(ndjson_points_file: str) -> None:
 
 
 def test_dunder_str(daa: Array) -> None:
-    assert str(daa) == "dask.awkward<from-json, npartitions=3>"
+    assert str(daa) == "dask.awkward<from-parquet, npartitions=3>"
 
 
 def test_calculate_known_divisions(ndjson_points_file: str) -> None:
