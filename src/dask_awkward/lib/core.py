@@ -1569,7 +1569,6 @@ def _ragged_index(container: ak.Array, index: ak.Array) -> ak.Array:
     return ak.transform(apply, index)
 
 
-# Exterior reductions need starts!
 def _chunk_reducer_positional(
     chunk: ak.Array, is_axis_none: bool, *, reducer: Callable
 ) -> PartialPositionalReductionType:
@@ -1584,7 +1583,6 @@ def _chunk_reducer_positional(
     )
 
 
-# All reductions need concatenation
 def _concat_reducer_positional(
     partials: list[PartialPositionalReductionType], is_axis_none: bool
 ) -> PartialPositionalReductionType:
@@ -1668,10 +1666,27 @@ def non_trivial_reduction(
     if is_positional:
         assert combiner is reducer
 
+    # For `axis=None`, we prepare each array to have the following structure:
+    #   [[[ ... [x1 x2 x3 ... xN] ... ]]] (length-1 outer lists)
+    # This makes the subsequent reductions an `axis=-1` reduction
+    if axis is None:
+        prepared_array = map_partitions(_prepare_axis_none_chunk, array)
+    else:
+        prepared_array = array
+
     if is_positional:
+        # For positional reducers, we reduce the initial partitions with `chunked_fn`
+        # to form (index, value, length) "partial" reduction tuples
+        # (where `length` corresponds to the pre-reduction length)
         chunked_fn = _chunk_reducer_positional
-        tree_node_fn = _tree_node_reducer_positional
+        # These partials are aggregated into batches (a list of partials),
+        # which are concatenated with `concat_fn` to form a single partial _array_,
+        # a tuple of the concatenated partial indices and values, and the sum of the partial lengths.
         concat_fn = _concat_reducer_positional
+        # This partial _array_ tuple is reduced in `tree_node_fn` to form a partial _reduction_ tuple
+        tree_node_fn = _tree_node_reducer_positional
+        # For the final node, instead of the above `tree_node_fn`, the `finalize_fn` is applied to perform the
+        # final reduction, and adjust the metadata (keepdims, mask_identity)
         finalize_fn = _finalise_reducer_positional
 
         chunked_kwargs = {"reducer": reducer, "is_axis_none": axis is None}
@@ -1721,13 +1736,6 @@ def non_trivial_reduction(
     tree_node_fn = partial(tree_node_fn, **tree_node_kwargs)
     concat_fn = partial(concat_fn, **concat_kwargs)
     finalize_fn = partial(finalize_fn, **finalize_kwargs)
-
-    # For axis=None, let's remove the structure to make the internal operations
-    # axis=-1
-    if axis is None:
-        prepared_array = map_partitions(_prepare_axis_none_chunk, array)
-    else:
-        prepared_array = array
 
     if split_every is None:
         split_every = 8
