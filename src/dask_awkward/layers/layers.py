@@ -6,6 +6,7 @@ from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any
 
 from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
+from dask.highlevelgraph import MaterializedLayer
 
 from dask_awkward.utils import LazyInputsDict
 
@@ -187,4 +188,30 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
                 meta=self._meta,
                 behavior=self._behavior,
             )
+        return self
+
+
+class AwkwardMaterializedLayer(MaterializedLayer):
+    def __init__(self, mapping, previous_layer_name, **kwargs):
+        self.prev_name = previous_layer_name
+        super().__init__(mapping, **kwargs)
+
+    def mock(self):
+        mapping = self.mapping.copy()
+        if not mapping:
+            # no partitions at all
+            return self
+        name = next(iter(mapping))[0]
+
+        if (name, 0) in mapping:
+            task = mapping[(name, 0)]
+            task = [
+                (self.prev_name, 0)
+                if isinstance(v, tuple) and len(v) == 2 and v[0] == self.prev_name
+                else v
+                for v in task
+            ]
+            return MaterializedLayer({(name, 0): task})
+
+        # failed to cull during column opt
         return self
