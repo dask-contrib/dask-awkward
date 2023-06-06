@@ -197,10 +197,6 @@ def _mock_output(layer):
     return new_layer
 
 
-def _do_nothing_return_array(*args, **_):
-    return args[0]
-
-
 def _touch_and_call_fn(fn, *args, **kwargs):
     _touch_all_data(*args, **kwargs)
     return fn(*args, **kwargs)
