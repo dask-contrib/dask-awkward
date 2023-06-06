@@ -206,12 +206,10 @@ class AwkwardMaterializedLayer(MaterializedLayer):
         if (name, 0) in mapping:
             task = mapping[(name, 0)]
             task = tuple(
-                [
-                    (self.prev_name, 0)
-                    if isinstance(v, tuple) and len(v) == 2 and v[0] == self.prev_name
-                    else v
-                    for v in task
-                ]
+                (self.prev_name, 0)
+                if isinstance(v, tuple) and len(v) == 2 and v[0] == self.prev_name
+                else v
+                for v in task
             )
             return MaterializedLayer({(name, 0): task})
 
