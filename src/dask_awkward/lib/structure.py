@@ -9,8 +9,7 @@ from typing import TYPE_CHECKING, Any
 import awkward as ak
 import numpy as np
 from awkward._nplikes.typetracer import TypeTracerArray
-from dask.base import is_dask_collection, tokenize
-from dask.highlevelgraph import HighLevelGraph
+from dask.base import is_dask_collection
 
 from dask_awkward.lib.core import (
     Array,
