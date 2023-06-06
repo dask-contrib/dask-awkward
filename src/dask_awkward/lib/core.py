@@ -556,8 +556,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         self._meta = empty_typetracer()
 
     def repartition(self, npartitions=None, divisions=None, rows_per_partition=None):
-        from dask_awkward.lib.structure import repartition_layer
         from dask_awkward.layers import AwkwardMaterializedLayer
+        from dask_awkward.lib.structure import repartition_layer
 
         if sum(bool(_) for _ in [npartitions, divisions, rows_per_partition]) != 1:
             raise ValueError("Please specify exactly one of the inputs")
