@@ -574,7 +574,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         key = f"repartition-{token}"
 
         new_layer_raw = repartition_layer(self, key, divisions)
-        new_layer = AwkwardMaterializedLayer(new_layer_raw, key)
+        new_layer = AwkwardMaterializedLayer(new_layer_raw, previous_layer_name=self.name)
         new_graph = HighLevelGraph.from_collections(
             key, new_layer, dependencies=(self,)
         )
