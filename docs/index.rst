@@ -41,10 +41,10 @@ arrays at `their website <awkwardarray_>`_.
    :caption: API
 
    api-collections.rst
+   api-inspect.rst
    api-io.rst
    api-reducers.rst
    api-structure.rst
-   api-utilities.rst
 
 .. toctree::
    :maxdepth: 1

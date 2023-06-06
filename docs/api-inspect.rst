@@ -1,5 +1,5 @@
-Utilities
----------
+Inspection
+----------
 
 .. currentmodule:: dask_awkward
 
@@ -7,3 +7,4 @@ Utilities
    :toctree: generated/
 
    necessary_columns
+   sample
