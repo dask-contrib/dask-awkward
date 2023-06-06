@@ -88,7 +88,8 @@ def sample(arr, factor: int | None = None, probability: float | None = None):
 
     Parameters
     ----------
-    arr: dask-awkward array
+    arr : dask_awkward.Array
+        Array collection to sample
     factor: if given, every Nth row will be kept. The counting restarts for each
         partition, so reducing the row count by an exact factor is not guaranteed
     probability: a number between 0 and 1, giving the chance of any particular
