@@ -18,7 +18,7 @@ DEFAULT_SCHEDULER: Any = "sync"
 def assert_eq(
     a: Any,
     b: Any,
-    check_forms: bool = False,
+    check_forms: bool = True,
     check_divisions: bool = True,
     scheduler: Any | None = None,
     **kwargs: Any,
@@ -43,7 +43,7 @@ def assert_eq_arrays(
     a: Array | ak.Array,
     b: Array | ak.Array,
     isclose_equal_nan: bool = False,
-    check_forms: bool = False,
+    check_forms: bool = True,
     check_divisions: bool = True,
     scheduler: Any | None = None,
 ) -> None:

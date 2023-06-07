@@ -841,8 +841,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 pidx, where = normalize_single_outer_inner_index(self.divisions, where)  # type: ignore
             partition = self.partitions[pidx]
             if partition._meta is not None:
-                # new_meta = partition._meta[where]
-                new_meta = make_unknown_length(partition._meta)[where]
+                new_meta = partition._meta[where]
+                # new_meta = make_unknown_length(partition._meta)[where]
                 # new_meta = ak.Array(
                 #     ak.to_backend(
                 #         partition._meta,
