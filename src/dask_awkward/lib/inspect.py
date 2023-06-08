@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+import numpy as np
 from dask.base import unpack_collections
 from dask.highlevelgraph import HighLevelGraph
 
 from dask_awkward.layers import AwkwardInputLayer
+
+if TYPE_CHECKING:
+    from dask_awkward.lib.core import Array
 
 
 def necessary_columns(*args: Any, traverse: bool = True) -> dict[str, list[str]]:
@@ -16,6 +20,9 @@ def necessary_columns(*args: Any, traverse: bool = True) -> dict[str, list[str]]
     *args : Dask collections or HighLevelGraphs
         The collection (or collection graph) of interest. These can be
         individual objects, lists, sets, or dictionaries.
+    traverse : bool, optional
+        If True (default), builtin Python collections are traversed
+        looking for any Dask collections they might contain.
 
     Returns
     -------
@@ -78,3 +85,31 @@ def necessary_columns(*args: Any, traverse: bool = True) -> dict[str, list[str]]
             out[key] = update
 
     return out
+
+
+def sample(arr, factor: int | None = None, probability: float | None = None) -> Array:
+    """Decimate the data to a smaller number of rows.
+
+    Must give either `factor` or `probability`.
+
+    Parameters
+    ----------
+    arr : dask_awkward.Array
+        Array collection to sample
+    factor : int, optional
+        if given, every Nth row will be kept. The counting restarts for each
+        partition, so reducing the row count by an exact factor is not guaranteed
+    probability : float, optional
+        a number between 0 and 1, giving the chance of any particular
+        row surviving. For instance, for probability=0.1, roughly 1-in-10
+        rows will remain.
+
+    """
+    if not (factor is None) ^ (probability is None):
+        raise ValueError("Give exactly one of factor or probability")
+    if factor:
+        return arr.map_partitions(lambda x: x[::factor], meta=arr._meta)
+    else:
+        return arr.map_partitions(
+            lambda x: x[np.random.random(len(x)) < probability], meta=arr._meta
+        )
