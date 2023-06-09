@@ -157,7 +157,7 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
             self.schema,
             subrg=subrg,
         )
-        return ak.Array(unproject_layout(array, self.original_form))
+        return ak.Array(unproject_layout(self.original_form, array.layout))
 
     def project_columns(
         self,
