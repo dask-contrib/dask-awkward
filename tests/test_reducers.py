@@ -49,7 +49,7 @@ def test_any(
     assert_eq(ar, dr)
 
 
-@pytest.mark.parametrize("axis", [1, -1, 0, None])
+@pytest.mark.parametrize("axis", [1, -1])
 @pytest.mark.parametrize("keepdims", [True, False])
 @pytest.mark.parametrize("mask_identity", [True, False])
 def test_argmax(
@@ -61,12 +61,32 @@ def test_argmax(
 ) -> None:
     xd = daa.points.x
     xc = caa.points.x
-    dr = dak.argmax(xd, axis=axis)
-    ar = ak.argmax(xc, axis=axis)
+    dr = dak.argmax(xd, axis=axis, keepdims=keepdims, mask_identity=mask_identity)
+    ar = ak.argmax(xc, axis=axis, keepdims=keepdims, mask_identity=mask_identity)
     assert_eq(dr, ar)
 
 
-@pytest.mark.parametrize("axis", [1, -1, 0, None])
+@pytest.mark.xfail(
+    reason="positional reducers are not supported for axis=0 and axis=None"
+)
+@pytest.mark.parametrize("axis", [0, None])
+@pytest.mark.parametrize("keepdims", [True, False])
+@pytest.mark.parametrize("mask_identity", [True, False])
+def test_argmax_axis_0_none(
+    daa: dak.Array,
+    caa: ak.Array,
+    axis: int,
+    keepdims: bool,
+    mask_identity: bool,
+) -> None:
+    xd = daa.points.x
+    xc = caa.points.x
+    dr = dak.argmax(xd, axis=axis, keepdims=keepdims, mask_identity=mask_identity)
+    ar = ak.argmax(xc, axis=axis, keepdims=keepdims, mask_identity=mask_identity)
+    assert_eq(dr, ar)
+
+
+@pytest.mark.parametrize("axis", [1, -1])
 @pytest.mark.parametrize("keepdims", [True, False])
 @pytest.mark.parametrize("mask_identity", [True, False])
 def test_argmin(
@@ -78,8 +98,28 @@ def test_argmin(
 ) -> None:
     xd = daa.points.x
     xc = caa.points.x
-    dr = dak.argmin(xd, axis=axis)
-    ar = ak.argmin(xc, axis=axis)
+    dr = dak.argmin(xd, axis=axis, keepdims=keepdims, mask_identity=mask_identity)
+    ar = ak.argmin(xc, axis=axis, keepdims=keepdims, mask_identity=mask_identity)
+    assert_eq(dr, ar)
+
+
+@pytest.mark.xfail(
+    reason="positional reducers are not supported for axis=0 and axis=None"
+)
+@pytest.mark.parametrize("axis", [0, None])
+@pytest.mark.parametrize("keepdims", [True, False])
+@pytest.mark.parametrize("mask_identity", [True, False])
+def test_argmin_axis_0_none(
+    daa: dak.Array,
+    caa: ak.Array,
+    axis: int,
+    keepdims: bool,
+    mask_identity: bool,
+) -> None:
+    xd = daa.points.x
+    xc = caa.points.x
+    dr = dak.argmin(xd, axis=axis, keepdims=keepdims, mask_identity=mask_identity)
+    ar = ak.argmin(xc, axis=axis, keepdims=keepdims, mask_identity=mask_identity)
     assert_eq(dr, ar)
 
 
@@ -93,8 +133,12 @@ def test_count(
     keepdims: bool,
     mask_identity: bool,
 ) -> None:
-    ar = ak.count(caa["points"]["x"], axis=axis)
-    dr = dak.count(daa["points"]["x"], axis=axis)
+    ar = ak.count(
+        caa["points"]["x"], axis=axis, keepdims=keepdims, mask_identity=mask_identity
+    )
+    dr = dak.count(
+        daa["points"]["x"], axis=axis, keepdims=keepdims, mask_identity=mask_identity
+    )
     assert_eq(ar, dr)
 
 
@@ -108,8 +152,12 @@ def test_count_nonzero(
     keepdims: bool,
     mask_identity: bool,
 ) -> None:
-    ar = ak.count_nonzero(caa["points"]["x"], axis=axis)
-    dr = dak.count_nonzero(daa["points"]["x"], axis=axis)
+    ar = ak.count_nonzero(
+        caa["points"]["x"], axis=axis, keepdims=keepdims, mask_identity=mask_identity
+    )
+    dr = dak.count_nonzero(
+        daa["points"]["x"], axis=axis, keepdims=keepdims, mask_identity=mask_identity
+    )
     assert_eq(ar, dr)
 
 

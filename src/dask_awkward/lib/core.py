@@ -8,7 +8,6 @@ import sys
 import warnings
 from collections.abc import Callable, Hashable, Mapping, Sequence
 from functools import cached_property, partial
-from itertools import accumulate
 from numbers import Number
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
@@ -1498,7 +1497,7 @@ def _from_iter(obj):
 PartialReductionType = ak.Array
 
 
-def _chunk_reducer_trivial(
+def _chunk_reducer_non_positional(
     chunk: ak.Array | PartialReductionType,
     is_axis_none: bool,
     *,
@@ -1513,14 +1512,14 @@ def _chunk_reducer_trivial(
     )
 
 
-def _concat_reducer_trivial(
+def _concat_reducer_non_positional(
     partials: list[PartialReductionType], is_axis_none: bool
 ) -> ak.Array:
     concat_axis = -1 if is_axis_none else 0
     return ak.concatenate(partials, axis=concat_axis)
 
 
-def _finalise_reducer_trivial(
+def _finalise_reducer_non_positional(
     partial: PartialReductionType,
     is_axis_none: bool,
     *,
@@ -1536,16 +1535,6 @@ def _finalise_reducer_trivial(
     )
 
 
-PartialPositionalReductionType = "tuple[ak.Array, ak.Array, int]"
-
-
-def _next_chunk_partition_offset(chunk: ak.Array, is_axis_none: bool) -> int:
-    if is_axis_none:
-        return len(ak.ravel(chunk))
-    else:
-        return len(chunk)
-
-
 def _prepare_axis_none_chunk(chunk: ak.Array) -> ak.Array:
     # TODO: this is private Awkward code. We should figure out how to export it
     # if needed
@@ -1557,88 +1546,6 @@ def _prepare_axis_none_chunk(chunk: ak.Array) -> ak.Array:
         allow_records=False,
     )
     return ak.Array(layout, behavior=chunk.behavior)
-
-
-def _ragged_index(container: ak.Array, index: ak.Array) -> ak.Array:
-    def apply(layout: ak.contents.Content, **kwargs) -> ak.contents.Content | None:
-        if layout.is_numpy:
-            flat_container = ak.ravel(container, highlevel=False)
-            return flat_container[layout]
-
-    # Take list structure from `index`
-    return ak.transform(apply, index)
-
-
-def _chunk_reducer_positional(
-    chunk: ak.Array, is_axis_none: bool, *, reducer: Callable
-) -> PartialPositionalReductionType:
-    index = reducer(
-        chunk, axis=-1 if is_axis_none else 0, keepdims=True, mask_identity=True
-    )
-    # Adjust the index to be absolute w.r.t the original array
-    return (
-        index,
-        _ragged_index(chunk, index),
-        _next_chunk_partition_offset(chunk, is_axis_none),
-    )
-
-
-def _concat_reducer_positional(
-    partials: list[PartialPositionalReductionType], is_axis_none: bool
-) -> PartialPositionalReductionType:
-    partial_indices, partial_values, lengths = zip(*partials)
-    # Adjust indices by the starts for this set of partials
-    starts = [0, *accumulate(lengths)]
-    adjusted_indices = [i + start for i, start in zip(partial_indices, starts)]
-
-    concat_axis = -1 if is_axis_none else 0
-    return (
-        ak.concatenate(adjusted_indices, axis=concat_axis),
-        ak.concatenate(partial_values, axis=concat_axis),
-        starts[-1],
-    )
-
-
-def _tree_node_reducer_positional(
-    partial: PartialPositionalReductionType, is_axis_none: bool, *, reducer: Callable
-) -> PartialPositionalReductionType:
-    # `partial` comes from `concat`
-    partial_index, partial_value, partial_length = partial
-    final_index_index = reducer(
-        partial_value, axis=-1 if is_axis_none else 0, keepdims=True, mask_identity=True
-    )
-    # Indices are already absolute!
-    return (
-        _ragged_index(partial_index, final_index_index),
-        _ragged_index(partial_value, final_index_index),
-        partial_length,
-    )
-
-
-def _finalise_reducer_positional(
-    partial: PartialPositionalReductionType,
-    is_axis_none: bool,
-    *,
-    reducer: Callable,
-    mask_identity: bool,
-    keepdims: bool,
-):
-    partial_index, partial_value, _ = partial
-    final_index_index = reducer(
-        partial_value, axis=-1, keepdims=True, mask_identity=True
-    )
-    final_index = _ragged_index(partial_index, final_index_index)
-
-    # The return type of positional reducers is unaffected by option-type values
-    # i.e., we can safely remove the mask if it is not required
-    if not mask_identity:
-        final_index = ak.fill_none(final_index, -1, axis=-1)
-    if not keepdims:
-        if is_axis_none:
-            final_index = ak.ravel(final_index)[0]
-        else:
-            final_index = final_index[0]
-    return final_index
 
 
 def non_trivial_reduction(
@@ -1655,6 +1562,9 @@ def non_trivial_reduction(
     dtype: Any | None = None,
     split_every: int | bool | None = None,
 ):
+    if is_positional:
+        raise NotImplementedError("positional reducers at axis=0 or axis=None")
+
     # Regularise the axis to (0, None)
     if axis == 0 or axis == -1 * array.ndim:
         axis = 0
@@ -1663,6 +1573,7 @@ def non_trivial_reduction(
 
     if combiner is None:
         combiner = reducer
+
     if is_positional:
         assert combiner is reducer
 
@@ -1674,42 +1585,21 @@ def non_trivial_reduction(
     else:
         prepared_array = array
 
-    if is_positional:
-        # For positional reducers, we reduce the initial partitions with `chunked_fn`
-        # to form (index, value, length) "partial" reduction tuples
-        # (where `length` corresponds to the pre-reduction length)
-        chunked_fn = _chunk_reducer_positional
-        # These partials are aggregated into batches (a list of partials),
-        # which are concatenated with `concat_fn` to form a single partial _array_,
-        # a tuple of the concatenated partial indices and values, and the sum of the partial lengths.
-        concat_fn = _concat_reducer_positional
-        # This partial _array_ tuple is reduced in `tree_node_fn` to form a partial _reduction_ tuple
-        tree_node_fn = _tree_node_reducer_positional
-        # For the final node, instead of the above `tree_node_fn`, the `finalize_fn` is applied to perform the
-        # final reduction, and adjust the metadata (keepdims, mask_identity)
-        finalize_fn = _finalise_reducer_positional
+    chunked_fn = _chunk_reducer_non_positional
+    tree_node_fn = _chunk_reducer_non_positional
+    concat_fn = _concat_reducer_non_positional
+    finalize_fn = _finalise_reducer_non_positional
 
-        chunked_kwargs = {"reducer": reducer, "is_axis_none": axis is None}
-        tree_node_kwargs = {"reducer": reducer, "is_axis_none": axis is None}
-
-    else:
-        chunked_fn = _chunk_reducer_trivial
-        tree_node_fn = _chunk_reducer_trivial
-        concat_fn = _concat_reducer_trivial
-        finalize_fn = _finalise_reducer_trivial
-
-        chunked_kwargs = {
-            "reducer": reducer,
-            "is_axis_none": axis is None,
-            "mask_identity": mask_identity,
-        }
-        tree_node_kwargs = {
-            "reducer": combiner,
-            "is_axis_none": axis is None,
-            "mask_identity": mask_identity,
-        }
-
-    from dask.layers import DataFrameTreeReduction
+    chunked_kwargs = {
+        "reducer": reducer,
+        "is_axis_none": axis is None,
+        "mask_identity": mask_identity,
+    }
+    tree_node_kwargs = {
+        "reducer": combiner,
+        "is_axis_none": axis is None,
+        "mask_identity": mask_identity,
+    }
 
     concat_kwargs = {"is_axis_none": axis is None}
     finalize_kwargs = {
@@ -1718,6 +1608,9 @@ def non_trivial_reduction(
         "keepdims": keepdims,
         "is_axis_none": axis is None,
     }
+
+    from dask.layers import DataFrameTreeReduction
+
     token = token or tokenize(
         array,
         reducer,
