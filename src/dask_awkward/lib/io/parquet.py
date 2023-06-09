@@ -25,11 +25,8 @@ from dask_awkward.lib.core import (
     new_scalar_object,
     typetracer_array,
 )
-from dask_awkward.lib.io.io import (
-    LayoutUnprojectableMixin,
-    from_map,
-    with_original_form,
-)
+from dask_awkward.lib.io.io import from_map
+from dask_awkward.lib.unproject_layout import unproject_layout
 
 log = logging.getLogger(__name__)
 
@@ -79,7 +76,7 @@ class _FromParquetFn:
         return self.__repr__()
 
 
-class _FromParquetFileWiseFn(_FromParquetFn, LayoutUnprojectableMixin):
+class _FromParquetFileWiseFn(_FromParquetFn):
     def __init__(
         self,
         *,
@@ -97,7 +94,6 @@ class _FromParquetFileWiseFn(_FromParquetFn, LayoutUnprojectableMixin):
             original_form=original_form,
         )
 
-    @with_original_form
     def __call__(self, source: Any) -> Any:
         array = _file_to_partition(
             source,
@@ -105,16 +101,7 @@ class _FromParquetFileWiseFn(_FromParquetFn, LayoutUnprojectableMixin):
             self.columns,
             self.schema,
         )
-        return array
-
-    # def __call2(self, source: Any) -> Any:
-    #     array = _file_to_partition(
-    #         source,
-    #         self.fs,
-    #         self.columns,
-    #         self.schema,
-    #     )
-    #     return self.unproject_layout(array)
+        return ak.Array(unproject_layout(self.original_form, array.layout))
 
     def project_columns(
         self,
@@ -163,13 +150,14 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
         subrg, source = pair
         if isinstance(subrg, int):
             subrg = [[subrg]]
-        return _file_to_partition(
+        array = _file_to_partition(
             source,
             self.fs,
             self.columns,
             self.schema,
             subrg=subrg,
         )
+        return ak.Array(unproject_layout(array, self.original_form))
 
     def project_columns(
         self,

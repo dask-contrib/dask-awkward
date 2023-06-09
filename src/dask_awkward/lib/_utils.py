@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import awkward as ak
 from awkward.forms.form import Form
 
 
@@ -49,14 +48,3 @@ def set_form_keys(form: Form, *, key: str) -> Form:
 
     # Return the now mutated Form object.
     return form
-
-
-def make_unused_columns_dataless(
-    good_array: ak.Array,
-    original_form: Form,
-) -> ak.Array:
-    from dask_awkward.lib.unproject_layout import unproject_layout
-
-    a = unproject_layout(original_form, good_array.layout)
-
-    return ak.Array(a)

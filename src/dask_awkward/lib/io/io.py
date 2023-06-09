@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import functools
 import math
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, Callable, Mapping, Protocol
@@ -19,7 +18,6 @@ from dask_awkward.lib.core import (
     new_array_object,
     typetracer_array,
 )
-from dask_awkward.lib.unproject_layout import unproject_layout
 
 if TYPE_CHECKING:
     from dask.array.core import Array as DaskArray
@@ -47,46 +45,6 @@ class ImplementsFormTransformation(Protocol):
         **kwargs: Any,
     ) -> tuple[Mapping[str, ak.Array], Callable[[str, ak.forms.Form, str], str] | str]:
         raise NotImplementedError
-
-
-def with_original_form(func: Callable) -> Callable:
-    """Decorator to rehydrate a column-projected array with its original form.
-
-    This decorator is designed to be used with a class that has a
-    `self.original_form` attribute.
-
-    Parameters
-    ----------
-    func : Callable
-        The method to decorate, should be a the ``__call__`` method of
-        class.
-
-    """
-
-    @functools.wraps(func)
-    def wrapper(callable_class, *args, **kwargs):
-        res = func(callable_class, *args, **kwargs)
-        res = unproject_layout(callable_class.original_form, res.layout)
-        return ak.Array(res)
-
-    return wrapper
-
-
-class LayoutUnprojectableMixin:
-    """Mixin to provide the ability to rehydrate a column-projected array.
-
-    The only method of this mixin is `unproject_layout` which expects
-    the inherting class to have a `self.original_form` attribute.
-
-    This method is designed to be used before returning a concrete
-    array from the ``__call__`` method.
-
-    """
-
-    def unproject_layout(self, array: ak.Array) -> ak.Array:
-        if self.original_form is not None:
-            return ak.Array(unproject_layout(self.original_form, array.layout))
-        return array
 
 
 class _FromAwkwardFn:
