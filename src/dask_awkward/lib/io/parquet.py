@@ -9,6 +9,7 @@ from typing import Any, Sequence
 
 import awkward as ak
 import fsspec
+from awkward.forms.form import Form
 from awkward.operations import ak_from_parquet, to_arrow_table
 from awkward.operations.ak_from_parquet import _load
 from dask.base import tokenize
@@ -25,6 +26,7 @@ from dask_awkward.lib.core import (
     typetracer_array,
 )
 from dask_awkward.lib.io.io import from_map
+from dask_awkward.lib.unproject_layout import unproject_layout
 
 log = logging.getLogger(__name__)
 
@@ -37,6 +39,7 @@ class _FromParquetFn:
         schema: Any,
         listsep: str = "list.item",
         unnamed_root: bool = False,
+        original_form: Form | None = None,
     ) -> None:
         self.fs = fs
         self.schema = schema
@@ -45,13 +48,18 @@ class _FromParquetFn:
         self.columns = self.schema.columns(self.listsep)
         if self.unnamed_root:
             self.columns = [f".{c}" for c in self.columns]
+        self.original_form = original_form
 
     @abc.abstractmethod
     def __call__(self, source: Any) -> ak.Array:
         ...
 
     @abc.abstractmethod
-    def project_columns(self, columns: Sequence[str] | None) -> _FromParquetFn:
+    def project_columns(
+        self,
+        columns: Sequence[str] | None,
+        orignal_form: Form | None = None,
+    ) -> _FromParquetFn:
         ...
 
     def __repr__(self) -> str:
@@ -60,7 +68,7 @@ class _FromParquetFn:
             f"  schema={repr(self.schema)}\n"
             f"  listsep={self.listsep}\n"
             f"  unnamed_root={self.unnamed_root}\n"
-            f"  self.columns={self.columns}\n)"
+            f"  columns={self.columns}\n"
         )
         return s
 
@@ -76,20 +84,30 @@ class _FromParquetFileWiseFn(_FromParquetFn):
         schema: Any,
         listsep: str = "list.item",
         unnamed_root: bool = False,
+        original_form: Form | None = None,
     ) -> None:
         super().__init__(
-            fs=fs, schema=schema, listsep=listsep, unnamed_root=unnamed_root
+            fs=fs,
+            schema=schema,
+            listsep=listsep,
+            unnamed_root=unnamed_root,
+            original_form=original_form,
         )
 
     def __call__(self, source: Any) -> Any:
-        return _file_to_partition(
+        array = _file_to_partition(
             source,
             self.fs,
             self.columns,
             self.schema,
         )
+        return ak.Array(unproject_layout(self.original_form, array.layout))
 
-    def project_columns(self, columns: Sequence[str] | None) -> _FromParquetFileWiseFn:
+    def project_columns(
+        self,
+        columns: Sequence[str] | None,
+        original_form: Form | None = None,
+    ) -> _FromParquetFileWiseFn:
         if columns is None:
             return self
 
@@ -99,6 +117,7 @@ class _FromParquetFileWiseFn(_FromParquetFn):
             schema=new_schema,
             listsep=self.listsep,
             unnamed_root=self.unnamed_root,
+            original_form=original_form,
         )
 
         log.debug(f"project_columns received: {columns}")
@@ -117,26 +136,33 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
         schema: Any,
         listsep: str = "list.item",
         unnamed_root: bool = False,
+        original_form: Form | None = None,
     ) -> None:
         super().__init__(
-            fs=fs, schema=schema, listsep=listsep, unnamed_root=unnamed_root
+            fs=fs,
+            schema=schema,
+            listsep=listsep,
+            unnamed_root=unnamed_root,
+            original_form=original_form,
         )
 
     def __call__(self, pair: Any) -> ak.Array:
         subrg, source = pair
         if isinstance(subrg, int):
             subrg = [[subrg]]
-        return _file_to_partition(
+        array = _file_to_partition(
             source,
             self.fs,
             self.columns,
             self.schema,
             subrg=subrg,
         )
+        return ak.Array(unproject_layout(self.original_form, array.layout))
 
     def project_columns(
         self,
         columns: Sequence[str] | None,
+        original_form: Form | None = None,
     ) -> _FromParquetFragmentWiseFn:
         if columns is None:
             return self
@@ -144,6 +170,7 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
             fs=self.fs,
             schema=self.schema.select_columns(columns),
             unnamed_root=self.unnamed_root,
+            original_form=original_form,
         )
 
 
