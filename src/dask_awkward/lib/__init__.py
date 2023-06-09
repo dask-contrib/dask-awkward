@@ -2,7 +2,7 @@ from dask_awkward.lib.core import Array, Record, Scalar
 from dask_awkward.lib.core import _type as type
 from dask_awkward.lib.core import map_partitions, typetracer_from_form
 from dask_awkward.lib.describe import fields
-from dask_awkward.lib.inspect import necessary_columns
+from dask_awkward.lib.inspect import necessary_columns, sample
 from dask_awkward.lib.io.io import (
     ImplementsFormTransformation,
     from_awkward,

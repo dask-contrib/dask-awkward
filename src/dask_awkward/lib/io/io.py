@@ -407,7 +407,9 @@ def to_dataframe(
         label="to-dataframe",
         **kwargs,
     )
-    meta = ak.to_dataframe(array._meta.layout.form.length_zero_array(), **kwargs)
+    meta = ak.to_dataframe(
+        array._meta.layout.form.length_zero_array(highlevel=False), **kwargs
+    )
     return new_dd_object(
         intermediate.dask,
         intermediate.name,
