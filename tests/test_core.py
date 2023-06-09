@@ -238,7 +238,8 @@ def test_scalar_getitem_getattr() -> None:
 )
 def test_getitem_zero_slice_single(daa: Array, where):
     out = daa[where]
-    assert out.compute().tolist() == daa[where].compute().tolist()
+    assert out.compute().tolist() == daa.compute()[where].tolist()
+    assert len(out) == len(daa.compute()[where])
 
 
 @pytest.mark.parametrize(
@@ -261,7 +262,8 @@ def test_getitem_zero_slice_single(daa: Array, where):
 @pytest.mark.parametrize("rest", [slice(None, None, None), slice(0, 1)])
 def test_getitem_zero_slice_tuple(daa: Array, where, rest):
     out = daa[where, rest]
-    assert out.compute().tolist() == daa[where, rest].compute().tolist()
+    assert out.compute().tolist() == daa.compute()[where, rest].tolist()
+    assert len(out) == len(daa.compute()[where, rest])
 
 
 def test_is_typetracer(daa: Array) -> None:
