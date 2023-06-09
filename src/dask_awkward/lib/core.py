@@ -923,7 +923,10 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             outpart += 1
             remainder += (self.divisions[i + 1] - self.divisions[i]) % step
             divisions.append(
-                (self.divisions[i + 1] - self.divisions[i]) // step + divisions[-1]
+                min(
+                    (self.divisions[i + 1] - self.divisions[i]) // step + divisions[-1],
+                    divisions[-1] + slice_end,
+                )
             )
             remainder = remainder % step
         hlg = HighLevelGraph.from_collections(
