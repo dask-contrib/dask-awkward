@@ -134,7 +134,7 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         """
         import awkward as ak
 
-        from dask_awkward.lib.core import set_form_keys
+        from dask_awkward.lib._utils import set_form_keys
 
         starting_form = copy.deepcopy(self._meta.layout.form)
         starting_layout = starting_form.length_zero_array(highlevel=False)
@@ -169,13 +169,26 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
             if len(columns) == 0:
                 columns = self._meta.fields[:1]
 
-            # requested columns to original order; adds on extra columns, which are probably
-            # wildcard ones
-            form_columns = self._meta.layout.form.columns()
-            original = [c for c in form_columns if c in columns]
-            new = [c for c in columns if c not in form_columns]
+            # original form
+            original_form = self._meta.layout.form
+
+            # original columns before column projection
+            original_form_columns = original_form.columns()
+
+            # make sure that the requested columns match the order of
+            # the original columns; tack on "new" columns that are
+            # likely the wildcard columns.
+            original = [c for c in original_form_columns if c in columns]
+            new = [c for c in columns if c not in original_form_columns]
             columns = original + new
-            io_func = self.io_func.project_columns(columns)
+
+            try:
+                io_func = self.io_func.project_columns(
+                    columns,
+                    original_form=original_form,
+                )
+            except TypeError:
+                io_func = self.io_func.project_columns(columns)
             return AwkwardInputLayer(
                 name=self.name,
                 columns=columns,
