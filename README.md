@@ -33,3 +33,8 @@ Documentation
 
 Documentation is hosted at
 [https://dask-awkward.readthedocs.io/](https://dask-awkward.readthedocs.io/).
+
+Acknowledgements
+----------------
+
+Support for this work was provided by NSF grant [OAC-2103945](https://www.nsf.gov/awardsearch/showAward?AWD_ID=2103945).
