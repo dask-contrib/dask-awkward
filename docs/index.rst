@@ -12,6 +12,10 @@ The dask-awkward project implements a native Dask collection for
 representing partitioned Awkward arrays. Read more about Awkward
 arrays at `their website <awkwardarray_>`_.
 
+
+Table of Contents
+~~~~~~~~~~~~~~~~~
+
 .. toctree::
    :maxdepth: 1
    :caption: Getting Started
@@ -53,4 +57,9 @@ arrays at `their website <awkwardarray_>`_.
    dev-contributing.rst
    dev-releasing.rst
 
+------------
+
+Support for this work was provided by NSF grant `OAC-2103945 <nsf_>`_.
+
 .. _awkwardarray: https://awkward-array.org/
+.. _nsf: https://www.nsf.gov/awardsearch/showAward?AWD_ID=2103945
