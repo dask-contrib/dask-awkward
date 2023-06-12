@@ -266,6 +266,21 @@ def test_getitem_zero_slice_tuple(daa: Array, where, rest):
     assert len(out) == len(daa.compute()[where, rest])
 
 
+def test_getitem_zero_slice_divisions():
+    concrete = ak.Array([[1, 2, 3], [4], [5, 6, 7], [8, 9]] * 25)
+    lazy = dak.from_awkward(concrete, npartitions=4)
+
+    assert_eq(concrete, lazy)
+    assert_eq(concrete[:10], lazy[:10], check_forms=False)
+
+    assert_eq(concrete[10:68:5], lazy[10:68:5], check_forms=False)
+    assert_eq(concrete[-30:], lazy[-30:], check_forms=False)
+
+    assert lazy[-30:].divisions == (0, 25, 30)
+    assert len(lazy[-30:]) == 30
+    assert len(lazy[10:68:5]) == len(concrete[10:68:5])
+
+
 def test_is_typetracer(daa: Array) -> None:
     assert not is_typetracer(daa)
     assert not is_typetracer(daa[0])
