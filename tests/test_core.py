@@ -272,12 +272,19 @@ def test_getitem_zero_slice_divisions():
 
     assert_eq(concrete, lazy)
     assert_eq(concrete[:10], lazy[:10], check_forms=False)
+    assert lazy[:10].divisions == (0, 10)
 
-    assert_eq(concrete[10:68:5], lazy[10:68:5], check_forms=False)
     assert_eq(concrete[-30:], lazy[-30:], check_forms=False)
-
     assert lazy[-30:].divisions == (0, 5, 30)
     assert len(lazy[-30:]) == 30
+
+    lazy2 = lazy[10:68:5]
+    assert_eq(concrete[10:68:5], lazy2, check_forms=False)
+    divs = [0]
+    for i in range(lazy[10:68:5].npartitions):
+        divs.append(len(lazy2.partitions[i].compute()) + divs[i])
+    assert lazy2.divisions == tuple(divs)
+
     assert len(lazy[10:68:5]) == len(concrete[10:68:5])
 
 
