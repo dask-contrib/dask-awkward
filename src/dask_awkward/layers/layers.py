@@ -28,7 +28,7 @@ class AwkwardBlockwiseLayer(Blockwise):
         nb = layer.numblocks
         layer.numblocks = {k: tuple(1 for _ in v) for k, v in nb.items()}
         layer.__dict__.pop("_dims", None)
-        return layer
+        return layer, None
 
     def __getstate__(self) -> dict:
         d = self.__dict__.copy()
@@ -224,7 +224,7 @@ class AwkwardMaterializedLayer(MaterializedLayer):
                 else v
                 for v in task
             )
-            return MaterializedLayer({(name, 0): task})
+            return MaterializedLayer({(name, 0): task}), None
 
         # failed to cull during column opt
-        return self
+        return self, None
