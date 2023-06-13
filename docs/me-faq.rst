@@ -6,20 +6,23 @@ what does this mean?**
 
     When computing a dask-awkward collection that is reading from
     disk, the necessary columns optimization tries to discover which
-    parts of a file on disk are necessary for the compute, and then
-    rewrite the reading layer in the graph to only read the minimum
-    necessary columns from the files on disk. If we are unable to
-    determine the necessary columns, this optimization is simply
-    skipped and the warning (that you've seen) is thrown. Consequences
-    of this optimization being skipped include an increase in the
-    memory usage of your compute (because more data will be read from
-    disk) and an increase in runtime (because it takes time to read
-    the data that you actually do not need). You can read more about
-    the optimization and how to configure it (by either silencing the
-    warning or raise the exception) at :doc:`this section of the docs
-    <me-optimization>`. Please open an issue on the GitHub issue
-    tracker if you think you've found a failure in the optimization
-    that should be fixed.
+    parts of a file on disk are necessary for the compute. The
+    optimization then rewrites the data input layer in the graph such
+    that you only read the minimum set of columns from the files on
+    disk. If we are unable to determine the necessary columns, this
+    optimization is simply skipped and the warning (that you've seen)
+    is thrown.
+
+    Consequences of this optimization being skipped include: an
+    increase in the memory usage of your compute (because more data
+    will be read from disk) and/or an increase in runtime (because it
+    takes time to read the data that you actually do not need).
+
+    You can read more about the optimization and how to configure it
+    (by either silencing the warning or raise the exception) at
+    :doc:`this section of the docs <me-optimization>`. Please open an
+    issue on the GitHub issue tracker if you think you've found a
+    failure in the optimization that should be fixed.
 
 **I just saw "UserWarning: metadata could not be determined; a compute
 on the first partition will occur." what does that mean?**
