@@ -266,26 +266,31 @@ def test_getitem_zero_slice_tuple(daa: Array, where, rest):
     assert len(out) == len(daa.compute()[where, rest])
 
 
-def test_getitem_zero_slice_divisions():
+@pytest.mark.parametrize(
+    "where",
+    [
+        slice(None, 10, None),
+        slice(-30, None, None),
+        slice(10, 68, 5),
+        slice(None, 5, 2),
+        slice(None, 15, 3),
+        slice(15, None, 6),
+        slice(None, None, 3),
+    ],
+)
+def test_getitem_zero_slice_divisions(where):
     concrete = ak.Array([[1, 2, 3], [4], [5, 6, 7], [8, 9]] * 25)
     lazy = dak.from_awkward(concrete, npartitions=4)
 
-    assert_eq(concrete, lazy)
-    assert_eq(concrete[:10], lazy[:10], check_forms=False)
-    assert lazy[:10].divisions == (0, 10)
+    conc_sliced = concrete[where]
+    lazy_sliced = lazy[where]
+    assert_eq(conc_sliced, lazy_sliced, check_forms=False)
 
-    assert_eq(concrete[-30:], lazy[-30:], check_forms=False)
-    assert lazy[-30:].divisions == (0, 5, 30)
-    assert len(lazy[-30:]) == 30
-
-    lazy2 = lazy[10:68:5]
-    assert_eq(concrete[10:68:5], lazy2, check_forms=False)
     divs = [0]
-    for i in range(lazy[10:68:5].npartitions):
-        divs.append(len(lazy2.partitions[i].compute()) + divs[i])
-    assert lazy2.divisions == tuple(divs)
-
-    assert len(lazy[10:68:5]) == len(concrete[10:68:5])
+    for i in range(lazy_sliced.npartitions):
+        divs.append(len(lazy_sliced.partitions[i].compute()) + divs[i])
+    assert lazy_sliced.divisions == tuple(divs)
+    assert len(lazy_sliced) == len(conc_sliced)
 
 
 def test_is_typetracer(daa: Array) -> None:
