@@ -276,7 +276,7 @@ def test_getitem_zero_slice_divisions():
     assert_eq(concrete[10:68:5], lazy[10:68:5], check_forms=False)
     assert_eq(concrete[-30:], lazy[-30:], check_forms=False)
 
-    assert lazy[-30:].divisions == (0, 25, 30)
+    assert lazy[-30:].divisions == (0, 5, 30)
     assert len(lazy[-30:]) == 30
     assert len(lazy[10:68:5]) == len(concrete[10:68:5])
 
