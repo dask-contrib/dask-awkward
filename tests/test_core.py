@@ -275,6 +275,7 @@ def test_getitem_zero_slice_tuple(daa: Array, where, rest):
         slice(None, 5, 2),
         slice(None, 15, 3),
         slice(15, None, 6),
+        slice(62, None, None),
         slice(None, None, 3),
     ],
 )
