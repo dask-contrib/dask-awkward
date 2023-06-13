@@ -488,7 +488,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if hasattr(dsk, "layers"):
             # i.e., NOT matrializes/persisted state
             # output typetracer
-            lay = list(dsk.layers.values())[-1]
+            lay = dsk.layers[dsk._toposort_layers()[-1]]
             if isinstance(lay, AwkwardBlockwiseLayer):
                 lay._meta = meta  # type: ignore
         self._name: str = name
