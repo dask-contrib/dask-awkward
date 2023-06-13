@@ -898,15 +898,17 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         # make low-level graph
         for i in range(self.npartitions):
             if start > self.divisions[i + 1]:
-                # first partition not found
+                # first partition not yet found
                 continue
             if stop < self.divisions[i] and dask:
                 # no more partitions with valid rows
                 # does **NOT** exit if there are no partitions yet, to make sure there is always
                 # at least one, needed to get metadata of empty output right
                 break
-            slice_start = max(start - self.divisions[i] + remainder, 0)
-            slice_end = min(stop - self.divisions[i], self.divisions[i + 1])
+            slice_start = max(start - self.divisions[i], 0 + remainder)
+            slice_end = min(
+                stop - self.divisions[i], self.divisions[i + 1] - self.divisions[i]
+            )
             if (
                 slice_end == slice_start
                 and (self.divisions[i + 1] - self.divisions[i])
@@ -921,11 +923,13 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 rest,
             )
             outpart += 1
-            remainder += (self.divisions[i + 1] - self.divisions[i]) % step
+            remainder = (
+                (self.divisions[i] + slice_start) - self.divisions[i + 1]
+            ) % step
+            remainder = step - remainder if remainder < 0 else remainder
             divisions.append(
-                (self.divisions[i + 1] - self.divisions[i]) // step + divisions[-1]
+                divisions[-1] + len(list(range(slice_start, slice_end, step)))
             )
-            remainder = remainder % step
         hlg = HighLevelGraph.from_collections(
             name,
             AwkwardMaterializedLayer(dask, previous_layer_name=self.name),
