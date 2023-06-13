@@ -213,7 +213,7 @@ class AwkwardMaterializedLayer(MaterializedLayer):
         mapping = self.mapping.copy()
         if not mapping:
             # no partitions at all
-            return self
+            return self, None
         name = next(iter(mapping))[0]
 
         if (name, 0) in mapping:
