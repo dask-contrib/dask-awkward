@@ -21,6 +21,16 @@ if TYPE_CHECKING:
     from awkward import Array as AwkwardArray
 
 
+COLUMN_OPT_FAILED_WARNING_MSG = """The necessary columns optimization failed; exception raised:
+
+{exception} with message {message}.
+
+Please see the FAQ section of the docs for more information:
+https://dask-awkward.readthedocs.io/en/stable/me-faq.html
+
+"""
+
+
 def all_optimizations(
     dsk: Mapping,
     keys: Hashable | list[Hashable] | set[Hashable],
@@ -367,7 +377,9 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
         on_fail = dask.config.get("awkward.optimization.on-fail")
         # this is the default, throw a warning but skip the optimization.
         if on_fail == "warn":
-            warnings.warn(f"Column projection optimization failed: {type(err)}, {err}")
+            warnings.warn(
+                COLUMN_OPT_FAILED_WARNING_MSG.format(exception=type(err), message=err)
+            )
             return {}
         # option "pass" means do not throw warning but skip the optimization.
         elif on_fail == "pass":
