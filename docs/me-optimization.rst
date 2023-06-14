@@ -97,11 +97,11 @@ raise an exception, the configuration parameter can be adjusted. Here
 are the options for the ``awkward.optimization.on-fail`` configuration
 parameter:
 
-- ``pass``: fail silently; the optimization is skipped (can reduce
+- ``"pass"``: fail silently; the optimization is skipped (can reduce
   performance by reading unncessary data from disk).
-- ``raise``: fail by raising an exception: this will stop the process
+- ``"raise"``: fail by raising an exception: this will stop the process
   at compute time.
-- ``warn`` (the default): fail with a warning but let the compute
+- ``"warn"`` (the default): fail with a warning but let the compute
   continue without the necessary columns optimization (can reduce
   performance by reading unncessary data from disk).
 

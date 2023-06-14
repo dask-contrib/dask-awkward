@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 import keyword
 import logging
+import math
 import operator
 import sys
 import warnings
@@ -488,7 +489,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if hasattr(dsk, "layers"):
             # i.e., NOT matrializes/persisted state
             # output typetracer
-            lay = list(dsk.layers.values())[-1]
+            lay = dsk.layers[dsk._toposort_layers()[-1]]
             if isinstance(lay, AwkwardBlockwiseLayer):
                 lay._meta = meta  # type: ignore
         self._name: str = name
@@ -906,15 +907,17 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         # make low-level graph
         for i in range(self.npartitions):
             if start > self.divisions[i + 1]:
-                # first partition not found
+                # first partition not yet found
                 continue
             if stop < self.divisions[i] and dask:
                 # no more partitions with valid rows
                 # does **NOT** exit if there are no partitions yet, to make sure there is always
                 # at least one, needed to get metadata of empty output right
                 break
-            slice_start = max(start - self.divisions[i] + remainder, 0)
-            slice_end = min(stop - self.divisions[i], self.divisions[i + 1])
+            slice_start = max(start - self.divisions[i], 0 + remainder)
+            slice_end = min(
+                stop - self.divisions[i], self.divisions[i + 1] - self.divisions[i]
+            )
             if (
                 slice_end == slice_start
                 and (self.divisions[i + 1] - self.divisions[i])
@@ -929,11 +932,13 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 rest,
             )
             outpart += 1
-            remainder += (self.divisions[i + 1] - self.divisions[i]) % step
-            divisions.append(
-                (self.divisions[i + 1] - self.divisions[i]) // step + divisions[-1]
-            )
-            remainder = remainder % step
+            remainder = (
+                (self.divisions[i] + slice_start) - self.divisions[i + 1]
+            ) % step
+            remainder = step - remainder if remainder < 0 else remainder
+            nextdiv = math.ceil((slice_end - slice_start) / step)
+            divisions.append(divisions[-1] + nextdiv)
+
         hlg = HighLevelGraph.from_collections(
             name,
             AwkwardMaterializedLayer(dask, previous_layer_name=self.name),
@@ -2054,53 +2059,6 @@ def typetracer_from_form(form: Form) -> ak.Array:
     """
     layout = form.length_zero_array(highlevel=False)
     return ak.Array(layout.to_typetracer(forget_length=True))
-
-
-def set_form_keys(form: Form, *, key: str) -> Form:
-    """Recursive function to apply key labels to `form`.
-
-    Parameters
-    ----------
-    form : awkward.forms.form.Form
-        Awkward Array form object to mutate.
-    key : str
-        Label to apply. If recursion is triggered by passing in a
-        Record Form, the key is used as a prefix for a specific
-        field.
-
-    Returns
-    -------
-    awkward.forms.form.Form
-        Mutated Form object.
-
-    """
-
-    # If the form is a record we need to loop over all fields in the
-    # record and set form that include the field name; this will keep
-    # recursing as well.
-    if form.is_record:
-        for field in form.fields:
-            full_key = f"{key}.{field}"
-            set_form_keys(form.content(field), key=full_key)
-
-    # If the form is a list (e.g. ListOffsetArray) we append a
-    # __list__ suffix to notify the optimization pass that we only
-    # touched the offsets and not the data buffer for this kind of
-    # identified form; keep recursing
-    elif form.is_list:
-        form.form_key = f"{key}.__list__"
-        set_form_keys(form.content, key=key)
-
-    # NumPy like array is easy
-    elif form.is_numpy:
-        form.form_key = key
-
-    # Anything else grab the content and keep recursing
-    else:
-        set_form_keys(form.content, key=key)
-
-    # Return the now mutated Form object.
-    return form
 
 
 def make_unknown_length(array: ak.Array) -> ak.Array:

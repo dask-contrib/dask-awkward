@@ -21,6 +21,16 @@ if TYPE_CHECKING:
     from awkward import Array as AwkwardArray
 
 
+COLUMN_OPT_FAILED_WARNING_MSG = """The necessary columns optimization failed; exception raised:
+
+{exception} with message {message}.
+
+Please see the FAQ section of the docs for more information:
+https://dask-awkward.readthedocs.io/en/stable/me-faq.html
+
+"""
+
+
 def all_optimizations(
     dsk: Mapping,
     keys: Hashable | list[Hashable] | set[Hashable],
@@ -348,7 +358,7 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
             layers[name], report = lay.mock()
             reports[name] = report
         elif hasattr(lay, "mock"):
-            layers[name] = lay.mock()
+            layers[name], _ = lay.mock()
 
     for name in _ak_output_layer_names(dsk):
         layers[name] = _mock_output(layers[name])
@@ -367,7 +377,9 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
         on_fail = dask.config.get("awkward.optimization.on-fail")
         # this is the default, throw a warning but skip the optimization.
         if on_fail == "warn":
-            warnings.warn(f"Column projection optimization failed: {type(err)}, {err}")
+            warnings.warn(
+                COLUMN_OPT_FAILED_WARNING_MSG.format(exception=type(err), message=err)
+            )
             return {}
         # option "pass" means do not throw warning but skip the optimization.
         elif on_fail == "pass":
@@ -474,5 +486,7 @@ def _prune_wildcards(columns: list[str], meta: AwkwardArray) -> list[str]:
         else:
             if imeta.fields:
                 good_columns.append(f"{col[:-2]}.{imeta.fields[0]}")
+            else:
+                good_columns.append(col[:-2])
 
     return good_columns
