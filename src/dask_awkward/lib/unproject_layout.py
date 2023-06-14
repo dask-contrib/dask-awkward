@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 
 import awkward as ak
+import dask.config
 import numpy as np
 from awkward.contents import (
     BitMaskedArray,
@@ -375,4 +376,6 @@ def _unproject_layout(form, layout, length, backend):
 
 
 def unproject_layout(form: Form, layout: Content) -> Content:
-    return _unproject_layout(form, layout, layout.length, layout.backend)
+    if dask.config.get("awkward.optimization.enabled", False) and form is not None:
+        return _unproject_layout(form, layout, layout.length, layout.backend)
+    return layout
