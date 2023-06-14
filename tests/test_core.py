@@ -181,6 +181,23 @@ def test_typestr(daa: Array) -> None:
     assert len(daa._typestr(max=20)) == 20 + extras
 
 
+def test_head(daa: Array):
+    out = daa.head(1)
+    assert out.tolist() == daa.compute()[:1].tolist()
+
+    out = daa.head(6)  # first partition only has 5 rows
+    assert out.tolist() == daa.compute()[:5].tolist()
+
+    out = daa.head(1, compute=False)
+    assert isinstance(out, dak.lib.Array)
+    assert out.divisions == (None, None)  # since where not known
+
+    daa.eager_compute_divisions()
+    out = daa.head(1, compute=False)
+    assert isinstance(out, dak.lib.Array)
+    assert out.divisions == (0, 1)
+
+
 def test_record_collection(daa: Array) -> None:
     assert type(daa[0]) is Record
     aa = daa.compute()
@@ -200,6 +217,82 @@ def test_scalar_getitem_getattr() -> None:
     t = Thing(c=3, b=2, a=1)
     s = new_known_scalar(t)
     assert s.c.compute() == t.c
+
+
+@pytest.mark.parametrize(
+    "where",
+    [
+        slice(0, 10),
+        slice(0, 11),
+        slice(1, 10),
+        slice(1, 11),
+        slice(1, 3),
+        slice(6, 12),
+        slice(0, 10, 2),
+        slice(0, 11, 2),
+        slice(1, 14, 2),
+        slice(1, 11, 2),
+        slice(1, 3, 3),
+        slice(None, None, 3),
+    ],
+)
+def test_getitem_zero_slice_single(daa: Array, where):
+    out = daa[where]
+    assert out.compute().tolist() == daa.compute()[where].tolist()
+    assert len(out) == len(daa.compute()[where])
+
+
+@pytest.mark.parametrize(
+    "where",
+    [
+        slice(0, 10),
+        slice(0, 11),
+        slice(1, 10),
+        slice(1, 11),
+        slice(1, 3),
+        slice(6, 12),
+        slice(0, 10, 2),
+        slice(0, 11, 2),
+        slice(1, 14, 2),
+        slice(1, 11, 2),
+        slice(1, 3, 3),
+        slice(None, None, 3),
+    ],
+)
+@pytest.mark.parametrize("rest", [slice(None, None, None), slice(0, 1)])
+def test_getitem_zero_slice_tuple(daa: Array, where, rest):
+    out = daa[where, rest]
+    assert out.compute().tolist() == daa.compute()[where, rest].tolist()
+    assert len(out) == len(daa.compute()[where, rest])
+
+
+@pytest.mark.parametrize(
+    "where",
+    [
+        slice(None, 10, None),
+        slice(-30, None, None),
+        slice(10, 68, 5),
+        slice(None, 5, 2),
+        slice(None, 15, 3),
+        slice(15, None, 6),
+        slice(62, None, None),
+        slice(35, 70, None),
+        slice(None, None, 3),
+    ],
+)
+def test_getitem_zero_slice_divisions(where):
+    concrete = ak.Array([[1, 2, 3], [4], [5, 6, 7], [8, 9]] * 25)
+    lazy = dak.from_awkward(concrete, npartitions=4)
+
+    conc_sliced = concrete[where]
+    lazy_sliced = lazy[where]
+    assert_eq(conc_sliced, lazy_sliced, check_forms=False)
+
+    divs = [0]
+    for i in range(lazy_sliced.npartitions):
+        divs.append(len(lazy_sliced.partitions[i].compute()) + divs[i])
+    assert lazy_sliced.divisions == tuple(divs)
+    assert len(lazy_sliced) == len(conc_sliced)
 
 
 def test_is_typetracer(daa: Array) -> None:

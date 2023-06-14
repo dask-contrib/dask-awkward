@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 import keyword
 import logging
+import math
 import operator
 import sys
 import warnings
@@ -32,7 +33,7 @@ from dask.utils import IndexCallable, funcname, key_split
 from numpy.lib.mixins import NDArrayOperatorsMixin
 from tlz import first
 
-from dask_awkward.layers import AwkwardBlockwiseLayer
+from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardMaterializedLayer
 from dask_awkward.lib.optimize import all_optimizations
 from dask_awkward.typing import AwkwardDaskCollection
 from dask_awkward.utils import (
@@ -488,7 +489,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if hasattr(dsk, "layers"):
             # i.e., NOT matrializes/persisted state
             # output typetracer
-            lay = list(dsk.layers.values())[-1]
+            lay = dsk.layers[dsk._toposort_layers()[-1]]
             if isinstance(lay, AwkwardBlockwiseLayer):
                 lay._meta = meta  # type: ignore
         self._name: str = name
@@ -706,7 +707,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         dsk = {(name, i): tuple(key) for i, key in enumerate(new_keys)}
         graph = HighLevelGraph.from_collections(
             name,
-            dsk,
+            AwkwardMaterializedLayer(dsk, previous_layer_name=self.name),
             dependencies=[self],
         )
 
@@ -865,13 +866,83 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         }
         hlg = HighLevelGraph.from_collections(
             name,
-            dsk,
+            AwkwardMaterializedLayer(dsk, previous_layer_name=self.name),
             dependencies=[partition],
         )
         if isinstance(new_meta, ak.Record):
             return new_record_object(hlg, name, meta=new_meta)
         else:
             return new_scalar_object(hlg, name, meta=new_meta)
+
+    def _getitem_slice_on_zero(self, where: tuple[slice, ...]):
+        # normalise
+        sl: slice = where[0]
+        rest = tuple(where[1:])
+        step = sl.step or 1
+        start = sl.start or 0
+
+        if not self.known_divisions:
+            self.eager_compute_divisions()
+        stop = sl.stop or self.divisions[-1]
+        start = start if start >= 0 else self.divisions[-1] + start
+        stop = stop if stop >= 0 else self.divisions[-1] + stop
+        if step < 0:
+            raise DaskAwkwardNotImplemented("negative step slice on zeroth dimension")
+
+        # setup
+        token = tokenize(self, where)
+        name = f"getitem-{token}"
+        remainder = 0
+        outpart = 0
+        divisions = [0]
+        dask = {}
+        # make low-level graph
+        for i in range(self.npartitions):
+            if start > self.divisions[i + 1]:
+                # first partition not yet found
+                continue
+            if stop < self.divisions[i] and dask:
+                # no more partitions with valid rows
+                # does **NOT** exit if there are no partitions yet, to make sure there is always
+                # at least one, needed to get metadata of empty output right
+                break
+            slice_start = max(start - self.divisions[i], 0 + remainder)
+            slice_end = min(
+                stop - self.divisions[i], self.divisions[i + 1] - self.divisions[i]
+            )
+            if (
+                slice_end == slice_start
+                and (self.divisions[i + 1] - self.divisions[i])
+                and dask
+            ):
+                # in case of zero-row last partition (if not only partition)
+                break
+            dask[(name, outpart)] = (
+                _zero_getitem,
+                (self.name, i),
+                slice(slice_start, slice_end, step),
+                rest,
+            )
+            outpart += 1
+            remainder = (
+                (self.divisions[i] + slice_start) - self.divisions[i + 1]
+            ) % step
+            remainder = step - remainder if remainder < 0 else remainder
+            nextdiv = math.ceil((slice_end - slice_start) / step)
+            divisions.append(divisions[-1] + nextdiv)
+
+        hlg = HighLevelGraph.from_collections(
+            name,
+            AwkwardMaterializedLayer(dask, previous_layer_name=self.name),
+            dependencies=[self],
+        )
+        return new_array_object(
+            hlg,
+            name,
+            meta=self._meta,
+            behavior=self.behavior,
+            divisions=tuple(divisions),
+        )
 
     def _getitem_tuple(self, where: tuple[Any, ...]) -> Array:
         if isinstance(where[0], int):
@@ -886,6 +957,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         elif isinstance(where[0], slice) and is_empty_slice(where[0]):
             return self._getitem_trivial_map_partitions(where)
 
+        elif isinstance(where[0], slice):
+            return self._getitem_slice_on_zero(where)
         # boolean array
         elif isinstance(where[0], Array):
             try:
@@ -914,8 +987,16 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if isinstance(where, str):
             return self._getitem_outer_str_or_list(where, label=where)
 
+        # an empty slice
+
+        elif is_empty_slice(where):
+            return self
+
         elif isinstance(where, list):
             return self._getitem_outer_str_or_list(where)
+
+        elif isinstance(where, slice):
+            return self._getitem_slice_on_zero((where,))
 
         # a single integer
         elif isinstance(where, int):
@@ -928,10 +1009,6 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             dtype = layout.dtype.type
             if issubclass(dtype, (np.bool_, bool, np.int64, np.int32, int)):
                 return self._getitem_outer_bool_or_int_lazy_array(where)
-
-        # an empty slice
-        elif is_empty_slice(where):
-            return self
 
         # a single ellipsis
         elif where is Ellipsis:
@@ -1197,6 +1274,28 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         from dask_awkward.lib.io.io import to_dask_bag
 
         return to_dask_bag(self)
+
+    def head(self, nrow=10, compute=True):
+        """First few rows of the array
+
+        These rows are taken only from the first partition for simplicity. If that partition
+        has fewer rows than ``nrow``, no attempt is made to fetch more from subsequent
+        partitions.
+
+        By default this is then processed eagerly and returned.
+        """
+        out: Array = self.partitions[0].map_partitions(
+            lambda x: x[:nrow], meta=self._meta
+        )
+        if compute:
+            return out.compute()
+        if self.known_divisions:
+            out._divisions = (0, min(nrow, self.divisions[1]))
+        return out
+
+
+def _zero_getitem(arr: ak.Array, zeroth: slice, rest: tuple[slice, ...]) -> ak.Array:
+    return arr.__getitem__((zeroth,) + rest)
 
 
 def compute_typetracer(dsk: HighLevelGraph, name: str) -> ak.Array:
@@ -1952,50 +2051,3 @@ def typetracer_from_form(form: Form) -> ak.Array:
     """
     layout = form.length_zero_array(highlevel=False)
     return ak.Array(layout.to_typetracer(forget_length=True))
-
-
-def set_form_keys(form: Form, *, key: str) -> Form:
-    """Recursive function to apply key labels to `form`.
-
-    Parameters
-    ----------
-    form : awkward.forms.form.Form
-        Awkward Array form object to mutate.
-    key : str
-        Label to apply. If recursion is triggered by passing in a
-        Record Form, the key is used as a prefix for a specific
-        field.
-
-    Returns
-    -------
-    awkward.forms.form.Form
-        Mutated Form object.
-
-    """
-
-    # If the form is a record we need to loop over all fields in the
-    # record and set form that include the field name; this will keep
-    # recursing as well.
-    if form.is_record:
-        for field in form.fields:
-            full_key = f"{key}.{field}"
-            set_form_keys(form.content(field), key=full_key)
-
-    # If the form is a list (e.g. ListOffsetArray) we append a
-    # __list__ suffix to notify the optimization pass that we only
-    # touched the offsets and not the data buffer for this kind of
-    # identified form; keep recursing
-    elif form.is_list:
-        form.form_key = f"{key}.__list__"
-        set_form_keys(form.content, key=key)
-
-    # NumPy like array is easy
-    elif form.is_numpy:
-        form.form_key = key
-
-    # Anything else grab the content and keep recursing
-    else:
-        set_form_keys(form.content, key=key)
-
-    # Return the now mutated Form object.
-    return form

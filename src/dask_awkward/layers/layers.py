@@ -6,6 +6,7 @@ from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any
 
 from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
+from dask.highlevelgraph import MaterializedLayer
 
 from dask_awkward.utils import LazyInputsDict
 
@@ -27,7 +28,7 @@ class AwkwardBlockwiseLayer(Blockwise):
         nb = layer.numblocks
         layer.numblocks = {k: tuple(1 for _ in v) for k, v in nb.items()}
         layer.__dict__.pop("_dims", None)
-        return layer
+        return layer, None
 
     def __getstate__(self) -> dict:
         d = self.__dict__.copy()
@@ -133,7 +134,7 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         """
         import awkward as ak
 
-        from dask_awkward.lib.core import set_form_keys
+        from dask_awkward.lib._utils import set_form_keys
 
         starting_form = copy.deepcopy(self._meta.layout.form)
         starting_layout = starting_form.length_zero_array(highlevel=False)
@@ -168,13 +169,26 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
             if len(columns) == 0:
                 columns = self._meta.fields[:1]
 
-            # requested columns to original order; adds on extra columns, which are probably
-            # wildcard ones
-            form_columns = self._meta.layout.form.columns()
-            original = [c for c in form_columns if c in columns]
-            new = [c for c in columns if c not in form_columns]
+            # original form
+            original_form = self._meta.layout.form
+
+            # original columns before column projection
+            original_form_columns = original_form.columns()
+
+            # make sure that the requested columns match the order of
+            # the original columns; tack on "new" columns that are
+            # likely the wildcard columns.
+            original = [c for c in original_form_columns if c in columns]
+            new = [c for c in columns if c not in original_form_columns]
             columns = original + new
-            io_func = self.io_func.project_columns(columns)
+
+            try:
+                io_func = self.io_func.project_columns(
+                    columns,
+                    original_form=original_form,
+                )
+            except TypeError:
+                io_func = self.io_func.project_columns(columns)
             return AwkwardInputLayer(
                 name=self.name,
                 columns=columns,
@@ -188,3 +202,29 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
                 behavior=self._behavior,
             )
         return self
+
+
+class AwkwardMaterializedLayer(MaterializedLayer):
+    def __init__(self, mapping, previous_layer_name, **kwargs):
+        self.prev_name = previous_layer_name
+        super().__init__(mapping, **kwargs)
+
+    def mock(self):
+        mapping = self.mapping.copy()
+        if not mapping:
+            # no partitions at all
+            return self, None
+        name = next(iter(mapping))[0]
+
+        if (name, 0) in mapping:
+            task = mapping[(name, 0)]
+            task = tuple(
+                (self.prev_name, 0)
+                if isinstance(v, tuple) and len(v) == 2 and v[0] == self.prev_name
+                else v
+                for v in task
+            )
+            return MaterializedLayer({(name, 0): task}), None
+
+        # failed to cull during column opt
+        return self, None
