@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 import keyword
 import logging
+import math
 import operator
 import sys
 import warnings
@@ -927,9 +928,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 (self.divisions[i] + slice_start) - self.divisions[i + 1]
             ) % step
             remainder = step - remainder if remainder < 0 else remainder
-            divisions.append(
-                divisions[-1] + len(list(range(slice_start, slice_end, step)))
-            )
+            nextdiv = math.ceil((slice_end - slice_start) / step)
+            divisions.append(divisions[-1] + nextdiv)
+
         hlg = HighLevelGraph.from_collections(
             name,
             AwkwardMaterializedLayer(dask, previous_layer_name=self.name),
