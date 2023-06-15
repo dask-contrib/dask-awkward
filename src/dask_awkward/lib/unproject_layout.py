@@ -3,7 +3,6 @@ from __future__ import annotations
 import math
 
 import awkward as ak
-import dask.config
 import numpy as np
 from awkward.contents import (
     BitMaskedArray,
@@ -375,7 +374,33 @@ def _unproject_layout(form, layout, length, backend):
         raise AssertionError(f"unexpected combination: {type(form)} and {type(layout)}")
 
 
-def unproject_layout(form: Form, layout: Content) -> Content:
-    if dask.config.get("awkward.optimization.enabled", False) and form is not None:
-        return _unproject_layout(form, layout, layout.length, layout.backend)
-    return layout
+def unproject_layout(form: Form | None, layout: Content) -> Content:
+    """Rehydrate a layout to include all parts of an original form.
+
+    When we perform the necessary columns optimization we drop fields
+    that are not necessary for a computed result. Sometimes we have
+    task graphs that expect to see fields in name only (but no their
+    data). To protect against FieldNotFound exception we "unproject"
+    or "rehydrate" the layout with the original form. This reapplys
+    all original fields, but the ones that were orignally projected
+    away are data-less.
+
+    Parameters
+    ----------
+    form : awkward.forms.form.Form, optional
+        The complete Form to apply to a projected layout. If ``None``,
+        the layout will be returned without unprojection (this case
+        assumes column projection did not occur).
+    layout : awkward.contents.content.Content
+        The projected layout.
+
+    Returns
+    -------
+    awkward.contents.content.Content
+        Unprojected layout (all fields from the original form that did
+        not appear in the projected layout will be PlaceholderArrays).
+
+    """
+    if form is None:
+        return layout
+    return _unproject_layout(form, layout, layout.length, layout.backend)
