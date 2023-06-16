@@ -489,7 +489,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if hasattr(dsk, "layers"):
             # i.e., NOT matrializes/persisted state
             # output typetracer
-            lay = list(dsk.layers.values())[-1]
+            lay = dsk.layers[dsk._toposort_layers()[-1]]
             if isinstance(lay, AwkwardBlockwiseLayer):
                 lay._meta = meta  # type: ignore
         self._name: str = name
@@ -934,15 +934,17 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         # make low-level graph
         for i in range(self.npartitions):
             if start > self.divisions[i + 1]:
-                # first partition not found
+                # first partition not yet found
                 continue
             if stop < self.divisions[i] and dask:
                 # no more partitions with valid rows
                 # does **NOT** exit if there are no partitions yet, to make sure there is always
                 # at least one, needed to get metadata of empty output right
                 break
-            slice_start = max(start - self.divisions[i] + remainder, 0)
-            slice_end = min(stop - self.divisions[i], self.divisions[i + 1])
+            slice_start = max(start - self.divisions[i], 0 + remainder)
+            slice_end = min(
+                stop - self.divisions[i], self.divisions[i + 1] - self.divisions[i]
+            )
             if (
                 slice_end == slice_start
                 and (self.divisions[i + 1] - self.divisions[i])
@@ -957,11 +959,13 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 rest,
             )
             outpart += 1
-            remainder += (self.divisions[i + 1] - self.divisions[i]) % step
-            divisions.append(
-                (self.divisions[i + 1] - self.divisions[i]) // step + divisions[-1]
-            )
-            remainder = remainder % step
+            remainder = (
+                (self.divisions[i] + slice_start) - self.divisions[i + 1]
+            ) % step
+            remainder = step - remainder if remainder < 0 else remainder
+            nextdiv = math.ceil((slice_end - slice_start) / step)
+            divisions.append(divisions[-1] + nextdiv)
+
         hlg = HighLevelGraph.from_collections(
             name,
             AwkwardMaterializedLayer(dask, previous_layer_name=self.name),
@@ -1639,7 +1643,7 @@ def total_reduction_to_scalar(
     comb_kwargs: dict[str, Any] | None = None,
     agg_kwargs: dict[str, Any] | None = None,
 ) -> Scalar:
-    from dask.layers import DataFrameTreeReduction
+    from dask_awkward.layers import AwkwardTreeReductionLayer
 
     chunked_kwargs = chunked_kwargs or {}
     token = token or tokenize(
@@ -1680,7 +1684,7 @@ def total_reduction_to_scalar(
     else:
         pass
 
-    dftr = DataFrameTreeReduction(
+    trl = AwkwardTreeReductionLayer(
         name=name_agg,
         name_input=chunked_result.name,
         npartitions_input=chunked_result.npartitions,
@@ -1692,7 +1696,7 @@ def total_reduction_to_scalar(
     )
 
     graph = HighLevelGraph.from_collections(
-        name_agg, dftr, dependencies=(chunked_result,)
+        name_agg, trl, dependencies=(chunked_result,)
     )
     return new_scalar_object(graph, name_agg, meta=meta)
 
