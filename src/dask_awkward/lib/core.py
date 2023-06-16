@@ -1736,12 +1736,11 @@ def non_trivial_reduction(
     else:
         pass
 
-    name_chunked = f"{label}-prepare-{token}"
-    chunked = partitionwise_layer(chunked_fn, name_chunked, prepared_array)
+    chunked = map_partitions(chunked_fn, prepared_array, meta=empty_typetracer())
 
     trl = AwkwardTreeReductionLayer(
         name=name_finalize,
-        name_input=name_chunked,
+        name_input=chunked.name,
         npartitions_input=prepared_array.npartitions,
         concat_func=concat_fn,
         tree_node_func=tree_node_fn,
@@ -1750,15 +1749,7 @@ def non_trivial_reduction(
         tree_node_name=name_tree_node,
     )
 
-    # Build graph
-    prepared_array_graph = prepared_array.__dask_graph__()
-    layers = {name_finalize: trl, name_chunked: chunked, **prepared_array_graph.layers}
-    dependencies = {
-        name_finalize: {name_chunked},
-        name_chunked: {prepared_array.name},
-        **prepared_array_graph.dependencies,
-    }
-    graph = HighLevelGraph(layers, dependencies)
+    graph = HighLevelGraph.from_collections(name_finalize, trl, dependencies=(chunked,))
 
     meta = reducer(
         array._meta,
