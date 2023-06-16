@@ -1708,7 +1708,7 @@ def non_trivial_reduction(
         "is_axis_none": axis is None,
     }
 
-    from dask.layers import DataFrameTreeReduction
+    from dask_awkward.layers import AwkwardTreeReductionLayer
 
     token = token or tokenize(
         array,
@@ -1739,7 +1739,7 @@ def non_trivial_reduction(
     name_chunked = f"{label}-prepare-{token}"
     chunked = partitionwise_layer(chunked_fn, name_chunked, prepared_array)
 
-    dftr = DataFrameTreeReduction(
+    trl = AwkwardTreeReductionLayer(
         name=name_finalize,
         name_input=name_chunked,
         npartitions_input=prepared_array.npartitions,
@@ -1752,7 +1752,7 @@ def non_trivial_reduction(
 
     # Build graph
     prepared_array_graph = prepared_array.__dask_graph__()
-    layers = {name_finalize: dftr, name_chunked: chunked, **prepared_array_graph.layers}
+    layers = {name_finalize: trl, name_chunked: chunked, **prepared_array_graph.layers}
     dependencies = {
         name_finalize: {name_chunked},
         name_chunked: {prepared_array.name},
