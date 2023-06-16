@@ -1616,7 +1616,7 @@ def total_reduction_to_scalar(
     comb_kwargs: dict[str, Any] | None = None,
     agg_kwargs: dict[str, Any] | None = None,
 ) -> Scalar:
-    from dask.layers import DataFrameTreeReduction
+    from dask_awkward.layers import AwkwardTreeReductionLayer
 
     chunked_kwargs = chunked_kwargs or {}
     token = token or tokenize(
@@ -1657,7 +1657,7 @@ def total_reduction_to_scalar(
     else:
         pass
 
-    dftr = DataFrameTreeReduction(
+    trl = AwkwardTreeReductionLayer(
         name=name_agg,
         name_input=chunked_result.name,
         npartitions_input=chunked_result.npartitions,
@@ -1669,7 +1669,7 @@ def total_reduction_to_scalar(
     )
 
     graph = HighLevelGraph.from_collections(
-        name_agg, dftr, dependencies=(chunked_result,)
+        name_agg, trl, dependencies=(chunked_result,)
     )
     return new_scalar_object(graph, name_agg, meta=meta)
 
