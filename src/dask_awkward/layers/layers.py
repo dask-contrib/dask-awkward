@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
 from dask.highlevelgraph import MaterializedLayer
+from dask.layers import DataFrameTreeReduction
 
 from dask_awkward.utils import LazyInputsDict
 
@@ -228,3 +229,20 @@ class AwkwardMaterializedLayer(MaterializedLayer):
 
         # failed to cull during column opt
         return self, None
+
+
+class AwkwardTreeReductionLayer(DataFrameTreeReduction):
+    def mock(self):
+        return (
+            AwkwardTreeReductionLayer(
+                name=self.name,
+                name_input=self.name_input,
+                npartitions_input=1,
+                concat_func=self.concat_func,
+                tree_node_func=self.tree_node_func,
+                finalize_func=self.finalize_func,
+                split_every=self.split_every,
+                tree_node_name=self.tree_node_name,
+            ),
+            None,
+        )
