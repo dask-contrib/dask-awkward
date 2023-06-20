@@ -3,15 +3,9 @@ from __future__ import annotations
 import awkward as ak
 import numpy as np
 import pytest
-from packaging.version import Version
 
 import dask_awkward as dak
-from dask_awkward.lib.testutils import assert_eq
-
-bad_np_mixin_slots_version = (Version(np.__version__) >= Version("1.25.0")) and (
-    Version(ak.__version__) <= Version("2.2.3")
-)
-
+from dask_awkward.lib.testutils import BAD_NP_AK_MIXIN_VERSIONING, assert_eq
 
 behaviors: dict = {}
 
@@ -38,7 +32,7 @@ class Point:
 
 
 @pytest.mark.xfail(
-    bad_np_mixin_slots_version,
+    BAD_NP_AK_MIXIN_VERSIONING,
     reason="NumPy 1.25 mixin __slots__ change",
 )
 def test_distance_behavior(
@@ -56,7 +50,7 @@ def test_distance_behavior(
 
 
 @pytest.mark.xfail(
-    bad_np_mixin_slots_version,
+    BAD_NP_AK_MIXIN_VERSIONING,
     reason="NumPy 1.25 mixin __slots__ change",
 )
 def test_property_behavior(daa_p1: dak.Array, caa_p1: ak.Array) -> None:
@@ -72,7 +66,7 @@ def test_property_behavior(daa_p1: dak.Array, caa_p1: ak.Array) -> None:
 
 
 @pytest.mark.xfail(
-    bad_np_mixin_slots_version,
+    BAD_NP_AK_MIXIN_VERSIONING,
     reason="NumPy 1.25 mixin __slots__ change",
 )
 def test_nonexistent_behavior(daa_p1: dak.Array, daa_p2: dak.Array) -> None:

@@ -16,10 +16,9 @@ from distributed.utils_test import cleanup  # noqa
 from distributed.utils_test import loop  # noqa
 from distributed.utils_test import loop_in_thread  # noqa
 from distributed.utils_test import cluster, gen_cluster
-from packaging.version import Version
 
 import dask_awkward as dak
-from dask_awkward.lib.testutils import assert_eq
+from dask_awkward.lib.testutils import BAD_NP_AK_MIXIN_VERSIONING, assert_eq
 
 # @pytest.fixture(scope="session")
 # def small_cluster():
@@ -31,11 +30,6 @@ from dask_awkward.lib.testutils import assert_eq
 # def simple_client(small_cluster):
 #     with Client(small_cluster) as client:
 #         yield client
-
-
-bad_np_mixin_slots_version = (Version(np.__version__) >= Version("1.25.0")) and (
-    Version(ak.__version__) <= Version("2.2.3")
-)
 
 
 def test_compute(loop, ndjson_points_file):  # noqa
@@ -108,7 +102,7 @@ class Point:
 
 
 @pytest.mark.xfail(
-    bad_np_mixin_slots_version,
+    BAD_NP_AK_MIXIN_VERSIONING,
     reason="NumPy 1.25 mixin __slots__ change",
 )
 def test_from_list_behaviorized(loop, L1, L2):  # noqa

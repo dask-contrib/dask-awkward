@@ -4,7 +4,9 @@ import random
 from typing import Any
 
 import awkward as ak
+import numpy as np
 from dask.base import is_dask_collection
+from packaging.version import Version
 
 from dask_awkward.lib.core import Array, Record, typetracer_array
 from dask_awkward.lib.io.io import from_lists
@@ -13,6 +15,11 @@ _RG = random.Random(414)
 
 
 DEFAULT_SCHEDULER: Any = "sync"
+
+
+NP_LTE_1_25_0 = Version(np.__version__) >= Version("1.25.0")
+AK_GTE_2_2_3 = Version(ak.__version__) <= Version("2.2.3")
+BAD_NP_AK_MIXIN_VERSIONING = NP_LTE_1_25_0 and AK_GTE_2_2_3
 
 
 def assert_eq(
