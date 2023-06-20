@@ -2062,10 +2062,17 @@ def typetracer_from_form(form: Form) -> ak.Array:
 
 
 def make_unknown_length(array: ak.Array) -> ak.Array:
-    return ak.Array(
-        ak.to_backend(
-            array,
-            "typetracer",
-            highlevel=False,
-        ).to_typetracer(forget_length=True)
-    )
+    """Make any highlevel Array a highlevel typetracer Array with unknown length.
+
+    Parameters
+    ----------
+    array : ak.Array
+        Array of interest
+
+    Returns
+    -------
+    ak.Array
+        Highlevel typetracer Array with unknown length.
+
+    """
+    return ak.Array(ak.to_layout(array).to_typetracer(forget_length=True))
