@@ -1576,31 +1576,6 @@ def map_partitions(
         )
 
 
-def _from_iter(obj):
-    """Try to run ak.from_iter, but have fallbacks.
-
-    This function first tries to call ak.form_iter on the input (which
-    should be some iterable). We expect a list of Scalar typetracers
-    to fail, so if the call fails due to ValueError or TypeError then
-    we manually do some typetracer operations to return the proper
-    representation of the input iterable-of-typetracers.
-
-    """
-    try:
-        return ak.from_iter(obj)
-    except (ValueError, TypeError):
-        first_obj = obj[0]
-
-        if isinstance(first_obj, MaybeNone):
-            first_obj = first_obj.content
-
-        return ak.Array(
-            ak.Array(first_obj)
-            .layout.form.length_one_array()
-            .layout.to_typetracer(forget_length=True)
-        )
-
-
 PartialReductionType = ak.Array
 
 
@@ -1771,79 +1746,6 @@ def non_trivial_reduction(
         return new_scalar_object(graph, name_finalize, meta=meta)
 
 
-def total_reduction_to_scalar(
-    *,
-    label: str,
-    array: Array,
-    meta: Any,
-    chunked_fn: Callable,
-    comb_fn: Callable | None = None,
-    agg_fn: Callable | None = None,
-    token: str | None = None,
-    dtype: Any | None = None,
-    split_every: int | bool | None = None,
-    chunked_kwargs: dict[str, Any] | None = None,
-    comb_kwargs: dict[str, Any] | None = None,
-    agg_kwargs: dict[str, Any] | None = None,
-) -> Scalar:
-    from dask_awkward.layers import AwkwardTreeReductionLayer
-
-    chunked_kwargs = chunked_kwargs or {}
-    token = token or tokenize(
-        array,
-        chunked_fn,
-        comb_fn,
-        agg_fn,
-        label,
-        dtype,
-        split_every,
-        chunked_kwargs,
-        comb_kwargs,
-        agg_kwargs,
-    )
-    name_comb = f"{label}-combine-{token}"
-    name_agg = f"{label}-agg-{token}"
-
-    comb_kwargs = comb_kwargs or chunked_kwargs
-    agg_kwargs = agg_kwargs or comb_kwargs
-
-    comb_fn = comb_fn or chunked_fn
-    agg_fn = agg_fn or comb_fn
-
-    chunked_fn = partial(chunked_fn, **chunked_kwargs)
-    comb_fn = partial(comb_fn, **comb_kwargs)
-    agg_fn = partial(agg_fn, **agg_kwargs)
-
-    chunked_result = map_partitions(
-        chunked_fn,
-        array,
-        meta=empty_typetracer(),
-    )
-
-    if split_every is None:
-        split_every = 8
-    elif split_every is False:
-        split_every = sys.maxsize
-    else:
-        pass
-
-    trl = AwkwardTreeReductionLayer(
-        name=name_agg,
-        name_input=chunked_result.name,
-        npartitions_input=chunked_result.npartitions,
-        concat_func=_from_iter,
-        tree_node_func=comb_fn,
-        finalize_func=agg_fn,
-        split_every=split_every,
-        tree_node_name=name_comb,
-    )
-
-    graph = HighLevelGraph.from_collections(
-        name_agg, trl, dependencies=(chunked_result,)
-    )
-    return new_scalar_object(graph, name_agg, meta=meta)
-
-
 def calculate_known_divisions(array: Array) -> tuple[int, ...]:
     """Determine the divisions of a collection.
 
@@ -1889,24 +1791,6 @@ def _type(array: Array) -> Type | None:
     if array._meta is not None:
         return array._meta.layout.form.type
     return None
-
-
-def ndim(array: Array) -> int:
-    """Number of dimensions before reaching a numeric type or a record.
-
-    Parameters
-    ----------
-    array : dask_awkward.Array
-        The collection
-
-    Returns
-    -------
-    int or None
-        Number of dimensions as an integer, or ``None`` if the
-        collection does not contain metadata.
-
-    """
-    return array.ndim
 
 
 def is_awkward_collection(obj: Any) -> bool:
@@ -2131,15 +2015,6 @@ def compatible_partitions(*args: Array) -> bool:
                 if a.divisions != arg.divisions:
                     return False
 
-    return True
-
-
-def compatible_divisions(*args: Array) -> bool:
-    if not all(a.known_divisions for a in args):
-        return False
-    for arg in args[1:]:
-        if arg.divisions != args[0].divisions:
-            return False
     return True
 
 
