@@ -707,8 +707,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         dsk = {(name, i): tuple(key) for i, key in enumerate(new_keys)}
         graph = HighLevelGraph.from_collections(
             name,
-            AwkwardMaterializedLayer(dsk, previous_layer_name=self.name),
-            dependencies=[self],
+            AwkwardMaterializedLayer(dsk, previous_layer_names=[self.name]),
+            dependencies=(self,),
         )
 
         # if a single partition was requested we trivially know the new divisions.
@@ -874,7 +874,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         }
         hlg = HighLevelGraph.from_collections(
             name,
-            AwkwardMaterializedLayer(dsk, previous_layer_name=self.name),
+            AwkwardMaterializedLayer(dsk, previous_layer_names=[self.name]),
             dependencies=[partition],
         )
         if isinstance(new_meta, ak.Record):
@@ -941,7 +941,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         hlg = HighLevelGraph.from_collections(
             name,
-            AwkwardMaterializedLayer(dask, previous_layer_name=self.name),
+            AwkwardMaterializedLayer(dask, previous_layer_names=[self.name]),
             dependencies=[self],
         )
         return new_array_object(
