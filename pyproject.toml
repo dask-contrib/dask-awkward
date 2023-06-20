@@ -27,6 +27,7 @@ classifiers = [
   "Topic :: Scientific/Engineering",
 ]
 dependencies = [
+  "numpy <=1.24.3",
   "awkward >=2.2.2",
   "dask >=2023.04.0",
 ]
