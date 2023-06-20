@@ -707,8 +707,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         dsk = {(name, i): tuple(key) for i, key in enumerate(new_keys)}
         graph = HighLevelGraph.from_collections(
             name,
-            AwkwardMaterializedLayer(dsk, previous_layer_name=self.name),
-            dependencies=[self],
+            AwkwardMaterializedLayer(dsk, previous_layer_names=[self.name]),
+            dependencies=(self,),
         )
 
         # if a single partition was requested we trivially know the new divisions.
@@ -843,6 +843,14 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             partition = self.partitions[pidx]
             if partition._meta is not None:
                 new_meta = partition._meta[where]
+                # new_meta = make_unknown_length(partition._meta)[where]
+                # new_meta = ak.Array(
+                #     ak.to_backend(
+                #         partition._meta,
+                #         "typetracer",
+                #         highlevel=False,
+                #     ).to_typetracer(forget_length=True)
+                # )[where]
 
         # if we know a new array is going to be made, just call the
         # trivial inner on the new partition.
@@ -866,7 +874,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         }
         hlg = HighLevelGraph.from_collections(
             name,
-            AwkwardMaterializedLayer(dsk, previous_layer_name=self.name),
+            AwkwardMaterializedLayer(dsk, previous_layer_names=[self.name]),
             dependencies=[partition],
         )
         if isinstance(new_meta, ak.Record):
@@ -933,7 +941,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         hlg = HighLevelGraph.from_collections(
             name,
-            AwkwardMaterializedLayer(dask, previous_layer_name=self.name),
+            AwkwardMaterializedLayer(dask, previous_layer_names=[self.name]),
             dependencies=[self],
         )
         return new_array_object(
@@ -2051,3 +2059,20 @@ def typetracer_from_form(form: Form) -> ak.Array:
     """
     layout = form.length_zero_array(highlevel=False)
     return ak.Array(layout.to_typetracer(forget_length=True))
+
+
+def make_unknown_length(array: ak.Array) -> ak.Array:
+    """Make any highlevel Array a highlevel typetracer Array with unknown length.
+
+    Parameters
+    ----------
+    array : ak.Array
+        Array of interest
+
+    Returns
+    -------
+    ak.Array
+        Highlevel typetracer Array with unknown length.
+
+    """
+    return ak.Array(ak.to_layout(array).to_typetracer(forget_length=True))

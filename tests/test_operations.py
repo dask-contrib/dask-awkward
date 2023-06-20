@@ -8,10 +8,11 @@ from dask_awkward.lib.testutils import assert_eq
 from dask_awkward.utils import IncompatiblePartitions
 
 
-def test_concatenate_simple(daa, caa):
+@pytest.mark.parametrize("axis", [0, 1])
+def test_concatenate_simple(daa, caa, axis):
     assert_eq(
-        ak.concatenate([caa.points.x, caa.points.y], axis=0),
-        dak.concatenate([daa.points.x, daa.points.y], axis=0),
+        ak.concatenate([caa.points.x, caa.points.y], axis=axis),
+        dak.concatenate([daa.points.x, daa.points.y], axis=axis),
     )
 
 
