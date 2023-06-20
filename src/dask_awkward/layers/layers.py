@@ -24,7 +24,7 @@ class AwkwardBlockwiseLayer(Blockwise):
         ob.__dict__.update(layer.__dict__)
         return ob
 
-    def mock(self):
+    def mock(self) -> tuple[AwkwardBlockwiseLayer, Any | None]:
         layer = copy.copy(self)
         nb = layer.numblocks
         layer.numblocks = {k: tuple(1 for _ in v) for k, v in nb.items()}
@@ -206,12 +206,19 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
 
 
 class AwkwardMaterializedLayer(MaterializedLayer):
-    def __init__(self, mapping, *, previous_layer_names, fn=None, **kwargs):
+    def __init__(
+        self,
+        mapping: dict,
+        *,
+        previous_layer_names: list[str],
+        fn: Callable | None = None,
+        **kwargs: Any,
+    ):
         self.previous_layer_names: list[str] = previous_layer_names
         self.fn = fn
         super().__init__(mapping, **kwargs)
 
-    def mock(self):
+    def mock(self) -> tuple[MaterializedLayer, Any | None]:
         mapping = self.mapping.copy()
         if not mapping:
             # no partitions at all
@@ -259,7 +266,7 @@ class AwkwardMaterializedLayer(MaterializedLayer):
 
 
 class AwkwardTreeReductionLayer(DataFrameTreeReduction):
-    def mock(self):
+    def mock(self) -> tuple[AwkwardTreeReductionLayer, Any | None]:
         return (
             AwkwardTreeReductionLayer(
                 name=self.name,
