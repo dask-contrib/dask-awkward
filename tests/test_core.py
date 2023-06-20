@@ -48,7 +48,7 @@ def test_clear_divisions(ndjson_points_file: str) -> None:
 
 
 def test_dunder_str(daa: Array) -> None:
-    assert str(daa) == "dask.awkward<from-json, npartitions=3>"
+    assert str(daa) == "dask.awkward<from-parquet, npartitions=3>"
 
 
 def test_calculate_known_divisions(ndjson_points_file: str) -> None:
@@ -601,3 +601,31 @@ def test_optimize_chain_multiple(daa):
     result = (daa.points.x**2 - daa.points.y) + 1
 
     assert len(result.compute()) > 0
+
+
+def test_make_unknown_length():
+    from dask_awkward.lib.core import make_unknown_length
+
+    arr = ak.Array(
+        [
+            {"a": [1, 2, 3], "b": 5},
+            {"a": [], "b": -1},
+            {"a": [9, 8, 7, 6], "b": 0},
+        ]
+    )
+    tt1 = ak.Array(arr.layout.to_typetracer())
+
+    # sanity checks
+    assert ak.backend(tt1) == "typetracer"
+    assert len(tt1) == 3
+
+    ul_arr = make_unknown_length(arr)
+    ul_tt1 = make_unknown_length(tt1)
+
+    assert ul_arr.layout.form == ul_tt1.layout.form
+
+    with pytest.raises(TypeError, match="cannot interpret unknown lengths"):
+        len(ul_arr)
+
+    with pytest.raises(TypeError, match="cannot interpret unknown lengths"):
+        len(ul_tt1)

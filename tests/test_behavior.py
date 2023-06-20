@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 import dask_awkward as dak
-from dask_awkward.lib.testutils import assert_eq
+from dask_awkward.lib.testutils import BAD_NP_AK_MIXIN_VERSIONING, assert_eq
 
 behaviors: dict = {}
 
@@ -31,6 +31,10 @@ class Point:
         return _dask_array_
 
 
+@pytest.mark.xfail(
+    BAD_NP_AK_MIXIN_VERSIONING,
+    reason="NumPy 1.25 mixin __slots__ change",
+)
 def test_distance_behavior(
     daa_p1: dak.Array,
     daa_p2: dak.Array,
@@ -45,6 +49,10 @@ def test_distance_behavior(
     assert_eq(np.abs(daa1), np.abs(caa1))
 
 
+@pytest.mark.xfail(
+    BAD_NP_AK_MIXIN_VERSIONING,
+    reason="NumPy 1.25 mixin __slots__ change",
+)
 def test_property_behavior(daa_p1: dak.Array, caa_p1: ak.Array) -> None:
     daa = dak.with_name(daa_p1.points, name="Point", behavior=behaviors)
     caa = ak.Array(caa_p1.points, with_name="Point", behavior=behaviors)
@@ -57,6 +65,10 @@ def test_property_behavior(daa_p1: dak.Array, caa_p1: ak.Array) -> None:
     assert repr(daa.non_dask_method()) == repr(daa)
 
 
+@pytest.mark.xfail(
+    BAD_NP_AK_MIXIN_VERSIONING,
+    reason="NumPy 1.25 mixin __slots__ change",
+)
 def test_nonexistent_behavior(daa_p1: dak.Array, daa_p2: dak.Array) -> None:
     daa1 = dak.with_name(daa_p1["points"], "Point", behavior=behaviors)
     daa2 = daa_p2
