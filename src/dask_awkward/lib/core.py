@@ -10,7 +10,7 @@ import warnings
 from collections.abc import Callable, Hashable, Mapping, Sequence
 from functools import cached_property, partial
 from numbers import Number
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 import awkward as ak
 import dask.config
@@ -642,7 +642,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     @property
     def known_divisions(self) -> bool:
-        """True of the divisions are known (absence of ``None`` in the tuple)."""
+        """True if the divisions are known (absence of ``None`` in the tuple)."""
         return len(self.divisions) > 0 and None not in self.divisions
 
     @property
@@ -1599,6 +1599,176 @@ def _from_iter(obj):
             .layout.form.length_one_array()
             .layout.to_typetracer(forget_length=True)
         )
+
+
+PartialReductionType = ak.Array
+
+
+def _chunk_reducer_non_positional(
+    chunk: ak.Array | PartialReductionType,
+    is_axis_none: bool,
+    *,
+    reducer: Callable,
+    mask_identity: bool,
+) -> PartialReductionType:
+    return reducer(
+        chunk,
+        keepdims=True,
+        axis=-1 if is_axis_none else 0,
+        mask_identity=mask_identity,
+    )
+
+
+def _concat_reducer_non_positional(
+    partials: list[PartialReductionType], is_axis_none: bool
+) -> ak.Array:
+    concat_axis = -1 if is_axis_none else 0
+    return ak.concatenate(partials, axis=concat_axis)
+
+
+def _finalise_reducer_non_positional(
+    partial: PartialReductionType,
+    is_axis_none: bool,
+    *,
+    reducer: Callable,
+    mask_identity: bool,
+    keepdims: bool,
+) -> ak.Array:
+    return reducer(
+        partial,
+        axis=None if is_axis_none else 0,
+        keepdims=keepdims,
+        mask_identity=mask_identity,
+    )
+
+
+def _prepare_axis_none_chunk(chunk: ak.Array) -> ak.Array:
+    # TODO: this is private Awkward code. We should figure out how to export it
+    # if needed
+    (layout,) = ak._do.remove_structure(
+        ak.to_layout(chunk),
+        flatten_records=False,
+        drop_nones=False,
+        keepdims=True,
+        allow_records=False,
+    )
+    return ak.Array(layout, behavior=chunk.behavior)
+
+
+def non_trivial_reduction(
+    *,
+    label: str,
+    array: Array,
+    axis: Literal[0] | None,
+    is_positional: bool,
+    keepdims: bool,
+    mask_identity: bool,
+    reducer: Callable,
+    combiner: Callable | None = None,
+    token: str | None = None,
+    dtype: Any | None = None,
+    split_every: int | bool | None = None,
+):
+    if is_positional:
+        raise NotImplementedError("positional reducers at axis=0 or axis=None")
+
+    # Regularise the axis to (0, None)
+    if axis == 0 or axis == -1 * array.ndim:
+        axis = 0
+    elif axis is not None:
+        raise ValueError(axis)
+
+    if combiner is None:
+        combiner = reducer
+
+    if is_positional:
+        assert combiner is reducer
+
+    # For `axis=None`, we prepare each array to have the following structure:
+    #   [[[ ... [x1 x2 x3 ... xN] ... ]]] (length-1 outer lists)
+    # This makes the subsequent reductions an `axis=-1` reduction
+    if axis is None:
+        prepared_array = map_partitions(_prepare_axis_none_chunk, array)
+    else:
+        prepared_array = array
+
+    chunked_fn = _chunk_reducer_non_positional
+    tree_node_fn = _chunk_reducer_non_positional
+    concat_fn = _concat_reducer_non_positional
+    finalize_fn = _finalise_reducer_non_positional
+
+    chunked_kwargs = {
+        "reducer": reducer,
+        "is_axis_none": axis is None,
+        "mask_identity": mask_identity,
+    }
+    tree_node_kwargs = {
+        "reducer": combiner,
+        "is_axis_none": axis is None,
+        "mask_identity": mask_identity,
+    }
+
+    concat_kwargs = {"is_axis_none": axis is None}
+    finalize_kwargs = {
+        "reducer": combiner,
+        "mask_identity": mask_identity,
+        "keepdims": keepdims,
+        "is_axis_none": axis is None,
+    }
+
+    from dask_awkward.layers import AwkwardTreeReductionLayer
+
+    token = token or tokenize(
+        array,
+        reducer,
+        label,
+        dtype,
+        split_every,
+        chunked_kwargs,
+        tree_node_kwargs,
+        concat_kwargs,
+        finalize_kwargs,
+    )
+    name_tree_node = f"{label}-tree-node-{token}"
+    name_finalize = f"{label}-finalize-{token}"
+
+    chunked_fn = partial(chunked_fn, **chunked_kwargs)
+    tree_node_fn = partial(tree_node_fn, **tree_node_kwargs)
+    concat_fn = partial(concat_fn, **concat_kwargs)
+    finalize_fn = partial(finalize_fn, **finalize_kwargs)
+
+    if split_every is None:
+        split_every = 8
+    elif split_every is False:
+        split_every = sys.maxsize
+    else:
+        pass
+
+    chunked = map_partitions(chunked_fn, prepared_array, meta=empty_typetracer())
+
+    trl = AwkwardTreeReductionLayer(
+        name=name_finalize,
+        name_input=chunked.name,
+        npartitions_input=prepared_array.npartitions,
+        concat_func=concat_fn,
+        tree_node_func=tree_node_fn,
+        finalize_func=finalize_fn,
+        split_every=split_every,
+        tree_node_name=name_tree_node,
+    )
+
+    graph = HighLevelGraph.from_collections(name_finalize, trl, dependencies=(chunked,))
+
+    meta = reducer(
+        array._meta,
+        axis=axis,
+        keepdims=keepdims,
+        mask_identity=mask_identity,
+    )
+    if isinstance(meta, ak.highlevel.Array):
+        return new_array_object(graph, name_finalize, meta=meta, npartitions=1)
+    else:
+        return new_scalar_object(graph, name_finalize, meta=meta)
 
 
 def total_reduction_to_scalar(
