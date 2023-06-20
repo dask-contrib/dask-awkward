@@ -37,13 +37,15 @@ Homepage = "https://github.com/dask-contrib/dask-awkward"
 "Bug Tracker" = "https://github.com/dask-contrib/dask-awkward/issues"
 
 [project.optional-dependencies]
+io = [
+  "aiohttp",
+  "pyarrow",
+]
 complete = [
   "aiohttp",
   "pyarrow",
-  "pytest >=6.0",
-  "pytest-cov >=3.0.0",
-  "requests >=2.27.1",
 ]
+# `docs` and `test` are separate from user installs
 docs = [
   "dask-sphinx-theme >=3.0.2",
   "pyarrow",
@@ -51,10 +53,6 @@ docs = [
   "pytest >=6.0",
   "pytest-cov >=3.0.0",
   "requests >=2.27.1",
-]
-io = [
-  "aiohttp",
-  "pyarrow",
 ]
 test = [
   "aiohttp",
