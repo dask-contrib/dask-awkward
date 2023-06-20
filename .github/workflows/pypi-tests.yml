@@ -31,7 +31,7 @@ jobs:
       run: |
         pip install pip wheel -U
         pip install dask[complete]
-        pip install -q --no-cache-dir .[complete]
+        pip install -q --no-cache-dir .[complete,test]
         pip list
     - name: test
       run: |

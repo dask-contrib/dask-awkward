@@ -24,7 +24,7 @@ class AwkwardBlockwiseLayer(Blockwise):
         ob.__dict__.update(layer.__dict__)
         return ob
 
-    def mock(self):
+    def mock(self) -> tuple[AwkwardBlockwiseLayer, Any | None]:
         layer = copy.copy(self)
         nb = layer.numblocks
         layer.numblocks = {k: tuple(1 for _ in v) for k, v in nb.items()}
@@ -206,25 +206,59 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
 
 
 class AwkwardMaterializedLayer(MaterializedLayer):
-    def __init__(self, mapping, previous_layer_name, **kwargs):
-        self.prev_name = previous_layer_name
+    def __init__(
+        self,
+        mapping: dict,
+        *,
+        previous_layer_names: list[str],
+        fn: Callable | None = None,
+        **kwargs: Any,
+    ):
+        self.previous_layer_names: list[str] = previous_layer_names
+        self.fn = fn
         super().__init__(mapping, **kwargs)
 
-    def mock(self):
+    def mock(self) -> tuple[MaterializedLayer, Any | None]:
         mapping = self.mapping.copy()
         if not mapping:
             # no partitions at all
             return self, None
         name = next(iter(mapping))[0]
 
-        if (name, 0) in mapping:
-            task = mapping[(name, 0)]
-            task = tuple(
-                (self.prev_name, 0)
-                if isinstance(v, tuple) and len(v) == 2 and v[0] == self.prev_name
-                else v
-                for v in task
-            )
+        # one previous layer name
+        #
+        # this case is used for mocking repartition or slicing where
+        # we maybe have multiple partitions that need to be included
+        # in a task.
+        if len(self.previous_layer_names) == 1:
+            prev_name: str = self.previous_layer_names[0]
+            if (name, 0) in mapping:
+                task = mapping[(name, 0)]
+                task = tuple(
+                    (prev_name, 0)
+                    if isinstance(v, tuple) and len(v) == 2 and v[0] == prev_name
+                    else v
+                    for v in task
+                )
+
+                # when using Array.partitions we need to mock that we
+                # just want the first partition.
+                if len(task) == 2 and task[1] > 0:
+                    task = (task[0], 0)
+                return MaterializedLayer({(name, 0): task}), None
+            return self, None
+
+        # more than one previous_layer_names
+        #
+        # this case is needed for dak.concatenate on axis=0; we need
+        # the first partition of _each_ of the previous layer names!
+        else:
+            if self.fn is None:
+                raise ValueError(
+                    "For multiple previous layers the fn argument cannot be None."
+                )
+            name0s = tuple((name, 0) for name in self.previous_layer_names)
+            task = (self.fn, *name0s)
             return MaterializedLayer({(name, 0): task}), None
 
         # failed to cull during column opt
@@ -232,7 +266,7 @@ class AwkwardMaterializedLayer(MaterializedLayer):
 
 
 class AwkwardTreeReductionLayer(DataFrameTreeReduction):
-    def mock(self):
+    def mock(self) -> tuple[AwkwardTreeReductionLayer, Any | None]:
         return (
             AwkwardTreeReductionLayer(
                 name=self.name,

@@ -63,8 +63,20 @@ def ndjson_points_file_str(ndjson_points1_str: str) -> str:
 
 
 @pytest.fixture(scope="session")
-def daa(ndjson_points1: str) -> dak.Array:
+def daa_old(ndjson_points1: str) -> dak.Array:
     return dak.from_json([ndjson_points1] * 3)
+
+
+@pytest.fixture(scope="session")
+def pq_points_dir(daa_old, tmp_path_factory) -> str:
+    pqdir = tmp_path_factory.mktemp("pqfiles")
+    dak.to_parquet(daa_old, str(pqdir), compute=True)
+    return str(pqdir)
+
+
+@pytest.fixture(scope="session")
+def daa(pq_points_dir: str) -> dak.Array:
+    return dak.from_parquet(pq_points_dir)
 
 
 @pytest.fixture(scope="session")
