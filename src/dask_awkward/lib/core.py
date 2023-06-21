@@ -22,7 +22,13 @@ from awkward._nplikes.typetracer import (
     is_unknown_scalar,
 )
 from awkward.highlevel import _dir_pattern
-from dask.base import DaskMethodsMixin, dont_optimize, is_dask_collection, unpack_collections, tokenize
+from dask.base import (
+    DaskMethodsMixin,
+    dont_optimize,
+    is_dask_collection,
+    tokenize,
+    unpack_collections,
+)
 from dask.blockwise import BlockwiseDep
 from dask.blockwise import blockwise as dask_blockwise
 from dask.context import globalmethod
@@ -1176,7 +1182,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             collection, if arguments are Array collections
             they must be compatibly partitioned with the object this
             method is being called from.
-        traverse : bool                                                                                                                                                                                                                                
+        traverse : bool
             Unpack basic python containers to find dask collections.
         **kwargs : Any
             Additional keyword arguments passed to the `func`.
@@ -1500,7 +1506,7 @@ def map_partitions(
     opt_touch_all : bool
         Touch all layers in this graph during typetracer based
         optimization.
-    traverse : bool                                                                                                                                                                                                                                
+    traverse : bool
         Unpack basic python containers to find dask collections.
     **kwargs : Any
         Additional keyword arguments passed to the `fn`.
