@@ -1920,9 +1920,16 @@ def to_length_zero_arrays(objects: Sequence[Any]) -> tuple[Any, ...]:
 
 
 def map_meta(fn: Callable, *args: Any, **kwargs: Any) -> ak.Array | None:
-    metas = to_meta(args)
+    arg_colls, arg_repack = unpack_collections(args, traverse=traverse)
+    kwarg_colls, kwarg_repack = unpack_collections(kwargs, traverse=traverse)
+
+    arg_metas = to_meta(arg_colls)
+    kwarg_metas = to_meta(kwarg_colls)
+
+    arg_metas = arg_repack(arg_metas)
+    kwarg_metas = kwarg_repack(kwarg_metas)
     try:
-        meta = fn(*metas, **kwargs)
+        meta = fn(*arg_metas, **kwarg_metas)
         return meta
     except Exception as err:
         # if compute-unknown-meta is False then we don't care about
