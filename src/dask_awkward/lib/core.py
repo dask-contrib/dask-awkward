@@ -1459,7 +1459,7 @@ def partitionwise_layer(
 
 
 def map_partitions(
-    fn: Callable,
+    base_fn: Callable,
     *args: Any,
     label: str | None = None,
     token: str | None = None,
@@ -1473,9 +1473,10 @@ def map_partitions(
 
     Parameters
     ----------
-    fn : Callable
-        Function to apply on all partitions.
-    *args : Collections and function arguments
+    base_fn : Callable
+        Function to apply on all partitions, this will get wraped to
+        handle kwargs, including dask collections.
+    *base_args : Collections and function arguments
         Arguments passed to the function. Partitioned arguments (i.e.
         Dask collections) will have `fn` applied to each partition.
         Array collection arguments they must be compatibly
@@ -1507,7 +1508,7 @@ def map_partitions(
         optimization.
     traverse : bool
         Unpack basic python containers to find dask collections.
-    **kwargs : Any
+    **base_kwargs : Any
         Additional keyword arguments passed to the `fn`.
 
     Returns
@@ -1542,20 +1543,33 @@ def map_partitions(
     This is effectively the same as `d = c * a`
 
     """
-    token = token or tokenize(fn, *args, meta, **kwargs)
-    label = label or funcname(fn)
+    token = token or tokenize(base_fn, *args, meta, **kwargs)
+    label = label or funcname(base_fn)
     name = f"{label}-{token}"
+    deps, repacker = unpack_collections(*args, kwargs, traverse=traverse)
+
+    # here we know that __repacker__(args)[-1] is original kwargs
+    def packed_fn(the_fn, therepacker, *deps_as_args):
+        repacked = therepacker(deps_as_args)
+        kwargs = repacked[-1]
+        args = repacked[:-1]
+        return the_fn(*args, **kwargs)
+
+    fn = partial(
+        packed_fn,
+        base_fn,
+        repacker,
+    )
+
     lay = partitionwise_layer(
         fn,
         name,
-        *args,
+        *deps,
         opt_touch_all=opt_touch_all,
-        **kwargs,
     )
-    deps, _ = unpack_collections(*args, *kwargs.values(), traverse=traverse)
 
     if meta is None:
-        meta = map_meta(fn, *args, traverse=traverse, **kwargs)
+        meta = map_meta(fn, *deps)
 
     hlg = HighLevelGraph.from_collections(
         name,
@@ -1931,19 +1945,11 @@ def to_length_zero_arrays(objects: Sequence[Any]) -> tuple[Any, ...]:
     return tuple(map(length_zero_array_or_identity, objects))
 
 
-def map_meta(
-    fn: Callable, *args: Any, traverse: bool = True, **kwargs: Any
-) -> ak.Array | None:
-    arg_colls, arg_repack = unpack_collections(args, traverse=traverse)
-    kwarg_colls, kwarg_repack = unpack_collections(kwargs, traverse=traverse)
-
-    arg_metas = to_meta(arg_colls)
-    kwarg_metas = to_meta(kwarg_colls)
-
-    arg_metas = arg_repack(arg_metas)[0]
-    kwarg_metas = kwarg_repack(kwarg_metas)[0]
+def map_meta(fn: Callable, *deps: Any) -> ak.Array | None:
+    # NOTE: fn is assumed to be a *packed* function
+    #       as defined up in map_partitions. be careful!
     try:
-        meta = fn(*arg_metas, **kwarg_metas)
+        meta = fn(*to_meta(deps))
         return meta
     except Exception as err:
         # if compute-unknown-meta is False then we don't care about
@@ -1966,9 +1972,8 @@ def map_meta(
             )
         pass
     try:
-        arg_lzas = arg_repack(to_length_zero_arrays(arg_colls))[0]
-        kwarg_lzas = kwarg_repack(to_length_zero_arrays(kwarg_colls))[0]
-        meta = typetracer_from_form(fn(*arg_lzas, **kwarg_lzas).layout.form)
+        arg_lzas = to_length_zero_arrays(deps)
+        meta = typetracer_from_form(fn(*arg_lzas).layout.form)
         return meta
     except Exception:
         # if compute-unknown-meta is True and we've gotten to this
@@ -1976,11 +1981,7 @@ def map_meta(
         # to happen as a consequence of us not being able to determine
         # metadata.
         if dask.config.get("awkward.compute-unknown-meta"):
-            extras = (
-                f"function call: {fn}\n"
-                f"args metadata: {arg_metas}\n"
-                f"kwargs metadata: {kwarg_metas}\n"
-            )
+            extras = f"function call: {fn}\n" f"metadata: {deps}\n"
             warnings.warn(
                 "metadata could not be determined; "
                 "a compute on the first partition will occur.\n"
