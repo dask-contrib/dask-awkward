@@ -629,3 +629,19 @@ def test_make_unknown_length():
 
     with pytest.raises(TypeError, match="cannot interpret unknown lengths"):
         len(ul_tt1)
+
+
+def my_power(arg_x, *, kwarg_y=None):
+    return arg_x**kwarg_y
+
+
+def test_map_partitions_args_and_kwargs_have_collection():
+    xc = ak.Array([[1, 2, 3], [4, 5], [6, 7, 8]])
+    yc = ak.Array([0, 1, 2])
+    xl = dak.from_awkward(xc, npartitions=3)
+    yl = dak.from_awkward(yc, npartitions=3)
+
+    zc = my_power(xc, kwarg_y=yc)
+    zl = dak.map_partitions(my_power, xl, kwarg_y=yl)
+
+    assert_eq(zc, zl)

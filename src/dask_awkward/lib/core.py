@@ -10,7 +10,7 @@ import warnings
 from collections.abc import Callable, Hashable, Mapping, Sequence
 from functools import cached_property, partial
 from numbers import Number
-from typing import TYPE_CHECKING, Any, Literal, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, overload
 
 import awkward as ak
 import dask.config
@@ -1888,21 +1888,33 @@ def meta_or_identity(obj: Any) -> Any:
     return obj
 
 
+@overload
 def to_meta(objects: Sequence[Any]) -> tuple[Any, ...]:
-    """In a sequence convert Dask Awkward collections to their metas.
+    ...
+
+
+@overload
+def to_meta(objects: dict[str, Any]) -> dict[str, Any]:
+    ...
+
+
+def to_meta(objects):
+    """Convert sequence or dict of Dask Awkward collections to their metas.
 
     Parameters
     ----------
-    objects : Sequence[Any]
-        Sequence of objects.
+    objects : Sequence[Any] or dict[str, Any]
+        Sequence or dictionary of objects to retrieve metas from.
 
     Returns
     -------
-    tuple[Any, ...]
-        The sequence of objects where collections have been replaced
-        with their metadata.
+    tuple[Any, ...] or dict[str, Any]
+        The sequence of objects (or dictionary) where collections have
+        been replaced with their metadata.
 
     """
+    if isinstance(objects, dict):
+        return {k: meta_or_identity(v) for k, v in objects.items()}
     return tuple(map(meta_or_identity, objects))
 
 
