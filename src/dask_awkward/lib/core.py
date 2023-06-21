@@ -1965,7 +1965,9 @@ def map_meta(
         # metadata.
         if dask.config.get("awkward.compute-unknown-meta"):
             extras = (
-                f"function call: {fn}\n" f"args metadata: {arg_metas}\n" f"kwargs metadata: {kwarg_metas}\n"
+                f"function call: {fn}\n"
+                f"args metadata: {arg_metas}\n"
+                f"kwargs metadata: {kwarg_metas}\n"
             )
             warnings.warn(
                 "metadata could not be determined; "
