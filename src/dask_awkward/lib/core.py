@@ -21,8 +21,8 @@ from awkward._nplikes.typetracer import (
     TypeTracerArray,
     is_unknown_scalar,
 )
-from awkward.highlevel import NDArrayOperatorsMixin, _dir_pattern
-from dask.base import DaskMethodsMixin, dont_optimize, is_dask_collection, tokenize
+from awkward.highlevel import _dir_pattern
+from dask.base import DaskMethodsMixin, dont_optimize, is_dask_collection, unpack_collections, tokenize
 from dask.blockwise import BlockwiseDep
 from dask.blockwise import blockwise as dask_blockwise
 from dask.context import globalmethod
@@ -30,6 +30,7 @@ from dask.delayed import Delayed
 from dask.highlevelgraph import HighLevelGraph
 from dask.threaded import get as threaded_get
 from dask.utils import IndexCallable, funcname, key_split
+from numpy.lib.mixins import NDArrayOperatorsMixin
 from tlz import first
 
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardMaterializedLayer
@@ -1161,6 +1162,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         self,
         func: Callable,
         *args: Any,
+        traverse: bool = True,
         **kwargs: Any,
     ) -> Array:
         """Map a function across all partitions of the collection.
@@ -1174,6 +1176,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             collection, if arguments are Array collections
             they must be compatibly partitioned with the object this
             method is being called from.
+        traverse : bool                                                                                                                                                                                                                                
+            Unpack basic python containers to find dask collections.
         **kwargs : Any
             Additional keyword arguments passed to the `func`.
 
@@ -1187,7 +1191,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         dask_awkward.map_partitions
 
         """
-        return map_partitions(func, self, *args, **kwargs)
+        return map_partitions(func, self, *args, traverse=traverse, **kwargs)
 
     def eager_compute_divisions(self) -> None:
         """Force a compute of the divisions."""
@@ -1457,6 +1461,7 @@ def map_partitions(
     meta: Any | None = None,
     output_divisions: int | None = None,
     opt_touch_all: bool = False,
+    traverse: bool = True
     **kwargs: Any,
 ) -> Array:
     """Map a callable across all partitions of any number of collections.
@@ -1495,6 +1500,8 @@ def map_partitions(
     opt_touch_all : bool
         Touch all layers in this graph during typetracer based
         optimization.
+    traverse : bool                                                                                                                                                                                                                                
+        Unpack basic python containers to find dask collections.
     **kwargs : Any
         Additional keyword arguments passed to the `fn`.
 
@@ -1540,9 +1547,7 @@ def map_partitions(
         opt_touch_all=opt_touch_all,
         **kwargs,
     )
-    deps = [a for a in args if is_dask_collection(a)] + [
-        v for _, v in kwargs.items() if is_dask_collection(v)
-    ]
+    deps, _ = unpack_collections(*args, *kwargs.values(), traverse=traverse)
 
     if meta is None:
         meta = map_meta(fn, *args, **kwargs)
