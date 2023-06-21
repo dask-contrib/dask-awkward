@@ -1458,6 +1458,19 @@ def partitionwise_layer(
     return layer
 
 
+class PackedKwargsFunction:
+    def __init__(self, the_fn, therepacker, len_args):
+        self.fn = the_fn
+        self.repacker = therepacker
+        self.len_args = len_args
+
+    def __call__(self, *deps_as_args):
+        args = deps_as_args[: self.len_args]
+        repacked = self.repacker(deps_as_args[self.len_args :])[0]
+        kwargs = repacked
+        return self.fn(*args, **kwargs)
+
+
 def map_partitions(
     base_fn: Callable,
     *args: Any,
@@ -1476,7 +1489,7 @@ def map_partitions(
     base_fn : Callable
         Function to apply on all partitions, this will get wraped to
         handle kwargs, including dask collections.
-    *base_args : Collections and function arguments
+    *args : Collections and function arguments
         Arguments passed to the function. Partitioned arguments (i.e.
         Dask collections) will have `fn` applied to each partition.
         Array collection arguments they must be compatibly
@@ -1508,7 +1521,7 @@ def map_partitions(
         optimization.
     traverse : bool
         Unpack basic python containers to find dask collections.
-    **base_kwargs : Any
+    **kwargs : Any
         Additional keyword arguments passed to the `fn`.
 
     Returns
@@ -1546,30 +1559,33 @@ def map_partitions(
     token = token or tokenize(base_fn, *args, meta, **kwargs)
     label = label or funcname(base_fn)
     name = f"{label}-{token}"
-    deps, repacker = unpack_collections(*args, kwargs, traverse=traverse)
+    arg_deps, _ = unpack_collections(*args, kwargs, traverse=traverse)
+    kwarg_deps, kwarg_repacker = unpack_collections(kwargs, traverse=traverse)
+    deps = arg_deps + kwarg_deps
 
-    # here we know that __repacker__(args)[-1] is original kwargs
-    def packed_fn(the_fn, therepacker, *deps_as_args):
-        repacked = therepacker(deps_as_args)
-        kwargs = repacked[-1]
-        args = repacked[:-1]
+    # here we know that deps_as_args[len_args:] is original kwargs
+    def packed_fn(the_fn, therepacker, len_args, *deps_as_args):
+        args = deps_as_args[:len_args]
+        repacked = therepacker(deps_as_args[len_args:])[0]
+        kwargs = repacked
         return the_fn(*args, **kwargs)
 
-    fn = partial(
-        packed_fn,
+    fn = PackedKwargsFunction(
         base_fn,
-        repacker,
+        kwarg_repacker,
+        len(args),
     )
 
     lay = partitionwise_layer(
         fn,
         name,
-        *deps,
+        *args,
+        *kwarg_deps,
         opt_touch_all=opt_touch_all,
     )
 
     if meta is None:
-        meta = map_meta(fn, *deps)
+        meta = map_meta(fn, *args, *kwarg_deps)
 
     hlg = HighLevelGraph.from_collections(
         name,

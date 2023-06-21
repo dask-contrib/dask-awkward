@@ -418,7 +418,7 @@ def test_scalar_dtype() -> None:
 
 
 def test_scalar_pickle(daa: Array) -> None:
-    import pickle
+    import cloudpickle as pickle
 
     s = 2
     c1 = new_known_scalar(s)
