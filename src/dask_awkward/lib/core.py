@@ -1954,8 +1954,9 @@ def map_meta(
             )
         pass
     try:
-        lzas = to_length_zero_arrays(args)
-        meta = typetracer_from_form(fn(*lzas, **kwargs).layout.form)
+        arg_lzas = arg_repack(to_length_zero_arrays(arg_colls))
+        kwarg_lzas = kwarg_repack(to_length_zero_arrays(kwarg_colls))
+        meta = typetracer_from_form(fn(*arg_lzas, **kwarg_lzas).layout.form)
         return meta
     except Exception:
         # if compute-unknown-meta is True and we've gotten to this
@@ -1964,7 +1965,7 @@ def map_meta(
         # metadata.
         if dask.config.get("awkward.compute-unknown-meta"):
             extras = (
-                f"function call: {fn}\n" f"metadata: {metas}\n" f"kwargs: {kwargs}\n"
+                f"function call: {fn}\n" f"args metadata: {arg_metas}\n" f"kwargs metadata: {kwarg_metas}\n"
             )
             warnings.warn(
                 "metadata could not be determined; "
