@@ -1928,8 +1928,8 @@ def map_meta(
     arg_metas = to_meta(arg_colls)
     kwarg_metas = to_meta(kwarg_colls)
 
-    arg_metas = arg_repack(arg_metas)
-    kwarg_metas = kwarg_repack(kwarg_metas)
+    arg_metas = arg_repack(arg_metas)[0]
+    kwarg_metas = kwarg_repack(kwarg_metas)[0]
     try:
         meta = fn(*arg_metas, **kwarg_metas)
         return meta
@@ -1954,8 +1954,8 @@ def map_meta(
             )
         pass
     try:
-        arg_lzas = arg_repack(to_length_zero_arrays(arg_colls))
-        kwarg_lzas = kwarg_repack(to_length_zero_arrays(kwarg_colls))
+        arg_lzas = arg_repack(to_length_zero_arrays(arg_colls))[0]
+        kwarg_lzas = kwarg_repack(to_length_zero_arrays(kwarg_colls))[0]
         meta = typetracer_from_form(fn(*arg_lzas, **kwarg_lzas).layout.form)
         return meta
     except Exception:
