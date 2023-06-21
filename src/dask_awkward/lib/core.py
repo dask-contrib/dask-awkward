@@ -1919,7 +1919,7 @@ def to_length_zero_arrays(objects: Sequence[Any]) -> tuple[Any, ...]:
     return tuple(map(length_zero_array_or_identity, objects))
 
 
-def map_meta(fn: Callable, *args: Any, **kwargs: Any) -> ak.Array | None:
+def map_meta(fn: Callable, *args: Any, traverse: bool=True, **kwargs: Any) -> ak.Array | None:
     arg_colls, arg_repack = unpack_collections(args, traverse=traverse)
     kwarg_colls, kwarg_repack = unpack_collections(kwargs, traverse=traverse)
 
