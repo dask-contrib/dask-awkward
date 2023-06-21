@@ -1555,7 +1555,7 @@ def map_partitions(
     deps, _ = unpack_collections(*args, *kwargs.values(), traverse=traverse)
 
     if meta is None:
-        meta = map_meta(fn, *args, **kwargs)
+        meta = map_meta(fn, *args, traverse=traverse, **kwargs)
 
     hlg = HighLevelGraph.from_collections(
         name,
