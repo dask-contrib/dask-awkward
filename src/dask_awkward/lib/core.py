@@ -1467,7 +1467,7 @@ def map_partitions(
     meta: Any | None = None,
     output_divisions: int | None = None,
     opt_touch_all: bool = False,
-    traverse: bool = True
+    traverse: bool = True,
     **kwargs: Any,
 ) -> Array:
     """Map a callable across all partitions of any number of collections.
