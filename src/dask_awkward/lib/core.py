@@ -21,7 +21,7 @@ from awkward._nplikes.typetracer import (
     TypeTracerArray,
     is_unknown_scalar,
 )
-from awkward.highlevel import _dir_pattern
+from awkward.highlevel import NDArrayOperatorsMixin, _dir_pattern
 from dask.base import DaskMethodsMixin, dont_optimize, is_dask_collection, tokenize
 from dask.blockwise import BlockwiseDep
 from dask.blockwise import blockwise as dask_blockwise
@@ -30,7 +30,6 @@ from dask.delayed import Delayed
 from dask.highlevelgraph import HighLevelGraph
 from dask.threaded import get as threaded_get
 from dask.utils import IndexCallable, funcname, key_split
-from numpy.lib.mixins import NDArrayOperatorsMixin
 from tlz import first
 
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardMaterializedLayer
