@@ -635,6 +635,10 @@ def my_power(arg_x, *, kwarg_y=None):
     return arg_x**kwarg_y
 
 
+def structured_function(*, inputs={}):
+    return inputs["x"] + inputs["y"] * inputs["z"]
+
+
 def test_map_partitions_args_and_kwargs_have_collection():
     xc = ak.Array([[1, 2, 3], [4, 5], [6, 7, 8]])
     yc = ak.Array([0, 1, 2])
@@ -645,3 +649,8 @@ def test_map_partitions_args_and_kwargs_have_collection():
     zl = dak.map_partitions(my_power, xl, kwarg_y=yl)
 
     assert_eq(zc, zl)
+
+    zd = structured_function(inputs={"x": xc, "y": xc, "z": yc})
+    zm = dak.map_partitions(structured_function, inputs={"x": xl, "y": xl, "z": yl})
+
+    assert_eq(zd, zm)
