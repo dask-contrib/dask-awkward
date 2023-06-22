@@ -1466,6 +1466,19 @@ class ArgsKwargsPackedFunction:
         self.arg_lens_for_repackers = arg_lens_for_repackers
 
     def __call__(self, *args_deps_expanded):
+        """This packing function receives a list of strictly
+        ordered arguments. The first range of arguments,
+        [0:sum(self.arg_lens_for_repackers)], corresponding to
+        the origin *args of self.fn but flattened to a list of
+        dask collections and non-dask-collection-containing arguments.
+        The remainder are the dask-collection-deps of self.fn's original
+        kwargs. The lengths of expected flattened inputs for each arg are
+        specified when this class is created, and we use that to process
+        the input flattened list of arguments sequentially.
+
+        The various repackers deal with restructuring the received flattened
+        list into the shape that self.fn expects.
+        """
         args = []
         len_args = 0
         for repacker, n_args in zip(self.arg_repackers, self.arg_lens_for_repackers):
@@ -1567,20 +1580,22 @@ def map_partitions(
     token = token or tokenize(base_fn, *args, meta, **kwargs)
     label = hyphenize(label or funcname(base_fn))
     name = f"{label}-{token}"
-    kwarg_deps, kwarg_repacker = unpack_collections(kwargs, traverse=traverse)
-    deps, _ = unpack_collections(*args, *kwargs.values(), traverse=traverse)
+    kwarg_flat_deps, kwarg_repacker = unpack_collections(kwargs, traverse=traverse)
+    flat_deps, _ = unpack_collections(*args, *kwargs.values(), traverse=traverse)
 
-    arg_deps_expanded = []
+    arg_flat_deps_expanded = []
     arg_repackers = []
     arg_lens_for_repackers = []
     for arg in args:
-        this_arg_deps, repacker = unpack_collections(arg, traverse=traverse)
-        if len(this_arg_deps) > 0:
-            arg_deps_expanded.extend(this_arg_deps)
+        this_arg_flat_deps, repacker = unpack_collections(arg, traverse=traverse)
+        if (
+            len(this_arg_flat_deps) > 0
+        ):  # if the deps list is empty this arg does not contain any dask collection, no need to repack!
+            arg_flat_deps_expanded.extend(this_arg_flat_deps)
             arg_repackers.append(repacker)
-            arg_lens_for_repackers.append(len(this_arg_deps))
+            arg_lens_for_repackers.append(len(this_arg_flat_deps))
         else:
-            arg_deps_expanded.append(arg)
+            arg_flat_deps_expanded.append(arg)
             arg_repackers.append(None)
             arg_lens_for_repackers.append(1)
 
@@ -1594,26 +1609,26 @@ def map_partitions(
     lay = partitionwise_layer(
         fn,
         name,
-        *arg_deps_expanded,
-        *kwarg_deps,
+        *arg_flat_deps_expanded,
+        *kwarg_flat_deps,
         opt_touch_all=opt_touch_all,
     )
 
     if meta is None:
-        meta = map_meta(fn, *arg_deps_expanded, *kwarg_deps)
+        meta = map_meta(fn, *arg_flat_deps_expanded, *kwarg_flat_deps)
 
     hlg = HighLevelGraph.from_collections(
         name,
         lay,
-        dependencies=deps,
+        dependencies=flat_deps,
     )
 
     if output_divisions is not None:
         if output_divisions == 1:
-            new_divisions = deps[0].divisions
+            new_divisions = flat_deps[0].divisions
         else:
             new_divisions = tuple(
-                map(lambda x: x * output_divisions, deps[0].divisions)
+                map(lambda x: x * output_divisions, flat_deps[0].divisions)
             )
         return new_array_object(
             hlg,
@@ -1626,7 +1641,7 @@ def map_partitions(
             hlg,
             name=name,
             meta=meta,
-            npartitions=deps[0].npartitions,
+            npartitions=flat_deps[0].npartitions,
         )
 
 
