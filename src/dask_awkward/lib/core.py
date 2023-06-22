@@ -1565,7 +1565,7 @@ def map_partitions(
 
     """
     token = token or tokenize(base_fn, *args, meta, **kwargs)
-    label = label or funcname(base_fn)
+    label = hyphenize(label or funcname(base_fn))
     name = f"{label}-{token}"
     kwarg_deps, kwarg_repacker = unpack_collections(kwargs, traverse=traverse)
     deps, _ = unpack_collections(*args, *kwargs.values(), traverse=traverse)
