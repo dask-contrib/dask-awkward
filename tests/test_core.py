@@ -639,6 +639,10 @@ def structured_function(*, inputs={}):
     return inputs["x"] + inputs["y"] * inputs["z"]
 
 
+def scaled_structured_function(scale, *, inputs={}):
+    return scale * (inputs["x"] + inputs["y"] * inputs["z"])
+
+
 def test_map_partitions_args_and_kwargs_have_collection():
     xc = ak.Array([[1, 2, 3], [4, 5], [6, 7, 8]])
     yc = ak.Array([0, 1, 2])
@@ -654,3 +658,22 @@ def test_map_partitions_args_and_kwargs_have_collection():
     zm = dak.map_partitions(structured_function, inputs={"x": xl, "y": xl, "z": yl})
 
     assert_eq(zd, zm)
+
+    ze = scaled_structured_function(2.0, inputs={"x": xc, "y": xc, "z": yc})
+    zn = dak.map_partitions(
+        scaled_structured_function, 2.0, inputs={"x": xl, "y": xl, "z": yl}
+    )
+
+    assert_eq(ze, zn)
+
+    zf = scaled_structured_function(2.0, inputs={"x": xc, "y": xc, "z": 4.0})
+    zo = dak.map_partitions(
+        scaled_structured_function, 2.0, inputs={"x": xl, "y": xl, "z": 4.0}
+    )
+
+    assert_eq(zf, zo)
+
+    zg = my_power(xc, kwarg_y=2.0)
+    zp = dak.map_partitions(my_power, xl, kwarg_y=2.0)
+
+    assert_eq(zg, zp)
