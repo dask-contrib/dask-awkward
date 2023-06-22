@@ -418,7 +418,7 @@ def test_scalar_dtype() -> None:
 
 
 def test_scalar_pickle(daa: Array) -> None:
-    import pickle
+    import cloudpickle as pickle
 
     s = 2
     c1 = new_known_scalar(s)
@@ -629,3 +629,85 @@ def test_make_unknown_length():
 
     with pytest.raises(TypeError, match="cannot interpret unknown lengths"):
         len(ul_tt1)
+
+
+def my_power(arg_x, *, kwarg_y=None):
+    return arg_x**kwarg_y
+
+
+def structured_function(*, inputs={}):
+    return inputs["x"] + inputs["y"] * inputs["z"]
+
+
+def scaled_structured_function(scale, *, inputs={}):
+    return scale * (inputs["x"] + inputs["y"] * inputs["z"])
+
+
+def mix_arg_and_kwarg_with_scalar_broadcasting(aaa, bbb, *, ccc=None, ddd=None):
+    return (aaa + bbb) ** ccc - ddd
+
+
+def test_map_partitions_args_and_kwargs_have_collection():
+    xc = ak.Array([[1, 2, 3], [4, 5], [6, 7, 8]])
+    yc = ak.Array([0, 1, 2])
+    xl = dak.from_awkward(xc, npartitions=3)
+    yl = dak.from_awkward(yc, npartitions=3)
+
+    zc = my_power(xc, kwarg_y=yc)
+    zl = dak.map_partitions(my_power, xl, kwarg_y=yl)
+
+    assert_eq(zc, zl)
+
+    zd = structured_function(inputs={"x": xc, "y": xc, "z": yc})
+    zm = dak.map_partitions(structured_function, inputs={"x": xl, "y": xl, "z": yl})
+
+    assert_eq(zd, zm)
+
+    ze = scaled_structured_function(2.0, inputs={"x": xc, "y": xc, "z": yc})
+    zn = dak.map_partitions(
+        scaled_structured_function, 2.0, inputs={"x": xl, "y": xl, "z": yl}
+    )
+
+    assert_eq(ze, zn)
+
+    zf = scaled_structured_function(2.0, inputs={"x": xc, "y": xc, "z": 4.0})
+    zo = dak.map_partitions(
+        scaled_structured_function, 2.0, inputs={"x": xl, "y": xl, "z": 4.0}
+    )
+
+    assert_eq(zf, zo)
+
+    zg = my_power(xc, kwarg_y=2.0)
+    zp = dak.map_partitions(my_power, xl, kwarg_y=2.0)
+
+    assert_eq(zg, zp)
+
+    a = ak.Array(
+        [
+            [
+                1,
+                2,
+                3,
+            ],
+            [4, 5],
+            [6, 7, 8],
+        ]
+    )
+    b = ak.Array([[-10, -10, -10], [-10, -10], [-10, -10, -10]])
+    c = ak.Array([0, 1, 2])
+    d = 1
+
+    aa = dak.from_awkward(a, npartitions=2)
+    bb = dak.from_awkward(b, npartitions=2)
+    cc = dak.from_awkward(c, npartitions=2)
+    dd = d
+
+    res1 = mix_arg_and_kwarg_with_scalar_broadcasting(a, b, ccc=c, ddd=d)
+    res2 = dak.map_partitions(
+        mix_arg_and_kwarg_with_scalar_broadcasting,
+        aa,
+        bb,
+        ccc=cc,
+        ddd=dd,
+    )
+    assert_eq(res1, res2)

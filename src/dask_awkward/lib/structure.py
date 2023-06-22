@@ -7,17 +7,9 @@ from numbers import Number
 from typing import TYPE_CHECKING, Any
 
 import awkward as ak
-import numpy as np
-from awkward._nplikes.typetracer import TypeTracerArray
 from dask.base import is_dask_collection
 
-from dask_awkward.lib.core import (
-    Array,
-    compatible_partitions,
-    map_partitions,
-    new_known_scalar,
-    total_reduction_to_scalar,
-)
+from dask_awkward.lib.core import Array, compatible_partitions, map_partitions
 from dask_awkward.utils import (
     DaskAwkwardNotImplemented,
     IncompatiblePartitions,
@@ -551,18 +543,7 @@ def num(
             behavior=behavior,
         )
     if axis == 0:
-        if array.known_divisions:
-            return new_known_scalar(array.divisions[-1], dtype=int)
-        else:
-            return total_reduction_to_scalar(
-                label="num",
-                array=array,
-                meta=TypeTracerArray._new(dtype=np.int64, shape=()),
-                chunked_fn=ak.num,
-                chunked_kwargs={"axis": 0},
-                comb_fn=ak.sum,
-                comb_kwargs={"axis": None},
-            )
+        return len(array)
     raise DaskAwkwardNotImplemented("TODO")
 
 

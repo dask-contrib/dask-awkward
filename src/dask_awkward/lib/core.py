@@ -10,7 +10,7 @@ import warnings
 from collections.abc import Callable, Hashable, Mapping, Sequence
 from functools import cached_property, partial
 from numbers import Number
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, overload
 
 import awkward as ak
 import dask.config
@@ -21,8 +21,14 @@ from awkward._nplikes.typetracer import (
     TypeTracerArray,
     is_unknown_scalar,
 )
-from awkward.highlevel import _dir_pattern
-from dask.base import DaskMethodsMixin, dont_optimize, is_dask_collection, tokenize
+from awkward.highlevel import NDArrayOperatorsMixin, _dir_pattern
+from dask.base import (
+    DaskMethodsMixin,
+    dont_optimize,
+    is_dask_collection,
+    tokenize,
+    unpack_collections,
+)
 from dask.blockwise import BlockwiseDep
 from dask.blockwise import blockwise as dask_blockwise
 from dask.context import globalmethod
@@ -30,7 +36,6 @@ from dask.delayed import Delayed
 from dask.highlevelgraph import HighLevelGraph
 from dask.threaded import get as threaded_get
 from dask.utils import IndexCallable, funcname, key_split
-from numpy.lib.mixins import NDArrayOperatorsMixin
 from tlz import first
 
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardMaterializedLayer
@@ -676,7 +681,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     @property
     def known_divisions(self) -> bool:
-        """True of the divisions are known (absence of ``None`` in the tuple)."""
+        """True if the divisions are known (absence of ``None`` in the tuple)."""
         return len(self.divisions) > 0 and None not in self.divisions
 
     @property
@@ -1198,6 +1203,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         self,
         func: Callable,
         *args: Any,
+        traverse: bool = True,
         **kwargs: Any,
     ) -> Array:
         """Map a function across all partitions of the collection.
@@ -1211,6 +1217,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             collection, if arguments are Array collections
             they must be compatibly partitioned with the object this
             method is being called from.
+        traverse : bool
+            Unpack basic python containers to find dask collections.
         **kwargs : Any
             Additional keyword arguments passed to the `func`.
 
@@ -1224,7 +1232,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         dask_awkward.map_partitions
 
         """
-        return map_partitions(func, self, *args, **kwargs)
+        return map_partitions(func, self, *args, traverse=traverse, **kwargs)
 
     def eager_compute_divisions(self) -> None:
         """Force a compute of the divisions."""
@@ -1486,22 +1494,58 @@ def partitionwise_layer(
     return layer
 
 
+class ArgsKwargsPackedFunction:
+    def __init__(self, the_fn, arg_repackers, kwarg_repacker, arg_lens_for_repackers):
+        self.fn = the_fn
+        self.arg_repackers = arg_repackers
+        self.kwarg_repacker = kwarg_repacker
+        self.arg_lens_for_repackers = arg_lens_for_repackers
+
+    def __call__(self, *args_deps_expanded):
+        """This packing function receives a list of strictly
+        ordered arguments. The first range of arguments,
+        [0:sum(self.arg_lens_for_repackers)], corresponding to
+        the origin *args of self.fn but flattened to a list of
+        dask collections and non-dask-collection-containing arguments.
+        The remainder are the dask-collection-deps of self.fn's original
+        kwargs. The lengths of expected flattened inputs for each arg are
+        specified when this class is created, and we use that to process
+        the input flattened list of arguments sequentially.
+
+        The various repackers deal with restructuring the received flattened
+        list into the shape that self.fn expects.
+        """
+        args = []
+        len_args = 0
+        for repacker, n_args in zip(self.arg_repackers, self.arg_lens_for_repackers):
+            args.append(
+                repacker(args_deps_expanded[len_args : len_args + n_args])[0]
+                if repacker is not None
+                else args_deps_expanded[len_args]
+            )
+            len_args += n_args
+        kwargs = self.kwarg_repacker(args_deps_expanded[len_args:])[0]
+        return self.fn(*args, **kwargs)
+
+
 def map_partitions(
-    fn: Callable,
+    base_fn: Callable,
     *args: Any,
     label: str | None = None,
     token: str | None = None,
     meta: Any | None = None,
     output_divisions: int | None = None,
     opt_touch_all: bool = False,
+    traverse: bool = True,
     **kwargs: Any,
 ) -> Array:
     """Map a callable across all partitions of any number of collections.
 
     Parameters
     ----------
-    fn : Callable
-        Function to apply on all partitions.
+    base_fn : Callable
+        Function to apply on all partitions, this will get wraped to
+        handle kwargs, including dask collections.
     *args : Collections and function arguments
         Arguments passed to the function. Partitioned arguments (i.e.
         Dask collections) will have `fn` applied to each partition.
@@ -1532,6 +1576,8 @@ def map_partitions(
     opt_touch_all : bool
         Touch all layers in this graph during typetracer based
         optimization.
+    traverse : bool
+        Unpack basic python containers to find dask collections.
     **kwargs : Any
         Additional keyword arguments passed to the `fn`.
 
@@ -1567,35 +1613,58 @@ def map_partitions(
     This is effectively the same as `d = c * a`
 
     """
-    token = token or tokenize(fn, *args, meta, **kwargs)
-    label = label or funcname(fn)
+    token = token or tokenize(base_fn, *args, meta, **kwargs)
+    label = hyphenize(label or funcname(base_fn))
     name = f"{label}-{token}"
+    kwarg_flat_deps, kwarg_repacker = unpack_collections(kwargs, traverse=traverse)
+    flat_deps, _ = unpack_collections(*args, *kwargs.values(), traverse=traverse)
+
+    arg_flat_deps_expanded = []
+    arg_repackers = []
+    arg_lens_for_repackers = []
+    for arg in args:
+        this_arg_flat_deps, repacker = unpack_collections(arg, traverse=traverse)
+        if (
+            len(this_arg_flat_deps) > 0
+        ):  # if the deps list is empty this arg does not contain any dask collection, no need to repack!
+            arg_flat_deps_expanded.extend(this_arg_flat_deps)
+            arg_repackers.append(repacker)
+            arg_lens_for_repackers.append(len(this_arg_flat_deps))
+        else:
+            arg_flat_deps_expanded.append(arg)
+            arg_repackers.append(None)
+            arg_lens_for_repackers.append(1)
+
+    fn = ArgsKwargsPackedFunction(
+        base_fn,
+        arg_repackers,
+        kwarg_repacker,
+        arg_lens_for_repackers,
+    )
+
     lay = partitionwise_layer(
         fn,
         name,
-        *args,
+        *arg_flat_deps_expanded,
+        *kwarg_flat_deps,
         opt_touch_all=opt_touch_all,
-        **kwargs,
     )
-    deps = [a for a in args if is_dask_collection(a)] + [
-        v for _, v in kwargs.items() if is_dask_collection(v)
-    ]
 
     if meta is None:
-        meta = map_meta(fn, *args, **kwargs)
+        meta = map_meta(fn, *arg_flat_deps_expanded, *kwarg_flat_deps)
 
     hlg = HighLevelGraph.from_collections(
         name,
         lay,
-        dependencies=deps,
+        dependencies=flat_deps,
     )
 
     if output_divisions is not None:
         if output_divisions == 1:
-            new_divisions = deps[0].divisions
+            new_divisions = flat_deps[0].divisions
         else:
             new_divisions = tuple(
-                map(lambda x: x * output_divisions, deps[0].divisions)
+                map(lambda x: x * output_divisions, flat_deps[0].divisions)
             )
         return new_array_object(
             hlg,
@@ -1608,83 +1677,145 @@ def map_partitions(
             hlg,
             name=name,
             meta=meta,
-            npartitions=deps[0].npartitions,
+            npartitions=flat_deps[0].npartitions,
         )
 
 
-def _from_iter(obj):
-    """Try to run ak.from_iter, but have fallbacks.
-
-    This function first tries to call ak.form_iter on the input (which
-    should be some iterable). We expect a list of Scalar typetracers
-    to fail, so if the call fails due to ValueError or TypeError then
-    we manually do some typetracer operations to return the proper
-    representation of the input iterable-of-typetracers.
-
-    """
-    try:
-        return ak.from_iter(obj)
-    except (ValueError, TypeError):
-        first_obj = obj[0]
-
-        if isinstance(first_obj, MaybeNone):
-            first_obj = first_obj.content
-
-        return ak.Array(
-            ak.Array(first_obj)
-            .layout.form.length_one_array()
-            .layout.to_typetracer(forget_length=True)
-        )
+PartialReductionType = ak.Array
 
 
-def total_reduction_to_scalar(
+def _chunk_reducer_non_positional(
+    chunk: ak.Array | PartialReductionType,
+    is_axis_none: bool,
+    *,
+    reducer: Callable,
+    mask_identity: bool,
+) -> PartialReductionType:
+    return reducer(
+        chunk,
+        keepdims=True,
+        axis=-1 if is_axis_none else 0,
+        mask_identity=mask_identity,
+    )
+
+
+def _concat_reducer_non_positional(
+    partials: list[PartialReductionType], is_axis_none: bool
+) -> ak.Array:
+    concat_axis = -1 if is_axis_none else 0
+    return ak.concatenate(partials, axis=concat_axis)
+
+
+def _finalise_reducer_non_positional(
+    partial: PartialReductionType,
+    is_axis_none: bool,
+    *,
+    reducer: Callable,
+    mask_identity: bool,
+    keepdims: bool,
+) -> ak.Array:
+    return reducer(
+        partial,
+        axis=None if is_axis_none else 0,
+        keepdims=keepdims,
+        mask_identity=mask_identity,
+    )
+
+
+def _prepare_axis_none_chunk(chunk: ak.Array) -> ak.Array:
+    # TODO: this is private Awkward code. We should figure out how to export it
+    # if needed
+    (layout,) = ak._do.remove_structure(
+        ak.to_layout(chunk),
+        flatten_records=False,
+        drop_nones=False,
+        keepdims=True,
+        allow_records=False,
+    )
+    return ak.Array(layout, behavior=chunk.behavior)
+
+
+def non_trivial_reduction(
     *,
     label: str,
     array: Array,
-    meta: Any,
-    chunked_fn: Callable,
-    comb_fn: Callable | None = None,
-    agg_fn: Callable | None = None,
+    axis: Literal[0] | None,
+    is_positional: bool,
+    keepdims: bool,
+    mask_identity: bool,
+    reducer: Callable,
+    combiner: Callable | None = None,
     token: str | None = None,
     dtype: Any | None = None,
     split_every: int | bool | None = None,
-    chunked_kwargs: dict[str, Any] | None = None,
-    comb_kwargs: dict[str, Any] | None = None,
-    agg_kwargs: dict[str, Any] | None = None,
-) -> Scalar:
+):
+    if is_positional:
+        raise NotImplementedError("positional reducers at axis=0 or axis=None")
+
+    # Regularise the axis to (0, None)
+    if axis == 0 or axis == -1 * array.ndim:
+        axis = 0
+    elif axis is not None:
+        raise ValueError(axis)
+
+    if combiner is None:
+        combiner = reducer
+
+    if is_positional:
+        assert combiner is reducer
+
+    # For `axis=None`, we prepare each array to have the following structure:
+    #   [[[ ... [x1 x2 x3 ... xN] ... ]]] (length-1 outer lists)
+    # This makes the subsequent reductions an `axis=-1` reduction
+    if axis is None:
+        prepared_array = map_partitions(_prepare_axis_none_chunk, array)
+    else:
+        prepared_array = array
+
+    chunked_fn = _chunk_reducer_non_positional
+    tree_node_fn = _chunk_reducer_non_positional
+    concat_fn = _concat_reducer_non_positional
+    finalize_fn = _finalise_reducer_non_positional
+
+    chunked_kwargs = {
+        "reducer": reducer,
+        "is_axis_none": axis is None,
+        "mask_identity": mask_identity,
+    }
+    tree_node_kwargs = {
+        "reducer": combiner,
+        "is_axis_none": axis is None,
+        "mask_identity": mask_identity,
+    }
+
+    concat_kwargs = {"is_axis_none": axis is None}
+    finalize_kwargs = {
+        "reducer": combiner,
+        "mask_identity": mask_identity,
+        "keepdims": keepdims,
+        "is_axis_none": axis is None,
+    }
+
     from dask_awkward.layers import AwkwardTreeReductionLayer
 
-    chunked_kwargs = chunked_kwargs or {}
     token = token or tokenize(
         array,
-        chunked_fn,
-        comb_fn,
-        agg_fn,
+        reducer,
         label,
         dtype,
         split_every,
         chunked_kwargs,
-        comb_kwargs,
-        agg_kwargs,
+        tree_node_kwargs,
+        concat_kwargs,
+        finalize_kwargs,
     )
-    name_comb = f"{label}-combine-{token}"
-    name_agg = f"{label}-agg-{token}"
-
-    comb_kwargs = comb_kwargs or chunked_kwargs
-    agg_kwargs = agg_kwargs or comb_kwargs
-
-    comb_fn = comb_fn or chunked_fn
-    agg_fn = agg_fn or comb_fn
+    name_tree_node = f"{label}-tree-node-{token}"
+    name_finalize = f"{label}-finalize-{token}"
 
     chunked_fn = partial(chunked_fn, **chunked_kwargs)
-    comb_fn = partial(comb_fn, **comb_kwargs)
-    agg_fn = partial(agg_fn, **agg_kwargs)
-
-    chunked_result = map_partitions(
-        chunked_fn,
-        array,
-        meta=empty_typetracer(),
-    )
+    tree_node_fn = partial(tree_node_fn, **tree_node_kwargs)
+    concat_fn = partial(concat_fn, **concat_kwargs)
+    finalize_fn = partial(finalize_fn, **finalize_kwargs)
 
     if split_every is None:
         split_every = 8
@@ -1693,21 +1824,31 @@ def total_reduction_to_scalar(
     else:
         pass
 
+    chunked = map_partitions(chunked_fn, prepared_array, meta=empty_typetracer())
+
     trl = AwkwardTreeReductionLayer(
-        name=name_agg,
-        name_input=chunked_result.name,
-        npartitions_input=chunked_result.npartitions,
-        concat_func=_from_iter,
-        tree_node_func=comb_fn,
-        finalize_func=agg_fn,
+        name=name_finalize,
+        name_input=chunked.name,
+        npartitions_input=prepared_array.npartitions,
+        concat_func=concat_fn,
+        tree_node_func=tree_node_fn,
+        finalize_func=finalize_fn,
         split_every=split_every,
-        tree_node_name=name_comb,
+        tree_node_name=name_tree_node,
     )
 
-    graph = HighLevelGraph.from_collections(
-        name_agg, trl, dependencies=(chunked_result,)
+    graph = HighLevelGraph.from_collections(name_finalize, trl, dependencies=(chunked,))
+
+    meta = reducer(
+        array._meta,
+        axis=axis,
+        keepdims=keepdims,
+        mask_identity=mask_identity,
     )
-    return new_scalar_object(graph, name_agg, meta=meta)
+    if isinstance(meta, ak.highlevel.Array):
+        return new_array_object(graph, name_finalize, meta=meta, npartitions=1)
+    else:
+        return new_scalar_object(graph, name_finalize, meta=meta)
 
 
 def calculate_known_divisions(array: Array) -> tuple[int, ...]:
@@ -1755,24 +1896,6 @@ def _type(array: Array) -> Type | None:
     if array._meta is not None:
         return array._meta.layout.form.type
     return None
-
-
-def ndim(array: Array) -> int:
-    """Number of dimensions before reaching a numeric type or a record.
-
-    Parameters
-    ----------
-    array : dask_awkward.Array
-        The collection
-
-    Returns
-    -------
-    int or None
-        Number of dimensions as an integer, or ``None`` if the
-        collection does not contain metadata.
-
-    """
-    return array.ndim
 
 
 def is_awkward_collection(obj: Any) -> bool:
@@ -1861,21 +1984,33 @@ def meta_or_identity(obj: Any) -> Any:
     return obj
 
 
+@overload
 def to_meta(objects: Sequence[Any]) -> tuple[Any, ...]:
-    """In a sequence convert Dask Awkward collections to their metas.
+    ...
+
+
+@overload
+def to_meta(objects: dict[str, Any]) -> dict[str, Any]:
+    ...
+
+
+def to_meta(objects):
+    """Convert sequence or dict of Dask Awkward collections to their metas.
 
     Parameters
     ----------
-    objects : Sequence[Any]
-        Sequence of objects.
+    objects : Sequence[Any] or dict[str, Any]
+        Sequence or dictionary of objects to retrieve metas from.
 
     Returns
     -------
-    tuple[Any, ...]
-        The sequence of objects where collections have been replaced
-        with their metadata.
+    tuple[Any, ...] or dict[str, Any]
+        The sequence of objects (or dictionary) where collections have
+        been replaced with their metadata.
 
     """
+    if isinstance(objects, dict):
+        return {k: meta_or_identity(v) for k, v in objects.items()}
     return tuple(map(meta_or_identity, objects))
 
 
@@ -1892,10 +2027,11 @@ def to_length_zero_arrays(objects: Sequence[Any]) -> tuple[Any, ...]:
     return tuple(map(length_zero_array_or_identity, objects))
 
 
-def map_meta(fn: Callable, *args: Any, **kwargs: Any) -> ak.Array | None:
-    metas = to_meta(args)
+def map_meta(fn: Callable, *deps: Any) -> ak.Array | None:
+    # NOTE: fn is assumed to be a *packed* function
+    #       as defined up in map_partitions. be careful!
     try:
-        meta = fn(*metas, **kwargs)
+        meta = fn(*to_meta(deps))
         return meta
     except Exception as err:
         # if compute-unknown-meta is False then we don't care about
@@ -1918,8 +2054,8 @@ def map_meta(fn: Callable, *args: Any, **kwargs: Any) -> ak.Array | None:
             )
         pass
     try:
-        lzas = to_length_zero_arrays(args)
-        meta = typetracer_from_form(fn(*lzas, **kwargs).layout.form)
+        arg_lzas = to_length_zero_arrays(deps)
+        meta = typetracer_from_form(fn(*arg_lzas).layout.form)
         return meta
     except Exception:
         # if compute-unknown-meta is True and we've gotten to this
@@ -1927,9 +2063,7 @@ def map_meta(fn: Callable, *args: Any, **kwargs: Any) -> ak.Array | None:
         # to happen as a consequence of us not being able to determine
         # metadata.
         if dask.config.get("awkward.compute-unknown-meta"):
-            extras = (
-                f"function call: {fn}\n" f"metadata: {metas}\n" f"kwargs: {kwargs}\n"
-            )
+            extras = f"function call: {fn}\n" f"metadata: {deps}\n"
             warnings.warn(
                 "metadata could not be determined; "
                 "a compute on the first partition will occur.\n"
@@ -1997,15 +2131,6 @@ def compatible_partitions(*args: Array) -> bool:
                 if a.divisions != arg.divisions:
                     return False
 
-    return True
-
-
-def compatible_divisions(*args: Array) -> bool:
-    if not all(a.known_divisions for a in args):
-        return False
-    for arg in args[1:]:
-        if arg.divisions != args[0].divisions:
-            return False
     return True
 
 
