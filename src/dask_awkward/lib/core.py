@@ -1197,16 +1197,18 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         """Clear the divisions of a Dask Awkward Collection."""
         self._divisions = (None,) * (self.npartitions + 1)
 
-    def __awkward_function__(self, func, args, kwargs):
+    def __awkward_function__(self, func, array_likes, args, kwargs):
         import dask_awkward
 
-        if any(isinstance(arg, ak.Array) for arg in args):
+        if any(isinstance(arg, ak.Array) for arg in array_likes):
             raise TypeError("cannot mix awkward.Array and dask_awkward.Array")
 
         fn_name = func.__qualname__
-        fn = getattr(dask_awkward, fn_name)
-        res = fn(*args, **kwargs)
-        return res
+        try:
+            fn = getattr(dask_awkward, fn_name)
+        except AttributeError:
+            return NotImplemented
+        return fn(*args, **kwargs)
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         if method != "__call__":
