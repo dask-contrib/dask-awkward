@@ -30,6 +30,7 @@ __all__ = (
     "combinations",
     "copy",
     "fill_none",
+    "drop_none",
     "firsts",
     "flatten",
     "from_regular",
@@ -332,6 +333,28 @@ def fill_none(
 
     fn = _FillNoneFn(value, axis=axis, highlevel=highlevel, behavior=behavior)
     return map_partitions(fn, array, label="fill-none", output_divisions=1)
+
+
+class _DropNoneFn:
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __call__(self, arr):
+        return ak.drop_none(arr, **self.kwargs)
+
+
+@borrow_docstring(ak.drop_none)
+def drop_none(
+    array: Array,
+    axis: int | None = None,
+    highlevel: bool = True,
+    behavior: dict | None = None,
+) -> Array:
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
+    fn = _DropNoneFn(axis=axis, highlevel=highlevel, behavior=behavior)
+    return map_partitions(fn, array, label="drop-none", output_divisions=1)
 
 
 class _FirstsFn:
