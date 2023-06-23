@@ -138,7 +138,7 @@ def test_fill_none(vf: int | float | str, axis: int | None) -> None:
     assert_eq(d, e, check_forms=(not isinstance(vf, str)))
 
 
-@pytest.mark.parametrize("axis", [0, 1, -1])
+@pytest.mark.parametrize("axis", [None, 0, 1, -1])
 def test_drop_none(axis: int) -> None:
     a = [[1, 2, None], [], [None], [5, 6, 7, None], [1, 2], None]
     b = [[None, 2, 1], [None], [], None, [7, 6, None, 5], [None, None]]
