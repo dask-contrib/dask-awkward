@@ -463,6 +463,23 @@ def test_compatible_partitions(ndjson_points_file: str) -> None:
     assert compatible_partitions(y, y)
 
 
+def test_compatible_partitions_after_slice() -> None:
+    a = [[1, 2, 3], [4, 5]]
+    b = [[5, 6, 7, 8], [], [9]]
+    lazy = dak.from_lists([a, b])
+    ccrt = ak.Array(a + b)
+
+    # sanity
+    assert_eq(lazy, ccrt)
+
+    # sanity
+    assert compatible_partitions(lazy, lazy + 2)
+    assert compatible_partitions(lazy, dak.num(lazy, axis=1) > 2)
+
+    assert not compatible_partitions(lazy[:-2], lazy)
+    assert not compatible_partitions(lazy[:-2], dak.num(lazy, axis=1) != 3)
+
+
 @pytest.mark.parametrize("meta", [5, False, [1, 2, 3]])
 def test_bad_meta_type(ndjson_points_file: str, meta: Any) -> None:
     with pytest.raises(TypeError, match="meta must be an instance of an Awkward Array"):
