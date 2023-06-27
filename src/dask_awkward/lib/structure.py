@@ -454,6 +454,7 @@ def full_like(array, fill_value, highlevel=True, behavior=None, dtype=None):
         highlevel=highlevel,
         behavior=behavior,
         dtype=dtype,
+        output_divisions=1,
     )
 
 
@@ -477,6 +478,7 @@ def isclose(
         highlevel=highlevel,
         behavior=behavior,
         label="is-close",
+        output_divisions=1,
     )
 
 
@@ -564,6 +566,7 @@ def num(
             axis=axis,
             highlevel=highlevel,
             behavior=behavior,
+            output_divisions=1,
         )
     if axis == 0:
         return len(array)
@@ -582,10 +585,10 @@ def ones_like(
     return map_partitions(
         ak.ones_like,
         array,
-        output_divisions=1,
         label="ones-like",
         behavior=behavior,
         dtype=dtype,
+        output_divisions=1,
     )
 
 
@@ -990,10 +993,10 @@ def zeros_like(
     return map_partitions(
         ak.zeros_like,
         array,
-        output_divisions=1,
         label="zeros-like",
         behavior=behavior,
         dtype=dtype,
+        output_divisions=1,
     )
 
 
