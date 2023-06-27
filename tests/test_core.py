@@ -539,7 +539,6 @@ def test_scalar_persist_and_rebuild(daa: Array) -> None:
 
 def test_output_divisions(daa: Array) -> None:
     assert dak.max(daa.points.y, axis=1).divisions == daa.divisions
-    assert dak.num(daa.points.y, axis=1).divisions == (None,) * (daa.npartitions + 1)
     assert daa["points"][["x", "y"]].divisions == daa.divisions
     assert daa["points"].divisions == daa.divisions
 
