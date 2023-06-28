@@ -19,7 +19,7 @@ class AwkwardBlockwiseLayer(Blockwise):
     """Just like upstream Blockwise, except we override pickling"""
 
     @classmethod
-    def from_blockwise(cls, layer) -> AwkwardBlockwiseLayer:
+    def from_blockwise(cls, layer: Blockwise) -> AwkwardBlockwiseLayer:
         ob = object.__new__(cls)
         ob.__dict__.update(layer.__dict__)
         return ob

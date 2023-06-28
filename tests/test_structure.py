@@ -506,3 +506,29 @@ def test_values_astype(daa, caa):
         dak.values_astype(daa, np.float32),
         ak.values_astype(caa, np.float32),
     )
+
+
+def test_repartition_whole(daa):
+    daa1 = daa.repartition(npartitions=1)
+    assert daa1.npartitions == 1
+    assert_eq(daa, daa1, check_divisions=False)
+
+
+def test_repartition_no_change(daa):
+    daa1 = daa.repartition(divisions=(0, 5, 10, 15))
+    assert daa1.npartitions == 3
+    assert_eq(daa, daa1, check_divisions=False)
+
+
+def test_repartition_split_all(daa):
+    daa1 = daa.repartition(rows_per_partition=1)
+    assert daa1.npartitions == len(daa)
+    out = daa1.compute()
+    assert out.tolist() == daa.compute().tolist()
+
+
+def test_repartition_uneven(daa):
+    daa1 = daa.repartition(divisions=(0, 7, 8, 11, 12))
+    assert daa1.npartitions == 4
+    out = daa1.compute()
+    assert out.tolist() == daa.compute()[:12].tolist()

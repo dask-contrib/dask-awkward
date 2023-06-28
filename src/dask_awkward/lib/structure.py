@@ -1089,3 +1089,51 @@ def zip(
         raise DaskAwkwardNotImplemented(
             "only sized iterables are supported by dak.zip (dict, list, or tuple)"
         )
+
+
+def _repartition_func(*stuff):
+    import builtins
+
+    import awkward as ak
+
+    *data, slices = stuff
+    data = [
+        d[sl[0] : sl[1]] if sl is not None else d
+        for d, sl in builtins.zip(data, slices)
+    ]
+    return ak.concatenate(data)
+
+
+def repartition_layer(arr: Array, key: str, divisions: list[int, ...]):
+    layer = {}
+
+    indivs = arr.divisions
+    i = 0
+    for index, (start, end) in enumerate(builtins.zip(divisions[:-1], divisions[1:])):
+        pp = []
+        ss = []
+        while indivs[i] <= start:
+            i += 1
+        j = i
+        i -= 1
+        while indivs[j] < end:
+            j += 1
+        for k in range(i, j):
+            if start < indivs[k]:
+                st = None
+            elif start < indivs[k + 1]:
+                st = start - indivs[k]
+            else:
+                continue
+            if end < indivs[k]:
+                continue
+            elif end < indivs[k + 1]:
+                en = end - indivs[k]
+            else:
+                en = None
+            pp.append(k)
+            ss.append((st, en))
+        layer[(key, index)] = (
+            (_repartition_func,) + tuple((arr.name, part) for part in pp) + (ss,)
+        )
+    return layer

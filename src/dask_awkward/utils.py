@@ -37,7 +37,7 @@ class LazyInputsDict(Mapping):
     Parameters
     ----------
     inputs : list[Any]
-        The list of dicionary values.
+        The list of dictionary values.
 
     """
 

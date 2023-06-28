@@ -76,7 +76,7 @@ def _finalize_array(results: Sequence[Any]) -> Any:
 
     # sometimes we just check the length of partitions so all results
     # will be integers, just make an array out of that.
-    elif isinstance(results, tuple) and all(
+    elif isinstance(results, (tuple, list)) and all(
         isinstance(r, (int, np.integer)) for r in results
     ):
         return ak.Array(list(results))
@@ -560,6 +560,40 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         """Assign an empty typetracer array as the collection metadata."""
         self._meta = empty_typetracer()
 
+    def repartition(self, npartitions=None, divisions=None, rows_per_partition=None):
+        from dask_awkward.layers import AwkwardMaterializedLayer
+        from dask_awkward.lib.structure import repartition_layer
+
+        if sum(bool(_) for _ in [npartitions, divisions, rows_per_partition]) != 1:
+            raise ValueError("Please specify exactly one of the inputs")
+        if not self.known_divisions:
+            self.eager_compute_divisions()
+        nrows = self.divisions[-1]
+        if npartitions:
+            rows_per_partition = math.ceil(nrows / npartitions)
+        if rows_per_partition:
+            divisions = list(range(0, nrows, rows_per_partition))
+            divisions.append(nrows)
+
+        token = tokenize(self, divisions)
+        key = f"repartition-{token}"
+
+        new_layer_raw = repartition_layer(self, key, divisions)
+        new_layer = AwkwardMaterializedLayer(
+            new_layer_raw,
+            previous_layer_names=[self.name],
+        )
+        new_graph = HighLevelGraph.from_collections(
+            key, new_layer, dependencies=(self,)
+        )
+        return new_array_object(
+            new_graph,
+            key,
+            meta=self._meta,
+            behavior=self.behavior,
+            divisions=divisions,
+        )
+
     def __len__(self) -> int:
         if not self.known_divisions:
             self.eager_compute_divisions()
@@ -700,6 +734,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return np.array(self.__dask_keys__(), dtype=object)
 
     def _partitions(self, index: Any) -> Array:
+        # TODO: this produces a materialized layer, but could work like repartition() and slice()
         if not isinstance(index, tuple):
             index = (index,)
         token = tokenize(self, index)
@@ -718,6 +753,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         # if a single partition was requested we trivially know the new divisions.
         if len(raw) == 1 and isinstance(raw[0], int) and self.known_divisions:
+            # TODO: don't we always know the divisions?
             new_divisions = (
                 0,
                 self.divisions[raw[0] + 1] - self.divisions[raw[0]],  # type: ignore
