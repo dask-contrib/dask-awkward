@@ -29,6 +29,7 @@ __all__ = (
     "cartesian",
     "combinations",
     "copy",
+    "drop_none",
     "fill_none",
     "firsts",
     "flatten",
@@ -334,6 +335,28 @@ def fill_none(
     return map_partitions(fn, array, label="fill-none", output_divisions=1)
 
 
+class _DropNoneFn:
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __call__(self, arr):
+        return ak.drop_none(arr, **self.kwargs)
+
+
+@borrow_docstring(ak.drop_none)
+def drop_none(
+    array: Array,
+    axis: int | None = None,
+    highlevel: bool = True,
+    behavior: dict | None = None,
+) -> Array:
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
+    fn = _DropNoneFn(axis=axis, highlevel=highlevel, behavior=behavior)
+    return map_partitions(fn, array, label="drop-none", output_divisions=1)
+
+
 class _FirstsFn:
     def __init__(self, **kwargs):
         self.kwargs = kwargs
@@ -431,6 +454,7 @@ def full_like(array, fill_value, highlevel=True, behavior=None, dtype=None):
         highlevel=highlevel,
         behavior=behavior,
         dtype=dtype,
+        output_divisions=1,
     )
 
 
@@ -454,6 +478,7 @@ def isclose(
         highlevel=highlevel,
         behavior=behavior,
         label="is-close",
+        output_divisions=1,
     )
 
 
@@ -541,6 +566,7 @@ def num(
             axis=axis,
             highlevel=highlevel,
             behavior=behavior,
+            output_divisions=1,
         )
     if axis == 0:
         return len(array)
@@ -559,10 +585,10 @@ def ones_like(
     return map_partitions(
         ak.ones_like,
         array,
-        output_divisions=1,
         label="ones-like",
         behavior=behavior,
         dtype=dtype,
+        output_divisions=1,
     )
 
 
@@ -967,10 +993,10 @@ def zeros_like(
     return map_partitions(
         ak.zeros_like,
         array,
-        output_divisions=1,
         label="zeros-like",
         behavior=behavior,
         dtype=dtype,
+        output_divisions=1,
     )
 
 

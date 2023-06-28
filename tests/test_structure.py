@@ -138,6 +138,16 @@ def test_fill_none(vf: int | float | str, axis: int | None) -> None:
     assert_eq(d, e, check_forms=(not isinstance(vf, str)))
 
 
+@pytest.mark.parametrize("axis", [None, 0, 1, -1])
+def test_drop_none(axis: int) -> None:
+    a = [[1, 2, None], [], [None], [5, 6, 7, None], [1, 2], None]
+    b = [[None, 2, 1], [None], [], None, [7, 6, None, 5], [None, None]]
+    c = dak.from_lists([a, b])
+    d = dak.drop_none(c)
+    e = ak.drop_none(ak.from_iter(a + b))
+    assert_eq(d, e)
+
+
 @pytest.mark.parametrize("axis", [0, 1, -1])
 def test_is_none(axis: int) -> None:
     a: list[Any] = [[1, 2, None], None, None, [], [None], [5, 6, 7, None], [1, 2], None]
@@ -468,7 +478,6 @@ def test_from_regular(caa):
     )
 
 
-@pytest.mark.xfail(reason="typetracer")
 def test_to_regular(caa):
     regular = ak.to_packed(caa[[0, 4, 5, 9, 10, 14]].points.x)
     dregular = dak.from_awkward(regular, 3)
