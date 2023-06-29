@@ -2286,7 +2286,7 @@ class PartitionCompatibility(IntEnum):
     MAYBE = 2
 
     @staticmethod
-    def check(*args: Array) -> PartitionCompatibility:
+    def _check(*args: Array) -> PartitionCompatibility:
         # first check to see if all arguments have the same number of
         # partitions; this is _always_ defined.
         for arg in args[1:]:
@@ -2324,4 +2324,4 @@ class PartitionCompatibility(IntEnum):
 
 
 def partition_compatibility(*args: Array) -> PartitionCompatibility:
-    return PartitionCompatibility.check(*args)
+    return PartitionCompatibility._check(*args)
