@@ -2281,6 +2281,30 @@ def make_unknown_length(array: ak.Array) -> ak.Array:
 
 
 class PartitionCompatibility(IntEnum):
+    """Sum type for describing partition compatibility.
+
+    Use the :func:`partition_compatibility` function as an entry point
+    to instances of this class.
+
+    Attributes
+    ----------
+    YES
+        The compatibility is absolutely true; equal number of
+        partitions and known divisions match.
+    NO
+        The compatibility is absolutely false; either an unequal
+        number of partitions or known divisions do not match
+    MAYBE
+        The compatibility is possible; the total number of partitions
+        are equal but some divisions are unknown so therefore it's
+        possible that partitions are not compatible.
+
+    See Also
+    --------
+    dask_awkward.partition_compatibility
+
+    """
+
     YES = 0
     NO = 1
     MAYBE = 2
@@ -2324,4 +2348,58 @@ class PartitionCompatibility(IntEnum):
 
 
 def partition_compatibility(*args: Array) -> PartitionCompatibility:
+    """Check if multiple collections have compatible partitions.
+
+    Parameters
+    ----------
+    *args : Array
+        Any number of array collections to check.
+
+    Returns
+    -------
+    PartitionCompatibility
+        Result of the check.
+
+    Examples
+    --------
+
+    Starting with an absolutely compatible comparison:
+
+    >>> import dask_awkward as dak
+    >>> import awkward as ak
+    >>> concrete = ak.Array([[1, 2, 3], [4], [5, 6], [0, 0, 0, 0]])
+    >>> lazy = dak.from_awkward(concrete npartitions=2)
+    >>> selection = dak.sum(lazy, axis=1) == 0
+    >>> dak.partition_compatibility(lazy, selection)
+    <PartitionCompatibility.YES: 0>
+
+    The selection doesn't change the length of the arrays at each
+    partition, so the divisions are known to be conserved for those
+    operations (the sum on ``axis=1`` along with the equality
+    comparison).
+
+    In general we have no way of knowing what the resulting divisions
+    will be after a boolean selection, but the total number of
+    partitions will be conserved, so we have to report ``MAYBE``:
+
+    >>> selected_lazy = lazy[selection]
+    >>> dak.partition_compatibility(lazy, lazy_selection)
+    <PartitionCompatibility.MAYBE: 2>
+
+    Due the simple nature of this example we know that after the
+    selection the partitions will not be compatible (because it's
+    clear only 1 element of the original array will survive the
+    selection, so the divisions will change after that compute). Now
+    we can eagerly compute what the divisions will be on the
+    ``lazy_selection`` collection and get a ``NO`` result:
+
+    >>> lazy_selection.eager_compute_divisions()
+    >>> dak.partition_compatibility(lazy, lazy_selection)
+    <PartitionCompatibility.NO: 1>
+
+    Remember that :func:`Array.eager_compute_divisions` is going to
+    trigger a compute to determine the divisions (to know divisions we
+    need to know the length of each partition)
+
+    """
     return PartitionCompatibility._check(*args)
