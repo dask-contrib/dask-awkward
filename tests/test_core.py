@@ -17,6 +17,7 @@ import sys
 
 import dask_awkward as dak
 from dask_awkward.lib.core import (
+    PartitionCompatibility,
     Record,
     Scalar,
     calculate_known_divisions,
@@ -29,6 +30,7 @@ from dask_awkward.lib.core import (
     new_record_object,
     new_scalar_object,
     normalize_single_outer_inner_index,
+    partition_compatibility,
     to_meta,
     typetracer_array,
 )
@@ -450,18 +452,25 @@ def test_scalar_to_delayed(daa: Array, optimize_graph: bool) -> None:
 def test_compatible_partitions(ndjson_points_file: str) -> None:
     daa1 = dak.from_json([ndjson_points_file] * 5)
     daa2 = dak.from_awkward(daa1.compute(), npartitions=4)
-    assert compatible_partitions(daa1, daa1)
-    assert compatible_partitions(daa1, daa1, daa1)
-    assert not compatible_partitions(daa1, daa2)
+    with pytest.warns(DeprecationWarning):
+        assert compatible_partitions(daa1, daa1)
+    with pytest.warns(DeprecationWarning):
+        assert compatible_partitions(daa1, daa1, daa1)
+    with pytest.warns(DeprecationWarning):
+        assert not compatible_partitions(daa1, daa2)
     daa1.eager_compute_divisions()
-    assert compatible_partitions(daa1, daa1)
+    with pytest.warns(DeprecationWarning):
+        assert compatible_partitions(daa1, daa1)
     x = ak.Array([[1, 2, 3], [1, 2, 3], [3, 4, 5]])
     y = ak.Array([[1, 2, 3], [3, 4, 5]])
     x = dak.from_awkward(x, npartitions=2)
     y = dak.from_awkward(y, npartitions=2)
-    assert not compatible_partitions(x, y)
-    assert not compatible_partitions(x, x, y)
-    assert compatible_partitions(y, y)
+    with pytest.warns(DeprecationWarning):
+        assert not compatible_partitions(x, y)
+    with pytest.warns(DeprecationWarning):
+        assert not compatible_partitions(x, x, y)
+    with pytest.warns(DeprecationWarning):
+        assert compatible_partitions(y, y)
 
 
 def test_compatible_partitions_after_slice() -> None:
@@ -474,11 +483,15 @@ def test_compatible_partitions_after_slice() -> None:
     assert_eq(lazy, ccrt)
 
     # sanity
-    assert compatible_partitions(lazy, lazy + 2)
-    assert compatible_partitions(lazy, dak.num(lazy, axis=1) > 2)
+    with pytest.warns(DeprecationWarning):
+        assert compatible_partitions(lazy, lazy + 2)
+    with pytest.warns(DeprecationWarning):
+        assert compatible_partitions(lazy, dak.num(lazy, axis=1) > 2)
 
-    assert not compatible_partitions(lazy[:-2], lazy)
-    assert not compatible_partitions(lazy[:-2], dak.num(lazy, axis=1) != 3)
+    with pytest.warns(DeprecationWarning):
+        assert not compatible_partitions(lazy[:-2], lazy)
+    with pytest.warns(DeprecationWarning):
+        assert not compatible_partitions(lazy[:-2], dak.num(lazy, axis=1) != 3)
 
     with pytest.raises(IncompatiblePartitions, match="incompatibly partitioned"):
         (lazy[:-2] + lazy).compute()
@@ -499,7 +512,7 @@ def test_compatible_partitions_mixed() -> None:
     assert_eq(f, a + a)
 
 
-def test_compatible_partitions_all_unknwn() -> None:
+def test_compatible_partitions_all_unknown() -> None:
     a = ak.Array([[1, 2, 3], [0, 0, 0, 0], [5, 6, 7, 8, 9], [0, 0, 0, 0]])
     b = dak.from_awkward(a, npartitions=2)
     c = b[dak.sum(b, axis=1) == 0]
@@ -511,6 +524,18 @@ def test_compatible_partitions_all_unknwn() -> None:
     e = c + d
     with pytest.raises(ValueError):
         e.compute()
+
+
+def test_partition_compatiblity() -> None:
+    a = ak.Array([[1, 2, 3], [0, 0, 0, 0], [5, 6, 7, 8, 9], [0, 0, 0, 0]])
+    b = dak.from_awkward(a, npartitions=2)
+    c = b[dak.sum(b, axis=1) == 0]
+    d = b[dak.sum(b, axis=1) == 6]
+    assert partition_compatibility(c, d) == PartitionCompatibility.MAYBE
+    assert partition_compatibility(b, c, d) == PartitionCompatibility.MAYBE
+    assert partition_compatibility(b, dak.num(b, axis=1)) == PartitionCompatibility.YES
+    c.eager_compute_divisions()
+    assert partition_compatibility(b, c) == PartitionCompatibility.NO
 
 
 @pytest.mark.parametrize("meta", [5, False, [1, 2, 3]])
