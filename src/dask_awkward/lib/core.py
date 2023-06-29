@@ -2162,13 +2162,9 @@ def compatible_partitions(*args: Array) -> bool:
         if arg.known_divisions:
             if arg.divisions != refarr.divisions:
                 return False
-        else:
-            warnings.warn(
-                f"Collection {arg.name} has unknown divisions (but has the "
-                f"same number of partitions as {refarr.name}; it's possible "
-                "that your task graph may fail at compute time if the "
-                "divisions are actually incompatible."
-            )
+
+    # if we reach this point we consider the partitions compatible.
+
     return True
 
 

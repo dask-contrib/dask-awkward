@@ -33,6 +33,7 @@ from dask_awkward.lib.core import (
     typetracer_array,
 )
 from dask_awkward.lib.testutils import assert_eq
+from dask_awkward.utils import IncompatiblePartitions
 
 if TYPE_CHECKING:
     from dask_awkward.lib.core import Array
@@ -479,6 +480,9 @@ def test_compatible_partitions_after_slice() -> None:
     assert not compatible_partitions(lazy[:-2], lazy)
     assert not compatible_partitions(lazy[:-2], dak.num(lazy, axis=1) != 3)
 
+    with pytest.raises(IncompatiblePartitions, match="incompatibly partitioned"):
+        (lazy[:-2] + lazy).compute()
+
 
 def test_compatible_partitions_mixed() -> None:
     a = ak.Array([[1, 2, 3], [0, 0, 0, 0], [5, 6, 7, 8, 9], [0, 0, 0, 0]])
@@ -488,9 +492,8 @@ def test_compatible_partitions_mixed() -> None:
     d = b[dak.num(b, axis=1) >= 3]
     assert not c.known_divisions
     # compatible partitions is going to get called in the __add__ ufunc
-    with pytest.warns(UserWarning, match="unknown divisions"):
-        e = b + c
-        f = b + d
+    e = b + c
+    f = b + d
     with pytest.raises(ValueError):
         e.compute()
     assert_eq(f, a + a)
