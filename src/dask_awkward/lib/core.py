@@ -1278,6 +1278,10 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         # compute new meta from inputs
         new_meta = ufunc(*inputs_meta)
 
+        dak_arrays = tuple(a for a in inputs if isinstance(a, Array))
+        if not compatible_partitions(*dak_arrays):
+            raise IncompatiblePartitions(*dak_arrays)
+
         return map_partitions(
             ufunc,
             *inputs,
@@ -2132,18 +2136,39 @@ def compatible_partitions(*args: Array) -> bool:
         ``True`` if the collections appear to be equally partitioned.
 
     """
-    a = args[0]
+    # first check to see if all arguments have the same number of
+    # partitions; this is _always_ defined.
 
+    a = args[0]
     for arg in args[1:]:
         if a.npartitions != arg.npartitions:
             return False
 
-    if a.known_divisions:
-        for arg in args[1:]:
-            if arg.known_divisions:
-                if a.divisions != arg.divisions:
-                    return False
+    # now we check if divisions are compatible. Sometimes divisions
+    # are unknown and we just have a tuple of Nones; but if divisions
+    # are known we want to check if they are compatible.
 
+    refarr: Array | None = None
+    for arg in args:
+        if arg.known_divisions:
+            refarr = arg
+            break
+        # if we never hit the break just return True because we have no
+        # known division Arrays.
+    else:
+        return True
+
+    for arg in args:
+        if arg.known_divisions:
+            if arg.divisions != refarr.divisions:
+                return False
+        else:
+            warnings.warn(
+                f"Collection {arg.name} has unknown divisions (but has the "
+                f"same number of partitions as {refarr.name}; it's possible "
+                "that your task graph may fail at compute time if the "
+                "divisions are actually incompatible."
+            )
     return True
 
 
