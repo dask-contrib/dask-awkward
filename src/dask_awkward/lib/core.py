@@ -8,6 +8,7 @@ import operator
 import sys
 import warnings
 from collections.abc import Callable, Hashable, Mapping, Sequence
+from enum import IntEnum
 from functools import cached_property, partial
 from numbers import Number
 from typing import TYPE_CHECKING, Any, Literal, TypeVar, overload
@@ -818,7 +819,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         self, where: Array | tuple[Any, ...]
     ) -> Any:
         ba = where if isinstance(where, Array) else where[0]
-        if not compatible_partitions(self, ba):
+        if partition_compatibility(self, ba) == PartitionCompatibility.NO:
             raise IncompatiblePartitions("getitem", self, ba)
 
         new_meta: Any | None = None
@@ -1279,8 +1280,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         new_meta = ufunc(*inputs_meta)
 
         dak_arrays = tuple(a for a in inputs if isinstance(a, Array))
-        if not compatible_partitions(*dak_arrays):
-            raise IncompatiblePartitions(*dak_arrays)
+        if partition_compatibility(*dak_arrays) == PartitionCompatibility.NO:
+            raise IncompatiblePartitions(ufunc.__name__, *dak_arrays)
 
         return map_partitions(
             ufunc,
@@ -1290,7 +1291,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             **kwargs,
         )
 
-    def __array__(self, *args, **kwargs):
+    def __array__(self, *_, **__):
         raise NotImplementedError
 
     def to_delayed(self, optimize_graph: bool = True) -> list[Delayed]:
@@ -2136,6 +2137,12 @@ def compatible_partitions(*args: Array) -> bool:
         ``True`` if the collections appear to be equally partitioned.
 
     """
+
+    warnings.warn(
+        "dak.compatible_partitions is deprecated, please use dak.partition_compatibility.",
+        DeprecationWarning,
+    )
+
     # first check to see if all arguments have the same number of
     # partitions; this is _always_ defined.
 
@@ -2153,8 +2160,8 @@ def compatible_partitions(*args: Array) -> bool:
         if arg.known_divisions:
             refarr = arg
             break
-        # if we never hit the break just return True because we have no
-        # known division Arrays.
+    # if we never hit the break just return True because we have no
+    # known division Arrays.
     else:
         return True
 
@@ -2271,3 +2278,50 @@ def make_unknown_length(array: ak.Array) -> ak.Array:
 
     """
     return ak.Array(ak.to_layout(array).to_typetracer(forget_length=True))
+
+
+class PartitionCompatibility(IntEnum):
+    YES = 0
+    NO = 1
+    MAYBE = 2
+
+    @staticmethod
+    def check(*args: Array) -> PartitionCompatibility:
+        # first check to see if all arguments have the same number of
+        # partitions; this is _always_ defined.
+        for arg in args[1:]:
+            if args[0].npartitions != arg.npartitions:
+                return PartitionCompatibility.NO
+
+        # now we check if divisions are compatible. Sometimes divisions
+        # are unknown and we just have a tuple of Nones; but if divisions
+        # are known we want to check if they are compatible.
+        refarr: Array | None = None
+        for arg in args:
+            if arg.known_divisions:
+                refarr = arg
+                break
+        # if we never hit the break just return True because we have no
+        # known division Arrays.
+        else:
+            return PartitionCompatibility.MAYBE
+
+        # at this point we have a reference array to compare divisions
+        ngood = 0
+        for arg in args:
+            if arg.known_divisions:
+                if arg.divisions != refarr.divisions:
+                    return PartitionCompatibility.NO
+                else:
+                    ngood += 1
+
+        # the ngood counter tells us if all divisions were present and are equal
+        if ngood == len(args):
+            return PartitionCompatibility.YES
+
+        # if ngood is less than len(args) then we fall back on maybe compatible
+        return PartitionCompatibility.MAYBE
+
+
+def partition_compatibility(*args: Array) -> PartitionCompatibility:
+    return PartitionCompatibility.check(*args)

@@ -7,9 +7,10 @@ from dask.highlevelgraph import HighLevelGraph
 from dask_awkward.layers import AwkwardMaterializedLayer
 from dask_awkward.lib.core import (
     Array,
-    compatible_partitions,
+    PartitionCompatibility,
     map_partitions,
     new_array_object,
+    partition_compatibility,
 )
 from dask_awkward.utils import DaskAwkwardNotImplemented, IncompatiblePartitions
 
@@ -60,7 +61,7 @@ def concatenate(
         return new_array_object(hlg, name, meta=meta, npartitions=npartitions)
 
     if axis > 0:
-        if not compatible_partitions(*arrays):
+        if partition_compatibility(*arrays) == PartitionCompatibility.NO:
             raise IncompatiblePartitions("concatenate", *arrays)
 
         fn = _ConcatenateFnAxisGT0(axis=axis)
