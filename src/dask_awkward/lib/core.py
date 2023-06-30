@@ -2117,64 +2117,6 @@ def typetracer_array(a: ak.Array | Array) -> ak.Array:
         raise TypeError(msg)
 
 
-def compatible_partitions(*args: Array) -> bool:
-    """Check if all arguments are compatibly partitioned.
-
-    In operations where the blocks of multiple collections are used
-    simultaneously, we need the collections to be equally partitioned.
-    If the first argument has known divisions, other collections with
-    known divisions will be tested against the first arguments
-    divisions.
-
-    Parameters
-    ----------
-    *args : Array
-        Array collections of interest.
-
-    Returns
-    -------
-    bool
-        ``True`` if the collections appear to be equally partitioned.
-
-    """
-
-    warnings.warn(
-        "dak.compatible_partitions is deprecated, please use dak.partition_compatibility.",
-        DeprecationWarning,
-    )
-
-    # first check to see if all arguments have the same number of
-    # partitions; this is _always_ defined.
-
-    a = args[0]
-    for arg in args[1:]:
-        if a.npartitions != arg.npartitions:
-            return False
-
-    # now we check if divisions are compatible. Sometimes divisions
-    # are unknown and we just have a tuple of Nones; but if divisions
-    # are known we want to check if they are compatible.
-
-    refarr: Array | None = None
-    for arg in args:
-        if arg.known_divisions:
-            refarr = arg
-            break
-    # if we never hit the break just return True because we have no
-    # known division Arrays.
-    else:
-        return True
-
-    for arg in args:
-        if arg.known_divisions:
-            if arg.divisions != refarr.divisions:
-                return False
-
-    # if we reach this point we consider the partitions compatible.
-
-    return True
-
-
 def empty_typetracer() -> ak.Array:
     """Instantiate a typetracer array with unknown length.
 
@@ -2288,16 +2230,17 @@ class PartitionCompatibility(IntEnum):
 
     Attributes
     ----------
-    YES
-        The compatibility is absolutely true; equal number of
-        partitions and known divisions match.
     NO
         The compatibility is absolutely false; either an unequal
         number of partitions or known divisions do not match
     MAYBE
         The compatibility is possible; the total number of partitions
         are equal but some divisions are unknown so therefore it's
-        possible that partitions are not compatible.
+        possible that partitions are not compatible, but this cannot
+        be determined without some compute.
+    YES
+        The compatibility is absolutely true; equal number of
+        partitions and known divisions match.
 
     See Also
     --------
@@ -2305,9 +2248,9 @@ class PartitionCompatibility(IntEnum):
 
     """
 
-    YES = 0
-    NO = 1
-    MAYBE = 2
+    NO = 0
+    MAYBE = 1
+    YES = 2
 
     @staticmethod
     def _check(*args: Array) -> PartitionCompatibility:
@@ -2403,3 +2346,52 @@ def partition_compatibility(*args: Array) -> PartitionCompatibility:
 
     """
     return PartitionCompatibility._check(*args)
+
+
+HowStrictT = Literal[1] | Literal[2] | PartitionCompatibility
+
+
+def compatible_partitions(
+    *args: Array,
+    how_strict: HowStrictT = PartitionCompatibility.MAYBE,
+) -> bool:
+    """Check if all arguments are compatibly partitioned.
+
+    In operations where the blocks of multiple collections are used
+    simultaneously, we need the collections to be equally partitioned.
+    If the first argument has known divisions, other collections with
+    known divisions will be tested against the first arguments
+    divisions.
+
+    Parameters
+    ----------
+    *args : Array
+        Array collections of interest.
+    how_strict : PartitionCompatibility or Literal[1] or Literal[2]
+        Strictness level for the compatibility. If
+        ``PartitionCompatbility.MAYBE`` or the integer 1, the check
+        will return ``True`` if the arrays are maybe compatible (that
+        is, some unknown divisions exist but the total number of
+        partitions are compatible). If ``PartitionCompatibility.YES``
+        or the integer 2, the check will return ``True`` if and only
+        if the arrays are absolutely compatible (that is, all
+        divisions are known and they are equal).
+
+    Returns
+    -------
+    bool
+        ``True`` if the collections have compatible partitions at the
+        level of requested strictness.
+
+    See Also
+    --------
+    dask_awkward.PartitionCompatibility
+    dask_awkward.partition_compatibility
+
+    """
+    partcomp = partition_compatibility(*args)
+    if partcomp == PartitionCompatibility.NO:
+        return False
+    elif partcomp == PartitionCompatibility.MAYBE:
+        return how_strict == 1
+    return True
