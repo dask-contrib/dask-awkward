@@ -7,7 +7,7 @@ datasets stored in Parquet or JSON format.
 
 Take this code-block for example:
 
-.. code:: python
+.. code:: pycon
 
    >>> import dask_awkward as dak
    >>> ds1 = dak.from_parquet("s3://path/to/dataset")

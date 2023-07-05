@@ -23,28 +23,32 @@ topic).
 
    behavior: dict = {}
 
+
    @ak.mixin_class(behavior)
    class Point:
        def distance(self, other):
-           return np.sqrt(
-               (self.x - other.x) ** 2 + (self.y - other.y) ** 2
-           )
+           return np.sqrt((self.x - other.x) ** 2 + (self.y - other.y) ** 2)
 
-   points1 = ak.Array([
-        [{"x": 1.0, "y": 1.1}, {"x": 2.0, "y": 2.2}, {"x": 3, "y": 3.3}],
-        [],
-        [{"x": 4.0, "y": 4.4}, {"x": 5.0, "y": 5.5}],
-        [{"x": 6.0, "y": 6.6}],
-        [{"x": 7.0, "y": 7.7}, {"x": 8.0, "y": 8.8}, {"x": 9, "y": 9.9}],
-    ])
 
-   points2 = ak.Array([
-       [{"x": 0.9, "y": 1.0}, {"x": 2.0, "y": 2.2}, {"x": 2.9, "y": 3.0}],
-       [],
-       [{"x": 3.9, "y": 4.0}, {"x": 5.0, "y": 5.5}],
-       [{"x": 5.9, "y": 6.0}],
-       [{"x": 6.9, "y": 7.0}, {"x": 8.0, "y": 8.8}, {"x": 8.9, "y": 9.0}],
-   ])
+   points1 = ak.Array(
+       [
+           [{"x": 1.0, "y": 1.1}, {"x": 2.0, "y": 2.2}, {"x": 3, "y": 3.3}],
+           [],
+           [{"x": 4.0, "y": 4.4}, {"x": 5.0, "y": 5.5}],
+           [{"x": 6.0, "y": 6.6}],
+           [{"x": 7.0, "y": 7.7}, {"x": 8.0, "y": 8.8}, {"x": 9, "y": 9.9}],
+       ]
+   )
+
+   points2 = ak.Array(
+       [
+           [{"x": 0.9, "y": 1.0}, {"x": 2.0, "y": 2.2}, {"x": 2.9, "y": 3.0}],
+           [],
+           [{"x": 3.9, "y": 4.0}, {"x": 5.0, "y": 5.5}],
+           [{"x": 5.9, "y": 6.0}],
+           [{"x": 6.9, "y": 7.0}, {"x": 8.0, "y": 8.8}, {"x": 8.9, "y": 9.0}],
+       ]
+   )
 
    array1 = dak.from_awkward(points1, npartitions=2)
    array2 = dak.from_awkward(points2, npartitions=2)
