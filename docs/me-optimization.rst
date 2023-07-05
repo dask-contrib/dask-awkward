@@ -118,6 +118,7 @@ above example, we write
    >>> result = ds.bar.x / ds.foo
    >>> with dask.config.set({"awkward.optimization.enabled": False}):
    ...     result.compute()
+   ...
 
 With this code we can save a little bit of overhead by not running the
 necessary columns optimization after already defining, by hand, the
