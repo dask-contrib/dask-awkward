@@ -39,7 +39,7 @@ on the first partition will occur." what does that mean?**
     is called ``awkward.compute-unknown-meta``. The default setting is
     ``True``. In code you can do something like this:
 
-    .. code-block:: python
+    .. code-block:: pycon
 
        with dask.config.set({"awkward.compute-unknown-meta": False}):
            # ... your code

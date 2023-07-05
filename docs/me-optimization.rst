@@ -40,7 +40,7 @@ column of floats for ``bar.y``.
 
 If our task graph is of the form:
 
-.. code:: python
+.. code:: pycon
 
    >>> ds = dak.from_parquet("/path/to/data")
    >>> result = ds.bar.x / ds.foo
@@ -84,7 +84,7 @@ You can see which columns are determined to be necessary by calling
 (it returns a mapping that pairs an input layer with the list of
 necessary columns):
 
-.. code:: python
+.. code:: pycon
 
    >>> dak.necessary_columns(result)
    {"some-layer-name": ["foo", "bar.x"]}
@@ -112,7 +112,7 @@ which columns should be read from disk. The
 determine how one should use the ``columns=`` argument. Using our
 above example, we write
 
-.. code:: python
+.. code:: pycon
 
    >>> ds = dak.from_parquet("/path/to/data", columns=["bar.x", "foo"])
    >>> result = ds.bar.x / ds.foo
