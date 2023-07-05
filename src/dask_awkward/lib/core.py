@@ -11,7 +11,7 @@ from collections.abc import Callable, Hashable, Mapping, Sequence
 from enum import IntEnum
 from functools import cached_property, partial
 from numbers import Number
-from typing import TYPE_CHECKING, Any, Literal, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, Union, overload
 
 import awkward as ak
 import dask.config
@@ -2348,7 +2348,7 @@ def partition_compatibility(*args: Array) -> PartitionCompatibility:
     return PartitionCompatibility._check(*args)
 
 
-HowStrictT = Literal[1] | Literal[2] | PartitionCompatibility
+HowStrictT = Union[Literal[1], Literal[2], PartitionCompatibility]
 
 
 def compatible_partitions(
