@@ -527,6 +527,27 @@ def test_partition_compatiblity() -> None:
     assert dak.partition_compatibility(b, c) == dak.PartitionCompatibility.NO
 
 
+def test_partition_compat_with_strictness() -> None:
+    a = ak.Array([[1, 2, 3], [0, 0, 0, 0], [5, 6, 7, 8, 9], [0, 0, 0, 0]])
+    b = dak.from_awkward(a, npartitions=2)
+    c = b[dak.sum(b, axis=1) == 0]
+    d = b[dak.sum(b, axis=1) == 6]
+
+    assert dak.compatible_partitions(c, d, how_strict=1)
+    assert dak.compatible_partitions(
+        c,
+        d,
+        how_strict=dak.PartitionCompatibility.MAYBE,
+    )
+
+    assert not dak.compatible_partitions(c, d, how_strict=2)
+    assert not dak.compatible_partitions(
+        c,
+        d,
+        how_strict=dak.PartitionCompatibility.YES,
+    )
+
+
 @pytest.mark.parametrize("meta", [5, False, [1, 2, 3]])
 def test_bad_meta_type(ndjson_points_file: str, meta: Any) -> None:
     with pytest.raises(TypeError, match="meta must be an instance of an Awkward Array"):
