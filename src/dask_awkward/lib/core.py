@@ -35,7 +35,7 @@ from dask.context import globalmethod
 from dask.delayed import Delayed
 from dask.highlevelgraph import HighLevelGraph
 from dask.threaded import get as threaded_get
-from dask.utils import IndexCallable, funcname, key_split
+from dask.utils import IndexCallable, funcname, is_arraylike, key_split
 from tlz import first
 
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardMaterializedLayer
@@ -1259,29 +1259,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if method != "__call__":
             raise RuntimeError("Array ufunc supports only method == '__call__'")
 
-        new_meta = None
-
-        # divisions need to be compat. (identical for now?)
-
-        inputs_meta = []
-        for inp in inputs:
-            # if input is a Dask Awkward Array collection, grab it's meta
-            if isinstance(inp, Array):
-                inputs_meta.append(inp._meta)
-            # if input is a concrete Awkward Array, grab it's typetracer
-            elif isinstance(inp, ak.Array):
-                inputs_meta.append(typetracer_array(inp))
-            # otherwise pass along
-            else:
-                inputs_meta.append(inp)
-
-        # compute new meta from inputs
-        new_meta = ufunc(*inputs_meta)
-
         return map_partitions(
             ufunc,
             *inputs,
-            meta=new_meta,
             output_divisions=1,
             **kwargs,
         )
@@ -1486,6 +1466,9 @@ def partitionwise_layer(
                 pairs.extend([arg, "i"])
             elif len(arg.numblocks) == 2:
                 pairs.extend([arg, "ij"])
+        elif is_arraylike(arg) and is_dask_collection(arg) and arg.ndim == 1:
+            pairs.extend([arg.name, "i"])
+            numblocks[arg.name] = arg.numblocks
         elif is_dask_collection(arg):
             raise DaskAwkwardNotImplemented(
                 "Use of Array with other Dask collections is currently unsupported."
@@ -1994,6 +1977,10 @@ def meta_or_identity(obj: Any) -> Any:
     """
     if is_awkward_collection(obj):
         return obj._meta
+    elif is_dask_collection(obj) and is_arraylike(obj):
+        return ak.Array(
+            ak.from_numpy(obj._meta).layout.to_typetracer(forget_length=True)
+        )
     return obj
 
 
@@ -2040,7 +2027,7 @@ def to_length_zero_arrays(objects: Sequence[Any]) -> tuple[Any, ...]:
     return tuple(map(length_zero_array_or_identity, objects))
 
 
-def map_meta(fn: Callable, *deps: Any) -> ak.Array | None:
+def map_meta(fn: ArgsKwargsPackedFunction, *deps: Any) -> ak.Array | None:
     # NOTE: fn is assumed to be a *packed* function
     #       as defined up in map_partitions. be careful!
     try:
