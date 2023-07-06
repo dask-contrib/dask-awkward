@@ -9,7 +9,12 @@ from typing import TYPE_CHECKING, Any
 import awkward as ak
 from dask.base import is_dask_collection
 
-from dask_awkward.lib.core import Array, compatible_partitions, map_partitions
+from dask_awkward.lib.core import (
+    Array,
+    PartitionCompatibility,
+    map_partitions,
+    partition_compatibility,
+)
 from dask_awkward.utils import (
     DaskAwkwardNotImplemented,
     IncompatiblePartitions,
@@ -201,7 +206,7 @@ def broadcast_arrays(*arrays, highlevel=True, **kwargs):
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
 
-    if not compatible_partitions(*arrays):
+    if partition_compatibility(*arrays) == PartitionCompatibility.NO:
         raise IncompatiblePartitions("broadcast_arrays", *arrays)
 
     array_metas = (array._meta for array in arrays)
@@ -465,7 +470,7 @@ def isclose(
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
 
-    if not compatible_partitions(a, b):
+    if partition_compatibility(a, b) == PartitionCompatibility.NO:
         raise IncompatiblePartitions("isclose", a, b)
 
     return map_partitions(
@@ -514,7 +519,7 @@ def local_index(array, axis=-1, highlevel=True, behavior=None):
 
 @borrow_docstring(ak.mask)
 def mask(array, mask, valid_when=True, highlevel=True, behavior=None):
-    if not compatible_partitions(array, mask):
+    if partition_compatibility(array, mask) == PartitionCompatibility.NO:
         raise IncompatiblePartitions("mask", array, mask)
     return map_partitions(
         ak.mask,
@@ -841,7 +846,7 @@ def where(
             "The condition argugment to where must be a dask_awkward.Array"
         )
 
-    if not compatible_partitions(*dask_args):
+    if partition_compatibility(*dask_args) == PartitionCompatibility.NO:
         raise IncompatiblePartitions("where", *dask_args)
 
     return map_partitions(
@@ -890,8 +895,8 @@ def with_field(base, what, where=None, highlevel=True, behavior=None):
     maybe_dask_args = [base, what]
     dask_args = tuple(arg for arg in maybe_dask_args if is_dask_collection(arg))
 
-    if not compatible_partitions(*dask_args):
-        raise IncompatiblePartitions("with_field", base, what)
+    if partition_compatibility(*dask_args) == PartitionCompatibility.NO:
+        raise IncompatiblePartitions("with_field", *dask_args)
     return map_partitions(
         _WithFieldFn(where=where, highlevel=highlevel, behavior=behavior),
         base,
