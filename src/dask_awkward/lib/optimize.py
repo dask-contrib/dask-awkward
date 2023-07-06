@@ -373,7 +373,11 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
     # this loop builds up what are the possible final leaf nodes by
     # inspecting the dependents dictionary. If something does not have
     # a dependent, it must be the end of a graph. These are the things
-    # we need to compute for; we only a single partition (the first).
+    # we need to compute for; we only use a single partition (the
+    # first). for a single collection `.compute()` this list will just
+    # be length 1; but if we are using `dask.compute` to pass in
+    # multiple collections to be computed simultaneously, this list
+    # will increase in length.
     outlayers = []
     for k, v in dependents.items():
         if isinstance(v, set) and len(v) == 0:
