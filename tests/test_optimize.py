@@ -13,7 +13,7 @@ def test_multiple_computes(pq_points_dir) -> None:
     ds2 = dak.from_parquet(pq_points_dir, columns=["points"])
 
     lists = [[[1, 2, 3], [4, 5]], [[], [0, 0, 0]]]
-    ds3 = dak.from_lists([[[1, 2, 3], [4, 5]], [[], [0, 0, 0]]])
+    ds3 = dak.from_lists(lists)
 
     assert ds1.name != ds2.name
     things1 = dask.compute(ds1.points.x, ds2.points.y)
