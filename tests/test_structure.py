@@ -362,7 +362,6 @@ def test_singletons(daa, L4, tmp_path):
     )
 
 
-@pytest.mark.xfail(reason="upstream awkward dtype mismatch")
 @pytest.mark.parametrize("ascending", [True, False])
 def test_argsort(daa, caa, ascending):
     assert_eq(
@@ -379,7 +378,6 @@ def test_argsort(daa, caa, ascending):
     )
 
 
-@pytest.mark.xfail(reason="upstream awkward dtype mismatch")
 @pytest.mark.parametrize("ascending", [True, False])
 def test_sort(daa, caa, ascending):
     assert_eq(
