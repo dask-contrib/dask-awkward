@@ -378,10 +378,9 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
     # be length 1; but if we are using `dask.compute` to pass in
     # multiple collections to be computed simultaneously, this list
     # will increase in length.
-    outlayers = []
-    for k, v in dependents.items():
-        if isinstance(v, set) and len(v) == 0:
-            outlayers.append((k, 0))
+    leaf_layers_keys = [
+        (k, 0) for k, v in dependents.items() if isinstance(v, set) and len(v) == 0
+    ]
 
     # now we try to compute for each possible output layer key (leaf
     # node on partition 0); this will cause the typetacer reports to
@@ -390,7 +389,7 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
     try:
         for layer in hlg.layers.values():
             layer.__dict__.pop("_cached_dict", None)
-        for outlayerkey in outlayers:
+        for outlayerkey in leaf_layers_keys:
             out = get_sync(hlg, outlayerkey)
             if isinstance(out, (ak.Array, ak.Record)):
                 out.layout._touch_data(recursive=True)

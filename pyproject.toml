@@ -42,23 +42,19 @@ io = [
   "pyarrow",
 ]
 complete = [
-  "aiohttp",
-  "pyarrow",
+  "dask-awkward[io]",
 ]
 # `docs` and `test` are separate from user installs
 docs = [
+  "dask-awkard[complete]",
   "dask-sphinx-theme >=3.0.2",
-  "pyarrow",
   "sphinx-design",
-  "pytest >=6.0",
-  "pytest-cov >=3.0.0",
   "requests >=2.27.1",
 ]
 test = [
-  "aiohttp",
+  "dask-awkward[complete]",
   "distributed",
   "pandas",
-  "pyarrow",
   "pytest >=6.0",
   "pytest-cov >=3.0.0",
   "requests >=2.27.1",
