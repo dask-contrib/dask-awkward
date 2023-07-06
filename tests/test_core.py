@@ -4,6 +4,7 @@ from collections import namedtuple
 from typing import TYPE_CHECKING, Any
 
 import awkward as ak
+import dask.array as da
 import fsspec
 import numpy as np
 import pytest
@@ -727,3 +728,13 @@ def test_map_partitions_args_and_kwargs_have_collection():
         ddd=dd,
     )
     assert_eq(res1, res2)
+
+
+def test_dask_array_in_map_partitions(daa, caa):
+    x1 = dak.zeros_like(daa.points.x)
+    y1 = da.ones(len(x1), chunks=x1.divisions[1])
+    z1 = x1 + y1
+    x2 = ak.zeros_like(caa.points.x)
+    y2 = np.ones(len(x2))
+    z2 = x2 + y2
+    assert_eq(z1, z2)
