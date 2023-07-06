@@ -1260,6 +1260,10 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if method != "__call__":
             raise RuntimeError("Array ufunc supports only method == '__call__'")
 
+        dak_arrays = tuple(a for a in inputs if isinstance(a, Array))
+        if partition_compatibility(*dak_arrays) == PartitionCompatibility.NO:
+            raise IncompatiblePartitions(*dak_arrays)
+
         return map_partitions(
             ufunc,
             *inputs,
