@@ -401,6 +401,7 @@ def unproject_layout(form: Form | None, layout: Content) -> Content:
         not appear in the projected layout will be PlaceholderArrays).
 
     """
-    if form is None:
-        return layout
-    return _unproject_layout(form, layout, layout.length, layout.backend)
+    return layout
+    # if form is None:
+    #     return layout
+    # return _unproject_layout(form, layout, layout.length, layout.backend)

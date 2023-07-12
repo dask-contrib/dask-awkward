@@ -421,7 +421,7 @@ def _necessary_columns(dsk: HighLevelGraph) -> dict[str, list[str]]:
     """Pair layer names with lists of necessary columns."""
     kv = {}
     for name, report in _get_column_reports(dsk).items():
-        cols = {_ for _ in report.data_touched if _ is not None}
+        cols = {_ for _ in report.data_touched + report.shape_touched if _ is not None}
         select = []
         for col in sorted(cols):
             if col == name:
