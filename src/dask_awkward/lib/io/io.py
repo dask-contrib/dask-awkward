@@ -12,6 +12,7 @@ from dask.highlevelgraph import HighLevelGraph
 from dask.utils import funcname
 
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardInputLayer
+from dask_awkward.layers.layers import AwkwardMaterializedLayer
 from dask_awkward.lib.core import (
     empty_typetracer,
     map_partitions,
@@ -184,7 +185,10 @@ def from_delayed(
 
     parts = [source] if isinstance(source, Delayed) else source
     name = f"{prefix}-{tokenize(parts)}"
-    dsk = {(name, i): part.key for i, part in enumerate(parts)}
+    dsk = AwkwardMaterializedLayer(
+        {(name, i): part.key for i, part in enumerate(parts)},
+        previous_layer_names=[parts[0].name],
+    )
     if divisions is None:
         divs: tuple[int | None, ...] = (None,) * (len(parts) + 1)
     else:

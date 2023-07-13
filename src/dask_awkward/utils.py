@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
+
+if TYPE_CHECKING:
+    from dask_awkward.lib.core import Array
+
 
 T = TypeVar("T")
 
@@ -19,12 +23,12 @@ https://github.com/dask-contrib/dask-awkward."""
 
 
 class IncompatiblePartitions(ValueError):
-    def __init__(self, name, *args):
+    def __init__(self, name: str, *args: Array) -> None:
         msg = self.divisions_msg(name, *args)
         super().__init__(msg)
 
     @staticmethod
-    def divisions_msg(name: str, *args: Any) -> str:
+    def divisions_msg(name: str, *args: Array) -> str:
         msg = f"The inputs to {name} are incompatibly partitioned\n"
         for i, arg in enumerate(args):
             msg += f"- arg{i} divisions: {arg.divisions}\n"
@@ -37,7 +41,7 @@ class LazyInputsDict(Mapping):
     Parameters
     ----------
     inputs : list[Any]
-        The list of dicionary values.
+        The list of dictionary values.
 
     """
 

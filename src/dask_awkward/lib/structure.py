@@ -7,16 +7,13 @@ from numbers import Number
 from typing import TYPE_CHECKING, Any
 
 import awkward as ak
-import numpy as np
-from awkward._nplikes.typetracer import TypeTracerArray
 from dask.base import is_dask_collection
 
 from dask_awkward.lib.core import (
     Array,
-    compatible_partitions,
+    PartitionCompatibility,
     map_partitions,
-    new_known_scalar,
-    total_reduction_to_scalar,
+    partition_compatibility,
 )
 from dask_awkward.utils import (
     DaskAwkwardNotImplemented,
@@ -37,6 +34,7 @@ __all__ = (
     "cartesian",
     "combinations",
     "copy",
+    "drop_none",
     "fill_none",
     "firsts",
     "flatten",
@@ -208,7 +206,7 @@ def broadcast_arrays(*arrays, highlevel=True, **kwargs):
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
 
-    if not compatible_partitions(*arrays):
+    if partition_compatibility(*arrays) == PartitionCompatibility.NO:
         raise IncompatiblePartitions("broadcast_arrays", *arrays)
 
     array_metas = (array._meta for array in arrays)
@@ -342,6 +340,28 @@ def fill_none(
     return map_partitions(fn, array, label="fill-none", output_divisions=1)
 
 
+class _DropNoneFn:
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __call__(self, arr):
+        return ak.drop_none(arr, **self.kwargs)
+
+
+@borrow_docstring(ak.drop_none)
+def drop_none(
+    array: Array,
+    axis: int | None = None,
+    highlevel: bool = True,
+    behavior: dict | None = None,
+) -> Array:
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
+    fn = _DropNoneFn(axis=axis, highlevel=highlevel, behavior=behavior)
+    return map_partitions(fn, array, label="drop-none", output_divisions=1)
+
+
 class _FirstsFn:
     def __init__(self, **kwargs):
         self.kwargs = kwargs
@@ -439,6 +459,7 @@ def full_like(array, fill_value, highlevel=True, behavior=None, dtype=None):
         highlevel=highlevel,
         behavior=behavior,
         dtype=dtype,
+        output_divisions=1,
     )
 
 
@@ -449,7 +470,7 @@ def isclose(
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
 
-    if not compatible_partitions(a, b):
+    if partition_compatibility(a, b) == PartitionCompatibility.NO:
         raise IncompatiblePartitions("isclose", a, b)
 
     return map_partitions(
@@ -462,6 +483,7 @@ def isclose(
         highlevel=highlevel,
         behavior=behavior,
         label="is-close",
+        output_divisions=1,
     )
 
 
@@ -497,7 +519,7 @@ def local_index(array, axis=-1, highlevel=True, behavior=None):
 
 @borrow_docstring(ak.mask)
 def mask(array, mask, valid_when=True, highlevel=True, behavior=None):
-    if not compatible_partitions(array, mask):
+    if partition_compatibility(array, mask) == PartitionCompatibility.NO:
         raise IncompatiblePartitions("mask", array, mask)
     return map_partitions(
         ak.mask,
@@ -549,20 +571,10 @@ def num(
             axis=axis,
             highlevel=highlevel,
             behavior=behavior,
+            output_divisions=1,
         )
     if axis == 0:
-        if array.known_divisions:
-            return new_known_scalar(array.divisions[-1], dtype=int)
-        else:
-            return total_reduction_to_scalar(
-                label="num",
-                array=array,
-                meta=TypeTracerArray._new(dtype=np.int64, shape=()),
-                chunked_fn=ak.num,
-                chunked_kwargs={"axis": 0},
-                comb_fn=ak.sum,
-                comb_kwargs={"axis": None},
-            )
+        return len(array)
     raise DaskAwkwardNotImplemented("TODO")
 
 
@@ -578,10 +590,10 @@ def ones_like(
     return map_partitions(
         ak.ones_like,
         array,
-        output_divisions=1,
         label="ones-like",
         behavior=behavior,
         dtype=dtype,
+        output_divisions=1,
     )
 
 
@@ -834,7 +846,7 @@ def where(
             "The condition argugment to where must be a dask_awkward.Array"
         )
 
-    if not compatible_partitions(*dask_args):
+    if partition_compatibility(*dask_args) == PartitionCompatibility.NO:
         raise IncompatiblePartitions("where", *dask_args)
 
     return map_partitions(
@@ -883,8 +895,8 @@ def with_field(base, what, where=None, highlevel=True, behavior=None):
     maybe_dask_args = [base, what]
     dask_args = tuple(arg for arg in maybe_dask_args if is_dask_collection(arg))
 
-    if not compatible_partitions(*dask_args):
-        raise IncompatiblePartitions("with_field", base, what)
+    if partition_compatibility(*dask_args) == PartitionCompatibility.NO:
+        raise IncompatiblePartitions("with_field", *dask_args)
     return map_partitions(
         _WithFieldFn(where=where, highlevel=highlevel, behavior=behavior),
         base,
@@ -986,10 +998,10 @@ def zeros_like(
     return map_partitions(
         ak.zeros_like,
         array,
-        output_divisions=1,
         label="zeros-like",
         behavior=behavior,
         dtype=dtype,
+        output_divisions=1,
     )
 
 
@@ -1082,3 +1094,51 @@ def zip(
         raise DaskAwkwardNotImplemented(
             "only sized iterables are supported by dak.zip (dict, list, or tuple)"
         )
+
+
+def _repartition_func(*stuff):
+    import builtins
+
+    import awkward as ak
+
+    *data, slices = stuff
+    data = [
+        d[sl[0] : sl[1]] if sl is not None else d
+        for d, sl in builtins.zip(data, slices)
+    ]
+    return ak.concatenate(data)
+
+
+def repartition_layer(arr: Array, key: str, divisions: list[int, ...]):
+    layer = {}
+
+    indivs = arr.divisions
+    i = 0
+    for index, (start, end) in enumerate(builtins.zip(divisions[:-1], divisions[1:])):
+        pp = []
+        ss = []
+        while indivs[i] <= start:
+            i += 1
+        j = i
+        i -= 1
+        while indivs[j] < end:
+            j += 1
+        for k in range(i, j):
+            if start < indivs[k]:
+                st = None
+            elif start < indivs[k + 1]:
+                st = start - indivs[k]
+            else:
+                continue
+            if end < indivs[k]:
+                continue
+            elif end < indivs[k + 1]:
+                en = end - indivs[k]
+            else:
+                en = None
+            pp.append(k)
+            ss.append((st, en))
+        layer[(key, index)] = (
+            (_repartition_func,) + tuple((arr.name, part) for part in pp) + (ss,)
+        )
+    return layer

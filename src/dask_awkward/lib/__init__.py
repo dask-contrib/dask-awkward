@@ -1,6 +1,11 @@
-from dask_awkward.lib.core import Array, Record, Scalar
+from dask_awkward.lib.core import Array, PartitionCompatibility, Record, Scalar
 from dask_awkward.lib.core import _type as type
-from dask_awkward.lib.core import map_partitions, typetracer_from_form
+from dask_awkward.lib.core import (
+    compatible_partitions,
+    map_partitions,
+    partition_compatibility,
+    typetracer_from_form,
+)
 from dask_awkward.lib.describe import fields
 from dask_awkward.lib.inspect import necessary_columns, sample
 from dask_awkward.lib.io.io import (
@@ -47,6 +52,7 @@ from dask_awkward.lib.structure import (
     cartesian,
     combinations,
     copy,
+    drop_none,
     fill_none,
     firsts,
     flatten,

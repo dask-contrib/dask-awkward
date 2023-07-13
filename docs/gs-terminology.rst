@@ -29,6 +29,7 @@ objects from the namespaces:
 
    # don't do this!
    from dask_awkward import Array
+
    # or this!
    from awkward import Array
 

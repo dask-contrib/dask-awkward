@@ -18,7 +18,7 @@ from distributed.utils_test import loop_in_thread  # noqa
 from distributed.utils_test import cluster, gen_cluster
 
 import dask_awkward as dak
-from dask_awkward.lib.testutils import assert_eq
+from dask_awkward.lib.testutils import BAD_NP_AK_MIXIN_VERSIONING, assert_eq
 
 # @pytest.fixture(scope="session")
 # def small_cluster():
@@ -101,6 +101,10 @@ class Point:
         return np.sqrt(self.x**2 + self.y**2)
 
 
+@pytest.mark.xfail(
+    BAD_NP_AK_MIXIN_VERSIONING,
+    reason="NumPy 1.25 mixin __slots__ change",
+)
 def test_from_list_behaviorized(loop, L1, L2):  # noqa
     with cluster() as (s, [a, b]):
         with Client(s["address"], loop=loop) as client:

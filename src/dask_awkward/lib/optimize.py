@@ -349,6 +349,8 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
 
     layers = dsk.layers.copy()  # type: ignore
     deps = dsk.dependencies.copy()  # type: ignore
+    dependents = dsk.dependents
+
     reports = {}
 
     # make labelled report
@@ -367,12 +369,30 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
         layers[name] = _touch_and_call(layers[name])
 
     hlg = HighLevelGraph(layers, deps)
-    outlayer = hlg.layers[hlg._toposort_layers()[-1]]
 
+    # this loop builds up what are the possible final leaf nodes by
+    # inspecting the dependents dictionary. If something does not have
+    # a dependent, it must be the end of a graph. These are the things
+    # we need to compute for; we only use a single partition (the
+    # first). for a single collection `.compute()` this list will just
+    # be length 1; but if we are using `dask.compute` to pass in
+    # multiple collections to be computed simultaneously, this list
+    # will increase in length.
+    leaf_layers_keys = [
+        (k, 0) for k, v in dependents.items() if isinstance(v, set) and len(v) == 0
+    ]
+
+    # now we try to compute for each possible output layer key (leaf
+    # node on partition 0); this will cause the typetacer reports to
+    # get correct fields/columns touched. If the result is a record or
+    # an array we of course want to touch all of the data/fields.
     try:
         for layer in hlg.layers.values():
             layer.__dict__.pop("_cached_dict", None)
-        out = get_sync(hlg, list(outlayer.keys())[0])
+        results = get_sync(hlg, leaf_layers_keys)
+        for out in results:
+            if isinstance(out, (ak.Array, ak.Record)):
+                out.layout._touch_data(recursive=True)
     except Exception as err:
         on_fail = dask.config.get("awkward.optimization.on-fail")
         # this is the default, throw a warning but skip the optimization.
@@ -394,8 +414,6 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
                 "Valid options are 'warn', 'pass', or 'raise'."
             )
 
-    if isinstance(out, (ak.Array, ak.Record)):
-        out.layout._touch_data(recursive=True)
     return reports
 
 

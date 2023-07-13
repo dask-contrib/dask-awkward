@@ -5,8 +5,6 @@ try:
 except ImportError:
     import json  # type: ignore[no-redef]
 
-from pathlib import Path
-
 import awkward as ak
 import fsspec
 import pytest
@@ -16,8 +14,8 @@ import dask_awkward.lib.testutils as daktu
 
 
 @pytest.fixture(scope="session")
-def single_record_file(tmpdir_factory: pytest.TempdirFactory) -> str:
-    fname = Path(tmpdir_factory.mktemp("data")) / "single_record.json"
+def single_record_file(tmp_path_factory: pytest.TempPathFactory) -> str:
+    fname = tmp_path_factory.mktemp("data") / "single_record.json"
     record = [{"record": [1, 2, 3]}]
     with fsspec.open(fname, "w") as f:
         print(json.dumps(record), file=f)
@@ -25,9 +23,9 @@ def single_record_file(tmpdir_factory: pytest.TempdirFactory) -> str:
 
 
 @pytest.fixture(scope="session")
-def ndjson_points1(tmpdir_factory: pytest.TempdirFactory) -> str:
+def ndjson_points1(tmp_path_factory: pytest.TempPathFactory) -> str:
     array = daktu.awkward_xy_points()
-    fname = Path(tmpdir_factory.mktemp("data")) / "points_ndjson1.json"
+    fname = tmp_path_factory.mktemp("data") / "points_ndjson1.json"
     with fsspec.open(fname, "w") as f:
         for entry in array.tolist():
             print(json.dumps({"points": entry}), file=f)
@@ -35,9 +33,9 @@ def ndjson_points1(tmpdir_factory: pytest.TempdirFactory) -> str:
 
 
 @pytest.fixture(scope="session")
-def ndjson_points1_str(tmpdir_factory: pytest.TempdirFactory) -> str:
+def ndjson_points1_str(tmp_path_factory: pytest.TempPathFactory) -> str:
     array = daktu.awkward_xy_points_str()
-    fname = Path(tmpdir_factory.mktemp("data")) / "points_ndjson1.json"
+    fname = tmp_path_factory.mktemp("data") / "points_ndjson1.json"
     with fsspec.open(fname, "w") as f:
         for entry in array.tolist():
             print(json.dumps({"points": entry}), file=f)
@@ -45,9 +43,9 @@ def ndjson_points1_str(tmpdir_factory: pytest.TempdirFactory) -> str:
 
 
 @pytest.fixture(scope="session")
-def ndjson_points2(tmpdir_factory: pytest.TempdirFactory) -> str:
+def ndjson_points2(tmp_path_factory: pytest.TempPathFactory) -> str:
     array = daktu.awkward_xy_points()
-    fname = Path(tmpdir_factory.mktemp("data")) / "points_ndjson2.json"
+    fname = tmp_path_factory.mktemp("data") / "points_ndjson2.json"
     with fsspec.open(fname, "w") as f:
         for entry in array.tolist():
             print(json.dumps({"points": entry}), file=f)
@@ -65,8 +63,20 @@ def ndjson_points_file_str(ndjson_points1_str: str) -> str:
 
 
 @pytest.fixture(scope="session")
-def daa(ndjson_points1: str) -> dak.Array:
+def daa_old(ndjson_points1: str) -> dak.Array:
     return dak.from_json([ndjson_points1] * 3)
+
+
+@pytest.fixture(scope="session")
+def pq_points_dir(daa_old, tmp_path_factory) -> str:
+    pqdir = tmp_path_factory.mktemp("pqfiles")
+    dak.to_parquet(daa_old, str(pqdir), compute=True)
+    return str(pqdir)
+
+
+@pytest.fixture(scope="session")
+def daa(pq_points_dir: str) -> dak.Array:
+    return dak.from_parquet(pq_points_dir)
 
 
 @pytest.fixture(scope="session")
@@ -157,16 +167,16 @@ def L4() -> list[list[dict[str, float]] | None]:
 
 
 @pytest.fixture(scope="session")
-def caa_parquet(caa: ak.Array, tmpdir_factory: pytest.TempdirFactory) -> str:
-    fname = tmpdir_factory.mktemp("parquet_data") / "caa.parquet"  # type: ignore
+def caa_parquet(caa: ak.Array, tmp_path_factory: pytest.TempPathFactory) -> str:
+    fname = tmp_path_factory.mktemp("parquet_data") / "caa.parquet"  # type: ignore
     ak.to_parquet(caa, str(fname), extensionarray=False)
     return str(fname)
 
 
 @pytest.fixture(scope="session")
-def unnamed_root_parquet_file(tmpdir_factory: pytest.TempdirFactory) -> str:
+def unnamed_root_parquet_file(tmp_path_factory: pytest.TempPathFactory) -> str:
     from dask_awkward.lib.testutils import unnamed_root_ds
 
-    fname = Path(tmpdir_factory.mktemp("unnamed_parquet_data")) / "file.parquet"
+    fname = tmp_path_factory.mktemp("unnamed_parquet_data") / "file.parquet"
     ak.to_parquet(unnamed_root_ds(), str(fname), extensionarray=False, row_group_size=3)
     return str(fname)

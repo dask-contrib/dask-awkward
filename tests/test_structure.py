@@ -138,6 +138,16 @@ def test_fill_none(vf: int | float | str, axis: int | None) -> None:
     assert_eq(d, e, check_forms=(not isinstance(vf, str)))
 
 
+@pytest.mark.parametrize("axis", [None, 0, 1, -1])
+def test_drop_none(axis: int) -> None:
+    a = [[1, 2, None], [], [None], [5, 6, 7, None], [1, 2], None]
+    b = [[None, 2, 1], [None], [], None, [7, 6, None, 5], [None, None]]
+    c = dak.from_lists([a, b])
+    d = dak.drop_none(c)
+    e = ak.drop_none(ak.from_iter(a + b))
+    assert_eq(d, e)
+
+
 @pytest.mark.parametrize("axis", [0, 1, -1])
 def test_is_none(axis: int) -> None:
     a: list[Any] = [[1, 2, None], None, None, [], [None], [5, 6, 7, None], [1, 2], None]
@@ -468,7 +478,6 @@ def test_from_regular(caa):
     )
 
 
-@pytest.mark.xfail(reason="typetracer")
 def test_to_regular(caa):
     regular = ak.to_packed(caa[[0, 4, 5, 9, 10, 14]].points.x)
     dregular = dak.from_awkward(regular, 3)
@@ -497,3 +506,29 @@ def test_values_astype(daa, caa):
         dak.values_astype(daa, np.float32),
         ak.values_astype(caa, np.float32),
     )
+
+
+def test_repartition_whole(daa):
+    daa1 = daa.repartition(npartitions=1)
+    assert daa1.npartitions == 1
+    assert_eq(daa, daa1, check_divisions=False)
+
+
+def test_repartition_no_change(daa):
+    daa1 = daa.repartition(divisions=(0, 5, 10, 15))
+    assert daa1.npartitions == 3
+    assert_eq(daa, daa1, check_divisions=False)
+
+
+def test_repartition_split_all(daa):
+    daa1 = daa.repartition(rows_per_partition=1)
+    assert daa1.npartitions == len(daa)
+    out = daa1.compute()
+    assert out.tolist() == daa.compute().tolist()
+
+
+def test_repartition_uneven(daa):
+    daa1 = daa.repartition(divisions=(0, 7, 8, 11, 12))
+    assert daa1.npartitions == 4
+    out = daa1.compute()
+    assert out.tolist() == daa.compute()[:12].tolist()

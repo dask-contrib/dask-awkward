@@ -4,6 +4,7 @@ from collections import namedtuple
 from typing import TYPE_CHECKING, Any
 
 import awkward as ak
+import dask.array as da
 import fsspec
 import numpy as np
 import pytest
@@ -20,7 +21,6 @@ from dask_awkward.lib.core import (
     Record,
     Scalar,
     calculate_known_divisions,
-    compatible_partitions,
     compute_typetracer,
     is_typetracer,
     meta_or_identity,
@@ -33,6 +33,7 @@ from dask_awkward.lib.core import (
     typetracer_array,
 )
 from dask_awkward.lib.testutils import assert_eq
+from dask_awkward.utils import IncompatiblePartitions
 
 if TYPE_CHECKING:
     from dask_awkward.lib.core import Array
@@ -48,7 +49,7 @@ def test_clear_divisions(ndjson_points_file: str) -> None:
 
 
 def test_dunder_str(daa: Array) -> None:
-    assert str(daa) == "dask.awkward<from-json, npartitions=3>"
+    assert str(daa) == "dask.awkward<from-parquet, npartitions=3>"
 
 
 def test_calculate_known_divisions(ndjson_points_file: str) -> None:
@@ -418,7 +419,7 @@ def test_scalar_dtype() -> None:
 
 
 def test_scalar_pickle(daa: Array) -> None:
-    import pickle
+    import cloudpickle as pickle
 
     s = 2
     c1 = new_known_scalar(s)
@@ -449,18 +450,103 @@ def test_scalar_to_delayed(daa: Array, optimize_graph: bool) -> None:
 def test_compatible_partitions(ndjson_points_file: str) -> None:
     daa1 = dak.from_json([ndjson_points_file] * 5)
     daa2 = dak.from_awkward(daa1.compute(), npartitions=4)
-    assert compatible_partitions(daa1, daa1)
-    assert compatible_partitions(daa1, daa1, daa1)
-    assert not compatible_partitions(daa1, daa2)
+    assert dak.compatible_partitions(daa1, daa1)
+    assert dak.compatible_partitions(daa1, daa1, daa1)
+    assert not dak.compatible_partitions(daa1, daa2)
     daa1.eager_compute_divisions()
-    assert compatible_partitions(daa1, daa1)
+    assert dak.compatible_partitions(daa1, daa1)
     x = ak.Array([[1, 2, 3], [1, 2, 3], [3, 4, 5]])
     y = ak.Array([[1, 2, 3], [3, 4, 5]])
     x = dak.from_awkward(x, npartitions=2)
     y = dak.from_awkward(y, npartitions=2)
-    assert not compatible_partitions(x, y)
-    assert not compatible_partitions(x, x, y)
-    assert compatible_partitions(y, y)
+    assert not dak.compatible_partitions(x, y)
+    assert not dak.compatible_partitions(x, x, y)
+    assert dak.compatible_partitions(y, y)
+
+
+def test_compatible_partitions_after_slice() -> None:
+    a = [[1, 2, 3], [4, 5]]
+    b = [[5, 6, 7, 8], [], [9]]
+    lazy = dak.from_lists([a, b])
+    ccrt = ak.Array(a + b)
+
+    # sanity
+    assert_eq(lazy, ccrt)
+
+    # sanity
+    assert dak.compatible_partitions(lazy, lazy + 2)
+    assert dak.compatible_partitions(lazy, dak.num(lazy, axis=1) > 2)
+
+    assert not dak.compatible_partitions(lazy[:-2], lazy)
+    assert not dak.compatible_partitions(lazy[:-2], dak.num(lazy, axis=1) != 3)
+
+    with pytest.raises(IncompatiblePartitions, match="incompatibly partitioned"):
+        (lazy[:-2] + lazy).compute()
+
+
+def test_compatible_partitions_mixed() -> None:
+    a = ak.Array([[1, 2, 3], [0, 0, 0, 0], [5, 6, 7, 8, 9], [0, 0, 0, 0]])
+    b = dak.from_awkward(a, npartitions=2)
+    assert b.known_divisions
+    c = b[dak.num(b, axis=1) == 4]
+    d = b[dak.num(b, axis=1) >= 3]
+    assert not c.known_divisions
+    # compatible partitions is going to get called in the __add__ ufunc
+    e = b + c
+    f = b + d
+    with pytest.raises(ValueError):
+        e.compute()
+    assert_eq(f, a + a)
+
+
+def test_compatible_partitions_all_unknown() -> None:
+    a = ak.Array([[1, 2, 3], [0, 0, 0, 0], [5, 6, 7, 8, 9], [0, 0, 0, 0]])
+    b = dak.from_awkward(a, npartitions=2)
+    c = b[dak.sum(b, axis=1) == 0]
+    d = b[dak.sum(b, axis=1) == 6]
+    # this will pass compatible partitions which gets called in the
+    # __add__ ufunc; both have unknown divisions but equal number of
+    # partitions. the unknown divisions are going to materialize to be
+    # incompatible so an exception will get raised at compute time.
+    e = c + d
+    with pytest.raises(ValueError):
+        e.compute()
+
+
+def test_partition_compatiblity() -> None:
+    a = ak.Array([[1, 2, 3], [0, 0, 0, 0], [5, 6, 7, 8, 9], [0, 0, 0, 0]])
+    b = dak.from_awkward(a, npartitions=2)
+    c = b[dak.sum(b, axis=1) == 0]
+    d = b[dak.sum(b, axis=1) == 6]
+    assert dak.partition_compatibility(c, d) == dak.PartitionCompatibility.MAYBE
+    assert dak.partition_compatibility(b, c, d) == dak.PartitionCompatibility.MAYBE
+    assert (
+        dak.partition_compatibility(b, dak.num(b, axis=1))
+        == dak.PartitionCompatibility.YES
+    )
+    c.eager_compute_divisions()
+    assert dak.partition_compatibility(b, c) == dak.PartitionCompatibility.NO
+
+
+def test_partition_compat_with_strictness() -> None:
+    a = ak.Array([[1, 2, 3], [0, 0, 0, 0], [5, 6, 7, 8, 9], [0, 0, 0, 0]])
+    b = dak.from_awkward(a, npartitions=2)
+    c = b[dak.sum(b, axis=1) == 0]
+    d = b[dak.sum(b, axis=1) == 6]
+
+    assert dak.compatible_partitions(c, d, how_strict=1)
+    assert dak.compatible_partitions(
+        c,
+        d,
+        how_strict=dak.PartitionCompatibility.MAYBE,
+    )
+
+    assert not dak.compatible_partitions(c, d, how_strict=2)
+    assert not dak.compatible_partitions(
+        c,
+        d,
+        how_strict=dak.PartitionCompatibility.YES,
+    )
 
 
 @pytest.mark.parametrize("meta", [5, False, [1, 2, 3]])
@@ -522,7 +608,6 @@ def test_scalar_persist_and_rebuild(daa: Array) -> None:
 
 def test_output_divisions(daa: Array) -> None:
     assert dak.max(daa.points.y, axis=1).divisions == daa.divisions
-    assert dak.num(daa.points.y, axis=1).divisions == (None,) * (daa.npartitions + 1)
     assert daa["points"][["x", "y"]].divisions == daa.divisions
     assert daa["points"].divisions == daa.divisions
 
@@ -601,3 +686,123 @@ def test_optimize_chain_multiple(daa):
     result = (daa.points.x**2 - daa.points.y) + 1
 
     assert len(result.compute()) > 0
+
+
+def test_make_unknown_length():
+    from dask_awkward.lib.core import make_unknown_length
+
+    arr = ak.Array(
+        [
+            {"a": [1, 2, 3], "b": 5},
+            {"a": [], "b": -1},
+            {"a": [9, 8, 7, 6], "b": 0},
+        ]
+    )
+    tt1 = ak.Array(arr.layout.to_typetracer())
+
+    # sanity checks
+    assert ak.backend(tt1) == "typetracer"
+    assert len(tt1) == 3
+
+    ul_arr = make_unknown_length(arr)
+    ul_tt1 = make_unknown_length(tt1)
+
+    assert ul_arr.layout.form == ul_tt1.layout.form
+
+    with pytest.raises(TypeError, match="cannot interpret unknown lengths"):
+        len(ul_arr)
+
+    with pytest.raises(TypeError, match="cannot interpret unknown lengths"):
+        len(ul_tt1)
+
+
+def my_power(arg_x, *, kwarg_y=None):
+    return arg_x**kwarg_y
+
+
+def structured_function(*, inputs={}):
+    return inputs["x"] + inputs["y"] * inputs["z"]
+
+
+def scaled_structured_function(scale, *, inputs={}):
+    return scale * (inputs["x"] + inputs["y"] * inputs["z"])
+
+
+def mix_arg_and_kwarg_with_scalar_broadcasting(aaa, bbb, *, ccc=None, ddd=None):
+    return (aaa + bbb) ** ccc - ddd
+
+
+def test_map_partitions_args_and_kwargs_have_collection():
+    xc = ak.Array([[1, 2, 3], [4, 5], [6, 7, 8]])
+    yc = ak.Array([0, 1, 2])
+    xl = dak.from_awkward(xc, npartitions=3)
+    yl = dak.from_awkward(yc, npartitions=3)
+
+    zc = my_power(xc, kwarg_y=yc)
+    zl = dak.map_partitions(my_power, xl, kwarg_y=yl)
+
+    assert_eq(zc, zl)
+
+    zd = structured_function(inputs={"x": xc, "y": xc, "z": yc})
+    zm = dak.map_partitions(structured_function, inputs={"x": xl, "y": xl, "z": yl})
+
+    assert_eq(zd, zm)
+
+    ze = scaled_structured_function(2.0, inputs={"x": xc, "y": xc, "z": yc})
+    zn = dak.map_partitions(
+        scaled_structured_function, 2.0, inputs={"x": xl, "y": xl, "z": yl}
+    )
+
+    assert_eq(ze, zn)
+
+    zf = scaled_structured_function(2.0, inputs={"x": xc, "y": xc, "z": 4.0})
+    zo = dak.map_partitions(
+        scaled_structured_function, 2.0, inputs={"x": xl, "y": xl, "z": 4.0}
+    )
+
+    assert_eq(zf, zo)
+
+    zg = my_power(xc, kwarg_y=2.0)
+    zp = dak.map_partitions(my_power, xl, kwarg_y=2.0)
+
+    assert_eq(zg, zp)
+
+    a = ak.Array(
+        [
+            [
+                1,
+                2,
+                3,
+            ],
+            [4, 5],
+            [6, 7, 8],
+        ]
+    )
+    b = ak.Array([[-10, -10, -10], [-10, -10], [-10, -10, -10]])
+    c = ak.Array([0, 1, 2])
+    d = 1
+
+    aa = dak.from_awkward(a, npartitions=2)
+    bb = dak.from_awkward(b, npartitions=2)
+    cc = dak.from_awkward(c, npartitions=2)
+    dd = d
+
+    res1 = mix_arg_and_kwarg_with_scalar_broadcasting(a, b, ccc=c, ddd=d)
+    res2 = dak.map_partitions(
+        mix_arg_and_kwarg_with_scalar_broadcasting,
+        aa,
+        bb,
+        ccc=cc,
+        ddd=dd,
+    )
+    assert_eq(res1, res2)
+
+
+def test_dask_array_in_map_partitions(daa, caa):
+    x1 = dak.zeros_like(daa.points.x)
+    y1 = da.ones(len(x1), chunks=x1.divisions[1])
+    z1 = x1 + y1
+    x2 = ak.zeros_like(caa.points.x)
+    y2 = np.ones(len(x2))
+    z2 = x2 + y2
+    assert_eq(z1, z2)

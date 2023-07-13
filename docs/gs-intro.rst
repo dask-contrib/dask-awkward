@@ -43,6 +43,7 @@ notice the use of wildcard syntax ("*").
 
            from pathlib import Path
            import awkward as ak
+
            file = Path("data.00.json")
            x = ak.from_json(file, line_delimited=True)
            x = x[ak.num(x.foo) > 2]
@@ -52,6 +53,7 @@ notice the use of wildcard syntax ("*").
         .. code-block:: python
 
            import dask_awkward as dak
+
            # dask-awkward only supports line-delimited=True
            x = dak.from_json("data.*.json")
            x = x[dak.num(x.foo) > 2]

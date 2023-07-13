@@ -6,5 +6,7 @@ Inspection
 .. autosummary::
    :toctree: generated/
 
+   partition_compatibility
+   PartitionCompatibility
    necessary_columns
    sample

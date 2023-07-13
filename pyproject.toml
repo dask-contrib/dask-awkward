@@ -27,7 +27,7 @@ classifiers = [
   "Topic :: Scientific/Engineering",
 ]
 dependencies = [
-  "awkward >=2.2.2",
+  "awkward >=2.2.4",
   "dask >=2023.04.0",
 ]
 dynamic = ["version"]
@@ -37,29 +37,24 @@ Homepage = "https://github.com/dask-contrib/dask-awkward"
 "Bug Tracker" = "https://github.com/dask-contrib/dask-awkward/issues"
 
 [project.optional-dependencies]
-complete = [
-  "aiohttp",
-  "pyarrow",
-  "pytest >=6.0",
-  "pytest-cov >=3.0.0",
-  "requests >=2.27.1",
-]
-docs = [
-  "dask-sphinx-theme >=3.0.2",
-  "pyarrow",
-  "sphinx-design",
-  "pytest >=6.0",
-  "pytest-cov >=3.0.0",
-  "requests >=2.27.1",
-]
 io = [
   "aiohttp",
   "pyarrow",
 ]
+complete = [
+  "dask-awkward[io]",
+]
+# `docs` and `test` are separate from user installs
+docs = [
+  "dask-awkward[complete]",
+  "dask-sphinx-theme >=3.0.2",
+  "sphinx-design",
+  "requests >=2.27.1",
+]
 test = [
-  "aiohttp",
+  "dask-awkward[complete]",
   "distributed",
-  "pyarrow",
+  "pandas",
   "pytest >=6.0",
   "pytest-cov >=3.0.0",
   "requests >=2.27.1",

@@ -4,11 +4,13 @@ import awkward as ak
 from dask.base import tokenize
 from dask.highlevelgraph import HighLevelGraph
 
+from dask_awkward.layers import AwkwardMaterializedLayer
 from dask_awkward.lib.core import (
     Array,
-    compatible_partitions,
+    PartitionCompatibility,
     map_partitions,
     new_array_object,
+    partition_compatibility,
 )
 from dask_awkward.utils import DaskAwkwardNotImplemented, IncompatiblePartitions
 
@@ -19,6 +21,10 @@ class _ConcatenateFnAxisGT0:
 
     def __call__(self, *args):
         return ak.concatenate(list(args), **self.kwargs)
+
+
+def _concatenate_axis0_multiarg(*args):
+    return ak.concatenate(list(args), axis=0)
 
 
 def concatenate(
@@ -45,11 +51,17 @@ def concatenate(
 
         meta = ak.concatenate(metas)
 
+        prev_names = [iarr.name for iarr in arrays]
+        g = AwkwardMaterializedLayer(
+            g,
+            previous_layer_names=prev_names,
+            fn=_concatenate_axis0_multiarg,
+        )
         hlg = HighLevelGraph.from_collections(name, g, dependencies=arrays)
         return new_array_object(hlg, name, meta=meta, npartitions=npartitions)
 
     if axis > 0:
-        if not compatible_partitions(*arrays):
+        if partition_compatibility(*arrays) == PartitionCompatibility.NO:
             raise IncompatiblePartitions("concatenate", *arrays)
 
         fn = _ConcatenateFnAxisGT0(axis=axis)
