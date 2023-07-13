@@ -389,8 +389,8 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
     try:
         for layer in hlg.layers.values():
             layer.__dict__.pop("_cached_dict", None)
-        for outlayerkey in leaf_layers_keys:
-            out = get_sync(hlg, outlayerkey)
+        results = get_sync(hlg, leaf_layers_keys)
+        for out in results:
             if isinstance(out, (ak.Array, ak.Record)):
                 out.layout._touch_data(recursive=True)
     except Exception as err:
