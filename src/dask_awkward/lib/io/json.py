@@ -29,10 +29,10 @@ from dask_awkward.lib.core import (
 from dask_awkward.lib.io.io import from_map
 
 if TYPE_CHECKING:
+    from awkward.contents.content import Content
     from fsspec.spec import AbstractFileSystem
 
     from dask_awkward.lib.core import Array, Scalar
-
 
 __all__ = ("from_json", "to_json")
 
@@ -264,6 +264,24 @@ def _from_json_bytes(
     return new_array_object(hlg, name, meta=meta, behavior=behavior, npartitions=n)
 
 
+def from_json2(
+    source,
+    *,
+    line_delimited=False,
+    schema=None,
+    nan_string=None,
+    posinf_string=None,
+    neginf_string=None,
+    complex_record_fields=None,
+    buffersize=65536,
+    initial=1024,
+    resize=8,
+    highlevel=True,
+    behavior=None,
+):
+    pass
+
+
 def from_json(
     urlpath: str | list[str],
     schema: dict | None = None,
@@ -488,71 +506,49 @@ def to_json(
     return res
 
 
-def layout_to_jsonschema(layout, input=None):
+def layout_to_jsonschema(
+    layout: Content,
+    existing_schema: dict = None,
+    required: bool = False,
+) -> dict:
     """Convert awkward array Layout to a JSON Schema dictionary."""
-    if input is None:
-        input = {"type": "object", "properties": {}}
-    if layout.is_RecordType:
-        input["type"] = "object"
-        input["properties"] = {}
+    if existing_schema is None:
+        existing_schema = {"type": "object", "properties": {}}
+    if layout.is_record:
+        existing_schema["type"] = "object"
+        existing_schema["properties"] = {}
+        existing_schema["required"] = layout.fields
         for field in layout.fields:
-            input["properties"][field] = {"type": None}
-            layout_to_jsonschema(layout[field], input["properties"][field])
-    elif layout.is_ListType:
-        input["type"] = "array"
-        input["items"] = {}
-        layout_to_jsonschema(layout.content, input["items"])
+            existing_schema["properties"][field] = {"type": None}
+            layout_to_jsonschema(layout[field], existing_schema["properties"][field])
+    elif layout.is_list:
+        existing_schema["type"] = "array"
+        existing_schema["items"] = {}
+        layout_to_jsonschema(layout.content, existing_schema["items"])
     elif layout.dtype.kind == "i":
-        input["type"] = "integer"
+        existing_schema["type"] = "integer"
     elif layout.dtype.kind == "f":
-        input["type"] = "number"
+        existing_schema["type"] = "number"
     elif layout.dtype.kind.lower() in "uso":
-        input["type"] = "string"
-    return input
-
-
-def form_to_jsonschema(form, input=None):
-    """Convert awkward array Layout to a JSON Schema dictionary."""
-    if input is None:
-        input = {"type": "object", "properties": {}}
-    if form.is_RecordType:
-        input["type"] = "object"
-        input["properties"] = {}
-        for field, content in zip(form.fields, form.contents):
-            input["properties"][field] = {"type": None}
-            form_to_jsonschema(content, input["properties"][field])
-    elif form.parameters.get("__array__") == "string":
-        input["type"] = "string"
-    elif form.is_ListType:
-        input["type"] = "array"
-        input["items"] = {}
-        form_to_jsonschema(form.content, input["items"])
-    elif "int" in form.type.primitive:
-        input["type"] = "integer"
-    elif "float" in form.type.primitive:
-        input["type"] = "number"
-    elif hasattr(form, "content"):
-        form_to_jsonschema(form.content, input)
-    else:
-        raise ValueError
-    return input
+        existing_schema["type"] = "string"
+    return existing_schema
 
 
 def form_to_dict(form):
     """Convert awkward array Layout to a JSON Schema dictionary."""
-    if form.is_RecordType:
+    if form.is_record:
         out = {}
         for field, content in zip(form.fields, form.contents):
             out[field] = form_to_dict(content)
         return out
     elif form.parameters.get("__array__") == "string":
         return "string"
-    elif form.is_ListType:
+    elif form.is_list:
         return [form_to_dict(form.content)]
     elif hasattr(form, "content"):
         return form_to_dict(form.content)
     else:
-        return form.type.primitive
+        return form.dtype
 
 
 def ak_schema_repr(arr):
