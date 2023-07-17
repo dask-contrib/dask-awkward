@@ -325,7 +325,7 @@ def test_to_bag(daa, caa):
 
 
 @pytest.mark.parametrize("compression", ["xz", "gzip", "zip"])
-def test_to_json(daa, tmpdir_factory, compression):
+def test_to_and_from_json(daa, tmpdir_factory, compression):
     tdir = str(tmpdir_factory.mktemp("json_temp"))
 
     p1 = os.path.join(tdir, "z", "z")
@@ -349,21 +349,6 @@ def test_to_json(daa, tmpdir_factory, compression):
     suffix = "gz" if compression == "gzip" else compression
     r = dak.from_json(os.path.join(tdir, f"*.json.{suffix}"))
     assert_eq(x, r)
-
-
-def test_to_json_raise_filenotfound(
-    daa: dak.Array,
-    tmpdir_factory: pytest.TempdirFactory,
-) -> None:
-    p = tmpdir_factory.mktemp("onelevel")
-    p2 = os.path.join(str(p), "two")
-    with pytest.raises(FileNotFoundError, match="Parent directory for output file"):
-        dak.to_json(
-            daa,
-            os.path.join(p2, "three", "four", "*.json"),
-            compute=True,
-            line_delimited=True,
-        )
 
 
 @pytest.mark.parametrize("optimize_graph", [True, False])

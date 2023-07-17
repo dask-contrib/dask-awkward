@@ -11,6 +11,7 @@ except ImportError:
     import json  # type: ignore[no-redef]
 
 import awkward as ak
+from awkward.forms.form import Form
 from dask.base import tokenize
 from dask.blockwise import BlockIndex
 from dask.bytes.core import read_bytes
@@ -44,6 +45,8 @@ class _FromJsonFn:
         storage: AbstractFileSystem,
         compression: str | None = None,
         schema: dict | None = None,
+        form: Form | None = None,
+        original_form: Form | None = None,
         **kwargs: Any,
     ) -> None:
         self.compression = compression
@@ -51,6 +54,8 @@ class _FromJsonFn:
         self.schema = schema
         self.args = args
         self.kwargs = kwargs
+        self.form = form
+        self.original_form = original_form
 
     @abc.abstractmethod
     def __call__(self, source: Any) -> ak.Array:
@@ -64,6 +69,7 @@ class _FromJsonLineDelimitedFn(_FromJsonFn):
         storage: AbstractFileSystem,
         compression: str | None = None,
         schema: dict | None = None,
+        form: Form | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(
@@ -71,6 +77,7 @@ class _FromJsonLineDelimitedFn(_FromJsonFn):
             storage=storage,
             compression=compression,
             schema=schema,
+            form=form,
             **kwargs,
         )
 
@@ -78,16 +85,19 @@ class _FromJsonLineDelimitedFn(_FromJsonFn):
         with self.storage.open(source, mode="rt", compression=self.compression) as f:
             return ak.from_json(f.read(), line_delimited=True, schema=self.schema)
 
-    def project_columns(self, columns):
-        schema = self.schema
+    def project_columns(self, columns, original_form: Form | None = None):
+        if self.form is not None:
+            form = self.form.select_columns(columns)
+            schema = layout_to_jsonschema(form.length_zero_array(highlevel=False))
+            return _FromJsonLineDelimitedFn(
+                schema=schema,
+                form=form,
+                storage=self.storage,
+                compression=self.compression,
+                original_form=original_form,
+            )
 
-        # TODO: do something with columns to redefine schema...
-
-        return _FromJsonLineDelimitedFn(
-            schema=schema,
-            storage=self.storage,
-            compression=self.compression,
-        )
+        return self
 
 
 class _FromJsonSingleObjInFileFn(_FromJsonFn):
@@ -95,8 +105,10 @@ class _FromJsonSingleObjInFileFn(_FromJsonFn):
         self,
         *args: Any,
         storage: AbstractFileSystem,
-        schema: dict | None = None,
         compression: str | None = None,
+        schema: dict | None = None,
+        form: Form | None = None,
+        original_form: Form | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(
@@ -104,6 +116,8 @@ class _FromJsonSingleObjInFileFn(_FromJsonFn):
             storage=storage,
             compression=compression,
             schema=schema,
+            form=form,
+            original_form=original_form,
             **kwargs,
         )
 
@@ -113,8 +127,15 @@ class _FromJsonSingleObjInFileFn(_FromJsonFn):
 
 
 class _FromJsonBytesFn:
-    def __init__(self, schema: dict | None = None) -> None:
+    def __init__(
+        self,
+        schema: dict | None = None,
+        form: Form | None = None,
+        original_form: Form | None = None,
+    ) -> None:
         self.schema = schema
+        self.form = form
+        self.original_form = original_form
 
     def __call__(self, source: bytes) -> ak.Array:
         return ak.from_json(source, line_delimited=True, schema=self.schema)
@@ -215,6 +236,7 @@ def _from_json_files(
             storage=fs,
             compression=compression,
             schema=schema,
+            form=meta.layout.form,
         )
 
     return from_map(
@@ -262,24 +284,6 @@ def _from_json_bytes(
 
     hlg = HighLevelGraph.from_collections(name, dsk, dependencies=deps)
     return new_array_object(hlg, name, meta=meta, behavior=behavior, npartitions=n)
-
-
-def from_json2(
-    source,
-    *,
-    line_delimited=False,
-    schema=None,
-    nan_string=None,
-    posinf_string=None,
-    neginf_string=None,
-    complex_record_fields=None,
-    buffersize=65536,
-    initial=1024,
-    resize=8,
-    highlevel=True,
-    behavior=None,
-):
-    pass
 
 
 def from_json(
@@ -555,28 +559,3 @@ def ak_schema_repr(arr):
     import yaml
 
     return yaml.dump(arr.layout.form)
-
-
-def _read_beginning_compressed(
-    storage: AbstractFileSystem,
-    source: str,
-    compression: str | None,
-    n_lines: int = 5,
-) -> ak.Array:
-    lines = []
-    with storage.open(source, mode="rt", compression=compression) as f:
-        for i, line in enumerate(f):
-            if i >= n_lines:
-                break
-            lines.append(ak.from_json(line))
-        return ak.from_iter(lines)
-
-
-def _read_beginning_uncompressed(
-    storage: AbstractFileSystem,
-    source: str,
-    numbytes: int = 16384,
-) -> ak.Array:
-    bytes = storage.cat(source, start=0, end=numbytes)
-    array = ak.concatenate([ak.from_json(line) for line in bytes.split(b"\n")[:-1]])
-    return array
