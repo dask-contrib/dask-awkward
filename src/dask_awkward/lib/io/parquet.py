@@ -36,16 +36,16 @@ class _FromParquetFn:
         self,
         *,
         fs: AbstractFileSystem,
-        schema: Any,
+        form: Any,
         listsep: str = "list.item",
         unnamed_root: bool = False,
         original_form: Form | None = None,
     ) -> None:
         self.fs = fs
-        self.schema = schema
+        self.form = form
         self.listsep = listsep
         self.unnamed_root = unnamed_root
-        self.columns = self.schema.columns(self.listsep)
+        self.columns = self.form.columns(self.listsep)
         if self.unnamed_root:
             self.columns = [f".{c}" for c in self.columns]
         self.original_form = original_form
@@ -65,7 +65,7 @@ class _FromParquetFn:
     def __repr__(self) -> str:
         s = (
             "\nFromParquetFn(\n"
-            f"  schema={repr(self.schema)}\n"
+            f"  form={repr(self.form)}\n"
             f"  listsep={self.listsep}\n"
             f"  unnamed_root={self.unnamed_root}\n"
             f"  columns={self.columns}\n"
@@ -81,14 +81,14 @@ class _FromParquetFileWiseFn(_FromParquetFn):
         self,
         *,
         fs: AbstractFileSystem,
-        schema: Any,
+        form: Any,
         listsep: str = "list.item",
         unnamed_root: bool = False,
         original_form: Form | None = None,
     ) -> None:
         super().__init__(
             fs=fs,
-            schema=schema,
+            form=form,
             listsep=listsep,
             unnamed_root=unnamed_root,
             original_form=original_form,
@@ -99,7 +99,7 @@ class _FromParquetFileWiseFn(_FromParquetFn):
             source,
             self.fs,
             self.columns,
-            self.schema,
+            self.form,
         )
         return ak.Array(unproject_layout(self.original_form, array.layout))
 
@@ -111,18 +111,18 @@ class _FromParquetFileWiseFn(_FromParquetFn):
         if columns is None:
             return self
 
-        new_schema = self.schema.select_columns(columns)
+        new_form = self.form.select_columns(columns)
         new = _FromParquetFileWiseFn(
             fs=self.fs,
-            schema=new_schema,
+            form=new_form,
             listsep=self.listsep,
             unnamed_root=self.unnamed_root,
             original_form=original_form,
         )
 
         log.debug(f"project_columns received: {columns}")
-        log.debug(f"new schema is {repr(new_schema)}")
-        log.debug(f"new schema columns are: {new_schema.columns(self.listsep)}")
+        log.debug(f"new form is {repr(new_form)}")
+        log.debug(f"new form columns are: {new_form.columns(self.listsep)}")
         log.debug(new)
 
         return new
@@ -133,14 +133,14 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
         self,
         *,
         fs: AbstractFileSystem,
-        schema: Any,
+        form: Any,
         listsep: str = "list.item",
         unnamed_root: bool = False,
         original_form: Form | None = None,
     ) -> None:
         super().__init__(
             fs=fs,
-            schema=schema,
+            form=form,
             listsep=listsep,
             unnamed_root=unnamed_root,
             original_form=original_form,
@@ -154,7 +154,7 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
             source,
             self.fs,
             self.columns,
-            self.schema,
+            self.form,
             subrg=subrg,
         )
         return ak.Array(unproject_layout(self.original_form, array.layout))
@@ -168,7 +168,7 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
             return self
         return _FromParquetFragmentWiseFn(
             fs=self.fs,
-            schema=self.schema.select_columns(columns),
+            form=self.form.select_columns(columns),
             unnamed_root=self.unnamed_root,
             original_form=original_form,
         )
@@ -252,7 +252,7 @@ def from_parquet(
         return from_map(
             _FromParquetFileWiseFn(
                 fs=fs,
-                schema=subform,
+                form=subform,
                 listsep=listsep,
                 unnamed_root=unnamed_root,
             ),
@@ -286,7 +286,7 @@ def from_parquet(
         return from_map(
             _FromParquetFragmentWiseFn(
                 fs=fs,
-                schema=subform,
+                form=subform,
                 listsep=listsep,
                 unnamed_root=unnamed_root,
             ),
@@ -298,7 +298,7 @@ def from_parquet(
         )
 
 
-def _file_to_partition(path, fs, columns, schema, subrg=None):
+def _file_to_partition(path, fs, columns, form, subrg=None):
     """read a whole parquet file to awkward"""
     return _load(
         actual_paths=[path],
@@ -311,7 +311,7 @@ def _file_to_partition(path, fs, columns, schema, subrg=None):
         generate_bitmasks=False,
         metadata=None,
         highlevel=True,
-        subform=schema,
+        subform=form,
         behavior=None,
     )
 
