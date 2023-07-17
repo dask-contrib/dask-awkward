@@ -375,7 +375,9 @@ def _unproject_layout(form, layout, length, backend):
 
 
 def unproject_layout(form: Form | None, layout: Content) -> Content:
-    """Rehydrate a layout to include all parts of an original form.
+    """Does nothing! Currently returns the passed in layout unchanged!
+
+    Rehydrate a layout to include all parts of an original form.
 
     When we perform the necessary columns optimization we drop fields
     that are not necessary for a computed result. Sometimes we have
@@ -401,6 +403,7 @@ def unproject_layout(form: Form | None, layout: Content) -> Content:
         not appear in the projected layout will be PlaceholderArrays).
 
     """
-    if form is None:
-        return layout
-    return _unproject_layout(form, layout, layout.length, layout.backend)
+    return layout
+    # if form is None:
+    #     return layout
+    # return _unproject_layout(form, layout, layout.length, layout.backend)

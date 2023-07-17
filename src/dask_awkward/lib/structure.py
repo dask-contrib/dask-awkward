@@ -73,6 +73,13 @@ class _ArgCartesianFn:
         self.kwargs = kwargs
 
     def __call__(self, *arrays):
+        # FIXME: with proper typetracer/form rehydration support we
+        # should not need to manually touch this when it's a
+        # typetracer
+        for a in arrays:
+            if ak.backend(a) == "typetracer":
+                a.layout._touch_data(recursive=True)
+
         return ak.argcartesian(list(arrays), **self.kwargs)
 
 

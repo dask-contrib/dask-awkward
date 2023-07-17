@@ -95,6 +95,8 @@ def test_json_bytes_no_delim_defined(ndjson_points_file: str) -> None:
 
 
 def test_to_and_from_dask_array(daa: dak.Array) -> None:
+    daa = dak.from_awkward(daa.compute(), npartitions=3)
+
     computed = ak.flatten(daa.points.x.compute())
     x = dak.flatten(daa.points.x)
     daskarr = dak.to_dask_array(x)
@@ -272,6 +274,8 @@ def test_from_lists(caa_p1: ak.Array) -> None:
 
 def test_to_dask_array(daa: dak.Array, caa: dak.Array) -> None:
     from dask.array.utils import assert_eq as da_assert_eq
+
+    daa = dak.from_awkward(daa.compute(), npartitions=4)
 
     da = dak.to_dask_array(dak.flatten(daa.points.x))
     ca = ak.to_numpy(ak.flatten(caa.points.x))
