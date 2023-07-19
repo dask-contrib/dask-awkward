@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import namedtuple
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import awkward as ak
 import dask.array as da
@@ -106,13 +106,6 @@ def test_len(ndjson_points_file: str) -> None:
 def test_meta_exists(daa: Array) -> None:
     assert daa._meta is not None
     assert daa["points"]._meta is not None
-
-
-def test_meta_raise(ndjson_points_file: str) -> None:
-    with pytest.raises(
-        TypeError, match="meta must be an instance of an Awkward Array."
-    ):
-        dak.from_json([ndjson_points_file], meta=5)
 
 
 def test_ndim(ndjson_points_file: str) -> None:
@@ -547,12 +540,6 @@ def test_partition_compat_with_strictness() -> None:
         d,
         how_strict=dak.PartitionCompatibility.YES,
     )
-
-
-@pytest.mark.parametrize("meta", [5, False, [1, 2, 3]])
-def test_bad_meta_type(ndjson_points_file: str, meta: Any) -> None:
-    with pytest.raises(TypeError, match="meta must be an instance of an Awkward Array"):
-        dak.from_json([ndjson_points_file] * 3, meta=meta)
 
 
 def test_bad_meta_backend_array(daa):

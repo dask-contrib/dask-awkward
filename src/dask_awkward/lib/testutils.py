@@ -125,7 +125,7 @@ def make_xy_point() -> dict[str, int]:
 
 
 def make_xy_point_str() -> dict[str, str]:
-    return {"x": str(_RG.randint(0, 10)), "y": str(_RG.randint(0, 10))}
+    return {"x": str(_RG.randint(0, 10)) * 3, "y": str(_RG.randint(0, 10)) * 4}
 
 
 def list_of_xy_points(n: int) -> list[dict[str, int]]:
