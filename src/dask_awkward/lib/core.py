@@ -654,6 +654,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             )
         )
 
+    def __reduce__(self):
+        return (Array, (self.dask, self.name, self._meta, self.divisions))
+
     @property
     def dask(self) -> HighLevelGraph:
         """High level task graph associated with the collection."""

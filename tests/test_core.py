@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from collections import namedtuple
 from typing import TYPE_CHECKING, Any
 
@@ -806,3 +807,8 @@ def test_dask_array_in_map_partitions(daa, caa):
     y2 = np.ones(len(x2))
     z2 = x2 + y2
     assert_eq(z1, z2)
+
+
+def test_dask_awkward_Array_copy(daa):
+    c = copy.copy(daa)
+    assert_eq(daa, c)
