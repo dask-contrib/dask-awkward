@@ -812,3 +812,11 @@ def test_dask_array_in_map_partitions(daa, caa):
 def test_dask_awkward_Array_copy(daa):
     c = copy.copy(daa)
     assert_eq(daa, c)
+
+
+def test_map_partitions_no_dask_collections_passed(caa):
+    with pytest.raises(
+        TypeError,
+        match="map_partitions expects at least one Dask collection",
+    ):
+        dak.num(caa.points.x, axis=1)
