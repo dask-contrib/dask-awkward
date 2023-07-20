@@ -448,6 +448,12 @@ def test_scalar_to_delayed(daa: Array, optimize_graph: bool) -> None:
     assert d1.compute() == s1c
 
 
+def test_defined_divisions_exception(ndjson_points1):
+    jsds = dak.from_json([ndjson_points1] * 3)
+    with pytest.raises(ValueError, match="defined_divisions only works"):
+        jsds.defined_divisions
+
+
 def test_compatible_partitions(ndjson_points_file: str) -> None:
     daa1 = dak.from_json([ndjson_points_file] * 5)
     daa2 = dak.from_awkward(daa1.compute(), npartitions=4)
