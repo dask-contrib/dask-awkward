@@ -1116,10 +1116,10 @@ def _repartition_func(*stuff):
     return ak.concatenate(data)
 
 
-def repartition_layer(arr: Array, key: str, divisions: list[int, ...]):
+def repartition_layer(arr: Array, key: str, divisions: tuple[int, ...]):
     layer = {}
 
-    indivs = arr.divisions
+    indivs = arr.defined_divisions
     i = 0
     for index, (start, end) in enumerate(builtins.zip(divisions[:-1], divisions[1:])):
         pp = []
