@@ -1623,6 +1623,16 @@ def map_partitions(
     kwarg_flat_deps, kwarg_repacker = unpack_collections(kwargs, traverse=traverse)
     flat_deps, _ = unpack_collections(*args, *kwargs.values(), traverse=traverse)
 
+    if len(flat_deps) == 0:
+        message = (
+            "map_partitions expects at least one Dask collection instance, "
+            "you are passing non-Dask collections to dask-awkward code.\n"
+            "observed argument types:\n"
+        )
+        for arg in args:
+            message += f"- {type(arg)}"
+        raise TypeError(message)
+
     arg_flat_deps_expanded = []
     arg_repackers = []
     arg_lens_for_repackers = []
