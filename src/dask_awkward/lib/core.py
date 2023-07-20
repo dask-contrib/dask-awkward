@@ -700,7 +700,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     @property
     def defined_divisions(self) -> tuple[int, ...]:
         if not self.known_divisions:
-            raise ValueError("real_divisions only works when divisions are known.")
+            raise ValueError("defined_divisions only works when divisions are known.")
         return self._divisions  # type: ignore
 
     @property
