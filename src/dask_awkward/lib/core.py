@@ -232,9 +232,9 @@ class Scalar(DaskMethodsMixin):
         hlg = HighLevelGraph.from_collections(name, task, dependencies=(d,))
         return Delayed(name, hlg)
 
-    def __getattr__(self, where: str) -> Any:
+    def __getattr__(self, attr: str) -> Any:
         d = self.to_delayed(optimize_graph=True)
-        return getattr(d, where)
+        return getattr(d, attr)
 
     @property
     def known_value(self) -> Any | None:
@@ -561,7 +561,12 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         """Assign an empty typetracer array as the collection metadata."""
         self._meta = empty_typetracer()
 
-    def repartition(self, npartitions=None, divisions=None, rows_per_partition=None):
+    def repartition(
+        self,
+        npartitions: int | None = None,
+        divisions: tuple[int, ...] | None = None,
+        rows_per_partition: int | None = None,
+    ) -> Array:
         from dask_awkward.layers import AwkwardMaterializedLayer
         from dask_awkward.lib.structure import repartition_layer
 
@@ -569,17 +574,21 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             raise ValueError("Please specify exactly one of the inputs")
         if not self.known_divisions:
             self.eager_compute_divisions()
-        nrows = self.divisions[-1]
-        if npartitions:
+        nrows = self.defined_divisions[-1]
+        new_divisions: tuple[int, ...] = tuple()
+        if divisions:
+            new_divisions = divisions
+        elif npartitions:
             rows_per_partition = math.ceil(nrows / npartitions)
         if rows_per_partition:
-            divisions = list(range(0, nrows, rows_per_partition))
-            divisions.append(nrows)
+            new_divs = list(range(0, nrows, rows_per_partition))
+            new_divs.append(nrows)
+            new_divisions = tuple(new_divs)
 
         token = tokenize(self, divisions)
         key = f"repartition-{token}"
 
-        new_layer_raw = repartition_layer(self, key, divisions)
+        new_layer_raw = repartition_layer(self, key, new_divisions)
         new_layer = AwkwardMaterializedLayer(
             new_layer_raw,
             previous_layer_names=[self.name],
@@ -592,7 +601,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             key,
             meta=self._meta,
             behavior=self.behavior,
-            divisions=divisions,
+            divisions=tuple(new_divisions),
         )
 
     def __len__(self) -> int:
@@ -654,6 +663,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             )
         )
 
+    def __reduce__(self):
+        return (Array, (self.dask, self.name, self._meta, self.divisions))
+
     @property
     def dask(self) -> HighLevelGraph:
         """High level task graph associated with the collection."""
@@ -684,6 +696,12 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     def known_divisions(self) -> bool:
         """True if the divisions are known (absence of ``None`` in the tuple)."""
         return len(self.divisions) > 0 and None not in self.divisions
+
+    @property
+    def defined_divisions(self) -> tuple[int, ...]:
+        if not self.known_divisions:
+            raise ValueError("defined_divisions only works when divisions are known.")
+        return self._divisions  # type: ignore
 
     @property
     def npartitions(self) -> int:
@@ -933,9 +951,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         if not self.known_divisions:
             self.eager_compute_divisions()
-        stop = sl.stop or self.divisions[-1]
-        start = start if start >= 0 else self.divisions[-1] + start
-        stop = stop if stop >= 0 else self.divisions[-1] + stop
+        stop = sl.stop or self.defined_divisions[-1]
+        start = start if start >= 0 else self.defined_divisions[-1] + start
+        stop = stop if stop >= 0 else self.defined_divisions[-1] + stop
         if step < 0:
             raise DaskAwkwardNotImplemented("negative step slice on zeroth dimension")
 
@@ -948,21 +966,22 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         dask = {}
         # make low-level graph
         for i in range(self.npartitions):
-            if start > self.divisions[i + 1]:
+            if start > self.defined_divisions[i + 1]:
                 # first partition not yet found
                 continue
-            if stop < self.divisions[i] and dask:
+            if stop < self.defined_divisions[i] and dask:
                 # no more partitions with valid rows
                 # does **NOT** exit if there are no partitions yet, to make sure there is always
                 # at least one, needed to get metadata of empty output right
                 break
-            slice_start = max(start - self.divisions[i], 0 + remainder)
+            slice_start = max(start - self.defined_divisions[i], 0 + remainder)
             slice_end = min(
-                stop - self.divisions[i], self.divisions[i + 1] - self.divisions[i]
+                stop - self.defined_divisions[i],
+                self.defined_divisions[i + 1] - self.defined_divisions[i],
             )
             if (
                 slice_end == slice_start
-                and (self.divisions[i + 1] - self.divisions[i])
+                and (self.defined_divisions[i + 1] - self.defined_divisions[i])
                 and dask
             ):
                 # in case of zero-row last partition (if not only partition)
@@ -975,7 +994,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             )
             outpart += 1
             remainder = (
-                (self.divisions[i] + slice_start) - self.divisions[i + 1]
+                (self.defined_divisions[i] + slice_start)
+                - self.defined_divisions[i + 1]
             ) % step
             remainder = step - remainder if remainder < 0 else remainder
             nextdiv = math.ceil((slice_end - slice_start) / step)
@@ -1340,7 +1360,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if compute:
             return out.compute()
         if self.known_divisions:
-            out._divisions = (0, min(nrow, self.divisions[1]))
+            out._divisions = (0, min(nrow, self.defined_divisions[1]))
         return out
 
 
@@ -1619,6 +1639,16 @@ def map_partitions(
     name = f"{label}-{token}"
     kwarg_flat_deps, kwarg_repacker = unpack_collections(kwargs, traverse=traverse)
     flat_deps, _ = unpack_collections(*args, *kwargs.values(), traverse=traverse)
+
+    if len(flat_deps) == 0:
+        message = (
+            "map_partitions expects at least one Dask collection instance, "
+            "you are passing non-Dask collections to dask-awkward code.\n"
+            "observed argument types:\n"
+        )
+        for arg in args:
+            message += f"- {type(arg)}"
+        raise TypeError(message)
 
     arg_flat_deps_expanded = []
     arg_repackers = []

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from collections import namedtuple
 from typing import TYPE_CHECKING
 
@@ -440,6 +441,12 @@ def test_scalar_to_delayed(daa: Array, optimize_graph: bool) -> None:
     assert d1.compute() == s1c
 
 
+def test_defined_divisions_exception(ndjson_points1):
+    jsds = dak.from_json([ndjson_points1] * 3)
+    with pytest.raises(ValueError, match="defined_divisions only works"):
+        jsds.defined_divisions
+
+
 def test_compatible_partitions(ndjson_points_file: str) -> None:
     daa1 = dak.from_json([ndjson_points_file] * 5)
     daa2 = dak.from_awkward(daa1.compute(), npartitions=4)
@@ -793,3 +800,16 @@ def test_dask_array_in_map_partitions(daa, caa):
     y2 = np.ones(len(x2))
     z2 = x2 + y2
     assert_eq(z1, z2)
+
+
+def test_dask_awkward_Array_copy(daa):
+    c = copy.copy(daa)
+    assert_eq(daa, c)
+
+
+def test_map_partitions_no_dask_collections_passed(caa):
+    with pytest.raises(
+        TypeError,
+        match="map_partitions expects at least one Dask collection",
+    ):
+        dak.num(caa.points.x, axis=1)
