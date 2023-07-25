@@ -394,3 +394,9 @@ def test_to_dataframe_str(
     df = ak.to_dataframe(caa)
 
     assert_eq(dd, df, check_index=False)
+
+
+def test_from_awkward_empty_array() -> None:
+    c = ak.Array([])
+    a = dak.from_awkward(c, npartitions=1)
+    assert_eq(a, c)
