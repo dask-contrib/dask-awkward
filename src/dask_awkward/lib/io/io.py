@@ -89,8 +89,11 @@ def from_awkward(
 
     """
     nrows = len(source)
-    chunksize = int(math.ceil(nrows / npartitions))
-    locs = list(range(0, nrows, chunksize)) + [nrows]
+    if nrows == 0:
+        locs = [None, None]
+    else:
+        chunksize = int(math.ceil(nrows / npartitions))
+        locs = list(range(0, nrows, chunksize)) + [nrows]
     starts = locs[:-1]
     stops = locs[1:]
     meta = typetracer_array(source)
