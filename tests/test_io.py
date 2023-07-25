@@ -396,7 +396,17 @@ def test_to_dataframe_str(
     assert_eq(dd, df, check_index=False)
 
 
-def test_from_awkward_empty_array() -> None:
-    c = ak.Array([])
-    a = dak.from_awkward(c, npartitions=1)
-    assert_eq(a, c)
+def test_from_awkward_empty_array(daa) -> None:
+    # no form
+    c1 = ak.Array([])
+    assert len(c1) == 0
+    a1 = dak.from_awkward(c1, npartitions=1)
+    assert_eq(a1, c1)
+    assert len(a1) == 0
+
+    # with a form
+    c2 = ak.Array(daa.layout.form.length_zero_array(highlevel=False))
+    assert len(c2) == 0
+    a2 = dak.from_awkward(c2, npartitions=1)
+    assert len(a2) == 0
+    daa.layout.form == a2.layout.form
