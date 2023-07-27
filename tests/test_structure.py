@@ -18,21 +18,20 @@ def test_flatten(caa: ak.Array, daa: dak.Array, axis: int | None) -> None:
     assert_eq(cr, dr)
 
 
-@pytest.mark.parametrize("axis", [0, 1, -1])
-def test_num(caa: ak.Array, daa: dak.Array, axis: int | None) -> None:
+@pytest.mark.parametrize("axis", [0, 1, -1, -2])
+def test_num(caa: ak.Array, daa: dak.Array, axis: int) -> None:
     da = daa["points"]
     ca = caa["points"]
 
     if axis == 0:
         assert_eq(dak.num(da.x, axis=axis), ak.num(ca.x, axis=axis))
         da.eager_compute_divisions()
-
-    assert_eq(dak.num(da.x, axis=axis), ak.num(ca.x, axis=axis))
-
     if axis == 1:
         c1 = dak.num(da.x, axis=axis) > 2
         c2 = ak.num(ca.x, axis=axis) > 2
         assert_eq(da[c1], ca[c2])
+
+    assert_eq(dak.num(da.x, axis=axis), ak.num(ca.x, axis=axis))
 
 
 def test_zip_dict_input(caa: ak.Array, daa: dak.Array) -> None:
