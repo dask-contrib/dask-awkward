@@ -7,12 +7,18 @@ from numbers import Number
 from typing import TYPE_CHECKING, Any
 
 import awkward as ak
-from dask.base import is_dask_collection
+import numpy as np
+from awkward._nplikes.typetracer import TypeTracerArray
+from dask.base import is_dask_collection, tokenize
+from dask.highlevelgraph import HighLevelGraph
 
+from dask_awkward.layers import AwkwardMaterializedLayer
 from dask_awkward.lib.core import (
     Array,
     PartitionCompatibility,
     map_partitions,
+    new_known_scalar,
+    new_scalar_object,
     partition_compatibility,
 )
 from dask_awkward.utils import (
@@ -562,6 +568,10 @@ def nan_to_num(
     raise DaskAwkwardNotImplemented("TODO")
 
 
+def _numaxis0(*integers):
+    return np.sum(np.array(integers))
+
+
 @borrow_docstring(ak.num)
 def num(
     array: Any,
@@ -571,7 +581,28 @@ def num(
 ) -> Any:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
-    if axis and axis != 0:
+    if axis == 0 or axis == -1 * array.ndim:
+        if array.known_divisions:
+            return new_known_scalar(array.defined_divisions[-1], label="num")
+
+        per_axis = map_partitions(
+            ak.num,
+            array,
+            axis=0,
+            meta=ak.Array(ak.Array([1, 1]).layout.to_typetracer(forget_length=True)),
+        )
+        name = f"numaxis0-{tokenize(array, axis)}"
+        keys = per_axis.__dask_keys__()
+        matlayer = AwkwardMaterializedLayer(
+            {(name, 0): (_numaxis0, *keys)}, previous_layer_names=[per_axis.name]
+        )
+        hlg = HighLevelGraph.from_collections(name, matlayer, dependencies=(per_axis,))
+        return new_scalar_object(
+            hlg,
+            name,
+            meta=TypeTracerArray._new(dtype=np.int64, shape=()),
+        )
+    else:
         return map_partitions(
             ak.num,
             array,
@@ -580,9 +611,6 @@ def num(
             behavior=behavior,
             output_divisions=1,
         )
-    if axis == 0:
-        return len(array)
-    raise DaskAwkwardNotImplemented("TODO")
 
 
 @borrow_docstring(ak.ones_like)
