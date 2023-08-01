@@ -3,7 +3,8 @@ from __future__ import annotations
 import abc
 import math
 import warnings
-from typing import TYPE_CHECKING, Any
+from collections.abc import Callable, Sequence
+from typing import TYPE_CHECKING, Any, Literal, overload
 
 try:
     import ujson as json
@@ -85,7 +86,11 @@ class _FromJsonLineDelimitedFn(_FromJsonFn):
         with self.storage.open(source, mode="rt", compression=self.compression) as f:
             return ak.from_json(f.read(), line_delimited=True, schema=self.schema)
 
-    def project_columns(self, columns, original_form: Form | None = None):
+    def project_columns(
+        self,
+        columns: Sequence[str],
+        original_form: Form | None = None,
+    ) -> _FromJsonLineDelimitedFn:
         if self.form is not None:
             form = self.form.select_columns(columns)
             schema = layout_to_jsonschema(form.length_zero_array(highlevel=False))
@@ -211,6 +216,10 @@ def _from_json_files(
         mode="rb",
         storage_options=storage_options,
     )
+
+    if compression == "infer":
+        compression = infer_compression(urlpaths[0])
+
     if meta is None:
         meta_read_kwargs = derive_meta_kwargs or {}
         meta = derive_json_meta(
@@ -218,13 +227,11 @@ def _from_json_files(
             urlpaths[0],
             schema=schema,
             one_obj_per_file=one_obj_per_file,
+            compression=compression,
             **meta_read_kwargs,
         )
 
     token = tokenize(fstoken, one_obj_per_file, compression, meta)
-
-    if compression == "infer":
-        compression = infer_compression(urlpaths[0])
 
     if one_obj_per_file:
         f: _FromJsonFn = _FromJsonSingleObjInFileFn(
@@ -434,55 +441,134 @@ class _ToJsonFn:
         if not self.fs.exists(path):
             self.fs.mkdir(path)
         self.zfill = math.ceil(math.log(npartitions, 10))
-        self.kwargs = kwargs
         self.compression = compression
         if self.compression == "infer":
             self.compression = infer_compression(self.path)
+        self.kwargs = kwargs
 
     def __call__(self, array: ak.Array, block_index: tuple[int]) -> None:
         part = str(block_index[0]).zfill(self.zfill)
         filename = f"part{part}.json"
         if self.compression is not None and self.compression != "infer":
-            compression = "gz" if self.compression == "gzip" else self.compression
-            filename = f"{filename}.{compression}"
+            ext = self.compression
+            if ext == "gzip":
+                ext = "gz"
+            if ext == "zstd":
+                ext = "zst"
+            filename = f"{filename}.{ext}"
 
         thispath = self.fs.sep.join([self.path, filename])
         with self.fs.open(thispath, mode="wt", compression=self.compression) as f:
-            ak.to_json(array, f, line_delimited=True, **self.kwargs)
+            ak.to_json(array, f, **self.kwargs)
 
         return None
+
+
+@overload
+def to_json(
+    array: Array,
+    path: str,
+    *,
+    line_delimited: bool | str,
+    num_indent_spaces: int | None,
+    num_readability_spaces: int,
+    nan_string: str | None,
+    posinf_string: str | None,
+    neginf_string: str | None,
+    complex_record_fields: tuple[str, str] | None,
+    convert_bytes: Callable | None,
+    convert_other: Callable | None,
+    storage_options: dict[str, Any] | None,
+    compression: str | None,
+    compute: Literal[False],
+) -> Scalar:
+    ...
+
+
+@overload
+def to_json(
+    array: Array,
+    path: str,
+    *,
+    line_delimited: bool | str,
+    num_indent_spaces: int | None,
+    num_readability_spaces: int,
+    nan_string: str | None,
+    posinf_string: str | None,
+    neginf_string: str | None,
+    complex_record_fields: tuple[str, str] | None,
+    convert_bytes: Callable | None,
+    convert_other: Callable | None,
+    storage_options: dict[str, Any] | None,
+    compression: str | None,
+    compute: Literal[True],
+) -> None:
+    ...
 
 
 def to_json(
     array: Array,
     path: str,
+    *,
+    line_delimited: bool | str = True,
+    num_indent_spaces: int | None = None,
+    num_readability_spaces: int = 0,
+    nan_string: str | None = None,
+    posinf_string: str | None = None,
+    neginf_string: str | None = None,
+    complex_record_fields: tuple[str, str] | None = None,
+    convert_bytes: Callable | None = None,
+    convert_other: Callable | None = None,
     storage_options: dict[str, Any] | None = None,
-    compute: bool = False,
     compression: str | None = None,
-    **kwargs: Any,
-) -> Scalar:
-    """Write data to line delimited JSON.
+    compute: bool = False,
+) -> Scalar | None:
+    """Store Array collection in JSON text.
 
     Parameters
     ----------
     array : Array
-        dask-awkward Array collection to write to disk.
+        Collection to store in JSON format
     path : str
-         Root directory of location to write to.
+        Root directory to save data; interpreted by filesystem-spec
+        (can be a remote filesystem path, for example an s3 bucket:
+        ``"s3://bucket/data"``).
+    line_delimited : bool | str
+        See docstring for :py:func:`ak.to_json`.
+    num_indent_spaces : int, optional
+        See docstring for :py:func:`ak.to_json`.
+    num_readability_spaces : int
+        See docstring for :py:func:`ak.to_json`.
+    nan_string : str, optional
+        See docstring for :py:func:`ak.to_json`.
+    posinf_string : str, optional
+        See docstring for :py:func:`ak.to_json`.
+    neginf_string : str, optional
+        See docstring for :py:func:`ak.to_json`.
+    complex_record_fields : tuple[str, str], optional
+        See docstring for :py:func:`ak.to_json`.
+    convert_bytes : Callable, optional
+        See docstring for :py:func:`ak.to_json`.
+    convert_other : Callable, optional
+        See docstring for :py:func:`ak.to_json`.
     storage_options : dict[str, Any], optional
-        filesystem-spec storage options.
-    compute : bool
-        If ``True`` immediately compute this collection.
+        Options passed to ``fsspec``.
     compression : str, optional
-        filesystem-spec compression algorithm to use.
-    **kwargs : Any
-        Additional arguments passed to ``ak.to_json``
+        Compress JSON data via ``fsspec``
+    compute : bool
+        Immediately compute the collection.
 
     Returns
     -------
-    None or dask_awkward.Scalar
-        Scalar which provides a lazy compute if `compute` is
-        ``False``, or ``None`` if `compute` is ``True``.
+    Scalar or None
+        Computable Scalar object if ``compute`` is ``False``,
+        otherwise returns ``None``.
+
+    Examples
+    --------
+
+    >>> import dask_awkward as dak
+    >>> print("Hello, world!")
 
     """
     storage_options = storage_options or {}
@@ -494,7 +580,15 @@ def to_json(
             path,
             npartitions=nparts,
             compression=compression,
-            **kwargs,
+            line_delimited=line_delimited,
+            num_indent_spaces=num_indent_spaces,
+            num_readability_spaces=num_readability_spaces,
+            nan_string=nan_string,
+            posinf_string=posinf_string,
+            neginf_string=neginf_string,
+            complex_record_fields=complex_record_fields,
+            convert_bytes=convert_bytes,
+            convert_other=convert_other,
         ),
         array,
         BlockIndex((nparts,)),
@@ -508,6 +602,7 @@ def to_json(
     res = new_scalar_object(graph, name=name, meta=None)
     if compute:
         res.compute()
+        return None
     return res
 
 
