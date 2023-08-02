@@ -53,6 +53,7 @@ docs = [
 ]
 test = [
   "dask-awkward[complete]",
+  "dask-histogram",
   "distributed",
   "hist",
   "pandas",
