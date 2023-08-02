@@ -1,5 +1,12 @@
 from dask_awkward import config  # isort:skip; load awkward config
 
+import dask_awkward.lib.core as core
+import dask_awkward.lib.desribe as describe
+import dask_awkward.lib.inspect as inspect
+import dask_awkward.lib.operations as operations
+import dask_awkward.lib.optimize as optimize
+import dask_awkward.lib.reducers as reducers
+import dask_awkward.lib.structure as structure
 from dask_awkward.lib.core import Array, PartitionCompatibility, Record, Scalar
 from dask_awkward.lib.core import _type as type
 from dask_awkward.lib.core import (
