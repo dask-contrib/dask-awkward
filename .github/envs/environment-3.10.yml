@@ -12,3 +12,4 @@ dependencies:
   - awkward
   - dask-histogram
   - uproot
+  - hist
