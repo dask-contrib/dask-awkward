@@ -1,7 +1,7 @@
 from dask_awkward import config  # isort:skip; load awkward config
 
 import dask_awkward.lib.core as core
-import dask_awkward.lib.desribe as describe
+import dask_awkward.lib.describe as describe
 import dask_awkward.lib.inspect as inspect
 import dask_awkward.lib.operations as operations
 import dask_awkward.lib.optimize as optimize
