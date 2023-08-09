@@ -79,7 +79,7 @@ intersphinx_mapping = {
     "awkward": ("https://awkward-array.org/doc/stable/", None),
 }
 
-autodoc_typehints = "none"
+autodoc_typehints = "description"
 
 pygments_style = "default"
 

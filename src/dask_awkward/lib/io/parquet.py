@@ -196,7 +196,6 @@ def from_parquet(
     path: str | list[str],
     *,
     columns: str | list[str] | None = None,
-    storage_options: dict[str, Any] | None = None,
     max_gap: int = 64_000,
     max_block: int = 256_000_000,
     footer_sample_size: int = 1_000_000,
@@ -206,7 +205,47 @@ def from_parquet(
     ignore_metadata: bool = True,
     scan_files: bool = False,
     split_row_groups: bool = False,
+    storage_options: dict[str, Any] | None = None,
 ) -> Array:
+    """Create an Array collection from a Parquet dataset.
+
+    See :func:`ak.from_parquet` for more information.
+
+    Parameters
+    ----------
+    path
+        Local directory containing parquet files, remote URL directory
+        containing Parquet files, or explicit list of Parquet files,
+        passed to fsspec for resolution. May contain glob patterns.
+    columns
+        See :func:`ak.from_parquet`
+    max_gap
+        See :func:`ak.from_parquet`
+    max_block
+        See :func:`ak.from_parquet`
+    footer_sample_size
+        See :func:`ak.from_parquet`
+    generate_bitmasks
+        See :func:`ak.from_parquet`
+    highlevel
+        See :func:`ak.from_parquet`
+    behavior
+        See :func:`ak.from_parquet`
+    ignore_metadata
+        If ``True``, ignore Parquet metadata file (if it exists).
+    scan_files
+        Scan files when parsing metadata.
+    split_row_groups
+        If ``True``, create partitions separated at the row group level.
+    storage_options
+        Storage options passed to fsspec.
+
+    Returns
+    -------
+    Array
+        Collection represented by the Parquet data on disk.
+
+    """
     if not highlevel:
         raise ValueError("dask-awkward only supports highlevel=True")
 
@@ -413,7 +452,7 @@ class _ToParquetFn:
 
 def to_parquet(
     array: Array,
-    destination: Any,
+    destination: str,
     *,
     list_to32: bool = False,
     string_to32: bool = True,
@@ -443,34 +482,103 @@ def to_parquet(
 ) -> Scalar | None:
     """Write data to Parquet format.
 
+    This will create one output file per partition.
+
+    See the documentation for :func:`ak.to_parquet` for more
+    information; there are many optional function arguments that are
+    described in that documentation.
+
     Parameters
     ----------
-    data : dask_awkward.Array
-        Array to write to parquet.
-    path : str
-        Root directory of location to write to
-    storage_options : dict
-        Arguments to pass to fsspec for creating the filesystem (see
-        ``fsspec`` documentation).
-    write_metadata : bool
-        Whether to create _metadata and _common_metadata files
-    compute : bool
-        Whether to immediately start writing or to return the dask
-        collection which can be computed at the user's discression.
+    array
+        The :obj:`dask_awkward.Array` collection to write to disk.
+    destination
+        Where to store the output; this can be a local filesystem path
+        or a remote filesystem path.
+    list_to32
+        See :func:`ak.to_parquet`
+    string_to32
+        See :func:`ak.to_parquet`
+    bytestring_to32
+        See :func:`ak.to_parquet`
+    emptyarray_to
+        See :func:`ak.to_parquet`
+    categorical_as_dictionary
+        See :func:`ak.to_parquet`
+    extensionarray
+        See :func:`ak.to_parquet`
+    count_nulls
+        See :func:`ak.to_parquet`
+    compression
+        See :func:`ak.to_parquet`
+    compression_level
+        See :func:`ak.to_parquet`
+    row_group_size
+        See :func:`ak.to_parquet`
+    data_page_size
+        See :func:`ak.to_parquet`
+    parquet_flavor
+        See :func:`ak.to_parquet`
+    parquet_version
+        See :func:`ak.to_parquet`
+    parquet_page_version
+        See :func:`ak.to_parquet`
+    parquet_metadata_statistics
+        See :func:`ak.to_parquet`
+    parquet_dictionary_encoding
+        See :func:`ak.to_parquet`
+    parquet_byte_stream_split
+        See :func:`ak.to_parquet`
+    parquet_coerce_timestamps
+        See :func:`ak.to_parquet`
+    parquet_old_int96_timestamps
+        See :func:`ak.to_parquet`
+    parquet_compliant_nested
+        See :func:`ak.to_parquet`
+    parquet_extra_options
+        See :func:`ak.to_parquet`
+    storage_options
+        Storage options passed to ``fsspec``.
+    write_metadata
+        Write Parquet metadata.
+    compute
+        If ``True``, immediately compute the result (write data to
+        disk). If ``False`` a Scalar collection will be returned such
+        that ``compute`` can be explicitly called.
+    prefix
+        An addition prefix for output files. If ``None`` all parts
+        inside the destination directory will be named
+        ``"partN.parquet"``; if defined, the names will be
+        ``f"{prefix}-partN.parquet"``.
 
     Returns
     -------
-    None or dask_awkward.Scalar
-        If `compute` is ``False``, a :py:class:`dask_awkward.Scalar`
-        representing the process will be returned, if `compute` is
-        ``True`` then the return is ``None``.
+    Scalar | None
+        If ``compute`` is ``False`` a :obj:`dask_awkward.Scalar`
+        object is returned such that it can be computed later. If
+        ``compute`` is ``True``, the collection is immediately
+        computed (and data will be written to disk) and ``None`` is
+        returned.
+
+    Examples
+    --------
+
+    >>> import awkward as ak
+    >>> import dask_awkward as dak
+    >>> a = ak.Array([{"a": [1, 2, 3]}, {"a": [4, 5]}])
+    >>> d = dak.from_awkward(a, npartitions=2)
+    >>> d.npartitions
+    2
+    >>> dak.to_parquet(d, "/tmp/my-output", prefix="data")
+    >>> import os
+    >>> os.listdir("/tmp/my-output")
+    ['data-part0.parquet', 'data-part1.parquet']
+
+
     """
     # TODO options we need:
-    #  - compression per data type or per leaf column ("path.to.leaf": "zstd" format)
     #  - byte stream split for floats if compression is not None or lzma
     #  - partitioning
-    #  - parquet 2 for full set of time and int types
-    #  - v2 data page (for possible later fastparquet implementation)
     #  - dict encoding always off
     fs, path = url_to_fs(destination, **(storage_options or {}))
     name = f"write-parquet-{tokenize(fs, array, destination)}"
