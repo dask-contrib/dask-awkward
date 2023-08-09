@@ -53,11 +53,14 @@ docs = [
 ]
 test = [
   "dask-awkward[complete]",
+  "dask-histogram",
   "distributed",
+  "hist",
   "pandas",
   "pytest >=6.0",
   "pytest-cov >=3.0.0",
   "requests >=2.27.1",
+  "uproot",
 ]
 
 [project.entry-points."dask.sizeof"]
