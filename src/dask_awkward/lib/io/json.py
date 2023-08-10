@@ -606,6 +606,11 @@ def to_json(
     return res
 
 
+def array_param_is_string_or_bytestring(layout: Content) -> bool:
+    params = layout.parameters or {}
+    return params == {"__array__": "string"} or params == {"__array__": "bytestring"}
+
+
 def layout_to_jsonschema(
     layout: Content,
     existing_schema: dict | None = None,
@@ -629,7 +634,10 @@ def layout_to_jsonschema(
         for field in layout.fields:
             existing_schema["properties"][field] = {"type": None}
             layout_to_jsonschema(layout[field], existing_schema["properties"][field])
-    elif (layout.parameters or {}) == {"__array__": "string"}:
+    elif (layout.parameters or {}) == {"__array__": "categorical"}:
+        existing_schema["enum"] = layout.content.to_list()
+        existing_schema["type"] = layout_to_jsonschema(layout.content)["type"]
+    elif array_param_is_string_or_bytestring(layout):
         existing_schema["type"] = "string"
     elif layout.is_list:
         existing_schema["type"] = "array"
@@ -642,6 +650,14 @@ def layout_to_jsonschema(
             existing_schema["type"] = "integer"
         elif layout.dtype.kind == "f":
             existing_schema["type"] = "number"
+    elif layout.is_indexed:
+        pass
+    elif layout.is_unknown:
+        existing_schema["type"] = "object"
+    elif layout.is_union:
+        existing_schema["type"] = [
+            layout_to_jsonschema(content)["type"] for content in layout.contents
+        ]
     return existing_schema
 
 

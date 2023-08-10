@@ -42,6 +42,10 @@ def set_form_keys(form: Form, *, key: str) -> Form:
     elif form.is_numpy:
         form.form_key = key
 
+    elif form.is_union:
+        for entry in form.contents:
+            set_form_keys(entry, key=key)
+
     # Anything else grab the content and keep recursing
     else:
         set_form_keys(form.content, key=key)
