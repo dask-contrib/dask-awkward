@@ -641,6 +641,9 @@ def layout_to_jsonschema(
         existing_schema["type"] = "string"
     elif layout.is_list:
         existing_schema["type"] = "array"
+        if layout.is_regular:
+            existing_schema["minItems"] = layout.size
+            existing_schema["maxItems"] = layout.size
         existing_schema["items"] = {}
         layout_to_jsonschema(layout.content, existing_schema["items"])
     elif layout.is_option:
