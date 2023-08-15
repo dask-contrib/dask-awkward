@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import awkward as ak
 
 from dask_awkward.lib.core import Array, map_partitions
