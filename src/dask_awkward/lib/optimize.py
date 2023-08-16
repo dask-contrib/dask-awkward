@@ -75,8 +75,8 @@ def optimize(
     input layers.
 
     """
-    if dask.config.get("awkward.optimization.enabled", default=False):
-        which = dask.config.get("awkward.optimization.which", default=[])
+    if dask.config.get("awkward.optimization.enabled"):
+        which = dask.config.get("awkward.optimization.which")
         if "columns" in which:
             dsk = optimize_columns(dsk)  # type: ignore
         if "layer-chains" in which:
