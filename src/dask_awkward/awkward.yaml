@@ -27,9 +27,7 @@ awkward:
     # - "layer-chains":
     #   Fuse adjacent blockwise layers ("layer chains") into a single
     #   layer in the task graph.
-    which:
-    - columns
-    - layer-chains
+    which: [columns, layer-chains]
 
     # This option controls whether or not a warning is thrown, an
     # exception is raised, or if nothing is done if a dask-awkward

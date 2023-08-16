@@ -45,7 +45,13 @@ For example, they can be set with the form:
    with dask.config.set({"awkward.optimization.<option>": False}):
        ...
 
-- ``enabled`` (default: ``True``): Enable dask-awkward specific optimizations.
+- ``enabled`` (default: ``True``): Enable dask-awkward specific
+  optimizations. More fine tuning can be handled with the ``which``
+  option.
+- ``which`` (default: ``[columns, layer-chains]``): Which of the
+  optimizations to run. The default setting is to run all available
+  optimizations. (if ``enabled`` is set to ``False`` this option is
+  ignored).
 - ``on-fail`` (default: ``warn``): When set to ``warn`` throw a
   warning of the optimization fails and continue without performing
   the optimization. If set to ``raise``, raise an exception at

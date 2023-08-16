@@ -11,13 +11,30 @@ we benefit from downstream in dask-awkward. You can read more about
 Dask optimization in general :doc:`at this section of the Dask docs
 <dask:optimize>`.
 
+dask-awkward Optimizations
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+There are two optimizations implemented in the dask-awkward code. One
+is the ``layer-chains`` optimization that fuses adjacent task graph
+layers together (if they are compatible with each other). This is a
+relatively simple optimization that just simplifies the task graph.
+The other optimization is the ``columns`` (or "necessary columns")
+optimization; which is a bit more technical and described in a
+follow-up section.
+
+One can configure which optimizations to run at compute-time; read
+more optimization. More information can be found in the
+:ref:`configuration section
+<ht-configuration:Optimization specific table>` of the docs.
+
+
 Necessary Columns
 ^^^^^^^^^^^^^^^^^
 
 We have one dask-awkward specific optimization that targets efficient
 data access from disk. We call it the "necessary columns"
 optimization. This optimization will execute the task graph *without
-operating on real data*. The data-less executation of the graph helps
+operating on real data*. The data-less execution of the graph helps
 determine which parts of a dataset sitting on disk are actually
 required to read in order to successfully complete the compute.
 
@@ -103,7 +120,7 @@ parameter:
   at compute time.
 - ``"warn"`` (the default): fail with a warning but let the compute
   continue without the necessary columns optimization (can reduce
-  performance by reading unncessary data from disk).
+  performance by reading unnecessary data from disk).
 
 One can also use the ``columns=`` argument (with
 :func:`~dask_awkward.from_parquet`, for example) to manually define
