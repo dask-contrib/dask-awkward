@@ -75,11 +75,12 @@ def optimize(
     input layers.
 
     """
-    if dask.config.get("awkward.optimization.enabled", default=False):
-        dsk = optimize_columns(dsk)  # type: ignore
-
-        # blockwise layer chaining optimization.
-        dsk = rewrite_layer_chains(dsk)
+    if dask.config.get("awkward.optimization.enabled"):
+        which = dask.config.get("awkward.optimization.which")
+        if "columns" in which:
+            dsk = optimize_columns(dsk)  # type: ignore
+        if "layer-chains" in which:
+            dsk = rewrite_layer_chains(dsk)
 
     return dsk
 
