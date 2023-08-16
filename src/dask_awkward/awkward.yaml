@@ -15,10 +15,21 @@ awkward:
   # Optimization specific configuration
   optimization:
 
-    # If true dask-awkward specific optimizations will be run. This is
-    # currently limited to determining necessary columns and applying
-    # column projection.
+    # If true dask-awkward specific optimizations will be run.
     enabled: True
+
+    # Which of the optimizations do we want to run; options include:
+    # - "columns":
+    #   Run the optimization step that determines which columns are
+    #   necessary for a computation and only read those columns
+    #   (either via Parquet, ROOT, or JSONSchema) from the data that
+    #   is on disk.
+    # - "layer-chains":
+    #   Fuse blockwise layer chains into a single layer in the task
+    #   graph.
+    which:
+    - columns
+    - layer-chains
 
     # This option controls whether or not a warning is thrown, an
     # exception is raised, or if nothing is done if a dask-awkward
