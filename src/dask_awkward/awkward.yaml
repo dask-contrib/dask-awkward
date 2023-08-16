@@ -25,8 +25,8 @@ awkward:
     #   (either via Parquet, ROOT, or JSONSchema) from the data that
     #   is on disk.
     # - "layer-chains":
-    #   Fuse blockwise layer chains into a single layer in the task
-    #   graph.
+    #   Fuse adjacent blockwise layers ("layer chains") into a single
+    #   layer in the task graph.
     which:
     - columns
     - layer-chains
