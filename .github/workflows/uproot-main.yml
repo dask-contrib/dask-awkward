@@ -32,7 +32,7 @@ jobs:
         cd ..
         git clone https://github.com/scikit-hep/uproot
         cd uproot
-        python3 -m pip install .[test]
+        python3 -m pip install .[test,dev]
     - name: Run uproot dask tests
       run: |
         cd ../uproot
