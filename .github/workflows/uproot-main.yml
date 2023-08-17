@@ -1,0 +1,38 @@
+name: awkward-main
+
+on:
+  push:
+    branches: ['main']
+    paths-ignore: ['**.md', 'docs/**']
+  pull_request:
+    paths-ignore: ['**.md', 'docs/**']
+  workflow_dispatch:
+
+concurrency:
+  group: 'coverage-${{ github.head_ref || github.run_id }}'
+  cancel-in-progress: true
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    env:
+      OS: ubuntu-latest
+      PYTHON: "3.10"
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+    - name: Install
+      run: |
+        python3 -m pip install pip wheel -U
+        python3 -m pip install -q --no-cache-dir -e .[complete,test]
+        git clone https://github.com/scikit-hep/uproot
+        cd uproot
+        python3 -m pip install .[test]
+    - name: Run uproot dask tests
+      run: |
+        cd uproot
+        python3 -m pytest -k dask
