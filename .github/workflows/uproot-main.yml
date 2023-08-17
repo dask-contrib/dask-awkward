@@ -1,4 +1,4 @@
-name: awkward-main
+name: uproot-main
 
 on:
   push:
