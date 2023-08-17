@@ -656,7 +656,14 @@ def layout_to_jsonschema(
     elif layout.is_indexed:
         pass
     elif layout.is_unknown:
-        existing_schema["type"] = "object"
+        existing_schema["type"] = [
+            "array",
+            "boolean",
+            "object",
+            "null",
+            "number",
+            "string",
+        ]
     elif layout.is_union:
         existing_schema["type"] = [
             layout_to_jsonschema(content)["type"] for content in layout.contents

@@ -29,7 +29,7 @@ from dask_awkward.lib.io.io import (
     to_dataframe,
     to_delayed,
 )
-from dask_awkward.lib.io.json import from_json, to_json
+from dask_awkward.lib.io.json import from_json, layout_to_jsonschema, to_json
 from dask_awkward.lib.io.parquet import from_parquet, to_parquet
 from dask_awkward.lib.operations import concatenate
 from dask_awkward.lib.reducers import (
