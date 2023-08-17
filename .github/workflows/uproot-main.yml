@@ -25,15 +25,12 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: "3.10"
-    - name: Install
+    - name: Install and test
       run: |
         python3 -m pip install pip wheel -U
         python3 -m pip install -q --no-cache-dir -e .[complete,test]
         cd ..
         git clone https://github.com/scikit-hep/uproot5
-        cd uproot
+        cd uproot5
         python3 -m pip install .[test,dev]
-    - name: Run uproot dask tests
-      run: |
-        cd ../uproot
         python3 -m pytest -k dask
