@@ -60,7 +60,8 @@ def concrete_data(json_data_dir: Path) -> ak.Array:
 
 
 def test_json_sanity(json_data_dir: Path, concrete_data: ak.Array) -> None:
-    ds = dak.from_json(str(json_data_dir) + "/*.json")
+    source = os.path.join(str(json_data_dir), "*.json")
+    ds = dak.from_json(source)
     assert ds
 
     assert_eq(ds, concrete_data)
@@ -92,14 +93,16 @@ def input_layer_array_partition0(collection: Array) -> ak.Array:
 
 
 def test_json_column_projection1(json_data_dir: Path) -> None:
-    ds = dak.from_json(str(json_data_dir) + "/*.json")
+    source = os.path.join(str(json_data_dir), "*.json")
+    ds = dak.from_json(source)
     ds2 = ds[["name", "goals"]]
     array = input_layer_array_partition0(ds2)
     assert array.fields == ["name", "goals"]
 
 
 def test_json_column_projection2(json_data_dir: Path) -> None:
-    ds = dak.from_json(str(json_data_dir) + "/*.json")
+    source = os.path.join(str(json_data_dir), "*.json")
+    ds = dak.from_json(source)
     # grab name and goals but then only use goals!
     ds2 = dak.max(ds[["name", "goals"]].goals, axis=1)
     array = input_layer_array_partition0(ds2)
