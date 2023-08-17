@@ -1089,7 +1089,17 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         raise DaskAwkwardNotImplemented(f"__getitem__ doesn't support where={where}.")
 
-    def __getitem__(self, where: Any) -> AwkwardDaskCollection:
+    @overload
+    def __getitem__(self, where: Array | str | Sequence[str] | slice) -> Array:
+        ...
+
+    @overload
+    def __getitem__(self, where: int) -> Scalar:
+        ...
+
+    def __getitem__(
+        self, where: Array | str | Sequence[str] | int | slice
+    ) -> Array | Scalar:
         """Select items from the collection.
 
         Heavily under construction.

@@ -84,9 +84,8 @@ def input_layer_array_partition0(collection: Array) -> ak.Array:
     """
     with dask.config.set({"awkward.optimization.which": ["columns"]}):
         optimized_hlg = dak_optimize(collection.dask, [])
-        layer_name = [
-            name for name in list(optimized_hlg.layers) if name.startswith("from-json")
-        ][0]
+        layers = list(optimized_hlg.layers)  # type: ignore[attr-defined]
+        layer_name = [name for name in layers if name.startswith("from-json")][0]
         sgc, arg = optimized_hlg[(layer_name, 0)]
         array = sgc.dsk[layer_name][0](arg)
     return array
@@ -185,12 +184,16 @@ def test_json_bytes_no_delim_defined(ndjson_points_file: str) -> None:
 
 
 @pytest.mark.parametrize("compression", ["xz", "gzip", "zip"])
-def test_to_and_from_json(daa, tmpdir_factory, compression):
-    tdir = str(tmpdir_factory.mktemp("json_temp"))
+def test_to_and_from_json(
+    daa: Array,
+    tmp_path_factory: pytest.TempPathFactory,
+    compression: str,
+) -> None:
+    tdir = str(tmp_path_factory.mktemp("json_temp"))
 
     p1 = os.path.join(tdir, "z", "z")
 
-    dak.to_json(daa, p1, compute=True)
+    dak.to_json(array=daa, path=p1, compute=True)
     paths = list((Path(tdir) / "z" / "z").glob("part*.json"))
     assert len(paths) == daa.npartitions
     arrays = ak.concatenate([ak.from_json(p, line_delimited=True) for p in paths])
@@ -200,8 +203,8 @@ def test_to_and_from_json(daa, tmpdir_factory, compression):
     assert_eq(arrays, x)
 
     s = dak.to_json(
-        daa,
-        tdir,
+        array=daa,
+        path=tdir,
         compression=compression,
         compute=False,
     )
