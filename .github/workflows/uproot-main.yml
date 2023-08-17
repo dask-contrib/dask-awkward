@@ -30,7 +30,7 @@ jobs:
         python3 -m pip install pip wheel -U
         python3 -m pip install -q --no-cache-dir -e .[complete,test]
         cd ..
-        git clone https://github.com/scikit-hep/uproot
+        git clone https://github.com/scikit-hep/uproot5
         cd uproot
         python3 -m pip install .[test,dev]
     - name: Run uproot dask tests
