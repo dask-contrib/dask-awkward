@@ -25,5 +25,10 @@ If you'd like to install dask-awkward from the latest commit to the
 
 .. raw:: html
 
+    <script>
+        window.goatcounter = {
+            path: function(p) { return location.host + p }
+        }
+    </script>
     <script data-goatcounter="https://distdatacats.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>

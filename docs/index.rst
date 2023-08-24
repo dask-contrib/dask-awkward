@@ -67,5 +67,10 @@ Support for this work was provided by NSF grant `OAC-2103945 <nsf_>`_.
 
 .. raw:: html
 
+    <script>
+        window.goatcounter = {
+            path: function(p) { return location.host + p }
+        }
+    </script>
     <script data-goatcounter="https://distdatacats.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
