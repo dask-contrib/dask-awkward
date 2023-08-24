@@ -78,3 +78,9 @@ For example usage of dask-awkward, `we have a demo repository
 
 .. _Awkward-Array: https://awkward-array.org/
 .. _Dask: https://dask.org/
+
+
+.. raw:: html
+
+    <script data-goatcounter="https://distdatacats.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>

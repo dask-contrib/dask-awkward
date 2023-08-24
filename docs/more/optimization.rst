@@ -141,3 +141,9 @@ With this code we can save a little bit of overhead by not running the
 necessary columns optimization after already defining, by hand, the
 minimal set (one should be sure about what is needed with this
 workflow).
+
+
+.. raw:: html
+
+    <script data-goatcounter="https://distdatacats.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>

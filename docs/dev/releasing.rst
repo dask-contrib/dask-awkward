@@ -59,3 +59,9 @@ Merge conda-forge version update
 The conda-forge ``regro-cf-autotick-bot`` will create a PR after
 detecting the new release on PyPI. You should be able to just merge
 the PR when CI passes.
+
+
+.. raw:: html
+
+    <script data-goatcounter="https://distdatacats.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>

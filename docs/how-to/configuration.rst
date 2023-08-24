@@ -59,3 +59,9 @@ For example, they can be set with the form:
   optimization. More information can be found in the :ref:`necessary
   columns optimization <more/optimization:necessary columns>` section of
   the docs.
+
+
+.. raw:: html
+
+    <script data-goatcounter="https://distdatacats.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>

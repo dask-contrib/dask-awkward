@@ -60,3 +60,9 @@ topic).
    result = distance.compute()
 
 .. _behaviors: https://awkward-array.org/doc/main/reference/ak.behavior.html
+
+
+.. raw:: html
+
+    <script data-goatcounter="https://distdatacats.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>

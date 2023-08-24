@@ -49,3 +49,8 @@ on the first partition will occur." what does that mean?**
 
 
 .. _daskconfig: https://docs.dask.org/en/stable/configuration.html
+
+.. raw:: html
+
+    <script data-goatcounter="https://distdatacats.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>

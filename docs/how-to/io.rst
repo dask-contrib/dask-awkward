@@ -32,3 +32,8 @@ awkward Array instances or Python lists.
 
 See the :ref:`IO API docs<api/io:IO>` page for more information on the
 possible ways to instantiate a new dask-awkward Array.
+
+.. raw:: html
+
+    <script data-goatcounter="https://distdatacats.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>

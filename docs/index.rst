@@ -63,3 +63,9 @@ Support for this work was provided by NSF grant `OAC-2103945 <nsf_>`_.
 
 .. _awkwardarray: https://awkward-array.org/
 .. _nsf: https://www.nsf.gov/awardsearch/showAward?AWD_ID=2103945
+
+
+.. raw:: html
+
+    <script data-goatcounter="https://distdatacats.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
