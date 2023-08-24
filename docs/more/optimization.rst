@@ -25,7 +25,7 @@ follow-up section.
 One can configure which optimizations to run at compute-time; read
 more optimization. More information can be found in the
 :ref:`configuration section
-<ht-configuration:Optimization specific table>` of the docs.
+<how-to/configuration:Optimization specific table>` of the docs.
 
 
 Necessary Columns

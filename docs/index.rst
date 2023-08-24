@@ -20,42 +20,42 @@ Table of Contents
    :maxdepth: 1
    :caption: Getting Started
 
-   gs-install.rst
-   gs-intro.rst
-   gs-terminology.rst
-   gs-limitations.rst
+   getting-started/install.rst
+   getting-started/intro.rst
+   getting-started/terminology.rst
+   getting-started/limitations.rst
 
 .. toctree::
    :maxdepth: 1
    :caption: How Tos
 
-   ht-configuration.rst
-   ht-io.rst
-   ht-behaviors.rst
+   how-to/configuration.rst
+   how-to/io.rst
+   how-to/behaviors.rst
 
 .. toctree::
    :maxdepth: 1
    :caption: Deeper Explanation
 
-   me-optimization.rst
-   me-faq.rst
+   more/optimization.rst
+   more/faq.rst
 
 .. toctree::
    :maxdepth: 1
    :caption: API
 
-   api-collections.rst
-   api-inspect.rst
-   api-io.rst
-   api-reducers.rst
-   api-structure.rst
+   api/collections.rst
+   api/inspect.rst
+   api/io.rst
+   api/reducers.rst
+   api/structure.rst
 
 .. toctree::
    :maxdepth: 1
    :caption: Development
 
-   dev-contributing.rst
-   dev-releasing.rst
+   dev/contributing.rst
+   dev/releasing.rst
 
 ------------
 
