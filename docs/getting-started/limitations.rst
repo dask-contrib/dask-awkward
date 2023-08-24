@@ -20,3 +20,13 @@ operations under this umbrella:
 3. **Things that just won't be implemented**: There will be parts of
    the dask-awkward API that we simply cannot implement for lazy
    computation!
+
+.. raw:: html
+
+    <script>
+        window.goatcounter = {
+            path: function(p) { return location.host + p }
+        }
+    </script>
+    <script data-goatcounter="https://distdatacats.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>

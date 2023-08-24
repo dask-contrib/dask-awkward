@@ -41,3 +41,14 @@ In written descriptions, we'll sometimes refer to the awkward-array
 Finally, the result of calling the ``compute()`` method on a
 ``dak.Array`` object will almost always result in an ``ak.Array``
 object.
+
+
+.. raw:: html
+
+    <script>
+        window.goatcounter = {
+            path: function(p) { return location.host + p }
+        }
+    </script>
+    <script data-goatcounter="https://distdatacats.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>

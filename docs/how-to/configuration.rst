@@ -57,5 +57,15 @@ For example, they can be set with the form:
   the optimization. If set to ``raise``, raise an exception at
   optimization time. If set to ``pass``, silently skip the
   optimization. More information can be found in the :ref:`necessary
-  columns optimization <me-optimization:necessary columns>` section of
+  columns optimization <more/optimization:necessary columns>` section of
   the docs.
+
+.. raw:: html
+
+    <script>
+        window.goatcounter = {
+            path: function(p) { return location.host + p }
+        }
+    </script>
+    <script data-goatcounter="https://distdatacats.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>

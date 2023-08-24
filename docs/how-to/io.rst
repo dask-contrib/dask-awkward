@@ -30,5 +30,15 @@ awkward Array instances or Python lists.
 
 .. _Uproot: https://github.com/scikit-hep/uproot5
 
-See the :ref:`IO API docs<api-io:IO>` page for more information on the
+See the :ref:`IO API docs<api/io:IO>` page for more information on the
 possible ways to instantiate a new dask-awkward Array.
+
+.. raw:: html
+
+    <script>
+        window.goatcounter = {
+            path: function(p) { return location.host + p }
+        }
+    </script>
+    <script data-goatcounter="https://distdatacats.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
