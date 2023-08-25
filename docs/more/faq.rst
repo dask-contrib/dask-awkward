@@ -20,7 +20,7 @@ what does this mean?**
 
     You can read more about the optimization and how to configure it
     (by either silencing the warning or raise the exception) at
-    :doc:`this section of the docs <me-optimization>`. Please open an
+    :doc:`this section of the docs <optimization>`. Please open an
     issue on the GitHub issue tracker if you think you've found a
     failure in the optimization that should be fixed.
 
@@ -49,3 +49,8 @@ on the first partition will occur." what does that mean?**
 
 
 .. _daskconfig: https://docs.dask.org/en/stable/configuration.html
+
+.. raw:: html
+
+   <script data-goatcounter="https://dask-awkward.goatcounter.com/count"
+           async src="//gc.zgo.at/count.js"></script>

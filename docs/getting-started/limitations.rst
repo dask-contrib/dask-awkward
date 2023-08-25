@@ -20,3 +20,8 @@ operations under this umbrella:
 3. **Things that just won't be implemented**: There will be parts of
    the dask-awkward API that we simply cannot implement for lazy
    computation!
+
+.. raw:: html
+
+   <script data-goatcounter="https://dask-awkward.goatcounter.com/count"
+           async src="//gc.zgo.at/count.js"></script>

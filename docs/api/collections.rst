@@ -17,3 +17,8 @@ Collections
    :toctree: generated/
 
    Scalar
+
+.. raw:: html
+
+   <script data-goatcounter="https://dask-awkward.goatcounter.com/count"
+           async src="//gc.zgo.at/count.js"></script>

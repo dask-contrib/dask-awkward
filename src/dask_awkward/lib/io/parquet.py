@@ -293,7 +293,7 @@ def from_parquet(
     listsep = "list.item"
     unnamed_root = False
     for c in parquet_columns:
-        if ".list.element." in c:
+        if ".list.element" in c:
             listsep = "list.element"
             break
         if c.startswith("."):

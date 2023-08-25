@@ -20,42 +20,42 @@ Table of Contents
    :maxdepth: 1
    :caption: Getting Started
 
-   gs-install.rst
-   gs-intro.rst
-   gs-terminology.rst
-   gs-limitations.rst
+   getting-started/install.rst
+   getting-started/intro.rst
+   getting-started/terminology.rst
+   getting-started/limitations.rst
 
 .. toctree::
    :maxdepth: 1
    :caption: How Tos
 
-   ht-configuration.rst
-   ht-io.rst
-   ht-behaviors.rst
+   how-to/configuration.rst
+   how-to/io.rst
+   how-to/behaviors.rst
 
 .. toctree::
    :maxdepth: 1
    :caption: Deeper Explanation
 
-   me-optimization.rst
-   me-faq.rst
+   more/optimization.rst
+   more/faq.rst
 
 .. toctree::
    :maxdepth: 1
    :caption: API
 
-   api-collections.rst
-   api-inspect.rst
-   api-io.rst
-   api-reducers.rst
-   api-structure.rst
+   api/collections.rst
+   api/inspect.rst
+   api/io.rst
+   api/reducers.rst
+   api/structure.rst
 
 .. toctree::
    :maxdepth: 1
    :caption: Development
 
-   dev-contributing.rst
-   dev-releasing.rst
+   dev/contributing.rst
+   dev/releasing.rst
 
 ------------
 
@@ -63,3 +63,9 @@ Support for this work was provided by NSF grant `OAC-2103945 <nsf_>`_.
 
 .. _awkwardarray: https://awkward-array.org/
 .. _nsf: https://www.nsf.gov/awardsearch/showAward?AWD_ID=2103945
+
+
+.. raw:: html
+
+   <script data-goatcounter="https://dask-awkward.goatcounter.com/count"
+           async src="//gc.zgo.at/count.js"></script>

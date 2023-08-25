@@ -22,3 +22,8 @@ If you'd like to install dask-awkward from the latest commit to the
 .. code:: none
 
    pip install git+https://github.com/dask-contrib/dask-awkward@main
+
+.. raw:: html
+
+   <script data-goatcounter="https://dask-awkward.goatcounter.com/count"
+           async src="//gc.zgo.at/count.js"></script>

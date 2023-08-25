@@ -25,7 +25,7 @@ follow-up section.
 One can configure which optimizations to run at compute-time; read
 more optimization. More information can be found in the
 :ref:`configuration section
-<ht-configuration:Optimization specific table>` of the docs.
+<how-to/configuration:Optimization specific table>` of the docs.
 
 
 Necessary Columns
@@ -141,3 +141,9 @@ With this code we can save a little bit of overhead by not running the
 necessary columns optimization after already defining, by hand, the
 minimal set (one should be sure about what is needed with this
 workflow).
+
+
+.. raw:: html
+
+   <script data-goatcounter="https://dask-awkward.goatcounter.com/count"
+           async src="//gc.zgo.at/count.js"></script>

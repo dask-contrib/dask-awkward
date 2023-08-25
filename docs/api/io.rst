@@ -19,3 +19,9 @@ IO
    to_delayed
    to_parquet
    to_json
+
+
+.. raw:: html
+
+   <script data-goatcounter="https://dask-awkward.goatcounter.com/count"
+           async src="//gc.zgo.at/count.js"></script>

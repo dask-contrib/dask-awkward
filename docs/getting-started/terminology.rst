@@ -41,3 +41,9 @@ In written descriptions, we'll sometimes refer to the awkward-array
 Finally, the result of calling the ``compute()`` method on a
 ``dak.Array`` object will almost always result in an ``ak.Array``
 object.
+
+
+.. raw:: html
+
+   <script data-goatcounter="https://dask-awkward.goatcounter.com/count"
+           async src="//gc.zgo.at/count.js"></script>
