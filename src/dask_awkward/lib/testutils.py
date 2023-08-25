@@ -5,6 +5,7 @@ from typing import Any
 
 import awkward as ak
 import numpy as np
+import pyarrow as pa
 from dask.base import is_dask_collection
 from packaging.version import Version
 
@@ -22,15 +23,7 @@ AK_LTE_2_2_3 = Version(ak.__version__) <= Version("2.2.3")
 BAD_NP_AK_MIXIN_VERSIONING = NP_GTE_1_25_0 and AK_LTE_2_2_3
 
 AK_LTE_2_3_3 = Version(ak.__version__) <= Version("2.3.3")
-PA_GTE_3_0_0 = False
-
-try:
-    import pyarrow as pa
-
-    PA_GTE_3_0_0 = Version(pa.__version__) >= Version("13.0.0")
-except ImportError:
-    pass
-
+PA_GTE_3_0_0 = Version(pa.__version__) >= Version("13.0.0")
 BAD_PA_AK_PARQUET_VERSIONING = AK_LTE_2_3_3 and PA_GTE_3_0_0
 
 
