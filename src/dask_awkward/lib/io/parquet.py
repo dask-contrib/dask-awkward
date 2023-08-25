@@ -302,10 +302,7 @@ def from_parquet(
     if split_row_groups is None:
         split_row_groups = row_counts is not None and len(row_counts) > 1
 
-    meta = ak.Array(
-        subform.length_zero_array(highlevel=False).to_typetracer(forget_length=True),
-        behavior=behavior,
-    )
+    meta = ak.typetracer.typetracer_from_form(subform, behavior=behavior)
 
     if split_row_groups is False or subrg is None:
         # file-wise
@@ -324,7 +321,7 @@ def from_parquet(
             actual_paths,
             label=label,
             token=token,
-            meta=typetracer_array(meta),
+            meta=meta,
         )
     else:
         # row-group wise

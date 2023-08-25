@@ -2051,10 +2051,7 @@ def to_meta(objects):
 
 def length_zero_array_or_identity(obj: Any) -> Any:
     if is_awkward_collection(obj):
-        return ak.Array(
-            obj._meta.layout.form.length_zero_array(highlevel=False),
-            behavior=obj.behavior,
-        )
+        return ak.typetracer.length_zero_if_typetracer(obj._meta, behavior=obj.behavior)
     return obj
 
 
@@ -2090,7 +2087,7 @@ def map_meta(fn: ArgsKwargsPackedFunction, *deps: Any) -> ak.Array | None:
         pass
     try:
         arg_lzas = to_length_zero_arrays(deps)
-        meta = typetracer_from_form(fn(*arg_lzas).layout.form)
+        meta = ak.typetracer.typetracer_from_form(fn(*arg_lzas).layout.form)
         return meta
     except Exception:
         # if compute-unknown-meta is True and we've gotten to this
@@ -2202,24 +2199,6 @@ def normalize_single_outer_inner_index(
     partition_index = int(np.digitize(index, divisions)) - 1
     new_index = index - divisions[partition_index]
     return (int(partition_index), int(new_index))
-
-
-def typetracer_from_form(form: Form) -> ak.Array:
-    """Create a typetracer Array from an awkward form.
-
-    Parameters
-    ----------
-    form : awkward.form.Form
-        Form that the resulting Array will have.
-
-    Returns
-    -------
-    awkward.Array
-        Resulting highlevel typetracer Array
-
-    """
-    layout = form.length_zero_array(highlevel=False)
-    return ak.Array(layout.to_typetracer(forget_length=True))
 
 
 def make_unknown_length(array: ak.Array) -> ak.Array:

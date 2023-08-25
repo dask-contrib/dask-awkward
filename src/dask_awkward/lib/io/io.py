@@ -415,7 +415,7 @@ def to_dataframe(
         **kwargs,
     )
     meta = ak.to_dataframe(
-        array._meta.layout.form.length_zero_array(highlevel=False), **kwargs
+        ak.typetracer.length_zero_if_typetracer(array._meta), **kwargs
     )
     return new_dd_object(
         intermediate.dask,
