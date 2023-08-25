@@ -5,6 +5,7 @@ from typing import Any
 
 import awkward as ak
 import numpy as np
+import pyarrow as pa
 from dask.base import is_dask_collection
 from packaging.version import Version
 
@@ -17,9 +18,13 @@ _RG = random.Random(414)
 DEFAULT_SCHEDULER: Any = "sync"
 
 
-NP_LTE_1_25_0 = Version(np.__version__) >= Version("1.25.0")
-AK_GTE_2_2_3 = Version(ak.__version__) <= Version("2.2.3")
-BAD_NP_AK_MIXIN_VERSIONING = NP_LTE_1_25_0 and AK_GTE_2_2_3
+NP_GTE_1_25_0 = Version(np.__version__) >= Version("1.25.0")
+AK_LTE_2_2_3 = Version(ak.__version__) <= Version("2.2.3")
+BAD_NP_AK_MIXIN_VERSIONING = NP_GTE_1_25_0 and AK_LTE_2_2_3
+
+AK_LTE_2_3_3 = Version(ak.__version__) <= Version("2.3.3")
+PA_GTE_3_0_0 = Version(pa.__version__) >= Version("13.0.0")
+BAD_PA_AK_PARQUET_VERSIONING = AK_LTE_2_3_3 and PA_GTE_3_0_0
 
 
 def assert_eq(
