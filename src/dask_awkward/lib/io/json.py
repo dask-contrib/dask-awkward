@@ -27,26 +27,11 @@ from dask_awkward.lib.io.io import from_map
 if TYPE_CHECKING:
     from awkward.contents.content import Content
     from fsspec.spec import AbstractFileSystem
+    from typing_extensions import Self
 
     from dask_awkward.lib.core import Array, Scalar
 
 __all__ = ("from_json", "to_json")
-
-
-def _fs_token_paths(
-    source: Any,
-    *,
-    storage_options: dict[str, Any] | None = None,
-) -> tuple[AbstractFileSystem, str, list[str]]:
-    fs, token, paths = get_fs_token_paths(source, storage_options=storage_options)
-
-    # if paths is length 1, check to see if it's a directory and
-    # wildcard search for JSON files. Otherwise, just keep whatever
-    # has already been found.
-    if len(paths) == 1 and fs.isdir(paths[0]):
-        paths = list(filter(lambda s: ".json" in s, fs.ls(paths[0])))
-
-    return fs, token, paths
 
 
 class FromJsonFn:
@@ -71,6 +56,29 @@ class FromJsonFn:
     @abc.abstractmethod
     def __call__(self, source: Any) -> ak.Array:
         ...
+
+    def _default_project_columns(
+        self,
+        columns: Sequence[str],
+        original_form: Form | None = None,
+    ) -> Self:
+        if self.schema is not None:
+            return self
+
+        if self.form is not None:
+            form = self.form.select_columns(columns)
+            schema = layout_to_jsonschema(form.length_zero_array(highlevel=False))
+
+            return type(self)(
+                schema=schema,
+                form=form,
+                storage=self.storage,
+                compression=self.compression,
+                original_form=original_form,
+                **self.kwargs,
+            )
+
+        return self
 
 
 class FromJsonLineDelimitedFn(FromJsonFn):
@@ -105,26 +113,54 @@ class FromJsonLineDelimitedFn(FromJsonFn):
         self,
         columns: Sequence[str],
         original_form: Form | None = None,
-    ) -> FromJsonLineDelimitedFn:
-        # if a schema is already defined we are not going to project
-        # columns; we will keep the schema that already exists.
-        if self.schema is not None:
-            return self
+    ) -> Self:
+        return self._default_project_columns(
+            columns=columns,
+            original_form=original_form,
+        )
 
-        if self.form is not None:
-            form = self.form.select_columns(columns)
-            schema = layout_to_jsonschema(form.length_zero_array(highlevel=False))
 
-            return FromJsonLineDelimitedFn(
-                schema=schema,
-                form=form,
-                storage=self.storage,
-                compression=self.compression,
-                original_form=original_form,
-                **self.kwargs,
+class FromJsonSingleObjPerFile(FromJsonFn):
+    def __init__(
+        self,
+        *args: Any,
+        storage: AbstractFileSystem,
+        compression: str | None = None,
+        schema: str | dict | list | None = None,
+        form: Form | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(
+            *args,
+            storage=storage,
+            compression=compression,
+            schema=schema,
+            form=form,
+            **kwargs,
+        )
+
+    def __call__(self, source: str) -> ak.Array:
+        with self.storage.open(source, mode="rt", compression=self.compression) as f:
+            return ak.Array(
+                [
+                    ak.from_json(
+                        f.read(),
+                        line_delimited=False,
+                        schema=self.schema,
+                        **self.kwargs,
+                    )
+                ]
             )
 
-        return self
+    def project_columns(
+        self,
+        columns: Sequence[str],
+        original_form: Form | None = None,
+    ) -> Self:
+        return self._default_project_columns(
+            columns=columns,
+            original_form=original_form,
+        )
 
 
 class FromJsonBytesFn:
@@ -147,6 +183,17 @@ class FromJsonBytesFn:
             schema=self.schema,
             **self.kwargs,
         )
+
+
+def meta_from_single_file(
+    fs: AbstractFileSystem,
+    paths: list[str],
+    compression: str | None,
+    **kwargs: Any,
+) -> ak.Array:
+    with fs.open(paths[0], compression=compression) as f:
+        array = ak.Array([ak.from_json(f.read(), line_delimited=False, **kwargs)])
+    return typetracer_array(array)
 
 
 def meta_from_bytechunks(
@@ -188,7 +235,6 @@ def _from_json_files(
     *,
     schema: str | dict | list | None = None,
     compression: str | None = "infer",
-    behavior: dict | None = None,
     **kwargs: Any,
 ) -> Array:
     if compression == "infer":
@@ -215,7 +261,38 @@ def _from_json_files(
         label="from-json",
         token=token,
         meta=meta,
-        behavior=behavior,
+    )
+
+
+def _from_json_sopf(
+    fs: AbstractFileSystem,
+    token: str,
+    paths: list[str],
+    *,
+    schema: str | dict | list | None = None,
+    compression: str | None = None,
+    **kwargs: Any,
+) -> Array:
+    if compression == "infer":
+        compression = infer_compression(paths[0])
+
+    meta = meta_from_single_file(fs, paths, compression, **kwargs)
+    token = tokenize(token, compression, meta, kwargs)
+
+    f = FromJsonSingleObjPerFile(
+        storage=fs,
+        compression=compression,
+        schema=schema,
+        form=meta.layout.form,
+        **kwargs,
+    )
+
+    return from_map(
+        f,
+        paths,
+        label="from-json",
+        token=token,
+        meta=meta,
     )
 
 
@@ -261,6 +338,22 @@ def _from_json_bytes(
     return new_array_object(hlg, name, meta=None, behavior=behavior, npartitions=n)
 
 
+def _fs_token_paths(
+    source: Any,
+    *,
+    storage_options: dict[str, Any] | None = None,
+) -> tuple[AbstractFileSystem, str, list[str]]:
+    fs, token, paths = get_fs_token_paths(source, storage_options=storage_options)
+
+    # if paths is length 1, check to see if it's a directory and
+    # wildcard search for JSON files. Otherwise, just keep whatever
+    # has already been found.
+    if len(paths) == 1 and fs.isdir(paths[0]):
+        paths = list(filter(lambda s: ".json" in s, fs.find(paths[0])))
+
+    return fs, token, paths
+
+
 def from_json(
     source: str | list[str],
     *,
@@ -291,6 +384,23 @@ def from_json(
         delimiter = b"\n"
     elif blocksize is None and delimiter == b"\n":
         blocksize = "128 MiB"
+
+    if not line_delimited:
+        return _from_json_sopf(
+            fs=fs,
+            token=token,
+            paths=paths,
+            schema=schema,
+            compression=compression,
+            nan_string=nan_string,
+            posinf_string=posinf_string,
+            neginf_string=neginf_string,
+            complex_record_fields=complex_record_fields,
+            buffersize=buffersize,
+            initial=initial,
+            resize=resize,
+            behavior=behavior,
+        )
 
     if blocksize is None and delimiter is None:
         return _from_json_files(

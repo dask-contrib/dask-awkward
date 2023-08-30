@@ -5,6 +5,7 @@ from pathlib import Path
 
 import awkward as ak
 import dask
+import fsspec
 import pytest
 
 import dask_awkward as dak
@@ -60,7 +61,7 @@ def concrete_data(json_data_dir: Path) -> ak.Array:
 
 
 def test_json_sanity(json_data_dir: Path, concrete_data: ak.Array) -> None:
-    source = os.path.join(str(json_data_dir), "*.json")
+    source = os.path.join(str(json_data_dir))
     ds = dak.from_json(source)
     assert ds
 
@@ -135,6 +136,30 @@ def test_json_bytes_no_delim_defined(ndjson_points_file: str) -> None:
                 concretes.append(json.loads(line))
 
     caa = ak.from_iter(concretes)
+    assert_eq(daa, caa)
+
+
+@pytest.mark.parametrize("compression", [None, "xz"])
+def test_json_one_obj_per_file(
+    single_record_file: str,
+    tmp_path_factory: pytest.TempPathFactory,
+    compression: str | None,
+) -> None:
+    if compression:
+        d = tmp_path_factory.mktemp("sopf")
+        p = str(d / f"file.json.{compression}")
+        with fsspec.open(single_record_file, "rt") as f:
+            text = f.read()
+        with fsspec.open(p, mode="w", compression=compression) as f:
+            print(text, file=f)
+        file_of_interest = p
+    else:
+        file_of_interest = single_record_file
+
+    daa = dak.from_json([file_of_interest] * 5, line_delimited=False)
+    single_record = ak.from_json(Path(single_record_file), line_delimited=False)
+    single_entry_array = ak.Array([single_record])
+    caa = ak.concatenate([single_entry_array] * 5)
     assert_eq(daa, caa)
 
 
