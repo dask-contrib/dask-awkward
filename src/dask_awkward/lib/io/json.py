@@ -9,19 +9,13 @@ import awkward as ak
 from awkward.forms.form import Form
 from dask.base import tokenize
 from dask.blockwise import BlockIndex
-from dask.bytes.core import read_bytes
 from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
-from dask.utils import parse_bytes
-from fsspec.core import get_fs_token_paths, url_to_fs
-from fsspec.utils import infer_compression
+from dask.utils import is_integer, parse_bytes
+from fsspec.core import OpenFile, get_fs_token_paths, url_to_fs
+from fsspec.utils import infer_compression, read_block
 
-from dask_awkward.lib.core import (
-    map_partitions,
-    new_array_object,
-    new_scalar_object,
-    typetracer_array,
-)
+from dask_awkward.lib.core import map_partitions, new_scalar_object, typetracer_array
 from dask_awkward.lib.io.io import from_map
 
 if TYPE_CHECKING:
@@ -37,7 +31,7 @@ __all__ = ("from_json", "to_json")
 class FromJsonFn:
     def __init__(
         self,
-        *args: Any,
+        *,
         storage: AbstractFileSystem,
         compression: str | None = None,
         schema: str | dict | list | None = None,
@@ -48,7 +42,6 @@ class FromJsonFn:
         self.compression = compression
         self.storage = storage
         self.schema = schema
-        self.args = args
         self.kwargs = kwargs
         self.form = form
         self.original_form = original_form
@@ -84,19 +77,20 @@ class FromJsonFn:
 class FromJsonLineDelimitedFn(FromJsonFn):
     def __init__(
         self,
-        *args: Any,
+        *,
         storage: AbstractFileSystem,
         compression: str | None = None,
         schema: str | dict | list | None = None,
         form: Form | None = None,
+        original_form: Form | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(
-            *args,
             storage=storage,
             compression=compression,
             schema=schema,
             form=form,
+            original_form=original_form,
             **kwargs,
         )
 
@@ -123,19 +117,20 @@ class FromJsonLineDelimitedFn(FromJsonFn):
 class FromJsonSingleObjPerFile(FromJsonFn):
     def __init__(
         self,
-        *args: Any,
+        *,
         storage: AbstractFileSystem,
         compression: str | None = None,
         schema: str | dict | list | None = None,
         form: Form | None = None,
+        original_form: Form | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(
-            *args,
             storage=storage,
             compression=compression,
             schema=schema,
             form=form,
+            original_form=original_form,
             **kwargs,
         )
 
@@ -163,25 +158,50 @@ class FromJsonSingleObjPerFile(FromJsonFn):
         )
 
 
-class FromJsonBytesFn:
+class FromJsonBytesFn(FromJsonFn):
     def __init__(
         self,
+        *,
+        storage: AbstractFileSystem,
+        compression: str | None = None,
         schema: str | dict | list | None = None,
         form: Form | None = None,
         original_form: Form | None = None,
         **kwargs: Any,
     ) -> None:
-        self.schema = schema
-        self.form = form
-        self.original_form = original_form
-        self.kwargs = kwargs
+        super().__init__(
+            storage=storage,
+            compression=compression,
+            schema=schema,
+            form=form,
+            original_form=original_form,
+            **kwargs,
+        )
 
-    def __call__(self, source: bytes) -> ak.Array:
+    def __call__(self, ingrediants: tuple[Any, ...]) -> ak.Array:
+        (fs, path, compression, offsets, length, delimiter) = ingrediants
+
+        with fs.open(path, compression=compression) as f:
+            if offsets == 0 and length is None:
+                bytestring = f.read()
+            else:
+                bytestring = read_block(f, offsets, length, delimiter)
+
         return ak.from_json(
-            source,
+            bytestring,
             line_delimited=True,
             schema=self.schema,
             **self.kwargs,
+        )
+
+    def project_columns(
+        self,
+        columns: Sequence[str],
+        original_form: Form | None = None,
+    ) -> Self:
+        return self._default_project_columns(
+            columns=columns,
+            original_form=original_form,
         )
 
 
@@ -199,7 +219,7 @@ def meta_from_single_file(
 def meta_from_bytechunks(
     fs: AbstractFileSystem,
     paths: list[str],
-    bytechunks: str | int = "16 KiB",
+    bytechunks: str | int = "128KiB",
     **kwargs: Any,
 ):
     bytechunks = parse_bytes(bytechunks)
@@ -296,49 +316,7 @@ def _from_json_sopf(
     )
 
 
-def _from_json_bytes(
-    *,
-    source: str | list[str],
-    schema: str | dict | list | None = None,
-    blocksize: str,
-    delimiter: Any,
-    behavior: dict | None,
-    storage_options: dict[str, Any] | None,
-    **kwargs: Any,
-) -> Array:
-    token = tokenize(source, delimiter, blocksize)
-    name = f"from-json-{token}"
-    storage_options = storage_options or {}
-    _, bytechunks = read_bytes(
-        source,
-        delimiter=delimiter,
-        blocksize=blocksize,
-        sample="0",
-        **storage_options,
-    )
-    flat_chunks = list(flatten(bytechunks))
-    f = FromJsonBytesFn(schema=schema, **kwargs)
-    dsk = {
-        (name, i): (f, delayed_chunk.key) for i, delayed_chunk in enumerate(flat_chunks)
-    }
-    deps = flat_chunks
-    n = len(deps)
-
-    # doesn't work because flat_chunks elements are remaining delayed objects.
-    # return from_map(
-    #     _from_json_bytes,
-    #     flat_chunks,
-    #     label="from-json",
-    #     token=token,
-    #     produces_tasks=True,
-    #     deps=flat_chunks,
-    # )
-
-    hlg = HighLevelGraph.from_collections(name, dsk, dependencies=deps)
-    return new_array_object(hlg, name, meta=None, behavior=behavior, npartitions=n)
-
-
-def _fs_token_paths(
+def json_fs_token_paths(
     source: Any,
     *,
     storage_options: dict[str, Any] | None = None,
@@ -370,13 +348,17 @@ def from_json(
     behavior: dict | None = None,
     blocksize: str | None = None,
     delimiter: bytes | None = None,
+    sample: str | int = "128KiB",
     compression: str | None = "infer",
     storage_options: dict[str, Any] | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("dask-awkward only supports highlevel awkward Arrays.")
 
-    fs, token, paths = _fs_token_paths(source, storage_options=storage_options)
+    fs, token, paths = json_fs_token_paths(source, storage_options=storage_options)
+
+    if len(paths) == 0:
+        raise OSError("%s resolved to no files" % source)
 
     # allow either blocksize or delimieter being not-None to trigger
     # line deliminated JSON reading.
@@ -385,6 +367,8 @@ def from_json(
     elif blocksize is None and delimiter == b"\n":
         blocksize = "128 MiB"
 
+    # if line delimited is False we use the single object per file
+    # implementation.
     if not line_delimited:
         return _from_json_sopf(
             fs=fs,
@@ -402,6 +386,8 @@ def from_json(
             behavior=behavior,
         )
 
+    # if we are not using blocksize and delimiter we are partitioning
+    # by file.
     if blocksize is None and delimiter is None:
         return _from_json_files(
             fs=fs,
@@ -418,14 +404,18 @@ def from_json(
             resize=resize,
             behavior=behavior,
         )
-        # if a `delimiter` and `blocksize` are defined we use Dask's
-    # `read_bytes` function to get delayed chunks of bytes.
+
+    # if a `delimiter` and `blocksize` are defined we use the byte
+    # reading implementation
     elif delimiter is not None and blocksize is not None:
         return _from_json_bytes(
-            source=source,
+            fs=fs,
+            token=token,
+            paths=paths,
             schema=schema,
             delimiter=delimiter,
             blocksize=blocksize,
+            sample=sample,
             behavior=behavior,
             nan_string=nan_string,
             posinf_string=posinf_string,
@@ -434,7 +424,6 @@ def from_json(
             buffersize=buffersize,
             initial=initial,
             resize=resize,
-            storage_options=storage_options,
         )
 
     # otherwise the arguments are bad
@@ -668,6 +657,8 @@ def layout_to_jsonschema(
             existing_schema["type"] = "integer"
         elif layout.dtype.kind == "f":
             existing_schema["type"] = "number"
+        elif layout.dtype.kind == "b":
+            existing_schema["type"] = "boolean"
     elif layout.is_indexed:
         pass
     elif layout.is_unknown:
@@ -707,3 +698,144 @@ def ak_schema_repr(arr):
     import yaml
 
     return yaml.dump(arr.layout.form)
+
+
+def _from_json_bytes(
+    fs: AbstractFileSystem,
+    token: str,
+    paths: list[str],
+    *,
+    schema: str | dict | list | None = None,
+    compression: str | None = "infer",
+    delimiter: bytes = b"\n",
+    not_zero: bool = False,
+    blocksize: str | int = "128 MiB",
+    sample: str | int = "128 kiB",
+    **kwargs,
+) -> Array:
+    if compression == "infer":
+        compression = infer_compression(paths[0])
+
+    token = tokenize(
+        fs,
+        token,
+        paths,
+        schema,
+        compression,
+        delimiter,
+        not_zero,
+        blocksize,
+        sample,
+        kwargs,
+    )
+
+    if blocksize is not None:
+        if isinstance(blocksize, str):
+            blocksize = parse_bytes(blocksize)
+        if not is_integer(blocksize):
+            raise TypeError("blocksize must be an integer")
+        blocksize = int(blocksize)
+
+    if blocksize is None:
+        offsets = [[0]] * len(paths)
+        lengths = [[None]] * len(paths)
+    else:
+        offsets = []
+        lengths = []
+        for path in paths:
+            if compression == "infer":
+                comp = infer_compression(path)
+            else:
+                comp = compression
+            if comp is not None:
+                raise ValueError(
+                    "Cannot do chunked reads on compressed files. "
+                    "To read, set blocksize=None"
+                )
+            size = fs.info(path)["size"]
+            if size is None:
+                raise ValueError(
+                    "Backing filesystem couldn't determine file size, cannot "
+                    "do chunked reads. To read, set blocksize=None."
+                )
+
+            elif size == 0:
+                # skip empty
+                offsets.append([])
+                lengths.append([])
+            else:
+                # shrink blocksize to give same number of parts
+                if size % blocksize and size > blocksize:
+                    blocksize1 = size / (size // blocksize)
+                else:
+                    blocksize1 = blocksize
+                place = 0
+                off = [0]
+                length = []
+
+                # figure out offsets, spreading around spare bytes
+                while size - place > (blocksize1 * 2) - 1:
+                    place += blocksize1
+                    off.append(int(place))
+                    length.append(off[-1] - off[-2])
+                length.append(size - off[-1])
+
+                if not_zero:
+                    off[0] = 1
+                    length[0] -= 1
+                offsets.append(off)
+                lengths.append(length)
+
+    out = []
+    for path, offset, length in zip(paths, offsets, lengths):
+        values = [
+            (
+                fs,
+                path,
+                compression,
+                offs,
+                leng,
+                delimiter,
+            )
+            for offs, leng in zip(offset, length)
+        ]
+        out.append(values)
+
+    if isinstance(sample, str):
+        sample = parse_bytes(sample)
+    with OpenFile(fs, paths[0], compression=compression) as f:
+        # read block without seek (because we start at zero)
+        if delimiter is None:
+            sample_bytes = f.read(sample)
+        else:
+            sample_buff = f.read(sample)
+            while True:
+                new = f.read(sample)
+                if not new:
+                    break
+                if delimiter in new:
+                    sample_buff = sample_buff + new.split(delimiter, 1)[0] + delimiter
+                    break
+                sample_buff = sample_buff + new
+            sample_bytes = sample_buff
+
+    rfind = sample_bytes.rfind(delimiter)
+    if rfind > 0:
+        sample_bytes = sample_bytes[:rfind]
+    meta = typetracer_array(ak.from_json(sample_bytes, line_delimited=True, **kwargs))
+
+    fn = FromJsonBytesFn(
+        storage=fs,
+        compression=compression,
+        schema=schema,
+        form=meta.layout.form,
+        **kwargs,
+    )
+
+    return from_map(
+        fn,
+        list(flatten(out)),
+        label="from-json",
+        token=token,
+        meta=meta,
+    )
