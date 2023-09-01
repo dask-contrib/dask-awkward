@@ -11,12 +11,12 @@ from dask.base import tokenize
 from dask.blockwise import BlockIndex
 from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
-from dask.utils import is_integer, parse_bytes
-from fsspec.core import OpenFile, get_fs_token_paths, url_to_fs
+from dask.utils import parse_bytes
+from fsspec.core import get_fs_token_paths, url_to_fs
 from fsspec.utils import infer_compression, read_block
 
 from dask_awkward.lib.core import map_partitions, new_scalar_object, typetracer_array
-from dask_awkward.lib.io.io import from_map
+from dask_awkward.lib.io.io import bytes_reading_ingredients, from_map
 
 if TYPE_CHECKING:
     from awkward.contents.content import Content
@@ -729,99 +729,16 @@ def _from_json_bytes(
         kwargs,
     )
 
-    if blocksize is not None:
-        if isinstance(blocksize, str):
-            blocksize = parse_bytes(blocksize)
-        if not is_integer(blocksize):
-            raise TypeError("blocksize must be an integer")
-        blocksize = int(blocksize)
+    bytes_ingredients, sample_bytes = bytes_reading_ingredients(
+        fs,
+        paths,
+        compression,
+        delimiter,
+        not_zero,
+        blocksize,
+        sample,
+    )
 
-    if blocksize is None:
-        offsets = [[0]] * len(paths)
-        lengths = [[None]] * len(paths)
-    else:
-        offsets = []
-        lengths = []
-        for path in paths:
-            if compression == "infer":
-                comp = infer_compression(path)
-            else:
-                comp = compression
-            if comp is not None:
-                raise ValueError(
-                    "Cannot do chunked reads on compressed files. "
-                    "To read, set blocksize=None"
-                )
-            size = fs.info(path)["size"]
-            if size is None:
-                raise ValueError(
-                    "Backing filesystem couldn't determine file size, cannot "
-                    "do chunked reads. To read, set blocksize=None."
-                )
-
-            elif size == 0:
-                # skip empty
-                offsets.append([])
-                lengths.append([])
-            else:
-                # shrink blocksize to give same number of parts
-                if size % blocksize and size > blocksize:
-                    blocksize1 = size / (size // blocksize)
-                else:
-                    blocksize1 = blocksize
-                place = 0
-                off = [0]
-                length = []
-
-                # figure out offsets, spreading around spare bytes
-                while size - place > (blocksize1 * 2) - 1:
-                    place += blocksize1
-                    off.append(int(place))
-                    length.append(off[-1] - off[-2])
-                length.append(size - off[-1])
-
-                if not_zero:
-                    off[0] = 1
-                    length[0] -= 1
-                offsets.append(off)
-                lengths.append(length)
-
-    out = []
-    for path, offset, length in zip(paths, offsets, lengths):
-        values = [
-            (
-                fs,
-                path,
-                compression,
-                offs,
-                leng,
-                delimiter,
-            )
-            for offs, leng in zip(offset, length)
-        ]
-        out.append(values)
-
-    if isinstance(sample, str):
-        sample = parse_bytes(sample)
-    with OpenFile(fs, paths[0], compression=compression) as f:
-        # read block without seek (because we start at zero)
-        if delimiter is None:
-            sample_bytes = f.read(sample)
-        else:
-            sample_buff = f.read(sample)
-            while True:
-                new = f.read(sample)
-                if not new:
-                    break
-                if delimiter in new:
-                    sample_buff = sample_buff + new.split(delimiter, 1)[0] + delimiter
-                    break
-                sample_buff = sample_buff + new
-            sample_bytes = sample_buff
-
-    rfind = sample_bytes.rfind(delimiter)
-    if rfind > 0:
-        sample_bytes = sample_bytes[:rfind]
     meta = typetracer_array(ak.from_json(sample_bytes, line_delimited=True, **kwargs))
 
     fn = FromJsonBytesFn(
@@ -834,7 +751,7 @@ def _from_json_bytes(
 
     return from_map(
         fn,
-        list(flatten(out)),
+        list(flatten(bytes_ingredients)),
         label="from-json",
         token=token,
         meta=meta,
