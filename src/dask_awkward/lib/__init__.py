@@ -3,8 +3,7 @@ from dask_awkward.lib.core import _type as type
 from dask_awkward.lib.core import (
     compatible_partitions,
     map_partitions,
-    partition_compatibility,
-    typetracer_from_form,
+    partition_compatibility
 )
 from dask_awkward.lib.describe import fields
 from dask_awkward.lib.inspect import necessary_columns, sample
