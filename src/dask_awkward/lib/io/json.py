@@ -16,7 +16,11 @@ from fsspec.core import get_fs_token_paths, url_to_fs
 from fsspec.utils import infer_compression, read_block
 
 from dask_awkward.lib.core import map_partitions, new_scalar_object, typetracer_array
-from dask_awkward.lib.io.io import bytes_reading_ingredients, from_map
+from dask_awkward.lib.io.io import (
+    _bytes_with_sample,
+    _BytesReadingInstructions,
+    from_map,
+)
 
 if TYPE_CHECKING:
     from awkward.contents.content import Content
@@ -178,14 +182,19 @@ class FromJsonBytesFn(FromJsonFn):
             **kwargs,
         )
 
-    def __call__(self, ingrediants: tuple[Any, ...]) -> ak.Array:
-        (fs, path, compression, offsets, length, delimiter) = ingrediants
-
-        with fs.open(path, compression=compression) as f:
-            if offsets == 0 and length is None:
+    def __call__(self, instructions: _BytesReadingInstructions) -> ak.Array:
+        with instructions.fs.open(
+            instructions.path, compression=instructions.compression
+        ) as f:
+            if instructions.offset == 0 and instructions.length is None:
                 bytestring = f.read()
             else:
-                bytestring = read_block(f, offsets, length, delimiter)
+                bytestring = read_block(
+                    f,
+                    instructions.offset,
+                    instructions.length,
+                    instructions.delimiter,
+                )
 
         return ak.from_json(
             bytestring,
@@ -729,7 +738,7 @@ def _from_json_bytes(
         kwargs,
     )
 
-    bytes_ingredients, sample_bytes = bytes_reading_ingredients(
+    bytes_ingredients, sample_bytes = _bytes_with_sample(
         fs,
         paths,
         compression,

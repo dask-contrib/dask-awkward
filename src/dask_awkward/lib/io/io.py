@@ -586,6 +586,16 @@ class _BytesReadingInstructions:
     length: int | None
     delimiter: bytes | None
 
+    def expand(self):
+        return (
+            self.fs,
+            self.path,
+            self.compression,
+            self.offset,
+            self.length,
+            self.delimiter,
+        )
+
 
 def _bytes_with_sample(
     fs: AbstractFileSystem,
