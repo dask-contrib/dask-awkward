@@ -578,7 +578,7 @@ def from_map(
 
 
 @dataclass
-class BytesReadingInstructions:
+class _BytesReadingInstructions:
     fs: AbstractFileSystem
     path: str
     compression: str | None
@@ -587,7 +587,7 @@ class BytesReadingInstructions:
     delimiter: bytes | None
 
 
-def bytes_with_sample(
+def _bytes_with_sample(
     fs: AbstractFileSystem,
     paths: list[str],
     compression: str | None,
@@ -595,7 +595,41 @@ def bytes_with_sample(
     not_zero: bool,
     blocksize: str | int,
     sample: str | int | bool,
-) -> tuple[list[list[BytesReadingInstructions]], bytes]:
+) -> tuple[list[list[_BytesReadingInstructions]], bytes]:
+    """Generate instructions for reading bytes from paths in a filesystem.
+
+    This function is for internal use in from_json and from_text; we
+    create a set of instructions to lazily read bytes from files on
+    disk.
+
+    Parameters
+    ----------
+    fs : AbstractFileSystem
+        Filesystem where data lives.
+    paths : list[str]
+        Path to the data.
+    compression : str, optional
+        Compression of the data.
+    delimiter : bytes, optional
+        Delimiter to create chunks on
+    not_zero : bool
+        If ``True`` skip forward 1 byte when seeking for the first
+        delimiter (dropping header).
+    blocksize : str | int
+        Size for each chunk of bytes.
+    sample : str | int | bool
+        Size of sample to eagerly read and return (if False return
+        ``b""``).
+
+    Returns
+    -------
+    list[list[_BytesReadingInstructions]]
+        list of lists of instructions (outer list of paths, inner list
+        for chunks of the path).
+    bytes
+        Sample bytes.
+
+    """
     if blocksize is not None:
         if isinstance(blocksize, str):
             blocksize = parse_bytes(blocksize)
@@ -655,7 +689,7 @@ def bytes_with_sample(
     out = []
     for path, offset, length in zip(paths, offsets, lengths):
         values = [
-            BytesReadingInstructions(
+            _BytesReadingInstructions(
                 fs,
                 path,
                 compression,
