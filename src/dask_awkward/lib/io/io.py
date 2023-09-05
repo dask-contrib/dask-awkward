@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterable
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable, Mapping, Protocol
 
 import awkward as ak
@@ -9,7 +10,8 @@ import numpy as np
 from awkward.types.numpytype import primitive_to_dtype
 from dask.base import flatten, tokenize
 from dask.highlevelgraph import HighLevelGraph
-from dask.utils import funcname
+from dask.utils import funcname, is_integer, parse_bytes
+from fsspec.utils import infer_compression
 
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardInputLayer
 from dask_awkward.layers.layers import AwkwardMaterializedLayer
@@ -25,6 +27,7 @@ if TYPE_CHECKING:
     from dask.bag.core import Bag as DaskBag
     from dask.dataframe.core import DataFrame as DaskDataFrame
     from dask.delayed import Delayed
+    from fsspec.core import AbstractFileSystem
 
     from dask_awkward.lib.core import Array
 
@@ -572,3 +575,155 @@ def from_map(
         )
 
     return result
+
+
+@dataclass
+class _BytesReadingInstructions:
+    fs: AbstractFileSystem
+    path: str
+    compression: str | None
+    offset: int | None
+    length: int | None
+    delimiter: bytes | None
+
+
+def _bytes_with_sample(
+    fs: AbstractFileSystem,
+    paths: list[str],
+    compression: str | None,
+    delimiter: bytes | None,
+    not_zero: bool,
+    blocksize: str | int,
+    sample: str | int | bool,
+) -> tuple[list[list[_BytesReadingInstructions]], bytes]:
+    """Generate instructions for reading bytes from paths in a filesystem.
+
+    This function is for internal use in from_json and from_text; we
+    create a set of instructions to lazily read bytes from files on
+    disk.
+
+    Parameters
+    ----------
+    fs : AbstractFileSystem
+        Filesystem where data lives.
+    paths : list[str]
+        Path to the data.
+    compression : str, optional
+        Compression of the data.
+    delimiter : bytes, optional
+        Delimiter to create chunks on
+    not_zero : bool
+        If ``True`` skip forward 1 byte when seeking for the first
+        delimiter (dropping header).
+    blocksize : str | int
+        Size for each chunk of bytes.
+    sample : str | int | bool
+        Size of sample to eagerly read and return (if False return
+        ``b""``).
+
+    Returns
+    -------
+    list[list[_BytesReadingInstructions]]
+        list of lists of instructions (outer list of paths, inner list
+        for chunks of the path).
+    bytes
+        Sample bytes.
+
+    """
+    if blocksize is not None:
+        if isinstance(blocksize, str):
+            blocksize = parse_bytes(blocksize)
+        if not is_integer(blocksize):
+            raise TypeError("blocksize must be an integer")
+        blocksize = int(blocksize)
+
+    if compression == "infer":
+        compression = infer_compression(paths[0])
+
+    if blocksize is None:
+        offsets = [[0]] * len(paths)
+        lengths = [[None]] * len(paths)
+    else:
+        offsets = []
+        lengths = []
+        for path in paths:
+            if compression is not None:
+                raise ValueError(
+                    "Cannot do chunked reads on compressed files. "
+                    "To read, set blocksize=None"
+                )
+            size = fs.info(path)["size"]
+            if size is None:
+                raise ValueError(
+                    "Backing filesystem couldn't determine file size, cannot "
+                    "do chunked reads. To read, set blocksize=None."
+                )
+
+            elif size == 0:
+                # skip empty
+                offsets.append([])
+                lengths.append([])
+            else:
+                # shrink blocksize to give same number of parts
+                if size % blocksize and size > blocksize:
+                    blocksize1 = size / (size // blocksize)
+                else:
+                    blocksize1 = blocksize
+                place = 0
+                off = [0]
+                length = []
+
+                # figure out offsets, spreading around spare bytes
+                while size - place > (blocksize1 * 2) - 1:
+                    place += blocksize1
+                    off.append(int(place))
+                    length.append(off[-1] - off[-2])
+                length.append(size - off[-1])
+
+                if not_zero:
+                    off[0] = 1
+                    length[0] -= 1
+                offsets.append(off)
+                lengths.append(length)
+
+    out = []
+    for path, offset, length in zip(paths, offsets, lengths):
+        values = [
+            _BytesReadingInstructions(
+                fs,
+                path,
+                compression,
+                offs,
+                leng,
+                delimiter,
+            )
+            for offs, leng in zip(offset, length)
+        ]
+        out.append(values)
+
+    sample_bytes = b""
+    if sample:
+        sample_size = parse_bytes(sample) if isinstance(sample, str) else sample
+        with fs.open(paths[0], compression=compression) as f:
+            # read block without seek (because we start at zero)
+            if delimiter is None:
+                sample_bytes = f.read(sample_size)
+            else:
+                sample_buff = f.read(sample_size)
+                while True:
+                    new = f.read(sample_size)
+                    if not new:
+                        break
+                    if delimiter in new:
+                        sample_buff = (
+                            sample_buff + new.split(delimiter, 1)[0] + delimiter
+                        )
+                        break
+                    sample_buff = sample_buff + new
+                sample_bytes = sample_buff
+
+        rfind = sample_bytes.rfind(delimiter)
+        if rfind > 0:
+            sample_bytes = sample_bytes[:rfind]
+
+    return out, sample_bytes
