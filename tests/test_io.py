@@ -15,9 +15,10 @@ try:
 except ImportError:
     import json  # type: ignore[no-redef]
 
+from awkward.typetracer import unknown_length
+
 import dask_awkward as dak
 from dask_awkward.lib.testutils import assert_eq
-from awkward.typetracer import unknown_length
 
 
 def test_force_by_lines_meta(ndjson_points_file: str) -> None:
