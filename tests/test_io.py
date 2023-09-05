@@ -415,8 +415,11 @@ def test_from_awkward_empty_array(daa) -> None:
 
 
 @pytest.mark.parametrize("sample", [False, 28])
+@pytest.mark.parametrize("not_zero", [True, False])
 def test_bytes_with_sample(
-    sample: int | str | bool, tmp_path_factory: pytest.TempPathFactory
+    sample: int | str | bool,
+    not_zero: bool,
+    tmp_path_factory: pytest.TempPathFactory,
 ) -> None:
     tmppath = tmp_path_factory.mktemp("bytes_with_sample")
 
@@ -435,7 +438,7 @@ def test_bytes_with_sample(
         paths=paths,
         compression="infer",
         delimiter=b"\n",
-        not_zero=False,
+        not_zero=not_zero,
         blocksize=256,
         sample=sample,
     )
@@ -445,8 +448,9 @@ def test_bytes_with_sample(
     assert len(bytes_instructions[0]) == 2
     assert len(bytes_instructions[1]) == 2
 
-    assert bytes_instructions[0][0].offset == 0
-    assert bytes_instructions[0][0].length == 256
+    # seek until next delimieter from 1 byte forward if not_zero is True
+    assert bytes_instructions[0][0].offset == 0 if not not_zero else 1
+    assert bytes_instructions[0][0].length == 256 if not not_zero else 255
 
     assert bytes_instructions[1][1].offset == 256
     assert bytes_instructions[1][1].length == 256
