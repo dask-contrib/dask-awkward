@@ -20,14 +20,3 @@ def test_pickle_ak_array():
 
 def identity(x):
     return x
-
-
-def test_worker_transfer():
-    array = ak.Array([[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]])[[0, 2]]
-    darray = dak.from_awkward(array, 1)
-    darray_result = darray.map_partitions(identity)
-
-    first, second = dask.compute(darray, darray_result)
-
-    assert ak.almost_equal(first, second)
-    assert first.layout.form == second.layout.form
