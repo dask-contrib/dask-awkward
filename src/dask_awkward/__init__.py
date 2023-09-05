@@ -23,6 +23,7 @@ from dask_awkward.lib.io.io import (
     from_delayed,
     from_lists,
     from_map,
+    from_text,
     to_dask_array,
     to_dask_bag,
     to_dataframe,
