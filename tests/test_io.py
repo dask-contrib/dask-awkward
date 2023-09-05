@@ -7,9 +7,11 @@ import numpy as np
 import pytest
 from dask.array.utils import assert_eq as da_assert_eq
 from dask.delayed import delayed
+from fsspec.core import get_fs_token_paths
 from numpy.typing import DTypeLike
 
 import dask_awkward as dak
+from dask_awkward.lib.io.io import _bytes_with_sample
 from dask_awkward.lib.testutils import assert_eq
 
 
@@ -289,3 +291,50 @@ def test_from_awkward_empty_array(daa) -> None:
     a2 = dak.from_awkward(c2, npartitions=1)
     assert len(a2) == 0
     daa.layout.form == a2.layout.form
+
+
+@pytest.mark.parametrize("sample", [False, 28])
+@pytest.mark.parametrize("not_zero", [True, False])
+def test_bytes_with_sample(
+    sample: int | str | bool,
+    not_zero: bool,
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    tmppath = tmp_path_factory.mktemp("bytes_with_sample")
+
+    lines1 = b"\n".join([b"a" * 127, b"b" * 127, b"c" * 127, b"d" * 128])
+    lines2 = b"\n".join([b"e" * 127, b"f" * 127, b"g" * 127, b"h" * 128])
+
+    with open(tmppath / "file1.txt", "wb") as f:
+        f.write(lines1)
+    with open(tmppath / "file2.txt", "wb") as f:
+        f.write(lines2)
+
+    fs, _, paths = get_fs_token_paths(str(tmppath / "*.txt"))
+
+    bytes_instructions, sample_bytes = _bytes_with_sample(
+        fs=fs,
+        paths=paths,
+        compression="infer",
+        delimiter=b"\n",
+        not_zero=not_zero,
+        blocksize=256,
+        sample=sample,
+    )
+
+    assert len(bytes_instructions) == 2
+
+    assert len(bytes_instructions[0]) == 2
+    assert len(bytes_instructions[1]) == 2
+
+    # seek until next delimieter from 1 byte forward if not_zero is True
+    assert bytes_instructions[0][0].offset == 0 if not not_zero else 1
+    assert bytes_instructions[0][0].length == 256 if not not_zero else 255
+
+    assert bytes_instructions[1][1].offset == 256
+    assert bytes_instructions[1][1].length == 256
+
+    if not sample:
+        assert sample_bytes == b""
+    else:
+        assert len(sample_bytes) == 127
