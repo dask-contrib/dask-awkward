@@ -33,7 +33,7 @@ def pickle_record(record: ak.Record, protocol: int) -> tuple:
 
 
 def pickle_array(array: ak.Array, protocol: int) -> tuple:
-    layout = ak.to_layout(array, allow_record=True)
+    layout = ak.to_layout(array, allow_record=False)
     form, length, container = ak.operations.to_buffers(
         layout,
         buffer_key="{form_key}-{attribute}",
