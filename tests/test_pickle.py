@@ -3,9 +3,6 @@ from __future__ import annotations
 import pickle
 
 import awkward as ak
-import dask.config
-
-import dask_awkward as dak
 
 
 def test_pickle_ak_array():
