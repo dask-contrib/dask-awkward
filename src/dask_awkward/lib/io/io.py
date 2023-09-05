@@ -593,7 +593,7 @@ def bytes_with_sample(
     delimiter: bytes | None,
     not_zero: bool,
     blocksize: str | int,
-    sample: str | int,
+    sample: str | int | bool,
 ) -> tuple[list[list[BytesReadingInstructions]], bytes]:
     if blocksize is not None:
         if isinstance(blocksize, str):
@@ -663,25 +663,29 @@ def bytes_with_sample(
         ]
         out.append(values)
 
-    sample_size = parse_bytes(sample) if isinstance(sample, str) else sample
-    with fs.open(paths[0], compression=compression) as f:
-        # read block without seek (because we start at zero)
-        if delimiter is None:
-            sample_bytes = f.read(sample_size)
-        else:
-            sample_buff = f.read(sample_size)
-            while True:
-                new = f.read(sample_size)
-                if not new:
-                    break
-                if delimiter in new:
-                    sample_buff = sample_buff + new.split(delimiter, 1)[0] + delimiter
-                    break
-                sample_buff = sample_buff + new
-            sample_bytes = sample_buff
+    sample_bytes = b""
+    if sample:
+        sample_size = parse_bytes(sample) if isinstance(sample, str) else sample
+        with fs.open(paths[0], compression=compression) as f:
+            # read block without seek (because we start at zero)
+            if delimiter is None:
+                sample_bytes = f.read(sample_size)
+            else:
+                sample_buff = f.read(sample_size)
+                while True:
+                    new = f.read(sample_size)
+                    if not new:
+                        break
+                    if delimiter in new:
+                        sample_buff = (
+                            sample_buff + new.split(delimiter, 1)[0] + delimiter
+                        )
+                        break
+                    sample_buff = sample_buff + new
+                sample_bytes = sample_buff
 
-    rfind = sample_bytes.rfind(delimiter)
-    if rfind > 0:
-        sample_bytes = sample_bytes[:rfind]
+        rfind = sample_bytes.rfind(delimiter)
+        if rfind > 0:
+            sample_bytes = sample_bytes[:rfind]
 
     return out, sample_bytes
