@@ -17,6 +17,7 @@ except ImportError:
 
 import dask_awkward as dak
 from dask_awkward.lib.testutils import assert_eq
+from awkward.typetracer import unknown_length
 
 
 def test_force_by_lines_meta(ndjson_points_file: str) -> None:
@@ -406,7 +407,4 @@ def test_from_awkward_empty_array(daa) -> None:
 
     # with a form
     c2 = ak.typetracer.typetracer_from_form(daa.layout.form)
-    assert len(c2) == 0
-    a2 = dak.from_awkward(c2, npartitions=1)
-    assert len(a2) == 0
-    daa.layout.form == a2.layout.form
+    assert c2.layout.length is unknown_length
