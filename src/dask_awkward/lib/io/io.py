@@ -11,6 +11,7 @@ from awkward.types.numpytype import primitive_to_dtype
 from dask.base import flatten, tokenize
 from dask.highlevelgraph import HighLevelGraph
 from dask.utils import funcname, is_integer, parse_bytes
+from fsspec.utils import infer_compression
 
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardInputLayer
 from dask_awkward.layers.layers import AwkwardMaterializedLayer
@@ -601,6 +602,9 @@ def bytes_with_sample(
         if not is_integer(blocksize):
             raise TypeError("blocksize must be an integer")
         blocksize = int(blocksize)
+
+    if compression == "infer":
+        compression = infer_compression(paths[0])
 
     if blocksize is None:
         offsets = [[0]] * len(paths)
