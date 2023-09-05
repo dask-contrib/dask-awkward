@@ -17,7 +17,7 @@ except ImportError:
     import json  # type: ignore[no-redef]
 
 import dask_awkward as dak
-from dask_awkward.lib.io.io import bytes_with_sample
+from dask_awkward.lib.io.io import _bytes_with_sample
 from dask_awkward.lib.testutils import assert_eq
 
 
@@ -433,7 +433,7 @@ def test_bytes_with_sample(
 
     fs, _, paths = get_fs_token_paths(str(tmppath / "*.txt"))
 
-    bytes_instructions, sample_bytes = bytes_with_sample(
+    bytes_instructions, sample_bytes = _bytes_with_sample(
         fs=fs,
         paths=paths,
         compression="infer",
