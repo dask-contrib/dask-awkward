@@ -13,6 +13,7 @@ def test_pickle_ak_array():
     )
     assert ak.almost_equal(array, next_array)
     assert array.layout.form == next_array.layout.form
+    assert buffers
 
 
 def identity(x):
