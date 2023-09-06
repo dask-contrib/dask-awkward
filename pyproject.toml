@@ -27,7 +27,7 @@ classifiers = [
   "Topic :: Scientific/Engineering",
 ]
 dependencies = [
-  "awkward >=2.2.4",
+  "awkward >=2.4.0",
   "dask >=2023.04.0",
 ]
 dynamic = ["version"]
@@ -65,6 +65,9 @@ test = [
 
 [project.entry-points."dask.sizeof"]
 awkward = "dask_awkward.sizeof:register"
+
+[project.entry-points."awkward.pickle.reduce"]
+dask_awkward = "dask_awkward.pickle:plugin"
 
 [tool.hatch.version]
 source = "vcs"
