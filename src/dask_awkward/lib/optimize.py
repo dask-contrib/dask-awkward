@@ -192,8 +192,7 @@ def _touch_all_data(*args, **kwargs):
     import awkward as ak
 
     for arg in args + tuple(kwargs.values()):
-        if isinstance(arg, ak.Array):
-            arg.layout._touch_data(recursive=True)
+        ak.typetracer.touch_data(arg)
 
 
 def _mock_output(layer):
@@ -393,7 +392,7 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
         results = get_sync(hlg, leaf_layers_keys)
         for out in results:
             if isinstance(out, (ak.Array, ak.Record)):
-                out.layout._touch_data(recursive=True)
+                ak.typetracer.touch_data(out)
     except Exception as err:
         on_fail = dask.config.get("awkward.optimization.on-fail")
         # this is the default, throw a warning but skip the optimization.
