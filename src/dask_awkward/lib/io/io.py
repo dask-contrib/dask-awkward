@@ -744,18 +744,21 @@ def _string_array_from_bytestring(bytestring, delimiter):
     return lines
 
 
-class FromTextFn:
-    def __init__(self):
-        pass
+def _from_text_on_block(instructions: _BytesReadingInstructions) -> ak.Array:
+    with instructions.fs.open(
+        instructions.path, compression=instructions.compression
+    ) as f:
+        if instructions.offset == 0 and instructions.length is None:
+            bytestring = f.read()
+        else:
+            bytestring = read_block(
+                f,
+                instructions.offset,
+                instructions.length,
+                instructions.delimiter,
+            )
 
-    def __call__(self, bri: _BytesReadingInstructions) -> ak.Array:
-        with bri.fs.open(bri.path, compression=bri.compression) as f:
-            if bri.offset == 0 and bri.length is None:
-                bytestring = f.read()
-            else:
-                bytestring = read_block(f, bri.offset, bri.length, bri.delimiter)
-
-        return _string_array_from_bytestring(bytestring, bri.delimiter)
+    return _string_array_from_bytestring(bytestring, instructions.delimiter)
 
 
 def from_text(
@@ -773,23 +776,29 @@ def from_text(
     if compression == "infer":
         compression = infer_compression(paths[0])
 
-    bytes_ingredients, sample_bytes = _bytes_with_sample(
+    bytes_ingredients, _ = _bytes_with_sample(
         fs,
         paths,
         compression,
         delimiter,
         False,
         blocksize,
-        sample_size,
+        False,
+    )
+    from awkward.forms import ListOffsetForm, NumpyForm
+    from awkward.typetracer import typetracer_from_form
+
+    # meta is _always_ an unknown length array of strings.
+    meta = typetracer_from_form(
+        ListOffsetForm(
+            "i64",
+            NumpyForm("uint8", parameters={"__array__": "char"}),
+            parameters={"__array__": "string"},
+        )
     )
 
-    rfind = sample_bytes.rfind(delimiter)
-    if rfind > 0:
-        sample_bytes = sample_bytes[:rfind]
-    meta = typetracer_array(_string_array_from_bytestring(sample_bytes, delimiter))
-
     return from_map(
-        FromTextFn(),
+        _from_text_on_block,
         list(flatten(bytes_ingredients)),
         label="from-text",
         token=token,
