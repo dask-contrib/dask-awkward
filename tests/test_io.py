@@ -286,7 +286,7 @@ def test_from_awkward_empty_array(daa) -> None:
     assert len(a1) == 0
 
     # with a form
-    c2 = ak.Array(daa.layout.form.length_zero_array(highlevel=False))
+    c2 = ak.typetracer.length_zero_if_typetracer(daa.layout)
     assert len(c2) == 0
     a2 = dak.from_awkward(c2, npartitions=1)
     assert len(a2) == 0
