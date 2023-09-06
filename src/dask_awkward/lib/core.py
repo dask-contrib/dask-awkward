@@ -1273,7 +1273,12 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         try:
             fn = getattr(dask_awkward, fn_name)
         except AttributeError:
-            return NotImplemented
+            try:
+                import dask_awkward.lib.str
+
+                fn = getattr(dask_awkward.str, fn_name)
+            except AttributeError:
+                return NotImplemented
         return fn(*args, **kwargs)
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
