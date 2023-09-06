@@ -7,7 +7,10 @@ from typing import TYPE_CHECKING, Any, Callable, Mapping, Protocol
 
 import awkward as ak
 import numpy as np
+from awkward.forms.listoffsetform import ListOffsetForm
+from awkward.forms.numpyform import NumpyForm
 from awkward.types.numpytype import primitive_to_dtype
+from awkward.typetracer import typetracer_from_form
 from dask.base import flatten, tokenize
 from dask.highlevelgraph import HighLevelGraph
 from dask.utils import funcname, is_integer, parse_bytes
@@ -785,8 +788,6 @@ def from_text(
         blocksize,
         False,
     )
-    from awkward.forms import ListOffsetForm, NumpyForm
-    from awkward.typetracer import typetracer_from_form
 
     # meta is _always_ an unknown length array of strings.
     meta = typetracer_from_form(
