@@ -585,14 +585,14 @@ class _BytesReadingInstructions:
     compression: str | None
     offset: int | None
     length: int | None
-    delimiter: bytes | None
+    delimiter: bytes
 
 
 def _bytes_with_sample(
     fs: AbstractFileSystem,
     paths: list[str],
     compression: str | None,
-    delimiter: bytes | None,
+    delimiter: bytes,
     not_zero: bool,
     blocksize: str | int,
     sample: str | int | bool,
@@ -730,7 +730,7 @@ def _bytes_with_sample(
     return out, sample_bytes
 
 
-def _string_array_from_bytestring(bytestring, delimiter):
+def _string_array_from_bytestring(bytestring: bytes, delimiter: bytes) -> ak.Array:
     buffer = np.frombuffer(bytestring, dtype=np.uint8)
     array = ak.from_numpy(buffer)
     array = ak.unflatten(array, len(array))
