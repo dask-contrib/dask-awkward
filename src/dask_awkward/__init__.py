@@ -13,7 +13,6 @@ from dask_awkward.lib.core import (
     compatible_partitions,
     map_partitions,
     partition_compatibility,
-    typetracer_from_form,
 )
 from dask_awkward.lib.describe import fields
 from dask_awkward.lib.inspect import necessary_columns, sample

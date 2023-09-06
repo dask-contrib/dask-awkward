@@ -138,17 +138,12 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         from dask_awkward.lib._utils import set_form_keys
 
         starting_form = copy.deepcopy(self._meta.layout.form)
-        starting_layout = starting_form.length_zero_array(highlevel=False)
-        new_meta = ak.Array(
-            starting_layout.to_typetracer(forget_length=True),
-            behavior=self._behavior,
+        set_form_keys(starting_form, key=self.name)
+
+        new_meta_array, report = ak.typetracer.typetracer_with_report(
+            starting_form, highlevel=True, behavior=self._behavior
         )
-        form = new_meta.layout.form
 
-        set_form_keys(form, key=self.name)
-
-        new_meta_labelled, report = ak.typetracer.typetracer_with_report(form)
-        new_meta_array = ak.Array(new_meta_labelled, behavior=self._behavior)
         new_input_layer = AwkwardInputLayer(
             name=self.name,
             columns=self.columns,
