@@ -60,7 +60,10 @@ def from_text(
     compression: str | None = "infer",
     storage_options: dict | None = None,
 ) -> Array:
-    """Read text data as array of strings; each line an element.
+    """Create an Array collection from text data and a delimiter.
+
+    The default behavior of this input function is to create an array
+    collection where elements are seperated by newlines.
 
     Parameters
     ----------
@@ -85,7 +88,7 @@ def from_text(
     Examples
     --------
     >>> import dask_awkward as dak
-    >>> dak.from_text("s3://path/to/files/*.txt", blocksize="256 MiB")
+    >>> ds = dak.from_text("s3://path/to/files/*.txt", blocksize="256 MiB")
 
     """
     fs, token, paths = get_fs_token_paths(source, storage_options=storage_options or {})

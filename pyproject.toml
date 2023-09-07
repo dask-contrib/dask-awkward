@@ -49,6 +49,7 @@ docs = [
   "dask-awkward[complete]",
   "dask-sphinx-theme >=3.0.2",
   "sphinx-design",
+  "sphinx-codeautolink",
   "requests >=2.27.1",
 ]
 test = [

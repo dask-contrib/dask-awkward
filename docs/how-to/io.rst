@@ -17,7 +17,7 @@ Take this code-block for example:
 
 In the Parquet and text examples we will read data from Amazon S3; in
 the JSON example we're reading data from local disk. These collections
-will partitioned on a per-file basis
+will be partitioned on a per-file basis
 
 Support for the ROOT file format is provided by the Uproot_ project.
 
