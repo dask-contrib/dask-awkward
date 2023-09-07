@@ -85,7 +85,7 @@ def from_text(
     Examples
     --------
     >>> import dask_awkward as dak
-    >>> dak.from_text("s3://path/to/files", blocksize="256 MiB")
+    >>> dak.from_text("s3://path/to/files/*.txt", blocksize="256 MiB")
 
     """
     fs, token, paths = get_fs_token_paths(source, storage_options=storage_options or {})
