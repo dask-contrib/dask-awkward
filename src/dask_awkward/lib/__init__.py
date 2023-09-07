@@ -14,7 +14,6 @@ from dask_awkward.lib.io.io import (
     from_delayed,
     from_lists,
     from_map,
-    from_text,
     to_dask_array,
     to_dask_bag,
     to_dataframe,
@@ -22,6 +21,7 @@ from dask_awkward.lib.io.io import (
 )
 from dask_awkward.lib.io.json import from_json, to_json
 from dask_awkward.lib.io.parquet import from_parquet, to_parquet
+from dask_awkward.lib.io.text import from_text
 from dask_awkward.lib.operations import concatenate
 from dask_awkward.lib.reducers import (
     all,
