@@ -44,6 +44,8 @@ def test_form_text(tmp_path_factory: pytest.TempPathFactory) -> None:
     caa_split = akstr.is_numeric(akstr.split_whitespace(caa))
     assert_eq(daa_split, caa_split)
 
+    assert daa_split[-1].compute().tolist() == [False, False, True]
+
     daa_split = daa.map_partitions(akstr.capitalize)
     caa_split = akstr.capitalize(caa)
     assert_eq(daa_split, caa_split)
