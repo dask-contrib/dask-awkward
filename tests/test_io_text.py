@@ -28,13 +28,13 @@ nlm abc 456"""
 
 def test_form_text(tmp_path_factory: pytest.TempPathFactory) -> None:
     p = tmp_path_factory.mktemp("from_text")
-    with (p / "file1.txt").open("w") as f:
+    with (p / "file1.txt").open("wt") as f:
         print(text1, file=f)
-    with (p / "file2.txt").open("w") as f:
+    with (p / "file2.txt").open("wt") as f:
         print(text2, file=f)
 
     daa = dak.from_text(str(p / "*.txt"))
-    caa = ak.concatenate([ak.Array(text1.split()), ak.Array(text2.split())])
+    caa = ak.concatenate([ak.Array(text1.split("\n")), ak.Array(text2.split("\n"))])
 
     assert daa.npartitions == 2
 
