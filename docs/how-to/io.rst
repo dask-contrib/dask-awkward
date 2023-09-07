@@ -3,7 +3,8 @@ Data IO
 
 Creating dask-awkward collections typically begins with reading from
 either local disk or cloud storage. There is built-in support for
-datasets stored in Parquet or JSON format.
+datasets stored in Parquet or JSON format, along support for reading
+text files with each line treated as an element of an array.
 
 Take this code-block for example:
 
@@ -11,15 +12,12 @@ Take this code-block for example:
 
    >>> import dask_awkward as dak
    >>> ds1 = dak.from_parquet("s3://path/to/dataset")
-   >>> ds2 = dak.from_json("/path/to/json-files/*.json")
+   >>> ds2 = dak.from_json("/path/to/json-files")
+   >>> ds3 = dak.from_text("s3://some/text/*.txt")
 
-Both the :py:func:`~dask_awkward.from_parquet` and
-:func:`~dask_awkward.from_json` calls will create new
-:class:`dask_awkward.Array` instances. In the Parquet example we will
-read data from Amazon S3; in the JSON example we're reading data from
-local disk (notice the wildcard syntax: all JSON files in that
-directory will be discovered, and each file will become a partition in
-the collection).
+In the Parquet and text examples we will read data from Amazon S3; in
+the JSON example we're reading data from local disk. These collections
+will partitioned on a per-file basis
 
 Support for the ROOT file format is provided by the Uproot_ project.
 
