@@ -7,34 +7,38 @@ import pytest
 import dask_awkward as dak
 from dask_awkward.lib.testutils import assert_eq
 
-text1 = """a sentence
-one two three
-one,two,three
-abc 123 def 456
-this is a test ok ok ok
-aaaaaaaaaaa bbbbbbbbbbbbb
-ccccccccccccccccccccccccc
-ddd ddd ddd ddd ddd ddd
-asdf jkl"""
+text1 = [
+    "a sentence",
+    "one two three",
+    "one,two,three",
+    "abc 123 def 456",
+    "this is a test ok ok ok",
+    "aaaaaaaaaaa bbbbbbbbbbbbb",
+    "ccccccccccccccccccccccccc",
+    "ddd ddd ddd ddd ddd ddd",
+    "asdf jkl",
+]
 
-text2 = """abc 123
-456 789 10,11,12
-dddddddd
-jjjjjjjjjjj
-lllllllll
-oooooooooooo iiiiiiii nnnnnn
-nlm abc 456"""
+text2 = [
+    "abc 123",
+    "456 789 10,11,12",
+    "dddddddd",
+    "jjjjjjjjjjj",
+    "lllllllll",
+    "oooooooooooo iiiiiiii nnnnnn",
+    "nlm abc 456",
+]
 
 
 def test_form_text(tmp_path_factory: pytest.TempPathFactory) -> None:
     p = tmp_path_factory.mktemp("from_text")
     with (p / "file1.txt").open("wt") as f:
-        print(text1, file=f)
+        f.write("\n".join(text1))
     with (p / "file2.txt").open("wt") as f:
-        print(text2, file=f)
+        f.write("\n".join(text2))
 
-    daa = dak.from_text(str(p / "*.txt"))
-    caa = ak.concatenate([ak.Array(text1.split("\n")), ak.Array(text2.split("\n"))])
+    daa = dak.from_text([str(p / "file1.txt"), str(p / "file2.txt")])
+    caa = ak.concatenate([ak.Array(text1), ak.Array(text2)])
 
     assert daa.npartitions == 2
 
