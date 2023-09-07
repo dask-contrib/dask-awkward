@@ -44,6 +44,7 @@ extensions = [
     "sphinx.ext.todo",
     "sphinx.ext.autosectionlabel",
     "sphinx_design",
+    "sphinx_codeautolink",
 ]
 
 # Add any paths that contain templates here, relative to this directory.

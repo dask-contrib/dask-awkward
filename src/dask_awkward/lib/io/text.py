@@ -57,13 +57,43 @@ def from_text(
     source: str | list[str],
     blocksize: str | int = "128 MiB",
     delimiter: bytes = b"\n",
-    sample_size: str | int = "128 KiB",
     compression: str | None = "infer",
     storage_options: dict | None = None,
 ) -> Array:
+    """Create an Array collection from text data and a delimiter.
+
+    The default behavior of this input function is to create an array
+    collection where elements are seperated by newlines.
+
+    Parameters
+    ----------
+    source : str | list[str]
+        Data source as a list of files or a single path (can be remote
+        files).
+    blocksize : str | int
+        Size of each partition in bytes.
+    delimiter : bytes
+        Delimiter to separate elements of the array (default is
+        newline character).
+    compression : str, optional
+        Compression of the files for reading (default is to infer).
+    storage_options : dict, optional
+        Storage options passed to the ``fsspec`` filesystem.
+
+    Returns
+    -------
+    Array
+        Resulting collection.
+
+    Examples
+    --------
+    >>> import dask_awkward as dak
+    >>> ds = dak.from_text("s3://path/to/files/*.txt", blocksize="256 MiB")
+
+    """
     fs, token, paths = get_fs_token_paths(source, storage_options=storage_options or {})
 
-    token = tokenize(source, token, blocksize, delimiter, sample_size)
+    token = tokenize(source, token, blocksize, delimiter, compression)
 
     if compression == "infer":
         compression = infer_compression(paths[0])
