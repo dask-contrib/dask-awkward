@@ -11,7 +11,7 @@ text1 = """a sentence
 one two three
 one,two,three
 abc 123 def 456
-this is a test\t ok ok ok
+this is a test ok ok ok
 aaaaaaaaaaa bbbbbbbbbbbbb
 ccccccccccccccccccccccccc
 ddd ddd ddd ddd ddd ddd
