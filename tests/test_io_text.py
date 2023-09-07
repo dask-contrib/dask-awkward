@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import awkward as ak
+import awkward.operations.str as akstr
 import pytest
 
 import dask_awkward as dak
@@ -37,12 +38,12 @@ def test_form_text(tmp_path_factory: pytest.TempPathFactory) -> None:
 
     assert daa.npartitions == 2
 
-    daa_split = daa.map_partitions(ak.str.split_whitespace).map_partitions(
-        ak.str.is_numeric
+    daa_split = daa.map_partitions(akstr.split_whitespace).map_partitions(
+        akstr.is_numeric
     )
-    caa_split = ak.str.is_numeric(ak.str.split_whitespace(caa))
+    caa_split = akstr.is_numeric(akstr.split_whitespace(caa))
     assert_eq(daa_split, caa_split)
 
-    daa_split = daa.map_partitions(ak.str.capitalize)
-    caa_split = ak.str.capitalize(caa)
+    daa_split = daa.map_partitions(akstr.capitalize)
+    caa_split = akstr.capitalize(caa)
     assert_eq(daa_split, caa_split)
