@@ -67,6 +67,7 @@ def count_substring(
         pattern,
         ignore_case=ignore_case,
         behavior=behavior,
+        output_divisions=1,
     )
 
 
@@ -85,6 +86,7 @@ def count_substring_regex(
         pattern,
         ignore_case=ignore_case,
         behavior=behavior,
+        output_divisions=1,
     )
 
 
@@ -103,6 +105,7 @@ def ends_with(
         pattern,
         ignore_case=ignore_case,
         behavior=behavior,
+        output_divisions=1,
     )
 
 
@@ -119,6 +122,7 @@ def extract_regex(
         array,
         pattern,
         behavior=behavior,
+        output_divisions=1,
     )
 
 
@@ -131,7 +135,14 @@ def find_substring(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.find_substring,
+        array,
+        pattern,
+        ignore_case=ignore_case,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -143,7 +154,14 @@ def find_substring_regex(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.find_substring_regex,
+        array,
+        pattern,
+        ignore_case=ignore_case,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
