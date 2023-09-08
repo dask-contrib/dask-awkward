@@ -584,7 +584,7 @@ class _BytesReadingInstructions:
     compression: str | None
     offset: int | None
     length: int | None
-    delimiter: bytes | None
+    delimiter: bytes
 
     def expand(self):
         return (
@@ -601,7 +601,7 @@ def _bytes_with_sample(
     fs: AbstractFileSystem,
     paths: list[str],
     compression: str | None,
-    delimiter: bytes | None,
+    delimiter: bytes,
     not_zero: bool,
     blocksize: str | int,
     sample: str | int | bool,

@@ -95,9 +95,20 @@ def input_layer_array_partition0(collection: Array) -> ak.Array:
 def test_json_column_projection1(json_data_dir: Path) -> None:
     source = os.path.join(str(json_data_dir), "*.json")
     ds = dak.from_json(source)
-    ds2 = ds[["name", "goals"]]
+    fields_to_keep = ["name", "goals"]
+    ds2 = ds[fields_to_keep]
     array = input_layer_array_partition0(ds2)
-    assert array.fields == ["name", "goals"]
+
+    dropped = []
+    for field in array.fields:
+        if field not in fields_to_keep:
+            dropped.append(field)
+
+    assert len(dropped) == 1
+
+    for field in dropped:
+        with pytest.raises(TypeError, match="PlaceholderArray supports only"):
+            print(array[field])
 
 
 def test_json_column_projection2(json_data_dir: Path) -> None:
@@ -105,8 +116,19 @@ def test_json_column_projection2(json_data_dir: Path) -> None:
     ds = dak.from_json(source)
     # grab name and goals but then only use goals!
     ds2 = dak.max(ds[["name", "goals"]].goals, axis=1)
+    fields_to_keep = ["goals"]
     array = input_layer_array_partition0(ds2)
-    assert array.fields == ["goals"]
+
+    dropped = []
+    for field in array.fields:
+        if field not in fields_to_keep:
+            dropped.append(field)
+
+    assert len(dropped) == 2
+
+    for field in dropped:
+        with pytest.raises(TypeError, match="PlaceholderArray supports only"):
+            print(array[field])
 
 
 def test_json_delim_defined(ndjson_points_file: str) -> None:

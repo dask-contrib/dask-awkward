@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import copy
 from collections import namedtuple
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import awkward as ak
 import dask.array as da
+import dask.config
 import fsspec
 import numpy as np
 import pytest
@@ -813,3 +815,14 @@ def test_map_partitions_no_dask_collections_passed(caa):
         match="map_partitions expects at least one Dask collection",
     ):
         dak.num(caa.points.x, axis=1)
+
+
+@pytest.mark.parametrize("fn", [dak.count, dak.zeros_like, dak.ones_like])
+def test_shape_only_ops(fn: Callable, tmp_path_factory: pytest.TempPathFactory) -> None:
+    a = ak.Array([{"a": 1, "b": 2}, {"a": 3, "b": 4}])
+    p = tmp_path_factory.mktemp("zeros-like-flat")
+    ak.to_parquet(a, str(p / "file.parquet"))
+    lazy = dak.from_parquet(str(p))
+    result = fn(lazy.b)
+    with dask.config.set({"awkward.optimization.enabled": True}):
+        result.compute()

@@ -13,13 +13,13 @@ IO
    from_lists
    from_map
    from_parquet
+   from_text
    to_dask_array
    to_dask_bag
    to_dataframe
    to_delayed
    to_parquet
    to_json
-
 
 .. raw:: html
 

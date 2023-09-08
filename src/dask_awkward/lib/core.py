@@ -2317,7 +2317,7 @@ def partition_compatibility(*args: Array) -> PartitionCompatibility:
     >>> import dask_awkward as dak
     >>> import awkward as ak
     >>> concrete = ak.Array([[1, 2, 3], [4], [5, 6], [0, 0, 0, 0]])
-    >>> lazy = dak.from_awkward(concrete npartitions=2)
+    >>> lazy = dak.from_awkward(concrete, npartitions=2)
     >>> selection = dak.sum(lazy, axis=1) == 0
     >>> dak.partition_compatibility(lazy, selection)
     <PartitionCompatibility.YES: 0>

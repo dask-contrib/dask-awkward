@@ -21,6 +21,7 @@ from dask_awkward.lib.io.io import (
     _BytesReadingInstructions,
     from_map,
 )
+from dask_awkward.lib.unproject_layout import unproject_layout
 
 if TYPE_CHECKING:
     from awkward.contents.content import Content
@@ -107,7 +108,7 @@ class FromJsonLineDelimitedFn(FromJsonFn):
                 **self.kwargs,
             )
             assert isinstance(array, ak.Array)
-            return array
+            return ak.Array(unproject_layout(self.original_form, array.layout))
 
     def project_columns(
         self,
@@ -142,7 +143,7 @@ class FromJsonSingleObjPerFile(FromJsonFn):
 
     def __call__(self, source: str) -> ak.Array:
         with self.storage.open(source, mode="rt", compression=self.compression) as f:
-            return ak.Array(
+            array = ak.Array(
                 [
                     ak.from_json(
                         f.read(),
@@ -152,6 +153,8 @@ class FromJsonSingleObjPerFile(FromJsonFn):
                     )
                 ]
             )
+            assert isinstance(array, ak.Array)
+            return ak.Array(unproject_layout(self.original_form, array.layout))
 
     def project_columns(
         self,
@@ -198,12 +201,14 @@ class FromJsonBytesFn(FromJsonFn):
                     instructions.delimiter,
                 )
 
-        return ak.from_json(
+        array = ak.from_json(
             bytestring,
             line_delimited=True,
             schema=self.schema,
             **self.kwargs,
         )
+        assert isinstance(array, ak.Array)
+        return ak.Array(unproject_layout(self.original_form, array.layout))
 
     def project_columns(
         self,

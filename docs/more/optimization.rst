@@ -59,6 +59,7 @@ If our task graph is of the form:
 
 .. code:: pycon
 
+   >>> import dask_awkward as dak
    >>> ds = dak.from_parquet("/path/to/data")
    >>> result = ds.bar.x / ds.foo
 
@@ -103,6 +104,7 @@ necessary columns):
 
 .. code:: pycon
 
+   >>> import dask_awkward as dak
    >>> dak.necessary_columns(result)
    {"some-layer-name": ["foo", "bar.x"]}
 
@@ -131,6 +133,8 @@ above example, we write
 
 .. code:: pycon
 
+   >>> import dask_awkward as dak
+   >>> import dask.config
    >>> ds = dak.from_parquet("/path/to/data", columns=["bar.x", "foo"])
    >>> result = ds.bar.x / ds.foo
    >>> with dask.config.set({"awkward.optimization.enabled": False}):
