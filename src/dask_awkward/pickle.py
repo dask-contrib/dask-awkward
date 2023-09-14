@@ -2,9 +2,17 @@ from __future__ import annotations
 
 __all__ = ("plugin",)
 
-import pickle
+from pickle import PickleBuffer
 
 import awkward as ak
+from awkward.typetracer import PlaceholderArray
+
+
+def maybe_make_pickle_buffer(buffer) -> PlaceholderArray | PickleBuffer:
+    if isinstance(buffer, PlaceholderArray):
+        return buffer
+    else:
+        return PickleBuffer(buffer)
 
 
 def pickle_record(record: ak.Record, protocol: int) -> tuple:
@@ -18,7 +26,7 @@ def pickle_record(record: ak.Record, protocol: int) -> tuple:
 
     # For pickle >= 5, we can avoid copying the buffers
     if protocol >= 5:
-        container = {k: pickle.PickleBuffer(v) for k, v in container.items()}
+        container = {k: maybe_make_pickle_buffer(v) for k, v in container.items()}
 
     if record.behavior is ak.behavior:
         behavior = None
@@ -43,7 +51,7 @@ def pickle_array(array: ak.Array, protocol: int) -> tuple:
 
     # For pickle >= 5, we can avoid copying the buffers
     if protocol >= 5:
-        container = {k: pickle.PickleBuffer(v) for k, v in container.items()}
+        container = {k: maybe_make_pickle_buffer(v) for k, v in container.items()}
 
     if array.behavior is ak.behavior:
         behavior = None
