@@ -423,7 +423,7 @@ def _necessary_columns(dsk: HighLevelGraph) -> dict[str, list[str]]:
     layer_to_columns = {}
     for name, report in _get_column_reports(dsk).items():
         touched_data_keys = {_ for _ in report.data_touched if _ is not None}
-        print(set(report.shape_touched), set(report.data_touched))
+
         necessary_columns = []
         for key in sorted(touched_data_keys):
             if key == name:
