@@ -173,7 +173,14 @@ def index_in(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.index_in,
+        array,
+        value_set,
+        skip_nones=skip_nones,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -183,7 +190,12 @@ def is_alnum(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.is_alnum,
+        array,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -193,7 +205,12 @@ def is_alpha(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.is_alpha,
+        array,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -203,7 +220,12 @@ def is_ascii(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.is_ascii,
+        array,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -213,7 +235,12 @@ def is_decimal(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.is_decimal,
+        array,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -223,7 +250,12 @@ def is_digit(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.is_digit,
+        array,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -245,7 +277,12 @@ def is_lower(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.is_lower,
+        array,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -255,7 +292,12 @@ def is_numeric(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.is_numeric,
+        array,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -265,7 +307,12 @@ def is_printable(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.is_printable,
+        array,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -275,7 +322,12 @@ def is_space(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.is_space,
+        array,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -285,7 +337,12 @@ def is_title(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.is_title,
+        array,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -295,7 +352,12 @@ def is_upper(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.is_upper,
+        array,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
