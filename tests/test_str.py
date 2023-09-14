@@ -17,6 +17,7 @@ lines1 = [
     " ",
     "      12.34" "   123      ",
     "this is line two",
+    "Ok Cool",
     "THIS IS LINE THREE",
     "OKOKOK",
     "       aaaaaaa       ",
@@ -33,6 +34,7 @@ lines2 = [
     "OK",
     "DDDDDDDDDDDDDDDDDDDDDD",
     "         aaa         ",
+    "Aa Bb Cc",
 ]
 
 lines3 = [
@@ -153,7 +155,7 @@ def test_is_space() -> None:
 
 
 def test_is_title() -> None:
-    pass
+    assert_eq(akstr.is_title(daa), akstr.is_title(caa))
 
 
 def test_is_upper() -> None:
@@ -161,11 +163,17 @@ def test_is_upper() -> None:
 
 
 def test_join() -> None:
-    pass
+    assert_eq(
+        akstr.join(akstr.split_whitespace(daa), ","),
+        akstr.join(akstr.split_whitespace(caa), ","),
+    )
 
 
 def test_join_element_wise() -> None:
-    pass
+    assert_eq(
+        akstr.join_element_wise(akstr.split_whitespace(daa)),
+        akstr.join_element_wise(akstr.split_whitespace(caa)),
+    )
 
 
 def test_length() -> None:
@@ -192,27 +200,35 @@ def test_ltrim_whitespace() -> None:
 
 
 def test_match_like() -> None:
-    pass
+    assert_eq(akstr.match_like(daa, "this%"), akstr.match_like(caa, "this%"))
 
 
 def test_match_substring() -> None:
-    pass
+    assert_eq(akstr.match_like(daa, "  aaa"), akstr.match_like(caa, "  aaa"))
 
 
 def test_match_substring_regex() -> None:
-    pass
+    assert_eq(
+        akstr.match_substring_regex(daa, r"\w+aaa\w+"),
+        akstr.match_substring_regex(caa, r"\w+aaa\w+"),
+    )
 
 
 def test_repeat() -> None:
-    pass
+    assert_eq(akstr.repeat(daa, 3), akstr.repeat(caa, 3))
 
 
 def test_replace_slice() -> None:
-    pass
+    a = akstr.replace_slice(daa, start=2, stop=12, replacement="...")
+    b = akstr.replace_slice(caa, start=2, stop=12, replacement="...")
+    assert_eq(a, b)
 
 
 def test_replace_substring() -> None:
-    pass
+    assert_eq(
+        akstr.replace_substring(daa, "aaa", "ZZZ"),
+        akstr.replace_substring(caa, "aaa", "ZZZ"),
+    )
 
 
 def test_replace_substring_regex() -> None:
@@ -238,12 +254,24 @@ def test_rtrim_whitespace() -> None:
     assert_eq(akstr.rtrim_whitespace(daa), akstr.rtrim_whitespace(caa))
 
 
-def test_slice() -> None:
-    pass
+@pytest.mark.parametrize(
+    "args",
+    [
+        (2, 10, 2),
+        (3, None, 1),
+        (0, None, 3),
+    ],
+)
+def test_slice(args) -> None:
+    start, stop, step = args
+    assert_eq(akstr.slice(daa, start, stop, step), akstr.slice(caa, start, stop, step))
 
 
 def test_split_pattern() -> None:
-    pass
+    assert_eq(
+        akstr.split_pattern(daa, "aa"),
+        akstr.split_pattern(caa, "aa"),
+    )
 
 
 def test_split_pattern_regex() -> None:
