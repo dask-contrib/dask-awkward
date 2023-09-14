@@ -6,6 +6,7 @@ from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any, Literal, overload
 
 import awkward as ak
+import dask
 from awkward.forms.form import Form
 from dask.base import tokenize
 from dask.blockwise import BlockIndex
@@ -30,7 +31,13 @@ if TYPE_CHECKING:
 
     from dask_awkward.lib.core import Array, Scalar
 
-__all__ = ("from_json", "to_json")
+
+def _use_optimization() -> bool:
+    formats = dask.config.get(
+        "awkward.optimization.column-opt-formats",
+        default=[],
+    )
+    return "json" in formats
 
 
 class FromJsonFn:
@@ -65,6 +72,7 @@ class FromJsonFn:
 
         if self.form is not None:
             form = self.form.select_columns(columns)
+            assert form is not None
             schema = layout_to_jsonschema(form.length_zero_array(highlevel=False))
 
             return type(self)(
@@ -115,6 +123,9 @@ class FromJsonLineDelimitedFn(FromJsonFn):
         columns: Sequence[str],
         original_form: Form | None = None,
     ) -> Self:
+        if not _use_optimization():
+            return self
+
         return self._default_project_columns(
             columns=columns,
             original_form=original_form,
@@ -161,6 +172,9 @@ class FromJsonSingleObjPerFile(FromJsonFn):
         columns: Sequence[str],
         original_form: Form | None = None,
     ) -> Self:
+        if not _use_optimization():
+            return self
+
         return self._default_project_columns(
             columns=columns,
             original_form=original_form,
@@ -215,6 +229,9 @@ class FromJsonBytesFn(FromJsonFn):
         columns: Sequence[str],
         original_form: Form | None = None,
     ) -> Self:
+        if not _use_optimization():
+            return self
+
         return self._default_project_columns(
             columns=columns,
             original_form=original_form,
@@ -222,6 +239,7 @@ class FromJsonBytesFn(FromJsonFn):
 
 
 def meta_from_single_file(
+    *,
     fs: AbstractFileSystem,
     paths: list[str],
     compression: str | None,
@@ -233,53 +251,78 @@ def meta_from_single_file(
 
 
 def meta_from_bytechunks(
+    *,
     fs: AbstractFileSystem,
     paths: list[str],
-    bytechunks: str | int = "128KiB",
+    sample_bytes: str | int,
     **kwargs: Any,
 ) -> ak.Array:
-    bytechunks = parse_bytes(bytechunks)
-    bytes = fs.cat(paths[0], start=0, end=bytechunks)
+    sample_bytes = parse_bytes(sample_bytes)
+    bytes = fs.cat(paths[0], start=0, end=sample_bytes)
     rfind = bytes.rfind(b"\n")
     if rfind > 0:
         bytes = bytes[:rfind]
     array = ak.from_json(bytes, line_delimited=True, **kwargs)
+    assert isinstance(array, ak.Array)
     return typetracer_array(array)
 
 
 def meta_from_line_by_line(
+    *,
     fs: AbstractFileSystem,
     paths: list[str],
     compression: str | None,
-    sample_rows: int = 10,
+    sample_rows: int | None,
     **kwargs: Any,
 ) -> ak.Array:
-    with fs.open(paths[0], mode="rt", compression=compression) as f:
+    if sample_rows is not None:
         lines = []
-        for i, line in enumerate(f):
-            lines.append(line)
-            if i >= sample_rows:
-                break
+        with fs.open(paths[0], mode="rt", compression=compression) as f:
+            for i, line in enumerate(f):
+                lines.append(line)
+                if i >= sample_rows:
+                    break
         array = ak.from_json("\n".join(lines), line_delimited=True, **kwargs)
-        return typetracer_array(array)
+    else:
+        with fs.open(paths[0], mode="rt", compression=compression) as f:
+            array = ak.from_json(
+                f.read(),
+                line_delimited=True,
+                **kwargs,
+            )
+    assert isinstance(array, ak.Array)
+    return typetracer_array(array)
 
 
 def _from_json_files(
+    *,
     fs: AbstractFileSystem,
     token: str,
     paths: list[str],
-    *,
-    schema: str | dict | list | None = None,
-    compression: str | None = "infer",
+    schema: str | dict | list | None,
+    compression: str | None,
+    sample_rows: int | None = 150,
+    sample_bytes: str | int = "256 KiB",
     **kwargs: Any,
 ) -> Array:
     if compression == "infer":
         compression = infer_compression(paths[0])
 
     if not compression:
-        meta = meta_from_bytechunks(fs, paths, **kwargs)
+        meta = meta_from_bytechunks(
+            fs=fs,
+            paths=paths,
+            sample_bytes=sample_bytes,
+            **kwargs,
+        )
     else:
-        meta = meta_from_line_by_line(fs, paths, compression, **kwargs)
+        meta = meta_from_line_by_line(
+            fs=fs,
+            paths=paths,
+            compression=compression,
+            sample_rows=sample_rows,
+            **kwargs,
+        )
 
     token = tokenize(compression, meta, kwargs)
 
@@ -301,18 +344,23 @@ def _from_json_files(
 
 
 def _from_json_sopf(
+    *,
     fs: AbstractFileSystem,
     token: str,
     paths: list[str],
-    *,
-    schema: str | dict | list | None = None,
-    compression: str | None = None,
+    schema: str | dict | list | None,
+    compression: str | None,
     **kwargs: Any,
 ) -> Array:
     if compression == "infer":
         compression = infer_compression(paths[0])
 
-    meta = meta_from_single_file(fs, paths, compression, **kwargs)
+    meta = meta_from_single_file(
+        fs=fs,
+        paths=paths,
+        compression=compression,
+        **kwargs,
+    )
     token = tokenize(token, compression, meta, kwargs)
 
     f = FromJsonSingleObjPerFile(
@@ -367,6 +415,8 @@ def from_json(
     sample: str | int = "128KiB",
     compression: str | None = "infer",
     storage_options: dict[str, Any] | None = None,
+    meta_sample_rows: int | None = 150,
+    meta_sample_bytes: int | str = "256 KiB",
 ) -> Array:
     if not highlevel:
         raise ValueError("dask-awkward only supports highlevel awkward Arrays.")
@@ -419,6 +469,8 @@ def from_json(
             initial=initial,
             resize=resize,
             behavior=behavior,
+            sample_rows=meta_sample_rows,
+            sample_bytes=meta_sample_bytes,
         )
 
     # if a `delimiter` and `blocksize` are defined we use the byte
@@ -623,11 +675,6 @@ def to_json(
     return res
 
 
-def array_param_is_string_or_bytestring(layout: Content) -> bool:
-    params = layout.parameters or {}
-    return params == {"__array__": "string"} or params == {"__array__": "bytestring"}
-
-
 @overload
 def json_type(original: str, add_null: Literal[False] = False) -> str:
     ...
@@ -659,6 +706,11 @@ def json_type(original: str | list[str], add_null: bool = False) -> str | list[s
             return original + ["null"]
         else:
             return original
+
+
+def array_param_is_string_or_bytestring(layout: Content) -> bool:
+    params = layout.parameters or {}
+    return params == {"__array__": "string"} or params == {"__array__": "bytestring"}
 
 
 def layout_to_jsonschema(
@@ -709,14 +761,7 @@ def layout_to_jsonschema(
     elif layout.is_indexed:
         pass
     elif layout.is_unknown:
-        existing_schema["type"] = [
-            "array",
-            "boolean",
-            "object",
-            "null",
-            "number",
-            "string",
-        ]
+        existing_schema["type"] = "null"
     elif layout.is_union:
         existing_schema["type"] = [
             layout_to_jsonschema(content)["type"] for content in layout.contents
@@ -786,7 +831,9 @@ def _from_json_bytes(
         sample,
     )
 
-    meta = typetracer_array(ak.from_json(sample_bytes, line_delimited=True, **kwargs))
+    sample_array = ak.from_json(sample_bytes, line_delimited=True, **kwargs)
+    assert isinstance(sample_array, ak.Array)
+    meta = typetracer_array(sample_array)
 
     fn = FromJsonBytesFn(
         storage=fs,
