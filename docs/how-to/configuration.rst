@@ -19,7 +19,7 @@ with the form:
 
 .. code-block:: python
 
-   with dask.config.set({"awkward.<option>": True}):
+   with dask.config.set({"awkward.<option>": value}):
        ...
 
 - ``raise-failed-meta`` (default: ``False``): If this option is set to
@@ -42,7 +42,7 @@ For example, they can be set with the form:
 
 .. code-block:: python
 
-   with dask.config.set({"awkward.optimization.<option>": False}):
+   with dask.config.set({"awkward.optimization.<option>": value}):
        ...
 
 - ``enabled`` (default: ``True``): Enable dask-awkward specific
@@ -52,6 +52,8 @@ For example, they can be set with the form:
   optimizations to run. The default setting is to run all available
   optimizations. (if ``enabled`` is set to ``False`` this option is
   ignored).
+- ``column-opt-formats`` (default: ``[parquet, json]``): Which input
+  formats should use the column optimization.
 - ``on-fail`` (default: ``warn``): When set to ``warn`` throw a
   warning of the optimization fails and continue without performing
   the optimization. If set to ``raise``, raise an exception at
