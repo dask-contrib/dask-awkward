@@ -19,6 +19,7 @@ lines1 = [
     "this is line two",
     "THIS IS LINE THREE",
     "OKOKOK",
+    "       aaaaaaa       ",
     "42.52",
     "OKOK",
 ]
@@ -31,6 +32,7 @@ lines2 = [
     " ",
     "OK",
     "DDDDDDDDDDDDDDDDDDDDDD",
+    "         aaa         ",
 ]
 
 lines3 = [
@@ -249,11 +251,17 @@ def test_split_pattern_regex() -> None:
 
 
 def test_split_whitespace() -> None:
-    pass
+    assert_eq(
+        akstr.split_whitespace(daa),
+        akstr.split_whitespace(caa),
+    )
 
 
 def test_starts_with() -> None:
-    pass
+    assert_eq(
+        akstr.starts_with(daa, "  "),
+        akstr.starts_with(caa, "  "),
+    )
 
 
 def test_swapcase() -> None:
@@ -261,19 +269,25 @@ def test_swapcase() -> None:
 
 
 def test_title() -> None:
-    pass
+    assert_eq(akstr.title(daa), akstr.title(caa))
 
 
 def test_to_categorical() -> None:
-    pass
+    a = akstr.to_categorical(daa)
+    b = akstr.to_categorical(caa)
+    assert set(a.compute().layout.content.to_list()) == set(b.layout.content.to_list())
+    assert_eq(a, b)
 
 
 def test_trim() -> None:
-    pass
+    assert_eq(
+        akstr.trim(daa, "123"),
+        akstr.trim(caa, "123"),
+    )
 
 
 def test_trim_whitespace() -> None:
-    pass
+    assert_eq(akstr.trim_whitespace(daa), akstr.trim_whitespace(caa))
 
 
 def test_upper() -> None:
