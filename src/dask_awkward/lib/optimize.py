@@ -13,6 +13,7 @@ from dask.highlevelgraph import HighLevelGraph
 from dask.local import get_sync
 
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardInputLayer
+from dask_awkward.lib._utils import LIST_KEY
 
 log = logging.getLogger(__name__)
 
@@ -419,23 +420,31 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
 
 def _necessary_columns(dsk: HighLevelGraph) -> dict[str, list[str]]:
     """Pair layer names with lists of necessary columns."""
-    kv = {}
+    layer_to_columns = {}
     for name, report in _get_column_reports(dsk).items():
-        cols = {_ for _ in report.data_touched if _ is not None}
-        select = []
-        for col in sorted(cols):
-            if col == name:
+        touched_data_keys = {_ for _ in report.data_touched if _ is not None}
+        print(set(report.shape_touched), set(report.data_touched))
+        necessary_columns = []
+        for key in sorted(touched_data_keys):
+            if key == name:
                 continue
-            n, c = col.split(".", 1)
-            if n == name:
-                if c.endswith("__list__"):
-                    cnew = c[:-9].rstrip(".")
-                    if cnew not in select:
-                        select.append(f"{cnew}.*")
-                else:
-                    select.append(c)
-        kv[name] = select
-    return kv
+
+            layer, column = key.split(".", 1)
+            if layer != name:
+                continue
+
+            # List offsets are tagged as {key}.{LIST_KEY}. This routine resolve
+            # _columns_, so we use a wildcard to indicate that we want to load
+            # *any* child column of this list. If the list contains no records,
+            # then we load
+            if column.endswith(LIST_KEY):
+                list_parent_path = column[: -(len(LIST_KEY) + 1)].rstrip(".")
+                if list_parent_path not in necessary_columns:
+                    necessary_columns.append(f"{list_parent_path}.*")
+            else:
+                necessary_columns.append(column)
+        layer_to_columns[name] = necessary_columns
+    return layer_to_columns
 
 
 def _prune_wildcards(columns: list[str], meta: AwkwardArray) -> list[str]:
@@ -478,33 +487,41 @@ def _prune_wildcards(columns: list[str], meta: AwkwardArray) -> list[str]:
 
     good_columns: list[str] = []
     wildcard_columns: list[str] = []
-    for col in columns:
-        if ".*" in col:
-            wildcard_columns.append(col)
+    for column in columns:
+        if column.endswith(".*"):
+            wildcard_columns.append(column)
         else:
-            good_columns.append(col)
+            good_columns.append(column)
 
-    for col in wildcard_columns:
+    for column in wildcard_columns:
         # each time we meet a wildcard column we need to start back
         # with the original meta array.
         imeta = meta
-        colsplit = col.split(".")[:-1]
-        parts = list(reversed(colsplit))
-        while parts:
-            part = parts.pop()
+        reverse_column_parts = [*column.split(".")[:-1]]
+        reverse_column_parts.reverse()
+
+        while reverse_column_parts:
+            part = reverse_column_parts.pop()
             # for unnamed roots part may be an empty string, so we
             # need this if statement.
             if part:
                 imeta = imeta[part]
 
-        for field in imeta.fields:
-            wholecol = f"{col[:-2]}.{field}"
-            if wholecol in good_columns:
-                break
+        definite_column = column[:-2]
+        # The given wildcard column contains no sub-columns, so load
+        # the column itself
+        if not imeta.fields:
+            good_columns.append(definite_column)
+
+        # Otherwise, prefer a column that we already need to load
         else:
-            if imeta.fields:
-                good_columns.append(f"{col[:-2]}.{imeta.fields[0]}")
+            for field in imeta.fields:
+                field_column = f"{definite_column}.{field}"
+                if field_column in good_columns:
+                    break
+            # Or, pick an arbitrary (first) column if no other fields are yet
+            # required
             else:
-                good_columns.append(col[:-2])
+                good_columns.append(f"{definite_column}.{imeta.fields[0]}")
 
     return good_columns
