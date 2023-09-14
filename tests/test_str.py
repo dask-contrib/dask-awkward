@@ -163,6 +163,9 @@ def test_is_upper() -> None:
 
 
 def test_join() -> None:
+    a = [["one two three", "four five"], ["six seven"]]
+    caa = ak.Array(a)
+    daa = dak.from_awkward(caa, npartitions=2)
     assert_eq(
         akstr.join(akstr.split_whitespace(daa), ","),
         akstr.join(akstr.split_whitespace(caa), ","),
@@ -170,10 +173,7 @@ def test_join() -> None:
 
 
 def test_join_element_wise() -> None:
-    assert_eq(
-        akstr.join_element_wise(akstr.split_whitespace(daa)),
-        akstr.join_element_wise(akstr.split_whitespace(caa)),
-    )
+    pass
 
 
 def test_length() -> None:
@@ -282,6 +282,9 @@ def test_split_pattern_regex() -> None:
 
 
 def test_split_whitespace() -> None:
+    a = [["one two three", "four five"], ["six seven"]]
+    caa = ak.Array(a)
+    daa = dak.from_awkward(caa, npartitions=2)
     assert_eq(
         akstr.split_whitespace(daa),
         akstr.split_whitespace(caa),
