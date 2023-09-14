@@ -494,10 +494,11 @@ def _prune_wildcards(columns: list[str], meta: AwkwardArray) -> list[str]:
             good_columns.append(column)
 
     for column in wildcard_columns:
+        definite_column = column[:-2]
         # each time we meet a wildcard column we need to start back
         # with the original meta array.
         imeta = meta
-        reverse_column_parts = [*column.split(".")[:-1]]
+        reverse_column_parts = [*definite_column.split(".")]
         reverse_column_parts.reverse()
 
         while reverse_column_parts:
@@ -506,8 +507,6 @@ def _prune_wildcards(columns: list[str], meta: AwkwardArray) -> list[str]:
             # need this if statement.
             if part:
                 imeta = imeta[part]
-
-        definite_column = column[:-2]
         # The given wildcard column contains no sub-columns, so load
         # the column itself
         if not imeta.fields:
