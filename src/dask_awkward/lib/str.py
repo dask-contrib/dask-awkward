@@ -5,7 +5,6 @@ import functools
 import awkward.operations.str as akstr
 
 from dask_awkward.lib.core import Array, map_partitions
-from dask_awkward.utils import DaskAwkwardNotImplemented
 
 
 def always_highlevel(fn):
@@ -45,8 +44,8 @@ def center(
     return map_partitions(
         akstr.center,
         array,
-        width,
-        padding,
+        width=width,
+        padding=padding,
         behavior=behavior,
         output_divisions=1,
     )
@@ -64,7 +63,7 @@ def count_substring(
     return map_partitions(
         akstr.count_substring,
         array,
-        pattern,
+        pattern=pattern,
         ignore_case=ignore_case,
         behavior=behavior,
         output_divisions=1,
@@ -83,7 +82,7 @@ def count_substring_regex(
     return map_partitions(
         akstr.count_substring_regex,
         array,
-        pattern,
+        pattern=pattern,
         ignore_case=ignore_case,
         behavior=behavior,
         output_divisions=1,
@@ -102,7 +101,7 @@ def ends_with(
     return map_partitions(
         akstr.ends_with,
         array,
-        pattern,
+        pattern=pattern,
         ignore_case=ignore_case,
         behavior=behavior,
         output_divisions=1,
@@ -120,7 +119,7 @@ def extract_regex(
     return map_partitions(
         akstr.extract_regex,
         array,
-        pattern,
+        pattern=pattern,
         behavior=behavior,
         output_divisions=1,
     )
@@ -138,7 +137,7 @@ def find_substring(
     return map_partitions(
         akstr.find_substring,
         array,
-        pattern,
+        pattern=pattern,
         ignore_case=ignore_case,
         behavior=behavior,
         output_divisions=1,
@@ -157,7 +156,7 @@ def find_substring_regex(
     return map_partitions(
         akstr.find_substring_regex,
         array,
-        pattern,
+        pattern=pattern,
         ignore_case=ignore_case,
         behavior=behavior,
         output_divisions=1,
@@ -176,7 +175,7 @@ def index_in(
     return map_partitions(
         akstr.index_in,
         array,
-        value_set,
+        value_set=value_set,
         skip_nones=skip_nones,
         behavior=behavior,
         output_divisions=1,
@@ -267,7 +266,14 @@ def is_in(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.is_in,
+        array,
+        value_set=value_set,
+        skip_nones=skip_nones,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -368,7 +374,13 @@ def join(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.join,
+        array,
+        separator=separator,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -377,7 +389,12 @@ def join_element_wise(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.join_element_wise,
+        *arrays,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -387,7 +404,12 @@ def length(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.length,
+        array,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -397,7 +419,12 @@ def lower(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.lower,
+        array,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -409,7 +436,14 @@ def lpad(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.lpad,
+        array,
+        width=width,
+        padding=padding,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -420,7 +454,13 @@ def ltrim(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.ltrim,
+        array,
+        characters=characters,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -430,7 +470,12 @@ def ltrim_whitespace(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.ltrim_whitespace,
+        array,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -442,7 +487,14 @@ def match_like(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.match_like,
+        array,
+        pattern=pattern,
+        ignore_case=ignore_case,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -454,7 +506,14 @@ def match_substring(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.match_substring,
+        array,
+        pattern=pattern,
+        ignore_case=ignore_case,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -466,7 +525,14 @@ def match_substring_regex(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.match_substring_regex,
+        array,
+        pattern=pattern,
+        ignore_case=ignore_case,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -477,7 +543,13 @@ def repeat(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.repeat,
+        array,
+        num_repeats=num_repeats,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -490,7 +562,15 @@ def replace_slice(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.replace_slice,
+        array,
+        start=start,
+        stop=stop,
+        replacement=replacement,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -503,7 +583,15 @@ def replace_substring(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.replace_substring,
+        array,
+        pattern=pattern,
+        replacement=replacement,
+        max_replacements=max_replacements,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -516,7 +604,15 @@ def replace_substring_regex(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.replace_substring_regex,
+        array,
+        pattern=pattern,
+        replacement=replacement,
+        max_replacements=max_replacements,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -526,7 +622,12 @@ def reverse(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.reverse,
+        array,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -538,7 +639,14 @@ def rpad(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.rpad,
+        array,
+        width=width,
+        padding=padding,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -549,7 +657,13 @@ def rtrim(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.rtrim,
+        array,
+        characters=characters,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -559,7 +673,12 @@ def rtrim_whitespace(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.rtrim_whitespace,
+        array,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -572,7 +691,15 @@ def slice(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.slice,
+        array,
+        start=start,
+        stop=stop,
+        step=step,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -585,7 +712,15 @@ def split_pattern(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.split_pattern,
+        array,
+        pattern=pattern,
+        max_splits=max_splits,
+        reverse=reverse,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -598,7 +733,15 @@ def split_pattern_regex(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.split_pattern_regex,
+        array,
+        pattern=pattern,
+        max_splits=max_splits,
+        reverse=reverse,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -628,7 +771,14 @@ def starts_with(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.starts_with,
+        array,
+        pattern=pattern,
+        ignore_case=ignore_case,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -638,7 +788,12 @@ def swapcase(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.swapcase,
+        array,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -648,7 +803,12 @@ def title(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.title,
+        array,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -658,7 +818,12 @@ def to_categorical(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.to_categorical,
+        array,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -669,7 +834,13 @@ def trim(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.trim,
+        array,
+        characters=characters,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -679,7 +850,12 @@ def trim_whitespace(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.trim_whitespace,
+        array,
+        behavior=behavior,
+        output_divisions=1,
+    )
 
 
 @always_highlevel
@@ -689,4 +865,9 @@ def upper(
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
-    raise DaskAwkwardNotImplemented
+    return map_partitions(
+        akstr.upper,
+        array,
+        behavior=behavior,
+        output_divisions=1,
+    )
