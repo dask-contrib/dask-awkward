@@ -20,6 +20,7 @@ lines1 = [
     "THIS IS LINE THREE",
     "OKOKOK",
     "42.52",
+    "OKOK",
 ]
 
 lines2 = [
@@ -28,6 +29,7 @@ lines2 = [
     "bbbbbbbbbbbbbbbb",
     "CCC",
     " ",
+    "OK",
     "DDDDDDDDDDDDDDDDDDDDDD",
 ]
 
@@ -177,11 +179,14 @@ def test_lpad() -> None:
 
 
 def test_ltrim() -> None:
-    pass
+    assert_eq(
+        akstr.ltrim(akstr.ltrim(daa, "th"), "   "),
+        akstr.ltrim(akstr.ltrim(caa, "th"), "   "),
+    )
 
 
 def test_ltrim_whitespace() -> None:
-    pass
+    assert_eq(akstr.ltrim_whitespace(daa), akstr.ltrim_whitespace(caa))
 
 
 def test_match_like() -> None:
@@ -213,19 +218,22 @@ def test_replace_substring_regex() -> None:
 
 
 def test_reverse() -> None:
-    pass
+    assert_eq(akstr.reverse(daa), akstr.reverse(caa))
 
 
 def test_rpad() -> None:
-    pass
+    assert_eq(akstr.rpad(daa, 5, "j"), akstr.rpad(caa, 5, "j"))
 
 
 def test_rtrim() -> None:
-    pass
+    assert_eq(
+        akstr.rtrim(akstr.rtrim(daa, "OK"), "   "),
+        akstr.rtrim(akstr.rtrim(caa, "OK"), "   "),
+    )
 
 
 def test_rtrim_whitespace() -> None:
-    pass
+    assert_eq(akstr.rtrim_whitespace(daa), akstr.rtrim_whitespace(caa))
 
 
 def test_slice() -> None:
@@ -249,7 +257,7 @@ def test_starts_with() -> None:
 
 
 def test_swapcase() -> None:
-    pass
+    assert_eq(akstr.swapcase(daa), akstr.swapcase(caa))
 
 
 def test_title() -> None:
@@ -269,4 +277,4 @@ def test_trim_whitespace() -> None:
 
 
 def test_upper() -> None:
-    pass
+    assert_eq(akstr.upper(daa), akstr.upper(caa))
