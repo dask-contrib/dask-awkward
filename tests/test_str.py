@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-import awkward as ak
 import pytest
 
 pytest.importorskip("pyarrow")
+
+import awkward as ak
+import awkward.operations.str as akstr
 
 import dask_awkward as dak
 from dask_awkward.lib.testutils import assert_eq
@@ -11,15 +13,22 @@ from dask_awkward.lib.testutils import assert_eq
 lines1 = [
     "this is line one",
     "123",
-    "      1234" "   123      ",
+    "5",
+    " ",
+    "      12.34" "   123      ",
     "this is line two",
+    "THIS IS LINE THREE",
+    "OKOKOK",
+    "42.52",
 ]
 
 lines2 = [
+    "1",
     "aaaaaaaaaaa",
     "bbbbbbbbbbbbbbbb",
-    "cccccccccccccccccccc",
-    "ddddddddddddddddddddddddd",
+    "CCC",
+    " ",
+    "DDDDDDDDDDDDDDDDDDDDDD",
 ]
 
 lines3 = [
@@ -45,33 +54,33 @@ def test_sanity():
 def test_capitalize() -> None:
     assert_eq(
         dak.str.capitalize(daa),
-        ak.str.capitalize(caa),
+        akstr.capitalize(caa),
     )
 
 
 def test_center() -> None:
     assert_eq(
         dak.str.center(daa, 5),
-        ak.str.center(caa, 5),
+        akstr.center(caa, 5),
     )
 
 
 def test_count_substring() -> None:
     assert_eq(
         dak.str.count_substring(daa, "aa"),
-        ak.str.count_substring(caa, "aa"),
+        akstr.count_substring(caa, "aa"),
     )
 
 
 def test_count_substring_regex() -> None:
-    a = ak.str.count_substring_regex(daa, r"aa\s+")
+    a = akstr.count_substring_regex(daa, r"aa\s+")
     assert isinstance(a, dak.Array)
-    b = ak.str.count_substring_regex(caa, r"aa\s+")
+    b = akstr.count_substring_regex(caa, r"aa\s+")
     assert_eq(a, b)
 
 
 def test_ends_with() -> None:
-    assert_eq(ak.str.ends_with(daa, "123"), ak.str.ends_with(caa, "123"))
+    assert_eq(akstr.ends_with(daa, "123"), akstr.ends_with(caa, "123"))
 
 
 def test_extract_regex() -> None:
@@ -79,55 +88,64 @@ def test_extract_regex() -> None:
 
 
 def test_find_substring() -> None:
-    pass
+    assert_eq(akstr.find_substring(daa, r"bbb"), akstr.find_substring(caa, r"bbb"))
 
 
 def test_find_substring_regex() -> None:
-    pass
+    assert_eq(
+        akstr.find_substring_regex(daa, r"aa\s+"),
+        akstr.find_substring_regex(caa, r"aa\s+"),
+    )
 
 
 def test_index_in() -> None:
-    pass
+    assert_eq(
+        akstr.index_in(daa, [" aaa ", "123"]),
+        akstr.index_in(caa, [" aaa ", "123"]),
+    )
 
 
 def test_is_alnum() -> None:
-    pass
+    assert_eq(akstr.is_alnum(daa), akstr.is_alnum(caa))
 
 
 def test_is_alpha() -> None:
-    pass
+    assert_eq(akstr.is_alpha(daa), akstr.is_alpha(caa))
 
 
 def test_is_ascii() -> None:
-    pass
+    assert_eq(akstr.is_ascii(daa), akstr.is_ascii(caa))
 
 
 def test_is_decimal() -> None:
-    pass
+    assert_eq(akstr.is_decimal(daa), akstr.is_decimal(caa))
 
 
 def test_is_digit() -> None:
-    pass
+    assert_eq(akstr.is_digit(daa), akstr.is_digit(caa))
 
 
 def test_is_in() -> None:
-    pass
+    assert_eq(
+        akstr.is_in(daa, ["CCC", "1"]),
+        akstr.is_in(caa, ["CCC", "1"]),
+    )
 
 
 def test_is_lower() -> None:
-    pass
+    assert_eq(akstr.is_lower(daa), akstr.is_lower(caa))
 
 
 def test_is_numeric() -> None:
-    pass
+    assert_eq(akstr.is_numeric(daa), akstr.is_numeric(caa))
 
 
 def test_is_printable() -> None:
-    pass
+    assert_eq(akstr.is_printable(daa), akstr.is_printable(caa))
 
 
 def test_is_space() -> None:
-    pass
+    assert_eq(akstr.is_space(daa), akstr.is_space(caa))
 
 
 def test_is_title() -> None:
@@ -135,7 +153,7 @@ def test_is_title() -> None:
 
 
 def test_is_upper() -> None:
-    pass
+    assert_eq(akstr.is_upper(daa), akstr.is_upper(caa))
 
 
 def test_join() -> None:
@@ -147,15 +165,15 @@ def test_join_element_wise() -> None:
 
 
 def test_length() -> None:
-    pass
+    assert_eq(akstr.length(daa), akstr.length(caa))
 
 
 def test_lower() -> None:
-    pass
+    assert_eq(akstr.lower(daa), akstr.lower(caa))
 
 
 def test_lpad() -> None:
-    pass
+    assert_eq(akstr.lpad(daa, 3), akstr.lpad(caa, 3))
 
 
 def test_ltrim() -> None:
