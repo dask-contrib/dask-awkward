@@ -275,7 +275,10 @@ def test_split_pattern() -> None:
 
 
 def test_split_pattern_regex() -> None:
-    pass
+    assert_eq(
+        akstr.split_pattern_regex(daa, r"[0-9]{2}"),
+        akstr.split_pattern_regex(caa, r"[0-9]{2}"),
+    )
 
 
 def test_split_whitespace() -> None:
