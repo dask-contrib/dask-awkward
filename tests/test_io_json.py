@@ -92,6 +92,24 @@ def input_layer_array_partition0(collection: Array) -> ak.Array:
     return array
 
 
+def test_json_column_projection_off(json_data_dir: Path) -> None:
+    source = os.path.join(str(json_data_dir), "*.json")
+    ds = dak.from_json(source)
+    fields_to_keep = ["name", "goals"]
+
+    ds2 = ds[fields_to_keep]
+    with dask.config.set({"awkward.optimization.column-opt-formats": []}):
+        array = input_layer_array_partition0(ds2)
+
+    normally_dropped = []
+    for field in array.fields:
+        if field not in fields_to_keep:
+            normally_dropped.append(field)
+
+    for nd in normally_dropped:
+        assert len(array[nd])
+
+
 def test_json_column_projection1(json_data_dir: Path) -> None:
     source = os.path.join(str(json_data_dir), "*.json")
     ds = dak.from_json(source)
