@@ -13,7 +13,7 @@ import pyarrow.dataset as pad
 
 import dask_awkward as dak
 from dask_awkward.lib.io.parquet import _metadata_file_from_data_files, to_parquet
-from dask_awkward.lib.testutils import BAD_PA_AK_PARQUET_VERSIONING, assert_eq
+from dask_awkward.lib.testutils import assert_eq
 
 data = [[1, 2, 3], [4, None], None]
 arr = pa.array(data)
@@ -74,7 +74,6 @@ def test_remote_double(ignore_metadata, scan_files, split_row_groups):
     )
 
 
-@pytest.mark.xfail(BAD_PA_AK_PARQUET_VERSIONING, reason="parquet item vs element")
 @pytest.mark.parametrize("ignore_metadata", [True, False])
 @pytest.mark.parametrize("scan_files", [True, False])
 def test_dir_of_one_file(tmpdir, ignore_metadata, scan_files):
@@ -85,7 +84,6 @@ def test_dir_of_one_file(tmpdir, ignore_metadata, scan_files):
     assert arr["arr"].compute().to_list() == data
 
 
-@pytest.mark.xfail(BAD_PA_AK_PARQUET_VERSIONING, reason="parquet item vs element")
 @pytest.mark.parametrize("ignore_metadata", [True, False])
 @pytest.mark.parametrize("scan_files", [True, False])
 def test_dir_of_one_file_metadata(tmpdir, ignore_metadata, scan_files):
@@ -100,7 +98,6 @@ def test_dir_of_one_file_metadata(tmpdir, ignore_metadata, scan_files):
     assert arr["arr"].compute().to_list() == data
 
 
-@pytest.mark.xfail(BAD_PA_AK_PARQUET_VERSIONING, reason="parquet item vs element")
 @pytest.mark.parametrize("ignore_metadata", [True, False])
 @pytest.mark.parametrize("scan_files", [True, False])
 def test_dir_of_two_files(tmpdir, ignore_metadata, scan_files):
@@ -114,7 +111,6 @@ def test_dir_of_two_files(tmpdir, ignore_metadata, scan_files):
     assert arr["arr"].compute().to_list() == data * 2
 
 
-@pytest.mark.xfail(BAD_PA_AK_PARQUET_VERSIONING, reason="parquet item vs element")
 @pytest.mark.parametrize("ignore_metadata", [True, False])
 @pytest.mark.parametrize("scan_files", [True, False])
 def test_dir_of_two_files_metadata(tmpdir, ignore_metadata, scan_files):
@@ -130,7 +126,6 @@ def test_dir_of_two_files_metadata(tmpdir, ignore_metadata, scan_files):
     assert arr["arr"].compute().to_list() == data * 2
 
 
-@pytest.mark.xfail(BAD_PA_AK_PARQUET_VERSIONING, reason="parquet item vs element")
 def test_columns(tmpdir):
     tmpdir = str(tmpdir)
     pad.write_dataset(ds_deep, tmpdir, format="parquet")
