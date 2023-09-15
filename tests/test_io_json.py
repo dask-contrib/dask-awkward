@@ -98,7 +98,7 @@ def test_json_column_projection_off(json_data_dir: Path) -> None:
     fields_to_keep = ["name", "goals"]
 
     ds2 = ds[fields_to_keep]
-    with dask.config.set({"awkward.optimization.column-opt-formats": []}):
+    with dask.config.set({"awkward.optimization.columns-opt-formats": []}):
         array = input_layer_array_partition0(ds2)
 
     assert array.fields == ["name", "team", "goals"]
@@ -109,7 +109,7 @@ def test_json_column_projection1(json_data_dir: Path) -> None:
     ds = dak.from_json(source)
     fields_to_keep = ["name", "goals"]
     ds2 = ds[fields_to_keep]
-    with dask.config.set({"awkward.optimization.column-opt-formats": ["json"]}):
+    with dask.config.set({"awkward.optimization.columns-opt-formats": ["json"]}):
         array = input_layer_array_partition0(ds2)
 
     assert array.fields == fields_to_keep
@@ -120,7 +120,7 @@ def test_json_column_projection2(json_data_dir: Path) -> None:
     ds = dak.from_json(source)
     # grab name and goals but then only use goals!
     ds2 = dak.max(ds[["name", "goals"]].goals, axis=1)
-    with dask.config.set({"awkward.optimization.column-opt-formats": ["json"]}):
+    with dask.config.set({"awkward.optimization.columns-opt-formats": ["json"]}):
         array = input_layer_array_partition0(ds2)
 
     assert array.fields == ["goals"]
