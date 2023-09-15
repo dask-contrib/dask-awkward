@@ -32,11 +32,10 @@ log = logging.getLogger(__name__)
 
 
 def _use_optimization() -> bool:
-    formats = dask.config.get(
+    return "parquet" in dask.config.get(
         "awkward.optimization.column-opt-formats",
         default=[],
     )
-    return "parquet" in formats
 
 
 class _FromParquetFn:
