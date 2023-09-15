@@ -398,7 +398,7 @@ def _from_json_bytes(
     delimiter: bytes = b"\n",
     not_zero: bool = False,
     blocksize: str | int = "128 MiB",
-    sample: str | int = "128 kiB",
+    sample_bytes: str | int = "10 kiB",
     **kwargs: Any,
 ) -> Array:
     if compression == "infer":
@@ -413,21 +413,21 @@ def _from_json_bytes(
         delimiter,
         not_zero,
         blocksize,
-        sample,
+        sample_bytes,
         kwargs,
     )
 
-    bytes_ingredients, sample_bytes = _bytes_with_sample(
+    bytes_ingredients, the_sample_bytes = _bytes_with_sample(
         fs,
         paths,
         compression,
         delimiter,
         not_zero,
         blocksize,
-        sample,
+        sample_bytes,
     )
 
-    sample_array = ak.from_json(sample_bytes, line_delimited=True, **kwargs)
+    sample_array = ak.from_json(the_sample_bytes, line_delimited=True, **kwargs)
     assert isinstance(sample_array, ak.Array)
     meta = typetracer_array(sample_array)
 
@@ -480,12 +480,103 @@ def from_json(
     behavior: dict | None = None,
     blocksize: str | None = None,
     delimiter: bytes | None = None,
-    sample: str | int = "128KiB",
     compression: str | None = "infer",
     storage_options: dict[str, Any] | None = None,
-    meta_sample_rows: int | None = 150,
-    meta_sample_bytes: int | str = "256 KiB",
+    meta_sample_rows: int | None = 100,
+    meta_sample_bytes: int | str = "10 kiB",
 ) -> Array:
+    """Create an Array collection from JSON data.
+
+    See :func:`ak.from_json` for more information.
+
+    Parameters
+    ----------
+    source : str | list[str]
+        Local or remote directory or list of files containing JSON
+        data to load. May contain glob patterns (passed to ``fsspec``).
+    line_delimited : bool
+        If ``True`` (the default) treat each line in the file as a
+        JSON object, if ``False``, entire files will be treated as
+        single objects.
+    schema : str | dict | list, optional
+        If defined the schema will be used by the parser to skip type
+        discovery. If not defined (``None``, the default),
+        dask-awkward's optimization capabilities will potentially be
+        used to generate a JSONSchema that contains the minimal
+        necessary parts of the JSON data that should be used to build
+        an Array to complete the desired computation. See
+        dask-awkward's optimization documentation for more
+        information.
+    nan_string : str, optional
+        See :func:`ak.from_json`
+    posinf_string : str, optional
+        See :func:`ak.from_json`
+    neginf_string : str, optional
+        See :func:`ak.from_json`
+    complex_record_fields : tuple[str, str], optional
+        See :func:`ak.from_json`
+    buffersize : int
+        See :func:`ak.from_json`
+    initial : int
+        See :func:`ak.from_json`
+    resize : float
+        See :func:`ak.from_json`
+    highlevel : bool
+        Argument specific to awkward-array that is always ``True`` for
+        dask-awkward.
+    behavior : dict, optional
+        See :func:`ak.from_json`
+    blocksize : str, optional
+        If ``None`` (default), the collection will be partitioned on a
+        per-file bases. If defined, this sets the size (in bytes) of
+        each partition.
+    delimiter : bytes, optional
+        Delimiter to use for separating blocks; if ``blocksize`` is
+        defined but this argument is not defined, the default is the
+        bytestring newline: ``b"\\n"``.
+    compression : str, optional
+        The compression of the dataset (default is to infer based on
+        file suffix)
+    storage_options : dict[str, Any], optional
+        Storage options based to ``fsspec``.
+    meta_sample_rows : int, optional
+        Number of rows to sample from files for determining metadata.
+        When reading files partitioned on a per-file basis this will
+        be the number of lines extracted from the first file to
+        determine the collection's metadata.
+    meta_sample_bytes : int | str
+        Number of bytes to sample from files for determining metadata.
+        When reading file partitioned on a blocksize basis this will
+        be the number of bytes sampled from the first partition to
+        determine the collection's metadata.
+
+    Returns
+    -------
+    Array
+        Resulting collection.
+
+    Examples
+    --------
+    An example where data is stored in an S3 data; this will grab all
+    JSON files under the path with blocksizes of 50 MB and we sample
+    the first 10 MB to determine metadata:
+
+    >>> import dask_awkward as dak
+    >>> dak.from_json(
+    ...     "s3://path/to/data",
+    ...     blocksize="50 MB",
+    ...     meta_sample_byes="10 MB",
+    ... )
+
+    An example where a JSONSchema is pre-defined. In this case
+    dask-awkward's optimization infrastructure will not attempt to
+    generate a minimal necessary schema, it will use the one provided:
+
+    >>> import dask_awkward as dak
+    >>> my_schema = ...
+    >>> dak.from_json(["file1.json", "file2.json"], schema=my_schema)
+
+    """
     if not highlevel:
         raise ValueError("dask-awkward only supports highlevel awkward Arrays.")
 
@@ -551,7 +642,7 @@ def from_json(
             schema=schema,
             delimiter=delimiter,
             blocksize=blocksize,
-            sample=sample,
+            sample_bytes=meta_sample_bytes,
             behavior=behavior,
             nan_string=nan_string,
             posinf_string=posinf_string,

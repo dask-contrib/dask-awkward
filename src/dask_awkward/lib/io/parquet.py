@@ -245,7 +245,8 @@ def from_parquet(
     generate_bitmasks
         See :func:`ak.from_parquet`
     highlevel
-        See :func:`ak.from_parquet`
+        Argument specific to awkward-array that is always ``True`` for
+        dask-awkward.
     behavior
         See :func:`ak.from_parquet`
     ignore_metadata
