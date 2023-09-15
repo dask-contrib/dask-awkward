@@ -83,12 +83,13 @@ def input_layer_array_partition0(collection: Array) -> ak.Array:
         immediately after the input layer.
 
     """
-    with dask.config.set({"awkward.optimization.which": ["columns"]}):
-        optimized_hlg = dak_optimize(collection.dask, [])
-        layers = list(optimized_hlg.layers)  # type: ignore[attr-defined]
-        layer_name = [name for name in layers if name.startswith("from-json")][0]
-        sgc, arg = optimized_hlg[(layer_name, 0)]
-        array = sgc.dsk[layer_name][0](arg)
+    with dask.config.set({"awkward.optimization.column-opt-formats": ["json"]}):
+        with dask.config.set({"awkward.optimization.which": ["columns"]}):
+            optimized_hlg = dak_optimize(collection.dask, [])
+            layers = list(optimized_hlg.layers)  # type: ignore[attr-defined]
+            layer_name = [name for name in layers if name.startswith("from-json")][0]
+            sgc, arg = optimized_hlg[(layer_name, 0)]
+            array = sgc.dsk[layer_name][0](arg)
     return array
 
 

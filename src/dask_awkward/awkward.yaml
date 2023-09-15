@@ -42,7 +42,7 @@ awkward:
     #     will be used to automatically generate a jsonschema that
     #     instructs the awkward JSON parser to skip unncessary keys in
     #     JSON datasets read from disk.
-    column-opt-formats: [parquet, json]
+    column-opt-formats: [parquet]
 
     # This option controls whether or not a warning is thrown, an
     # exception is raised, or if nothing is done if a dask-awkward
