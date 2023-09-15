@@ -52,8 +52,9 @@ For example, they can be set with the form:
   optimizations to run. The default setting is to run all available
   optimizations. (if ``enabled`` is set to ``False`` this option is
   ignored).
-- ``columns-opt-formats`` (default: ``[parquet, json]``): Which input
-  formats should use the column optimization.
+- ``columns-opt-formats`` (default: ``[parquet]``): Which input
+  formats should use the column optimization. The posibilities are
+  ``parquet`` (on by default) and ``json`` (currently opt-in).
 - ``on-fail`` (default: ``warn``): When set to ``warn`` throw a
   warning of the optimization fails and continue without performing
   the optimization. If set to ``raise``, raise an exception at

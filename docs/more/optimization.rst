@@ -38,6 +38,35 @@ operating on real data*. The data-less execution of the graph helps
 determine which parts of a dataset sitting on disk are actually
 required to read in order to successfully complete the compute.
 
+Once we've determined which parts of the data are necessary, we can
+pass that information to awkward's input functions at the data reading
+layers of our task graph. With Parquet, this is the ``columns=``
+argument of :func:`ak.from_parquet`. With JSON, we construct a
+JSONSchema that contains only the necessary parts of the data that we
+want, and we pass that to the ``schema=`` argument of
+:func:`ak.from_json`.
+
+.. note::
+
+   Two file formats are supported by the necessary columns
+   optimization: Parquet and JSON. The optimization is on by default
+   for reading Parquet, but it is opt-in for JSON. One can control via
+   configuration which formats will use the columns optimization when
+   read from disk. For example, the following code snippet shows how
+   to opt-in to using the necessary columns optimization via
+   JSONSchema
+
+   .. code:: python
+
+      import dask_awkward as dak
+      import dask.config
+
+      ds = dak.from_json("/path/to/data")
+      thing = dak.max(ds.field1, axis=1)
+      with dask.config.set({"awkward.optimization.columns-opt-formats": ["json"]}):
+          thing.compute()
+
+
 Let's look at a simple example dataset: an awkward array with two top
 level fields (``foo`` and ``bar``), with one field having two
 subfields (``bar.x`` and ``bar.y``). Imagine this dataset is going to
@@ -145,7 +174,6 @@ With this code we can save a little bit of overhead by not running the
 necessary columns optimization after already defining, by hand, the
 minimal set (one should be sure about what is needed with this
 workflow).
-
 
 .. raw:: html
 
