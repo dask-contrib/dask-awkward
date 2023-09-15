@@ -344,7 +344,7 @@ def _from_json_files(
     return from_map(
         f,
         paths,
-        label="from-json",
+        label="from-json-files",
         token=token,
         meta=meta,
     )
@@ -381,7 +381,67 @@ def _from_json_sopf(
     return from_map(
         f,
         paths,
-        label="from-json",
+        label="from-json-sopf",
+        token=token,
+        meta=meta,
+    )
+
+
+def _from_json_bytes(
+    fs: AbstractFileSystem,
+    token: str,
+    paths: list[str],
+    *,
+    schema: str | dict | list | None = None,
+    compression: str | None = "infer",
+    delimiter: bytes = b"\n",
+    not_zero: bool = False,
+    blocksize: str | int = "128 MiB",
+    sample: str | int = "128 kiB",
+    **kwargs: Any,
+) -> Array:
+    if compression == "infer":
+        compression = infer_compression(paths[0])
+
+    token = tokenize(
+        fs,
+        token,
+        paths,
+        schema,
+        compression,
+        delimiter,
+        not_zero,
+        blocksize,
+        sample,
+        kwargs,
+    )
+
+    bytes_ingredients, sample_bytes = _bytes_with_sample(
+        fs,
+        paths,
+        compression,
+        delimiter,
+        not_zero,
+        blocksize,
+        sample,
+    )
+
+    sample_array = ak.from_json(sample_bytes, line_delimited=True, **kwargs)
+    assert isinstance(sample_array, ak.Array)
+    meta = typetracer_array(sample_array)
+
+    fn = FromJsonBytesFn(
+        storage=fs,
+        compression=compression,
+        schema=schema,
+        form=meta.layout.form,
+        **kwargs,
+    )
+
+    return from_map(
+        fn,
+        list(flatten(bytes_ingredients)),
+        label="from-json-bytes",
         token=token,
         meta=meta,
     )
@@ -797,63 +857,3 @@ def ak_schema_repr(arr):
     import yaml
 
     return yaml.dump(arr.layout.form)
-
-
-def _from_json_bytes(
-    fs: AbstractFileSystem,
-    token: str,
-    paths: list[str],
-    *,
-    schema: str | dict | list | None = None,
-    compression: str | None = "infer",
-    delimiter: bytes = b"\n",
-    not_zero: bool = False,
-    blocksize: str | int = "128 MiB",
-    sample: str | int = "128 kiB",
-    **kwargs: Any,
-) -> Array:
-    if compression == "infer":
-        compression = infer_compression(paths[0])
-
-    token = tokenize(
-        fs,
-        token,
-        paths,
-        schema,
-        compression,
-        delimiter,
-        not_zero,
-        blocksize,
-        sample,
-        kwargs,
-    )
-
-    bytes_ingredients, sample_bytes = _bytes_with_sample(
-        fs,
-        paths,
-        compression,
-        delimiter,
-        not_zero,
-        blocksize,
-        sample,
-    )
-
-    sample_array = ak.from_json(sample_bytes, line_delimited=True, **kwargs)
-    assert isinstance(sample_array, ak.Array)
-    meta = typetracer_array(sample_array)
-
-    fn = FromJsonBytesFn(
-        storage=fs,
-        compression=compression,
-        schema=schema,
-        form=meta.layout.form,
-        **kwargs,
-    )
-
-    return from_map(
-        fn,
-        list(flatten(bytes_ingredients)),
-        label="from-json",
-        token=token,
-        meta=meta,
-    )
