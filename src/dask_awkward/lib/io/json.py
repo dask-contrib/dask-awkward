@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+import logging
 import math
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any, Literal, overload
@@ -30,6 +31,9 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
     from dask_awkward.lib.core import Array, Scalar
+
+
+log = logging.getLogger(__name__)
 
 
 def _use_optimization() -> bool:
@@ -115,8 +119,9 @@ class FromJsonLineDelimitedFn(FromJsonFn):
                 schema=self.schema,
                 **self.kwargs,
             )
-            assert isinstance(array, ak.Array)
-            return ak.Array(unproject_layout(self.original_form, array.layout))
+        log.debug("columns read from disk: %s" % str(array.layout.form.columns()))
+        assert isinstance(array, ak.Array)
+        return ak.Array(unproject_layout(self.original_form, array.layout))
 
     def project_columns(
         self,
@@ -164,8 +169,9 @@ class FromJsonSingleObjPerFile(FromJsonFn):
                     )
                 ]
             )
-            assert isinstance(array, ak.Array)
-            return ak.Array(unproject_layout(self.original_form, array.layout))
+        log.debug("columns read from disk: %s" % str(array.layout.form.columns()))
+        assert isinstance(array, ak.Array)
+        return ak.Array(unproject_layout(self.original_form, array.layout))
 
     def project_columns(
         self,
@@ -221,6 +227,7 @@ class FromJsonBytesFn(FromJsonFn):
             schema=self.schema,
             **self.kwargs,
         )
+        log.debug("columns read from disk: %s" % str(array.layout.form.columns()))
         assert isinstance(array, ak.Array)
         return ak.Array(unproject_layout(self.original_form, array.layout))
 
