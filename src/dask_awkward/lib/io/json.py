@@ -23,7 +23,6 @@ from dask_awkward.lib.io.io import (
     _BytesReadingInstructions,
     from_map,
 )
-from dask_awkward.lib.unproject_layout import unproject_layout
 
 if TYPE_CHECKING:
     from awkward.contents.content import Content
@@ -120,7 +119,8 @@ class FromJsonLineDelimitedFn(FromJsonFn):
             )
         log.debug("columns read from disk: %s" % str(array.layout.form.columns()))
         assert isinstance(array, ak.Array)
-        return ak.Array(unproject_layout(self.original_form, array.layout))
+        return array
+        # return ak.Array(unproject_layout(self.original_form, array.layout))
 
     def project_columns(
         self,
@@ -170,7 +170,8 @@ class FromJsonSingleObjPerFile(FromJsonFn):
             )
         log.debug("columns read from disk: %s" % str(array.layout.form.columns()))
         assert isinstance(array, ak.Array)
-        return ak.Array(unproject_layout(self.original_form, array.layout))
+        return array
+        # return ak.Array(unproject_layout(self.original_form, array.layout))
 
     def project_columns(
         self,
@@ -228,7 +229,8 @@ class FromJsonBytesFn(FromJsonFn):
         )
         log.debug("columns read from disk: %s" % str(array.layout.form.columns()))
         assert isinstance(array, ak.Array)
-        return ak.Array(unproject_layout(self.original_form, array.layout))
+        return array
+        # return ak.Array(unproject_layout(self.original_form, array.layout))
 
     def project_columns(
         self,

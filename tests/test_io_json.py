@@ -20,15 +20,15 @@ except ImportError:
 
 
 data1 = r"""{"name":"Bob","team":"tigers","goals":[0,0,0,1,2,0,1]}
-{"name":"Alice","team":"bears","goals":[3,2,1,0,1]}
+{"name":"Alice","team":"bears","goals":[null]}
 {"name":"Jack","team":"bears","goals":[0,0,0,0,0,0,0,0,1]}
 {"name":"Jill","team":"bears","goals":[3,0,2]}
-{"name":"Ted","team":"tigers","goals":[0,0,0,0,0]}
+{"name":"Ted","team":"tigers","goals":null}
 """
 
 data2 = r"""{"name":"Ellen","team":"tigers","goals":[1,0,0,0,2,0,1]}
 {"name":"Dan","team":"bears","goals":[0,0,3,1,0,2,0,0]}
-{"name":"Brad","team":"bears","goals":[0,0,4,0,0,1]}
+{"name":"Brad","team":"bears","goals":[null]}
 {"name":"Nancy","team":"tigers","goals":[0,0,1,1,1,1,0]}
 {"name":"Lance","team":"bears","goals":[1,1,1,1,1]}
 """
@@ -83,13 +83,12 @@ def input_layer_array_partition0(collection: Array) -> ak.Array:
         immediately after the input layer.
 
     """
-    with dask.config.set({"awkward.optimization.column-opt-formats": ["json"]}):
-        with dask.config.set({"awkward.optimization.which": ["columns"]}):
-            optimized_hlg = dak_optimize(collection.dask, [])
-            layers = list(optimized_hlg.layers)  # type: ignore[attr-defined]
-            layer_name = [name for name in layers if name.startswith("from-json")][0]
-            sgc, arg = optimized_hlg[(layer_name, 0)]
-            array = sgc.dsk[layer_name][0](arg)
+    with dask.config.set({"awkward.optimization.which": ["columns"]}):
+        optimized_hlg = dak_optimize(collection.dask, [])
+        layers = list(optimized_hlg.layers)  # type: ignore[attr-defined]
+        layer_name = [name for name in layers if name.startswith("from-json")][0]
+        sgc, arg = optimized_hlg[(layer_name, 0)]
+        array = sgc.dsk[layer_name][0](arg)
     return array
 
 
@@ -102,13 +101,7 @@ def test_json_column_projection_off(json_data_dir: Path) -> None:
     with dask.config.set({"awkward.optimization.column-opt-formats": []}):
         array = input_layer_array_partition0(ds2)
 
-    normally_dropped = []
-    for field in array.fields:
-        if field not in fields_to_keep:
-            normally_dropped.append(field)
-
-    for nd in normally_dropped:
-        assert len(array[nd])
+    assert array.fields == ["name", "team", "goals"]
 
 
 def test_json_column_projection1(json_data_dir: Path) -> None:
@@ -116,18 +109,10 @@ def test_json_column_projection1(json_data_dir: Path) -> None:
     ds = dak.from_json(source)
     fields_to_keep = ["name", "goals"]
     ds2 = ds[fields_to_keep]
-    array = input_layer_array_partition0(ds2)
+    with dask.config.set({"awkward.optimization.column-opt-formats": ["json"]}):
+        array = input_layer_array_partition0(ds2)
 
-    dropped = []
-    for field in array.fields:
-        if field not in fields_to_keep:
-            dropped.append(field)
-
-    assert len(dropped) == 1
-
-    for field in dropped:
-        with pytest.raises(TypeError, match="PlaceholderArray supports only"):
-            print(array[field])
+    assert array.fields == fields_to_keep
 
 
 def test_json_column_projection2(json_data_dir: Path) -> None:
@@ -135,19 +120,10 @@ def test_json_column_projection2(json_data_dir: Path) -> None:
     ds = dak.from_json(source)
     # grab name and goals but then only use goals!
     ds2 = dak.max(ds[["name", "goals"]].goals, axis=1)
-    fields_to_keep = ["goals"]
-    array = input_layer_array_partition0(ds2)
+    with dask.config.set({"awkward.optimization.column-opt-formats": ["json"]}):
+        array = input_layer_array_partition0(ds2)
 
-    dropped = []
-    for field in array.fields:
-        if field not in fields_to_keep:
-            dropped.append(field)
-
-    assert len(dropped) == 2
-
-    for field in dropped:
-        with pytest.raises(TypeError, match="PlaceholderArray supports only"):
-            print(array[field])
+    assert array.fields == ["goals"]
 
 
 def test_json_delim_defined(ndjson_points_file: str) -> None:
