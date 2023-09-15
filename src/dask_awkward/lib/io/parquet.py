@@ -10,6 +10,7 @@ from typing import Any, Literal, overload
 
 import awkward as ak
 import awkward.operations.ak_from_parquet as ak_from_parquet
+import dask
 from awkward.forms.form import Form
 from dask.base import tokenize
 from dask.blockwise import BlockIndex
@@ -28,6 +29,13 @@ from dask_awkward.lib.io.io import from_map
 from dask_awkward.lib.unproject_layout import unproject_layout
 
 log = logging.getLogger(__name__)
+
+
+def _use_optimization() -> bool:
+    return "parquet" in dask.config.get(
+        "awkward.optimization.columns-opt-formats",
+        default=[],
+    )
 
 
 class _FromParquetFn:
@@ -123,8 +131,12 @@ class _FromParquetFileWiseFn(_FromParquetFn):
         columns: Sequence[str] | None,
         original_form: Form | None = None,
     ) -> _FromParquetFileWiseFn:
+        if not _use_optimization():
+            return self
+
         if columns is None:
             return self
+
         new_form = self.form.select_columns(columns)
         new = _FromParquetFileWiseFn(
             fs=self.fs,
@@ -181,8 +193,12 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
         columns: Sequence[str] | None,
         original_form: Form | None = None,
     ) -> _FromParquetFragmentWiseFn:
+        if not _use_optimization():
+            return self
+
         if columns is None:
             return self
+
         return _FromParquetFragmentWiseFn(
             fs=self.fs,
             form=self.form.select_columns(columns),
@@ -229,7 +245,8 @@ def from_parquet(
     generate_bitmasks
         See :func:`ak.from_parquet`
     highlevel
-        See :func:`ak.from_parquet`
+        Argument specific to awkward-array that is always ``True`` for
+        dask-awkward.
     behavior
         See :func:`ak.from_parquet`
     ignore_metadata

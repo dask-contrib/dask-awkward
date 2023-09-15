@@ -15,7 +15,9 @@ awkward:
   # Optimization specific configuration
   optimization:
 
-    # If true dask-awkward specific optimizations will be run.
+    # If True dask-awkward specific optimizations will be run. If
+    # False, none of the remaining options under the optimization
+    # section matter because dask-awkward optimizations will be off.
     enabled: True
 
     # Which of the optimizations do we want to run; options include:
@@ -28,6 +30,19 @@ awkward:
     #   Fuse adjacent blockwise layers ("layer chains") into a single
     #   layer in the task graph.
     which: [columns, layer-chains]
+
+    # Which input formats to run the columns optimization on; options
+    # include:
+    # - parquet
+    #     when using dask_awkward.from_parquet the columns
+    #     optimization will be used to read only the necessary columns
+    #     from parquet files on disk.
+    # - json
+    #     when using dask_awkward.from_json the columns optimization
+    #     will be used to automatically generate a jsonschema that
+    #     instructs the awkward JSON parser to skip unncessary keys in
+    #     JSON datasets read from disk.
+    columns-opt-formats: [parquet]
 
     # This option controls whether or not a warning is thrown, an
     # exception is raised, or if nothing is done if a dask-awkward

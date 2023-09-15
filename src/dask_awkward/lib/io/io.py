@@ -11,7 +11,6 @@ from awkward.types.numpytype import primitive_to_dtype
 from dask.base import flatten, tokenize
 from dask.highlevelgraph import HighLevelGraph
 from dask.utils import funcname, is_integer, parse_bytes
-from fsspec.spec import AbstractFileSystem
 from fsspec.utils import infer_compression
 
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardInputLayer
@@ -28,6 +27,7 @@ if TYPE_CHECKING:
     from dask.bag.core import Bag as DaskBag
     from dask.dataframe.core import DataFrame as DaskDataFrame
     from dask.delayed import Delayed
+    from fsspec.spec import AbstractFileSystem
 
     from dask_awkward.lib.core import Array
 
@@ -586,6 +586,16 @@ class _BytesReadingInstructions:
     length: int | None
     delimiter: bytes
 
+    def expand(self):
+        return (
+            self.fs,
+            self.path,
+            self.compression,
+            self.offset,
+            self.length,
+            self.delimiter,
+        )
+
 
 def _bytes_with_sample(
     fs: AbstractFileSystem,
@@ -630,6 +640,7 @@ def _bytes_with_sample(
         Sample bytes.
 
     """
+
     if blocksize is not None:
         if isinstance(blocksize, str):
             blocksize = parse_bytes(blocksize)
