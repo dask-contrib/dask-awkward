@@ -932,26 +932,3 @@ def layout_to_jsonschema(
             layout_to_jsonschema(content)["type"] for content in layout.contents
         ]
     return existing_schema
-
-
-def form_to_dict(form):
-    """Convert awkward array Layout to a JSON Schema dictionary."""
-    if form.is_record:
-        out = {}
-        for field, content in zip(form.fields, form.contents):
-            out[field] = form_to_dict(content)
-        return out
-    elif form.parameters.get("__array__") == "string":
-        return "string"
-    elif form.is_list:
-        return [form_to_dict(form.content)]
-    elif hasattr(form, "content"):
-        return form_to_dict(form.content)
-    else:
-        return form.dtype
-
-
-def ak_schema_repr(arr):
-    import yaml
-
-    return yaml.dump(arr.layout.form)
