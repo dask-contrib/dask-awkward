@@ -562,7 +562,7 @@ def from_json(
     the first 10 MB to determine metadata:
 
     >>> import dask_awkward as dak
-    >>> dak.from_json(
+    >>> ds = dak.from_json(
     ...     "s3://path/to/data",
     ...     blocksize="50 MB",
     ...     meta_sample_byes="10 MB",
@@ -574,7 +574,13 @@ def from_json(
 
     >>> import dask_awkward as dak
     >>> my_schema = ...
-    >>> dak.from_json(["file1.json", "file2.json"], schema=my_schema)
+    >>> ds = dak.from_json(["file1.json", "file2.json"], schema=my_schema)
+
+    An example where each discovered file will be treated as a single
+    JSON object when creating the Array collection:
+
+    >>> import dask_awkward as dak
+    >>> ds = dak.from_json("/path/to/files/**.json", line_delimited=False)
 
     """
     if not highlevel:
