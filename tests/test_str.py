@@ -262,7 +262,7 @@ def test_rtrim_whitespace() -> None:
         (0, None, 3),
     ],
 )
-def test_slice(args) -> None:
+def test_slice(args: tuple) -> None:
     start, stop, step = args
     assert_eq(akstr.slice(daa, start, stop, step), akstr.slice(caa, start, stop, step))
 

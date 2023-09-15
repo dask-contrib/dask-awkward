@@ -1,15 +1,21 @@
 from __future__ import annotations
 
 import functools
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 import awkward.operations.str as akstr
+from typing_extensions import ParamSpec
 
 from dask_awkward.lib.core import Array, map_partitions
 
+T = TypeVar("T")
+P = ParamSpec("P")
 
-def always_highlevel(fn):
+
+def always_highlevel(fn: Callable[P, T]) -> Callable[P, T]:
     @functools.wraps(fn)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
         if not kwargs.get("highlevel", True):
             raise ValueError("dask-awkward supports only highlevel awkward arrays.")
         return fn(*args, **kwargs)
@@ -35,8 +41,8 @@ def capitalize(
 @always_highlevel
 def center(
     array: Array,
-    width,
-    padding=" ",
+    width: int,
+    padding: str | bytes = " ",
     *,
     highlevel: bool = True,
     behavior: dict | None = None,
@@ -128,9 +134,9 @@ def extract_regex(
 @always_highlevel
 def find_substring(
     array: Array,
-    pattern,
+    pattern: str | bytes,
     *,
-    ignore_case=False,
+    ignore_case: bool = False,
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
@@ -147,9 +153,9 @@ def find_substring(
 @always_highlevel
 def find_substring_regex(
     array: Array,
-    pattern,
+    pattern: str | bytes,
     *,
-    ignore_case=False,
+    ignore_case: bool = False,
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
@@ -166,9 +172,9 @@ def find_substring_regex(
 @always_highlevel
 def index_in(
     array: Array,
-    value_set,
+    value_set: Any,
     *,
-    skip_nones=False,
+    skip_nones: bool = False,
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
@@ -260,9 +266,9 @@ def is_digit(
 @always_highlevel
 def is_in(
     array: Array,
-    value_set,
+    value_set: Any,
     *,
-    skip_nones=False,
+    skip_nones: bool = False,
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
@@ -369,7 +375,7 @@ def is_upper(
 @always_highlevel
 def join(
     array: Array,
-    separator,
+    separator: Any,
     *,
     highlevel: bool = True,
     behavior: dict | None = None,
@@ -385,7 +391,7 @@ def join(
 
 @always_highlevel
 def join_element_wise(
-    *arrays,
+    *arrays: Array,
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
@@ -430,8 +436,8 @@ def lower(
 @always_highlevel
 def lpad(
     array: Array,
-    width,
-    padding=" ",
+    width: int,
+    padding: str | bytes = " ",
     *,
     highlevel: bool = True,
     behavior: dict | None = None,
@@ -449,7 +455,7 @@ def lpad(
 @always_highlevel
 def ltrim(
     array: Array,
-    characters,
+    characters: str | bytes,
     *,
     highlevel: bool = True,
     behavior: dict | None = None,
@@ -481,9 +487,9 @@ def ltrim_whitespace(
 @always_highlevel
 def match_like(
     array: Array,
-    pattern,
+    pattern: str | bytes,
     *,
-    ignore_case=False,
+    ignore_case: bool = False,
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
@@ -500,9 +506,9 @@ def match_like(
 @always_highlevel
 def match_substring(
     array: Array,
-    pattern,
+    pattern: str | bytes,
     *,
-    ignore_case=False,
+    ignore_case: bool = False,
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
@@ -519,9 +525,9 @@ def match_substring(
 @always_highlevel
 def match_substring_regex(
     array: Array,
-    pattern,
+    pattern: str | bytes,
     *,
-    ignore_case=False,
+    ignore_case: bool = False,
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
@@ -538,7 +544,7 @@ def match_substring_regex(
 @always_highlevel
 def repeat(
     array: Array,
-    num_repeats,
+    num_repeats: Any,
     *,
     highlevel: bool = True,
     behavior: dict | None = None,
@@ -555,9 +561,9 @@ def repeat(
 @always_highlevel
 def replace_slice(
     array: Array,
-    start,
-    stop,
-    replacement,
+    start: int,
+    stop: int,
+    replacement: str | bytes,
     *,
     highlevel: bool = True,
     behavior: dict | None = None,
@@ -576,10 +582,10 @@ def replace_slice(
 @always_highlevel
 def replace_substring(
     array: Array,
-    pattern,
-    replacement,
+    pattern: str,
+    replacement: str | bytes,
     *,
-    max_replacements=None,
+    max_replacements: int | None = None,
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
@@ -597,10 +603,10 @@ def replace_substring(
 @always_highlevel
 def replace_substring_regex(
     array: Array,
-    pattern,
-    replacement,
+    pattern: str,
+    replacement: str | bytes,
     *,
-    max_replacements=None,
+    max_replacements: int | None = None,
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
@@ -633,8 +639,8 @@ def reverse(
 @always_highlevel
 def rpad(
     array: Array,
-    width,
-    padding=" ",
+    width: int,
+    padding: str | bytes = " ",
     *,
     highlevel: bool = True,
     behavior: dict | None = None,
@@ -652,7 +658,7 @@ def rpad(
 @always_highlevel
 def rtrim(
     array: Array,
-    characters,
+    characters: str | bytes,
     *,
     highlevel: bool = True,
     behavior: dict | None = None,
@@ -684,9 +690,9 @@ def rtrim_whitespace(
 @always_highlevel
 def slice(
     array: Array,
-    start,
-    stop=None,
-    step=1,
+    start: int,
+    stop: int | None = None,
+    step: int = 1,
     *,
     highlevel: bool = True,
     behavior: dict | None = None,
@@ -705,10 +711,10 @@ def slice(
 @always_highlevel
 def split_pattern(
     array: Array,
-    pattern,
+    pattern: str | bytes,
     *,
-    max_splits=None,
-    reverse=False,
+    max_splits: int | None = None,
+    reverse: bool = False,
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
@@ -726,10 +732,10 @@ def split_pattern(
 @always_highlevel
 def split_pattern_regex(
     array: Array,
-    pattern,
+    pattern: str | bytes,
     *,
-    max_splits=None,
-    reverse=False,
+    max_splits: int | None = None,
+    reverse: bool = False,
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
@@ -765,9 +771,9 @@ def split_whitespace(
 @always_highlevel
 def starts_with(
     array: Array,
-    pattern,
+    pattern: str | bytes,
     *,
-    ignore_case=False,
+    ignore_case: bool = False,
     highlevel: bool = True,
     behavior: dict | None = None,
 ) -> Array:
@@ -829,7 +835,7 @@ def to_categorical(
 @always_highlevel
 def trim(
     array: Array,
-    characters,
+    characters: str | bytes,
     *,
     highlevel: bool = True,
     behavior: dict | None = None,
