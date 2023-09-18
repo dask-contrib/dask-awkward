@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+from typing import Final
+
 from awkward.forms.form import Form
+
+LIST_KEY: Final = "__list__"
 
 
 def set_form_keys(form: Form, *, key: str) -> Form:
@@ -35,7 +39,7 @@ def set_form_keys(form: Form, *, key: str) -> Form:
     # touched the offsets and not the data buffer for this kind of
     # identified form; keep recursing
     elif form.is_list:
-        form.form_key = f"{key}.__list__"
+        form.form_key = f"{key}.{LIST_KEY}"
         set_form_keys(form.content, key=key)
 
     # NumPy like array is easy
