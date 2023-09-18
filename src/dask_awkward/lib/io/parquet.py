@@ -70,6 +70,7 @@ class _FromParquetFn:
         self,
         columns: Sequence[str] | None,
         orignal_form: Form | None = None,
+        necessary_shape_columns: Sequence[str] | None = None,
     ) -> _FromParquetFn:
         ...
 
@@ -130,6 +131,7 @@ class _FromParquetFileWiseFn(_FromParquetFn):
         self,
         columns: Sequence[str] | None,
         original_form: Form | None = None,
+        necessary_shape_columns: Sequence[str] | None = None,
     ) -> _FromParquetFileWiseFn:
         if not _use_optimization():
             return self
@@ -192,6 +194,7 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
         self,
         columns: Sequence[str] | None,
         original_form: Form | None = None,
+        necessary_shape_columns: Sequence[str] | None = None,
     ) -> _FromParquetFragmentWiseFn:
         if not _use_optimization():
             return self

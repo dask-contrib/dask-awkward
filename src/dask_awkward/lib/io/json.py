@@ -68,6 +68,7 @@ class FromJsonFn:
         self,
         columns: Sequence[str],
         original_form: Form | None = None,
+        necessary_shape_columns: Sequence[str] | None = None,
     ) -> Self:
         if self.schema is not None:
             return self
@@ -126,6 +127,7 @@ class FromJsonLineDelimitedFn(FromJsonFn):
         self,
         columns: Sequence[str],
         original_form: Form | None = None,
+        necessary_shape_columns: Sequence[str] | None = None,
     ) -> Self:
         if not _use_optimization():
             return self
@@ -133,6 +135,7 @@ class FromJsonLineDelimitedFn(FromJsonFn):
         return self._default_project_columns(
             columns=columns,
             original_form=original_form,
+            necessary_shape_columns=necessary_shape_columns,
         )
 
 
@@ -177,6 +180,7 @@ class FromJsonSingleObjPerFile(FromJsonFn):
         self,
         columns: Sequence[str],
         original_form: Form | None = None,
+        necessary_shape_columns: Sequence[str] | None = None,
     ) -> Self:
         if not _use_optimization():
             return self
@@ -184,6 +188,7 @@ class FromJsonSingleObjPerFile(FromJsonFn):
         return self._default_project_columns(
             columns=columns,
             original_form=original_form,
+            necessary_shape_columns=necessary_shape_columns,
         )
 
 
@@ -236,6 +241,7 @@ class FromJsonBytesFn(FromJsonFn):
         self,
         columns: Sequence[str],
         original_form: Form | None = None,
+        necessary_shape_columns: Sequence[str] | None = None,
     ) -> Self:
         if not _use_optimization():
             return self
@@ -243,6 +249,7 @@ class FromJsonBytesFn(FromJsonFn):
         return self._default_project_columns(
             columns=columns,
             original_form=original_form,
+            necessary_shape_columns=necessary_shape_columns,
         )
 
 

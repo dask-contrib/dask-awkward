@@ -158,7 +158,12 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         )
         return new_input_layer, report
 
-    def project_columns(self, columns: list[str]) -> AwkwardInputLayer:
+    def project_columns(
+        self,
+        columns: list[str],
+        *,
+        necessary_shape_columns: list[str] | None = None,
+    ) -> AwkwardInputLayer:
         if hasattr(self.io_func, "project_columns"):
             # TODO: make project_columns call sites never pass in an
             # empty list.
@@ -182,6 +187,7 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
                 io_func = self.io_func.project_columns(
                     columns,
                     original_form=original_form,
+                    necessary_shape_columns=necessary_shape_columns,
                 )
             except TypeError:
                 io_func = self.io_func.project_columns(columns)

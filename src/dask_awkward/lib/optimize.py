@@ -123,7 +123,10 @@ def optimize_columns(dsk: HighLevelGraph) -> HighLevelGraph:
     for name, neccols in layer_to_necessary_columns.items():
         meta = layers[name]._meta
         neccols = _prune_wildcards(neccols, meta)
-        layers[name] = layers[name].project_columns(neccols)
+        layers[name] = layers[name].project_columns(
+            neccols,
+            necessary_shape_columns=None,
+        )
 
     return HighLevelGraph(layers, deps)
 
