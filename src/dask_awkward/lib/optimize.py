@@ -27,7 +27,7 @@ COLUMN_OPT_FAILED_WARNING_MSG = """The necessary columns optimization failed; ex
 {exception} with message {message}.
 
 Please see the FAQ section of the docs for more information:
-https://dask-awkward.readthedocs.io/en/stable/me-faq.html
+https://dask-awkward.readthedocs.io/en/stable/more/faq.html
 
 """
 
