@@ -1,362 +1,595 @@
 from __future__ import annotations
 
 import abc
+import logging
 import math
-import os
-import warnings
-from typing import TYPE_CHECKING, Any
-
-try:
-    import ujson as json
-except ImportError:
-    import json  # type: ignore[no-redef]
+from collections.abc import Callable, Sequence
+from typing import TYPE_CHECKING, Any, Literal, overload
 
 import awkward as ak
+import dask
+from awkward.forms.form import Form
 from dask.base import tokenize
 from dask.blockwise import BlockIndex
-from dask.bytes.core import read_bytes
 from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
 from dask.utils import parse_bytes
 from fsspec.core import get_fs_token_paths, url_to_fs
-from fsspec.utils import infer_compression
+from fsspec.utils import infer_compression, read_block
 
-from dask_awkward.lib.core import (
-    map_partitions,
-    new_array_object,
-    new_scalar_object,
-    typetracer_array,
+from dask_awkward.lib.core import map_partitions, new_scalar_object, typetracer_array
+from dask_awkward.lib.io.io import (
+    _bytes_with_sample,
+    _BytesReadingInstructions,
+    from_map,
 )
-from dask_awkward.lib.io.io import from_map
 
 if TYPE_CHECKING:
+    from awkward.contents.content import Content
     from fsspec.spec import AbstractFileSystem
+    from typing_extensions import Self
 
     from dask_awkward.lib.core import Array, Scalar
 
 
-__all__ = ("from_json", "to_json")
+log = logging.getLogger(__name__)
 
 
-class _FromJsonFn:
+def _use_optimization() -> bool:
+    return "json" in dask.config.get(
+        "awkward.optimization.columns-opt-formats",
+        default=[],
+    )
+
+
+class FromJsonFn:
     def __init__(
         self,
-        *args: Any,
+        *,
         storage: AbstractFileSystem,
         compression: str | None = None,
-        schema: dict | None = None,
+        schema: str | dict | list | None = None,
+        form: Form | None = None,
+        original_form: Form | None = None,
         **kwargs: Any,
     ) -> None:
         self.compression = compression
         self.storage = storage
         self.schema = schema
-        self.args = args
         self.kwargs = kwargs
+        self.form = form
+        self.original_form = original_form
 
     @abc.abstractmethod
     def __call__(self, source: Any) -> ak.Array:
         ...
 
+    def _default_project_columns(
+        self,
+        columns: Sequence[str],
+        original_form: Form | None = None,
+    ) -> Self:
+        if self.schema is not None:
+            return self
 
-class _FromJsonLineDelimitedFn(_FromJsonFn):
+        if self.form is not None:
+            form = self.form.select_columns(columns)
+            assert form is not None
+            schema = layout_to_jsonschema(form.length_zero_array(highlevel=False))
+
+            return type(self)(
+                schema=schema,
+                form=form,
+                storage=self.storage,
+                compression=self.compression,
+                original_form=original_form,
+                **self.kwargs,
+            )
+
+        return self
+
+
+class FromJsonLineDelimitedFn(FromJsonFn):
     def __init__(
         self,
-        *args: Any,
+        *,
         storage: AbstractFileSystem,
         compression: str | None = None,
-        schema: dict | None = None,
+        schema: str | dict | list | None = None,
+        form: Form | None = None,
+        original_form: Form | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(
-            *args,
             storage=storage,
             compression=compression,
             schema=schema,
+            form=form,
+            original_form=original_form,
             **kwargs,
         )
 
     def __call__(self, source: str) -> ak.Array:
         with self.storage.open(source, mode="rt", compression=self.compression) as f:
-            return ak.from_json(f.read(), line_delimited=True, schema=self.schema)
+            array = ak.from_json(
+                f.read(),
+                line_delimited=True,
+                schema=self.schema,
+                **self.kwargs,
+            )
+        log.debug("columns read from disk: %s" % str(array.layout.form.columns()))
+        assert isinstance(array, ak.Array)
+        return array
+        # return ak.Array(unproject_layout(self.original_form, array.layout))
 
-    def project_columns(self, columns):
-        schema = self.schema
+    def project_columns(
+        self,
+        columns: Sequence[str],
+        original_form: Form | None = None,
+    ) -> Self:
+        if not _use_optimization():
+            return self
 
-        # TODO: do something with columns to redefine schema...
-
-        return _FromJsonLineDelimitedFn(
-            schema=schema,
-            storage=self.storage,
-            compression=self.compression,
+        return self._default_project_columns(
+            columns=columns,
+            original_form=original_form,
         )
 
 
-class _FromJsonSingleObjInFileFn(_FromJsonFn):
+class FromJsonSingleObjPerFile(FromJsonFn):
     def __init__(
         self,
-        *args: Any,
+        *,
         storage: AbstractFileSystem,
-        schema: dict | None = None,
         compression: str | None = None,
+        schema: str | dict | list | None = None,
+        form: Form | None = None,
+        original_form: Form | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(
-            *args,
             storage=storage,
             compression=compression,
             schema=schema,
+            form=form,
+            original_form=original_form,
             **kwargs,
         )
 
     def __call__(self, source: str) -> ak.Array:
-        with self.storage.open(source, mode="rb", compression=self.compression) as f:
-            return ak.from_json(f, schema=self.schema, **self.kwargs)
+        with self.storage.open(source, mode="rt", compression=self.compression) as f:
+            array = ak.Array(
+                [
+                    ak.from_json(
+                        f.read(),
+                        line_delimited=False,
+                        schema=self.schema,
+                        **self.kwargs,
+                    )
+                ]
+            )
+        log.debug("columns read from disk: %s" % str(array.layout.form.columns()))
+        assert isinstance(array, ak.Array)
+        return array
+        # return ak.Array(unproject_layout(self.original_form, array.layout))
+
+    def project_columns(
+        self,
+        columns: Sequence[str],
+        original_form: Form | None = None,
+    ) -> Self:
+        if not _use_optimization():
+            return self
+
+        return self._default_project_columns(
+            columns=columns,
+            original_form=original_form,
+        )
 
 
-class _FromJsonBytesFn:
-    def __init__(self, schema: dict | None = None) -> None:
-        self.schema = schema
-
-    def __call__(self, source: bytes) -> ak.Array:
-        return ak.from_json(source, line_delimited=True, schema=self.schema)
-
-
-def derive_json_meta(
-    storage: AbstractFileSystem,
-    source: str,
-    schema: dict | None = None,
-    compression: str | None = "infer",
-    sample_rows: int = 5,
-    bytechunks: str | int = "16 KiB",
-    force_by_lines: bool = False,
-    one_obj_per_file: bool = False,
-) -> ak.Array:
-    if compression == "infer":
-        compression = infer_compression(source)
-
-    bytechunks = parse_bytes(bytechunks)
-
-    if one_obj_per_file:
-        fn = _FromJsonSingleObjInFileFn(
+class FromJsonBytesFn(FromJsonFn):
+    def __init__(
+        self,
+        *,
+        storage: AbstractFileSystem,
+        compression: str | None = None,
+        schema: str | dict | list | None = None,
+        form: Form | None = None,
+        original_form: Form | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(
             storage=storage,
             compression=compression,
             schema=schema,
+            form=form,
+            original_form=original_form,
+            **kwargs,
         )
-        return typetracer_array(fn(source))
 
-    # when the data is uncompressed we read `bytechunks` number of
-    # bytes then split on a newline bytes, and use the first
-    # `sample_rows` number of lines.
-    if compression is None and not force_by_lines:
-        try:
-            bytes = storage.cat(source, start=0, end=bytechunks)
-            lines = [json.loads(ln) for ln in bytes.split(b"\n")[:sample_rows]]
-            return typetracer_array(ak.from_iter(lines))
-        except ValueError:
-            # we'll get a ValueError if we can't decode the JSON from
-            # the bytes that we grabbed.
-            warnings.warn(
-                f"Couldn't determine metadata from reading first {bytechunks} "
-                f"of the dataset; will read the first {sample_rows} instead. "
-                "Try increasing the value of `bytechunks` or decreasing `sample_rows` "
-                "to remove this warning."
-            )
+    def __call__(self, instructions: _BytesReadingInstructions) -> ak.Array:
+        with instructions.fs.open(
+            instructions.path, compression=instructions.compression
+        ) as f:
+            if instructions.offset == 0 and instructions.length is None:
+                bytestring = f.read()
+            else:
+                bytestring = read_block(
+                    f,
+                    instructions.offset,
+                    instructions.length,
+                    instructions.delimiter,
+                )
 
-    # for compressed data (or if explicitly asked for with
-    # force_by_lines set to True) we read the first `sample_rows`
-    # number of rows after opening the compressed file.
-    with storage.open(source, mode="rt", compression=compression) as f:
+        array = ak.from_json(
+            bytestring,
+            line_delimited=True,
+            schema=self.schema,
+            **self.kwargs,
+        )
+        log.debug("columns read from disk: %s" % str(array.layout.form.columns()))
+        assert isinstance(array, ak.Array)
+        return array
+        # return ak.Array(unproject_layout(self.original_form, array.layout))
+
+    def project_columns(
+        self,
+        columns: Sequence[str],
+        original_form: Form | None = None,
+    ) -> Self:
+        if not _use_optimization():
+            return self
+
+        return self._default_project_columns(
+            columns=columns,
+            original_form=original_form,
+        )
+
+
+def meta_from_single_file(
+    *,
+    fs: AbstractFileSystem,
+    paths: list[str],
+    compression: str | None,
+    **kwargs: Any,
+) -> ak.Array:
+    with fs.open(paths[0], compression=compression) as f:
+        array = ak.Array([ak.from_json(f.read(), line_delimited=False, **kwargs)])
+    return typetracer_array(array)
+
+
+def meta_from_bytechunks(
+    *,
+    fs: AbstractFileSystem,
+    paths: list[str],
+    sample_bytes: str | int,
+    **kwargs: Any,
+) -> ak.Array:
+    sample_bytes = parse_bytes(sample_bytes)
+    bytes = fs.cat(paths[0], start=0, end=sample_bytes)
+    rfind = bytes.rfind(b"\n")
+    if rfind > 0:
+        bytes = bytes[:rfind]
+    array = ak.from_json(bytes, line_delimited=True, **kwargs)
+    assert isinstance(array, ak.Array)
+    return typetracer_array(array)
+
+
+def meta_from_line_by_line(
+    *,
+    fs: AbstractFileSystem,
+    paths: list[str],
+    compression: str | None,
+    sample_rows: int | None,
+    **kwargs: Any,
+) -> ak.Array:
+    if sample_rows is not None:
         lines = []
-        for i, line in enumerate(f):
-            lines.append(json.loads(line))
-            if i >= sample_rows:
-                break
-        return typetracer_array(ak.from_iter(lines))
+        with fs.open(paths[0], mode="rt", compression=compression) as f:
+            for i, line in enumerate(f):
+                lines.append(line)
+                if i >= sample_rows:
+                    break
+        array = ak.from_json("\n".join(lines), line_delimited=True, **kwargs)
+    else:
+        with fs.open(paths[0], mode="rt", compression=compression) as f:
+            array = ak.from_json(
+                f.read(),
+                line_delimited=True,
+                **kwargs,
+            )
+    assert isinstance(array, ak.Array)
+    return typetracer_array(array)
 
 
 def _from_json_files(
     *,
-    urlpath: str | list[str],
-    schema: dict | None = None,
-    one_obj_per_file: bool = False,
-    compression: str | None = "infer",
-    meta: ak.Array | None = None,
-    behavior: dict | None = None,
-    derive_meta_kwargs: dict[str, Any] | None = None,
-    storage_options: dict[str, Any] | None = None,
+    fs: AbstractFileSystem,
+    token: str,
+    paths: list[str],
+    schema: str | dict | list | None,
+    compression: str | None,
+    sample_rows: int | None = 150,
+    sample_bytes: str | int = "256 KiB",
+    **kwargs: Any,
 ) -> Array:
-    fs, fstoken, urlpaths = get_fs_token_paths(
-        urlpath,
-        mode="rb",
-        storage_options=storage_options,
-    )
-    if meta is None:
-        meta_read_kwargs = derive_meta_kwargs or {}
-        meta = derive_json_meta(
-            fs,
-            urlpaths[0],
-            schema=schema,
-            one_obj_per_file=one_obj_per_file,
-            **meta_read_kwargs,
-        )
-
-    token = tokenize(fstoken, one_obj_per_file, compression, meta)
-
     if compression == "infer":
-        compression = infer_compression(urlpaths[0])
+        compression = infer_compression(paths[0])
 
-    if one_obj_per_file:
-        f: _FromJsonFn = _FromJsonSingleObjInFileFn(
-            storage=fs,
-            compression=compression,
-            schema=schema,
+    if not compression:
+        meta = meta_from_bytechunks(
+            fs=fs,
+            paths=paths,
+            sample_bytes=sample_bytes,
+            **kwargs,
         )
     else:
-        f = _FromJsonLineDelimitedFn(
-            storage=fs,
+        meta = meta_from_line_by_line(
+            fs=fs,
+            paths=paths,
             compression=compression,
-            schema=schema,
+            sample_rows=sample_rows,
+            **kwargs,
         )
 
+    token = tokenize(compression, meta, kwargs)
+
+    f = FromJsonLineDelimitedFn(
+        storage=fs,
+        compression=compression,
+        schema=schema,
+        form=meta.layout.form,
+        **kwargs,
+    )
+
     return from_map(
-        f, urlpaths, label="from-json", token=token, meta=meta, behavior=behavior
+        f,
+        paths,
+        label="from-json-files",
+        token=token,
+        meta=meta,
+    )
+
+
+def _from_json_sopf(
+    *,
+    fs: AbstractFileSystem,
+    token: str,
+    paths: list[str],
+    schema: str | dict | list | None,
+    compression: str | None,
+    **kwargs: Any,
+) -> Array:
+    if compression == "infer":
+        compression = infer_compression(paths[0])
+
+    meta = meta_from_single_file(
+        fs=fs,
+        paths=paths,
+        compression=compression,
+        **kwargs,
+    )
+    token = tokenize(token, compression, meta, kwargs)
+
+    f = FromJsonSingleObjPerFile(
+        storage=fs,
+        compression=compression,
+        schema=schema,
+        form=meta.layout.form,
+        **kwargs,
+    )
+
+    return from_map(
+        f,
+        paths,
+        label="from-json-sopf",
+        token=token,
+        meta=meta,
     )
 
 
 def _from_json_bytes(
+    fs: AbstractFileSystem,
+    token: str,
+    paths: list[str],
     *,
-    urlpath: str | list[str],
-    schema: dict | None,
-    blocksize: int | str,
-    delimiter: Any,
-    meta: ak.Array | None,
-    behavior: dict | None,
-    storage_options: dict[str, Any] | None,
+    schema: str | dict | list | None = None,
+    compression: str | None = "infer",
+    delimiter: bytes = b"\n",
+    not_zero: bool = False,
+    blocksize: str | int = "128 MiB",
+    sample_bytes: str | int = "10 kiB",
+    **kwargs: Any,
 ) -> Array:
-    token = tokenize(urlpath, delimiter, blocksize, meta)
-    name = f"from-json-{token}"
-    storage_options = storage_options or {}
-    _, bytechunks = read_bytes(
-        urlpath,
-        delimiter=delimiter,
-        blocksize=blocksize,
-        sample="0",
-        **storage_options,
+    if compression == "infer":
+        compression = infer_compression(paths[0])
+
+    token = tokenize(
+        fs,
+        token,
+        paths,
+        schema,
+        compression,
+        delimiter,
+        not_zero,
+        blocksize,
+        sample_bytes,
+        kwargs,
     )
-    flat_chunks = list(flatten(bytechunks))
-    f = _FromJsonBytesFn(schema=schema)
-    dsk = {
-        (name, i): (f, delayed_chunk.key) for i, delayed_chunk in enumerate(flat_chunks)
-    }
-    deps = flat_chunks
-    n = len(deps)
 
-    # doesn't work because flat_chunks elements are remaining delayed objects.
-    # return from_map(
-    #     _from_json_bytes,
-    #     flat_chunks,
-    #     label="from-json",
-    #     token=token,
-    #     produces_tasks=True,
-    #     deps=flat_chunks,
-    # )
+    bytes_ingredients, the_sample_bytes = _bytes_with_sample(
+        fs,
+        paths,
+        compression,
+        delimiter,
+        not_zero,
+        blocksize,
+        sample_bytes,
+    )
 
-    hlg = HighLevelGraph.from_collections(name, dsk, dependencies=deps)
-    return new_array_object(hlg, name, meta=meta, behavior=behavior, npartitions=n)
+    sample_array = ak.from_json(the_sample_bytes, line_delimited=True, **kwargs)
+    assert isinstance(sample_array, ak.Array)
+    meta = typetracer_array(sample_array)
+
+    fn = FromJsonBytesFn(
+        storage=fs,
+        compression=compression,
+        schema=schema,
+        form=meta.layout.form,
+        **kwargs,
+    )
+
+    return from_map(
+        fn,
+        list(flatten(bytes_ingredients)),
+        label="from-json-bytes",
+        token=token,
+        meta=meta,
+    )
+
+
+def json_fs_token_paths(
+    source: Any,
+    *,
+    storage_options: dict[str, Any] | None = None,
+) -> tuple[AbstractFileSystem, str, list[str]]:
+    fs, token, paths = get_fs_token_paths(source, storage_options=storage_options)
+
+    # if paths is length 1, check to see if it's a directory and
+    # wildcard search for JSON files. Otherwise, just keep whatever
+    # has already been found.
+    if len(paths) == 1 and fs.isdir(paths[0]):
+        paths = list(filter(lambda s: ".json" in s, fs.find(paths[0])))
+
+    return fs, token, paths
 
 
 def from_json(
-    urlpath: str | list[str],
-    schema: dict | None = None,
-    # nan_string: str | None = None,
-    # posinf_string: str | None = None,
-    # neginf_string: str | None = None,
-    # complex_record_fields: tuple[str, str] | None = None,
-    # buffersize: int = 65536,
-    # initial: int = 1024,
-    # resize: float = 1.5,
-    highlevel: bool = True,
+    source: str | list[str],
     *,
-    blocksize: int | str | None = None,
-    delimiter: bytes | None = None,
-    one_obj_per_file: bool = False,
-    compression: str | None = "infer",
-    meta: ak.Array | None = None,
+    line_delimited: bool = True,
+    schema: str | dict | list | None = None,
+    nan_string: str | None = None,
+    posinf_string: str | None = None,
+    neginf_string: str | None = None,
+    complex_record_fields: tuple[str, str] | None = None,
+    buffersize: int = 65536,
+    initial: int = 1024,
+    resize: float = 8,
+    highlevel: bool = True,
     behavior: dict | None = None,
-    derive_meta_kwargs: dict[str, Any] | None = None,
+    blocksize: str | None = None,
+    delimiter: bytes | None = None,
+    compression: str | None = "infer",
     storage_options: dict[str, Any] | None = None,
+    meta_sample_rows: int | None = 100,
+    meta_sample_bytes: int | str = "10 kiB",
 ) -> Array:
-    """Create an Awkward Array collection from JSON data.
+    """Create an Array collection from JSON data.
 
-    There are three styles supported for reading JSON data:
-
-    1. Line delimited style: file(s) with one JSON object per line.
-       The function argument defaults are setup to handle this style.
-       This method assumes newline characters are not embedded in JSON
-       values.
-    2. Single JSON object per file (this requires `one_obj_per_file`
-       to be set to ``True``. These objects *must* be arrays.
-    3. Reading some number of bytes at a time. If at least one of
-       `blocksize` or `delimiter` are defined, Dask's
-       :py:func:`~dask.bytes.read_bytes` function will be used to
-       lazily read bytes (`blocksize` bytes per partition) and split
-       on `delimiter`). This method assumes line delimited JSON
-       without newline characters embedded in JSON values.
+    See :func:`ak.from_json` for more information.
 
     Parameters
     ----------
-    urlpath : str | list[str]
-        The source of the JSON dataset.
-    blocksize : int | str, optional
-        If defined, each partition will be created from a block of
-        JSON bytes of this size. If `delimiter` is defined (not
-        ``None``) but this value remains ``None``, a default value of
-        ``128 MiB`` will be used.
+    source : str | list[str]
+        Local or remote directory or list of files containing JSON
+        data to load. May contain glob patterns (passed to ``fsspec``).
+    line_delimited : bool
+        If ``True`` (the default) treat each line in the file as a
+        JSON object, if ``False``, entire files will be treated as
+        single objects.
+    schema : str | dict | list, optional
+        If defined the schema will be used by the parser to skip type
+        discovery. If not defined (``None``, the default),
+        dask-awkward's optimization capabilities will potentially be
+        used to generate a JSONSchema that contains the minimal
+        necessary parts of the JSON data that should be used to build
+        an Array to complete the desired computation. See
+        dask-awkward's optimization documentation for more
+        information.
+    nan_string : str, optional
+        See :func:`ak.from_json`
+    posinf_string : str, optional
+        See :func:`ak.from_json`
+    neginf_string : str, optional
+        See :func:`ak.from_json`
+    complex_record_fields : tuple[str, str], optional
+        See :func:`ak.from_json`
+    buffersize : int
+        See :func:`ak.from_json`
+    initial : int
+        See :func:`ak.from_json`
+    resize : float
+        See :func:`ak.from_json`
+    highlevel : bool
+        Argument specific to awkward-array that is always ``True`` for
+        dask-awkward.
+    behavior : dict, optional
+        See :func:`ak.from_json`
+    blocksize : str, optional
+        If ``None`` (default), the collection will be partitioned on a
+        per-file bases. If defined, this sets the size (in bytes) of
+        each partition.
     delimiter : bytes, optional
-        If defined (not ``None``), this will be the byte(s) to split
-        on when reading `blocksizes`. If this is ``None`` but
-        `blocksize` is defined (not ``None``), the default byte
-        charater will be the newline (``b"\\n"``).
-    one_obj_per_file : bool
-        If ``True`` each file will be considered a single JSON object.
+        Delimiter to use for separating blocks; if ``blocksize`` is
+        defined but this argument is not defined, the default is the
+        bytestring newline: ``b"\\n"``.
     compression : str, optional
-        Compression of the files in the dataset.
-    meta : Any, optional
-        The metadata for the collection. If ``None`` (the default),
-        them metadata will be determined by scanning the beginning of
-        the dataset.
-    derive_meta_kwargs : dict[str, Any], optional
-        Dictionary of arguments to be passed to `derive_json_meta` for
-        determining the collection metadata if `meta` is ``None``.
+        The compression of the dataset (default is to infer based on
+        file suffix)
     storage_options : dict[str, Any], optional
-        Storage options passed to fsspec.
+        Storage options based to ``fsspec``.
+    meta_sample_rows : int, optional
+        Number of rows to sample from files for determining metadata.
+        When reading files partitioned on a per-file basis this will
+        be the number of lines extracted from the first file to
+        determine the collection's metadata.
+    meta_sample_bytes : int | str
+        Number of bytes to sample from files for determining metadata.
+        When reading file partitioned on a blocksize basis this will
+        be the number of bytes sampled from the first partition to
+        determine the collection's metadata.
 
     Returns
     -------
     Array
-        The resulting Dask Awkward Array collection.
+        Resulting collection.
 
     Examples
     --------
-    One partition per file:
+    An example where data is stored in an S3 data; this will grab all
+    JSON files under the path with blocksizes of 50 MB and we sample
+    the first 10 MB to determine metadata:
 
-    >>> import dask_awkard as dak
-    >>> a = dak.from_json("dataset*.json")
-
-    One partition ber 200 MB of JSON data:
-
-    >>> a = dak.from_json("dataset*.json", blocksize="200 MB")
-
-    Same as previous call (explicit definition of the delimiter):
-
-    >>> a = dak.from_json(
-    ...     "dataset*.json", blocksize="200 MB", delimiter=b"\\n",
+    >>> import dask_awkward as dak
+    >>> ds = dak.from_json(
+    ...     "s3://path/to/data",
+    ...     blocksize="50 MB",
+    ...     meta_sample_byes="10 MB",
     ... )
 
-    """
+    An example where a JSONSchema is pre-defined. In this case
+    dask-awkward's optimization infrastructure will not attempt to
+    generate a minimal necessary schema, it will use the one provided:
 
+    >>> import dask_awkward as dak
+    >>> my_schema = ...
+    >>> ds = dak.from_json(["file1.json", "file2.json"], schema=my_schema)
+
+    An example where each discovered file will be treated as a single
+    JSON object when creating the Array collection:
+
+    >>> import dask_awkward as dak
+    >>> ds = dak.from_json("/path/to/files/**.json", line_delimited=False)
+
+    """
     if not highlevel:
         raise ValueError("dask-awkward only supports highlevel awkward Arrays.")
+
+    fs, token, paths = json_fs_token_paths(source, storage_options=storage_options)
+
+    if len(paths) == 0:
+        raise OSError("%s resolved to no files" % source)
 
     # allow either blocksize or delimieter being not-None to trigger
     # line deliminated JSON reading.
@@ -365,32 +598,65 @@ def from_json(
     elif blocksize is None and delimiter == b"\n":
         blocksize = "128 MiB"
 
-    # if delimiter is None and blocksize is None we are expecting to
-    # read a single file or a list of files. The list of files are
-    # expected to be line delimited (one JSON object per line)
-    if delimiter is None and blocksize is None:
-        return _from_json_files(
-            urlpath=urlpath,
+    # if line delimited is False we use the single object per file
+    # implementation.
+    if not line_delimited:
+        return _from_json_sopf(
+            fs=fs,
+            token=token,
+            paths=paths,
             schema=schema,
-            one_obj_per_file=one_obj_per_file,
             compression=compression,
-            meta=meta,
+            nan_string=nan_string,
+            posinf_string=posinf_string,
+            neginf_string=neginf_string,
+            complex_record_fields=complex_record_fields,
+            buffersize=buffersize,
+            initial=initial,
+            resize=resize,
             behavior=behavior,
-            derive_meta_kwargs=derive_meta_kwargs,
-            storage_options=storage_options,
         )
 
-    # if a `delimiter` and `blocksize` are defined we use Dask's
-    # `read_bytes` function to get delayed chunks of bytes.
+    # if we are not using blocksize and delimiter we are partitioning
+    # by file.
+    if blocksize is None and delimiter is None:
+        return _from_json_files(
+            fs=fs,
+            token=token,
+            paths=paths,
+            schema=schema,
+            compression=compression,
+            nan_string=nan_string,
+            posinf_string=posinf_string,
+            neginf_string=neginf_string,
+            complex_record_fields=complex_record_fields,
+            buffersize=buffersize,
+            initial=initial,
+            resize=resize,
+            behavior=behavior,
+            sample_rows=meta_sample_rows,
+            sample_bytes=meta_sample_bytes,
+        )
+
+    # if a `delimiter` and `blocksize` are defined we use the byte
+    # reading implementation
     elif delimiter is not None and blocksize is not None:
         return _from_json_bytes(
-            urlpath=urlpath,
+            fs=fs,
+            token=token,
+            paths=paths,
             schema=schema,
             delimiter=delimiter,
             blocksize=blocksize,
-            meta=meta,
+            sample_bytes=meta_sample_bytes,
             behavior=behavior,
-            storage_options=storage_options,
+            nan_string=nan_string,
+            posinf_string=posinf_string,
+            neginf_string=neginf_string,
+            complex_record_fields=complex_record_fields,
+            buffersize=buffersize,
+            initial=initial,
+            resize=resize,
         )
 
     # otherwise the arguments are bad
@@ -398,73 +664,165 @@ def from_json(
         raise TypeError("Incompatible combination of arguments.")  # pragma: no cover
 
 
-class _ToJsonFn:
+class ToJsonFn:
     def __init__(
         self,
         fs: AbstractFileSystem,
         path: str,
         npartitions: int,
         compression: str | None,
-        line_delimited: bool,
         **kwargs: Any,
     ) -> None:
         self.fs = fs
         self.path = path
-        self.just_dir = ".json" not in self.path
-        if self.just_dir:
-            if not self.fs.exists(path):
-                self.fs.mkdir(path)
-        self.wildcarded = "*" in self.path
+        if not self.fs.exists(path):
+            self.fs.mkdir(path)
         self.zfill = math.ceil(math.log(npartitions, 10))
-        self.kwargs = kwargs
         self.compression = compression
         if self.compression == "infer":
             self.compression = infer_compression(self.path)
-        self.line_delimited = line_delimited
+        self.kwargs = kwargs
 
     def __call__(self, array: ak.Array, block_index: tuple[int]) -> None:
         part = str(block_index[0]).zfill(self.zfill)
+        filename = f"part{part}.json"
+        if self.compression is not None and self.compression != "infer":
+            ext = self.compression
+            if ext == "gzip":
+                ext = "gz"
+            if ext == "zstd":
+                ext = "zst"
+            filename = f"{filename}.{ext}"
 
-        if self.just_dir:
-            path = os.path.join(self.path, f"part{part}.json")
-        elif self.wildcarded:
-            path = self.path.replace("*", part)
-        else:
-            raise RuntimeError("Cannot construct output file path.")  # pragma: no cover
-
-        try:
-            with self.fs.open(path, mode="wt", compression=self.compression) as f:
-                ak.to_json(array, f, line_delimited=self.line_delimited, **self.kwargs)
-        except FileNotFoundError:
-            raise FileNotFoundError(
-                f"Parent directory for output file ({path}) "
-                "is not available, create it."
-            )
+        thispath = self.fs.sep.join([self.path, filename])
+        with self.fs.open(thispath, mode="wt", compression=self.compression) as f:
+            ak.to_json(array, f, **self.kwargs)
 
         return None
+
+
+@overload
+def to_json(
+    array: Array,
+    path: str,
+    line_delimited: bool | str = True,
+    num_indent_spaces: int | None = None,
+    num_readability_spaces: int = 0,
+    nan_string: str | None = None,
+    posinf_string: str | None = None,
+    neginf_string: str | None = None,
+    complex_record_fields: tuple[str, str] | None = None,
+    convert_bytes: Callable | None = None,
+    convert_other: Callable | None = None,
+    storage_options: dict[str, Any] | None = None,
+    compression: str | None = None,
+    compute: Literal[False] = False,
+) -> Scalar:
+    ...
+
+
+@overload
+def to_json(
+    array: Array,
+    path: str,
+    line_delimited: bool | str,
+    num_indent_spaces: int | None,
+    num_readability_spaces: int,
+    nan_string: str | None,
+    posinf_string: str | None,
+    neginf_string: str | None,
+    complex_record_fields: tuple[str, str] | None,
+    convert_bytes: Callable | None,
+    convert_other: Callable | None,
+    storage_options: dict[str, Any] | None,
+    compression: str | None,
+    compute: Literal[True],
+) -> None:
+    ...
 
 
 def to_json(
     array: Array,
     path: str,
-    line_delimited: bool = True,
+    line_delimited: bool | str = True,
+    num_indent_spaces: int | None = None,
+    num_readability_spaces: int = 0,
+    nan_string: str | None = None,
+    posinf_string: str | None = None,
+    neginf_string: str | None = None,
+    complex_record_fields: tuple[str, str] | None = None,
+    convert_bytes: Callable | None = None,
+    convert_other: Callable | None = None,
     storage_options: dict[str, Any] | None = None,
+    compression: str | None = None,
     compute: bool = False,
-    compression: str | None = "infer",
-    **kwargs: Any,
-) -> Scalar:
-    """Write data to line delimited JSON."""
+) -> Scalar | None:
+    """Store Array collection in JSON text.
+
+    Parameters
+    ----------
+    array : Array
+        Collection to store in JSON format
+    path : str
+        Root directory to save data; interpreted by filesystem-spec
+        (can be a remote filesystem path, for example an s3 bucket:
+        ``"s3://bucket/data"``).
+    line_delimited : bool | str
+        See docstring for :py:func:`ak.to_json`.
+    num_indent_spaces : int, optional
+        See docstring for :py:func:`ak.to_json`.
+    num_readability_spaces : int
+        See docstring for :py:func:`ak.to_json`.
+    nan_string : str, optional
+        See docstring for :py:func:`ak.to_json`.
+    posinf_string : str, optional
+        See docstring for :py:func:`ak.to_json`.
+    neginf_string : str, optional
+        See docstring for :py:func:`ak.to_json`.
+    complex_record_fields : tuple[str, str], optional
+        See docstring for :py:func:`ak.to_json`.
+    convert_bytes : Callable, optional
+        See docstring for :py:func:`ak.to_json`.
+    convert_other : Callable, optional
+        See docstring for :py:func:`ak.to_json`.
+    storage_options : dict[str, Any], optional
+        Options passed to ``fsspec``.
+    compression : str, optional
+        Compress JSON data via ``fsspec``
+    compute : bool
+        Immediately compute the collection.
+
+    Returns
+    -------
+    Scalar or None
+        Computable Scalar object if ``compute`` is ``False``,
+        otherwise returns ``None``.
+
+    Examples
+    --------
+
+    >>> import dask_awkward as dak
+    >>> print("Hello, world!")
+
+    """
     storage_options = storage_options or {}
     fs, _ = url_to_fs(path, **storage_options)
     nparts = array.npartitions
     map_res = map_partitions(
-        _ToJsonFn(
+        ToJsonFn(
             fs,
             path,
             npartitions=nparts,
             compression=compression,
             line_delimited=line_delimited,
-            **kwargs,
+            num_indent_spaces=num_indent_spaces,
+            num_readability_spaces=num_readability_spaces,
+            nan_string=nan_string,
+            posinf_string=posinf_string,
+            neginf_string=neginf_string,
+            complex_record_fields=complex_record_fields,
+            convert_bytes=convert_bytes,
+            convert_other=convert_other,
         ),
         array,
         BlockIndex((nparts,)),
@@ -478,4 +836,99 @@ def to_json(
     res = new_scalar_object(graph, name=name, meta=None)
     if compute:
         res.compute()
+        return None
     return res
+
+
+@overload
+def json_type(original: str, add_null: Literal[False] = False) -> str:
+    ...
+
+
+@overload
+def json_type(original: str, add_null: Literal[True]) -> list[str]:
+    ...
+
+
+@overload
+def json_type(original: str, add_null: bool) -> str | list[str]:
+    ...
+
+
+@overload
+def json_type(original: list[str], add_null: bool) -> list[str]:
+    ...
+
+
+def json_type(original: str | list[str], add_null: bool = False) -> str | list[str]:
+    if isinstance(original, str):
+        if add_null:
+            return [original, "null"]
+        else:
+            return original
+    elif isinstance(original, list):
+        if add_null:
+            return original + ["null"]
+        else:
+            return original
+
+
+def array_param_is_string_or_bytestring(layout: Content) -> bool:
+    params = layout.parameters or {}
+    return params == {"__array__": "string"} or params == {"__array__": "bytestring"}
+
+
+def layout_to_jsonschema(
+    layout: Content,
+    existing_schema: dict | None = None,
+    title: str = "untitled",
+    description: str = "Auto generated by dask-awkward",
+    required: bool = False,
+    is_option: bool = False,
+) -> dict:
+    """Convert awkward array Layout to a JSON Schema dictionary."""
+    if existing_schema is None:
+        existing_schema = {
+            "title": title,
+            "description": description,
+            "type": "object",
+            "properties": {},
+        }
+    if layout.is_option:
+        layout_to_jsonschema(layout.content, existing_schema, is_option=True)
+    elif layout.is_record:
+        existing_schema["type"] = json_type("object", add_null=is_option)
+        existing_schema["properties"] = {}
+        if required:
+            existing_schema["required"] = layout.fields
+        for field in layout.fields:
+            existing_schema["properties"][field] = {"type": None}
+            layout_to_jsonschema(layout[field], existing_schema["properties"][field])
+    elif (layout.parameters or {}) == {"__array__": "categorical"}:
+        existing_schema["enum"] = layout.content.to_list()
+        existing_schema["type"] = layout_to_jsonschema(layout.content)["type"]
+    elif array_param_is_string_or_bytestring(layout):
+        existing_schema["type"] = json_type("string", add_null=is_option)
+    elif layout.is_list:
+        existing_schema["type"] = json_type("array", add_null=is_option)
+        if layout.is_regular:
+            existing_schema["minItems"] = layout.size
+            existing_schema["maxItems"] = layout.size
+        existing_schema["items"] = {}
+        layout_to_jsonschema(layout.content, existing_schema["items"])
+    elif layout.is_numpy:
+        if layout.dtype.kind == "i":
+            existing_schema["type"] = json_type("integer", add_null=is_option)
+        elif layout.dtype.kind == "f":
+            existing_schema["type"] = json_type("number", add_null=is_option)
+        elif layout.dtype.kind == "b":
+            existing_schema["type"] = json_type("boolean", add_null=is_option)
+    elif layout.is_indexed:
+        pass
+    elif layout.is_unknown:
+        existing_schema["type"] = "null"
+    elif layout.is_union:
+        existing_schema["type"] = [
+            layout_to_jsonschema(content)["type"] for content in layout.contents
+        ]
+    return existing_schema

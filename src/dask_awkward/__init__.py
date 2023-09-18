@@ -6,6 +6,7 @@ import dask_awkward.lib.inspect as inspect
 import dask_awkward.lib.operations as operations
 import dask_awkward.lib.optimize as optimize
 import dask_awkward.lib.reducers as reducers
+import dask_awkward.lib.str as str
 import dask_awkward.lib.structure as structure
 from dask_awkward.lib.core import Array, PartitionCompatibility, Record, Scalar
 from dask_awkward.lib.core import _type as type
@@ -28,7 +29,7 @@ from dask_awkward.lib.io.io import (
     to_dataframe,
     to_delayed,
 )
-from dask_awkward.lib.io.json import from_json, to_json
+from dask_awkward.lib.io.json import from_json, layout_to_jsonschema, to_json
 from dask_awkward.lib.io.parquet import from_parquet, to_parquet
 from dask_awkward.lib.io.text import from_text
 from dask_awkward.lib.operations import concatenate

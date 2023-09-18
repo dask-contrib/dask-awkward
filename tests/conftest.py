@@ -16,7 +16,7 @@ import dask_awkward.lib.testutils as daktu
 @pytest.fixture(scope="session")
 def single_record_file(tmp_path_factory: pytest.TempPathFactory) -> str:
     fname = tmp_path_factory.mktemp("data") / "single_record.json"
-    record = [{"record": [1, 2, 3]}]
+    record = {"record": [1, 2, 3]}
     with fsspec.open(fname, "w") as f:
         print(json.dumps(record), file=f)
     return str(fname)

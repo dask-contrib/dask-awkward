@@ -1089,7 +1089,17 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         raise DaskAwkwardNotImplemented(f"__getitem__ doesn't support where={where}.")
 
-    def __getitem__(self, where: Any) -> AwkwardDaskCollection:
+    @overload
+    def __getitem__(self, where: Array | str | Sequence[str] | slice) -> Array:
+        ...
+
+    @overload
+    def __getitem__(self, where: int) -> Scalar:
+        ...
+
+    def __getitem__(
+        self, where: Array | str | Sequence[str] | int | slice
+    ) -> Array | Scalar:
         """Select items from the collection.
 
         Heavily under construction.
@@ -1273,7 +1283,12 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         try:
             fn = getattr(dask_awkward, fn_name)
         except AttributeError:
-            return NotImplemented
+            try:
+                import dask_awkward.lib.str
+
+                fn = getattr(dask_awkward.str, fn_name)
+            except AttributeError:
+                return NotImplemented
         return fn(*args, **kwargs)
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):

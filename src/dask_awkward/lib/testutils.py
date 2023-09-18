@@ -5,7 +5,6 @@ from typing import Any
 
 import awkward as ak
 import numpy as np
-import pyarrow as pa
 from dask.base import is_dask_collection
 from packaging.version import Version
 
@@ -21,10 +20,6 @@ DEFAULT_SCHEDULER: Any = "sync"
 NP_GTE_1_25_0 = Version(np.__version__) >= Version("1.25.0")
 AK_LTE_2_2_3 = Version(ak.__version__) <= Version("2.2.3")
 BAD_NP_AK_MIXIN_VERSIONING = NP_GTE_1_25_0 and AK_LTE_2_2_3
-
-AK_LTE_2_3_3 = Version(ak.__version__) <= Version("2.3.3")
-PA_GTE_3_0_0 = Version(pa.__version__) >= Version("13.0.0")
-BAD_PA_AK_PARQUET_VERSIONING = AK_LTE_2_3_3 and PA_GTE_3_0_0
 
 
 def assert_eq(
@@ -130,7 +125,7 @@ def make_xy_point() -> dict[str, int]:
 
 
 def make_xy_point_str() -> dict[str, str]:
-    return {"x": str(_RG.randint(0, 10)), "y": str(_RG.randint(0, 10))}
+    return {"x": str(_RG.randint(0, 10)) * 3, "y": str(_RG.randint(0, 10)) * 4}
 
 
 def list_of_xy_points(n: int) -> list[dict[str, int]]:

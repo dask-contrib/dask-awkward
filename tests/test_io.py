@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import awkward as ak
@@ -11,89 +10,9 @@ from dask.delayed import delayed
 from fsspec.core import get_fs_token_paths
 from numpy.typing import DTypeLike
 
-try:
-    import ujson as json
-except ImportError:
-    import json  # type: ignore[no-redef]
-
 import dask_awkward as dak
 from dask_awkward.lib.io.io import _bytes_with_sample
 from dask_awkward.lib.testutils import assert_eq
-
-
-def test_force_by_lines_meta(ndjson_points_file: str) -> None:
-    daa1 = dak.from_json(
-        [ndjson_points_file] * 5,
-        derive_meta_kwargs={"force_by_lines": True},
-    )
-    daa2 = dak.from_json([ndjson_points_file] * 3)
-    assert daa1._meta is not None
-    assert daa2._meta is not None
-    f1 = daa1._meta.layout.form
-    f2 = daa2._meta.layout.form
-    assert f1 == f2
-
-
-def test_derive_json_meta_trigger_warning(ndjson_points_file: str) -> None:
-    with pytest.warns(UserWarning):
-        dak.from_json([ndjson_points_file], derive_meta_kwargs={"bytechunks": 64})
-
-
-def test_json_one_obj_per_file(single_record_file: str) -> None:
-    daa = dak.from_json(
-        [single_record_file] * 5,
-        one_obj_per_file=True,
-    )
-    caa = ak.concatenate([ak.from_json(Path(single_record_file))] * 5)
-    assert_eq(daa, caa)
-
-
-def test_json_delim_defined(ndjson_points_file: str) -> None:
-    source = [ndjson_points_file] * 6
-    daa = dak.from_json(source, delimiter=b"\n")
-
-    concretes = []
-    for s in source:
-        with open(s) as f:
-            for line in f:
-                concretes.append(json.loads(line))
-    caa = ak.from_iter(concretes)
-    assert_eq(
-        daa["points"][["x", "y"]],
-        caa["points"][["x", "y"]],
-    )
-
-
-def test_json_sample_rows_true(ndjson_points_file: str) -> None:
-    source = [ndjson_points_file] * 5
-
-    daa = dak.from_json(
-        source,
-        derive_meta_kwargs={"force_by_lines": True, "sample_rows": 2},
-    )
-
-    concretes = []
-    for s in source:
-        with open(s) as f:
-            for line in f:
-                concretes.append(json.loads(line))
-    caa = ak.from_iter(concretes)
-
-    assert_eq(daa, caa)
-
-
-def test_json_bytes_no_delim_defined(ndjson_points_file: str) -> None:
-    source = [ndjson_points_file] * 7
-    daa = dak.from_json(source, blocksize=650, delimiter=None)
-
-    concretes = []
-    for s in source:
-        with open(s) as f:
-            for line in f:
-                concretes.append(json.loads(line))
-
-    caa = ak.from_iter(concretes)
-    assert_eq(daa, caa)
 
 
 def test_to_and_from_dask_array(daa: dak.Array) -> None:
@@ -167,7 +86,7 @@ def test_column_ordering(tmpdir):
     c = b.map_partitions(assert_1)[["b", "a"]].map_partitions(assert_2)
 
     # arbitrary order here
-    assert set(list(dak.lib.necessary_columns(c).values())[0]) == {"b", "a"}
+    assert set(list(dak.necessary_columns(c).values())[0]) == {"b", "a"}
 
     arr = c.compute()
     assert arr.fields == ["b", "a"]  # output has required order
@@ -324,46 +243,6 @@ def test_to_bag(daa, caa):
     a = daa.to_dask_bag()
     for comprec, entry in zip(a.compute(), caa):
         assert comprec.tolist() == entry.tolist()
-
-
-def test_to_json(daa, tmpdir_factory):
-    tdir = str(tmpdir_factory.mktemp("json_temp"))
-
-    p1 = os.path.join(tdir, "z", "z")
-
-    dak.to_json(daa, p1, compute=True, line_delimited=True)
-    paths = list((Path(tdir) / "z" / "z").glob("part*.json"))
-    assert len(paths) == daa.npartitions
-    arrays = ak.concatenate([ak.from_json(p, line_delimited=True) for p in paths])
-    assert_eq(daa, arrays)
-
-    x = dak.from_json(os.path.join(p1, "*.json"))
-    assert_eq(arrays, x)
-
-    s = dak.to_json(
-        daa,
-        os.path.join(tdir, "file-*.json.gz"),
-        compute=False,
-        line_delimited=True,
-    )
-    s.compute()
-    r = dak.from_json(os.path.join(tdir, "*.json.gz"))
-    assert_eq(x, r)
-
-
-def test_to_json_raise_filenotfound(
-    daa: dak.Array,
-    tmpdir_factory: pytest.TempdirFactory,
-) -> None:
-    p = tmpdir_factory.mktemp("onelevel")
-    p2 = os.path.join(str(p), "two")
-    with pytest.raises(FileNotFoundError, match="Parent directory for output file"):
-        dak.to_json(
-            daa,
-            os.path.join(p2, "three", "four", "*.json"),
-            compute=True,
-            line_delimited=True,
-        )
 
 
 @pytest.mark.parametrize("optimize_graph", [True, False])
