@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import functools
+import sys
 from collections.abc import Callable
 from typing import Any, TypeVar
 
 import awkward.operations.str as akstr
-from typing_extensions import ParamSpec
+
+if sys.version_info < (3, 11, 0):
+    from typing_extensions import ParamSpec
+else:
+    from typing import ParamSpec
 
 from dask_awkward.lib.core import Array, map_partitions
 
