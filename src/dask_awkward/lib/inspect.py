@@ -74,7 +74,7 @@ def necessary_columns(*args: Any, traverse: bool = True) -> dict[str, list[str]]
         cols_this_dsk = o._necessary_columns(dsk)
 
         for name in cols_this_dsk:
-            neccols = cols_this_dsk[name]
+            neccols = cols_this_dsk[name]["data"]
             if not isinstance(dsk.layers[name], AwkwardInputLayer):
                 raise TypeError(f"Layer {name} should be an AwkwardInputLayer.")
             cols_this_dsk[name] = o._prune_wildcards(neccols, dsk.layers[name]._meta)

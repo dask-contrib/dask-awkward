@@ -120,11 +120,11 @@ def optimize_columns(dsk: HighLevelGraph) -> HighLevelGraph:
 
     layer_to_necessary_columns = _necessary_columns(dsk)
 
-    for name, neccols in layer_to_necessary_columns.items():
+    for name, neccolsdict in layer_to_necessary_columns.items():
         meta = layers[name]._meta
-        neccols = _prune_wildcards(neccols, meta)
+        nec_data_cols = _prune_wildcards(neccolsdict["data"], meta)
         layers[name] = layers[name].project_columns(
-            neccols,
+            nec_data_cols,
             necessary_shape_columns=None,
         )
 
@@ -421,32 +421,43 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
     return reports
 
 
-def _necessary_columns(dsk: HighLevelGraph) -> dict[str, list[str]]:
+def _wildcarded_list(touched_keys: set[str], layer_name: str) -> list[str]:
+    necessary_columns: list[str] = []
+    for key in sorted(touched_keys):
+        if key == layer_name:
+            continue
+
+        layer, column = key.split(".", 1)
+        if layer != layer_name:
+            continue
+
+        # List offsets are tagged as {key}.{LIST_KEY}. This routine resolve
+        # _columns_, so we use a wildcard to indicate that we want to load
+        # *any* child column of this list. If the list contains no records,
+        if column.endswith(LIST_KEY):
+            list_parent_path = column[: -(len(LIST_KEY) + 1)].rstrip(".")
+            if list_parent_path not in necessary_columns:
+                necessary_columns.append(f"{list_parent_path}.*")
+        else:
+            necessary_columns.append(column)
+
+    return necessary_columns
+
+
+def _necessary_columns(dsk: HighLevelGraph) -> dict[str, dict[str, list[str]]]:
     """Pair layer names with lists of necessary columns."""
     layer_to_columns = {}
     for name, report in _get_column_reports(dsk).items():
         touched_data_keys = {_ for _ in report.data_touched if _ is not None}
+        shape_touched_keys = {_ for _ in report.shape_touched if _ is not None}
 
-        necessary_columns = []
-        for key in sorted(touched_data_keys):
-            if key == name:
-                continue
+        data_necessary_columns = _wildcarded_list(touched_data_keys, name)
+        shape_necessary_columns = _wildcarded_list(shape_touched_keys, name)
 
-            layer, column = key.split(".", 1)
-            if layer != name:
-                continue
-
-            # List offsets are tagged as {key}.{LIST_KEY}. This routine resolve
-            # _columns_, so we use a wildcard to indicate that we want to load
-            # *any* child column of this list. If the list contains no records,
-            # then we load
-            if column.endswith(LIST_KEY):
-                list_parent_path = column[: -(len(LIST_KEY) + 1)].rstrip(".")
-                if list_parent_path not in necessary_columns:
-                    necessary_columns.append(f"{list_parent_path}.*")
-            else:
-                necessary_columns.append(column)
-        layer_to_columns[name] = necessary_columns
+        layer_to_columns[name] = {
+            "data": data_necessary_columns,
+            "shape": shape_necessary_columns,
+        }
     return layer_to_columns
 
 
