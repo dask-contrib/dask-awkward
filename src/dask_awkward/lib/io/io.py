@@ -116,11 +116,11 @@ class _FromListsFn:
     def __init__(self, behavior: dict | None = None):
         self.behavior = behavior
 
-    def __call__(self, x, **kwargs):
+    def __call__(self, x: list) -> ak.Array:
         return ak.Array(x, behavior=self.behavior)
 
 
-def from_lists(source: list[list[Any]], behavior: dict | None = None) -> Array:
+def from_lists(source: list, behavior: dict | None = None) -> Array:
     """Create an Array collection from a list of lists.
 
     Parameters
@@ -149,7 +149,7 @@ def from_lists(source: list[list[Any]], behavior: dict | None = None) -> Array:
     lists = list(source)
     divs = (0, *np.cumsum(list(map(len, lists))))
     return from_map(
-        _FromListsFn(),
+        _FromListsFn(behavior=behavior),
         lists,
         meta=typetracer_array(ak.Array(lists[0])),
         divisions=divs,

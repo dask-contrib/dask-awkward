@@ -6,7 +6,7 @@ import dask
 import dask_awkward as dak
 
 
-def test_multiple_computes(pq_points_dir) -> None:
+def test_multiple_computes(pq_points_dir: str) -> None:
     ds1 = dak.from_parquet(pq_points_dir)
     # add a columns= argument to force a new tokenize result in
     # from_parquet so we get two unique collections.
@@ -26,4 +26,4 @@ def test_multiple_computes(pq_points_dir) -> None:
     assert len(things3[1]) < len(things3[0])
 
     things = dask.compute(ds1.points, ds2.points.x, ds2.points.y, ds1.points.y, ds3)
-    assert things[-1].tolist() == ak.Array(lists[0] + lists[1]).tolist()
+    assert things[-1].tolist() == ak.Array(lists[0] + lists[1]).tolist()  # type: ignore

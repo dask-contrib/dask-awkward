@@ -1011,7 +1011,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             divisions=tuple(divisions),
         )
 
-    def _getitem_tuple(self, where: tuple[Any, ...]) -> Array:
+    def _getitem_tuple(self, where):
         if isinstance(where[0], int):
             return self._getitem_outer_int(where)
 
@@ -1049,7 +1049,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             f"Array.__getitem__ doesn't support multi object: {where}"
         )
 
-    def _getitem_single(self, where: Any) -> Array:
+    def _getitem_single(self, where):
         # a single string
         if isinstance(where, str):
             return self._getitem_outer_str_or_list(where, label=where)
@@ -1086,17 +1086,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         raise DaskAwkwardNotImplemented(f"__getitem__ doesn't support where={where}.")
 
-    @overload
-    def __getitem__(self, where: Array | str | Sequence[str] | slice) -> Array:
-        ...
-
-    @overload
-    def __getitem__(self, where: int) -> Scalar:
-        ...
-
-    def __getitem__(
-        self, where: Array | str | Sequence[str] | int | slice
-    ) -> Array | Scalar:
+    def __getitem__(self, where):
         """Select items from the collection.
 
         Heavily under construction.
