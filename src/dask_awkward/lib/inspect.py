@@ -87,7 +87,11 @@ def necessary_columns(*args: Any, traverse: bool = True) -> dict[str, list[str]]
     return out
 
 
-def sample(arr, factor: int | None = None, probability: float | None = None) -> Array:
+def sample(
+    arr: Array,
+    factor: int | None = None,
+    probability: float | None = None,
+) -> Array:
     """Decimate the data to a smaller number of rows.
 
     Must give either `factor` or `probability`.
@@ -111,5 +115,6 @@ def sample(arr, factor: int | None = None, probability: float | None = None) -> 
         return arr.map_partitions(lambda x: x[::factor], meta=arr._meta)
     else:
         return arr.map_partitions(
-            lambda x: x[np.random.random(len(x)) < probability], meta=arr._meta
+            lambda x: x[np.random.random(len(x)) < probability],  # type: ignore
+            meta=arr._meta,
         )

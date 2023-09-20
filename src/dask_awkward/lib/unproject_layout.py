@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from typing import Any
 
 import awkward as ak
 import numpy as np
@@ -53,7 +54,7 @@ dtype_of = {
 }
 
 
-def dummy_index_of(typecode: str, length: int, nplike) -> ak.index.Index:
+def dummy_index_of(typecode: str, length: int, nplike: Any) -> ak.index.Index:
     index_cls = index_of[typecode]
     dtype = dtype_of[typecode]
     return index_cls(PlaceholderArray(nplike, (length,), dtype), nplike=nplike)
@@ -117,6 +118,8 @@ def compatible(form: Form, layout: Content) -> bool:
 
     else:
         return False
+
+    return False
 
 
 def _unproject_layout(form, layout, length, backend):

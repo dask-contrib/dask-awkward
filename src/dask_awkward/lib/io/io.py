@@ -93,10 +93,10 @@ def from_awkward(
     """
     nrows = len(source)
     if nrows == 0:
-        locs = [None, None]
+        locs: tuple[None, ...] | tuple[int, ...] = (None, None)
     else:
         chunksize = int(math.ceil(nrows / npartitions))
-        locs = list(range(0, nrows, chunksize)) + [nrows]
+        locs = tuple(list(range(0, nrows, chunksize)) + [nrows])
     starts = locs[:-1]
     stops = locs[1:]
     meta = typetracer_array(source)
@@ -106,7 +106,7 @@ def from_awkward(
         stops,
         label=label or "from-awkward",
         token=tokenize(source, npartitions),
-        divisions=tuple(locs),
+        divisions=locs,
         meta=meta,
         behavior=behavior,
     )
@@ -383,7 +383,7 @@ def from_dask_array(array: DaskArray, behavior: dict | None = None) -> Array:
 
 
 def to_dataframe(
-    array,
+    array: Array,
     optimize_graph: bool = True,
     **kwargs: Any,
 ) -> DaskDataFrame:
@@ -463,7 +463,7 @@ def from_map(
     args: tuple[Any, ...] | None = None,
     label: str | None = None,
     token: str | None = None,
-    divisions: tuple[int, ...] | None = None,
+    divisions: tuple[int, ...] | tuple[None, ...] | None = None,
     meta: ak.Array | None = None,
     behavior: dict | None = None,
     **kwargs: Any,
@@ -603,7 +603,7 @@ def _bytes_with_sample(
     compression: str | None,
     delimiter: bytes,
     not_zero: bool,
-    blocksize: str | int,
+    blocksize: str | int | None,
     sample: str | int | bool,
 ) -> tuple[list[list[_BytesReadingInstructions]], bytes]:
     """Generate instructions for reading bytes from paths in a filesystem.
@@ -653,7 +653,7 @@ def _bytes_with_sample(
 
     if blocksize is None:
         offsets = [[0]] * len(paths)
-        lengths = [[None]] * len(paths)
+        lengths: list = [[None]] * len(paths)
     else:
         offsets = []
         lengths = []
@@ -717,21 +717,16 @@ def _bytes_with_sample(
         sample_size = parse_bytes(sample) if isinstance(sample, str) else sample
         with fs.open(paths[0], compression=compression) as f:
             # read block without seek (because we start at zero)
-            if delimiter is None:
-                sample_bytes = f.read(sample_size)
-            else:
-                sample_buff = f.read(sample_size)
-                while True:
-                    new = f.read(sample_size)
-                    if not new:
-                        break
-                    if delimiter in new:
-                        sample_buff = (
-                            sample_buff + new.split(delimiter, 1)[0] + delimiter
-                        )
-                        break
-                    sample_buff = sample_buff + new
-                sample_bytes = sample_buff
+            sample_buff = f.read(sample_size)
+            while True:
+                new = f.read(sample_size)
+                if not new:
+                    break
+                if delimiter in new:
+                    sample_buff = sample_buff + new.split(delimiter, 1)[0] + delimiter
+                    break
+                sample_buff = sample_buff + new
+            sample_bytes = sample_buff
 
         rfind = sample_bytes.rfind(delimiter)
         if rfind > 0:

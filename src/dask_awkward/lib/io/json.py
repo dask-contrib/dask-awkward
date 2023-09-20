@@ -418,13 +418,13 @@ def _from_json_bytes(
     )
 
     bytes_ingredients, the_sample_bytes = _bytes_with_sample(
-        fs,
-        paths,
-        compression,
-        delimiter,
-        not_zero,
-        blocksize,
-        sample_bytes,
+        fs=fs,
+        paths=paths,
+        compression=compression,
+        delimiter=delimiter,
+        not_zero=not_zero,
+        blocksize=blocksize,
+        sample=sample_bytes,
     )
 
     sample_array = ak.from_json(the_sample_bytes, line_delimited=True, **kwargs)
@@ -716,8 +716,8 @@ def to_json(
     convert_other: Callable | None = None,
     storage_options: dict[str, Any] | None = None,
     compression: str | None = None,
-    compute: Literal[False] = False,
-) -> Scalar:
+    compute: Literal[True] = True,
+) -> None:
     ...
 
 
@@ -736,8 +736,8 @@ def to_json(
     convert_other: Callable | None,
     storage_options: dict[str, Any] | None,
     compression: str | None,
-    compute: Literal[True],
-) -> None:
+    compute: Literal[False],
+) -> Scalar:
     ...
 
 
@@ -755,7 +755,7 @@ def to_json(
     convert_other: Callable | None = None,
     storage_options: dict[str, Any] | None = None,
     compression: str | None = None,
-    compute: bool = False,
+    compute: bool = True,
 ) -> Scalar | None:
     """Store Array collection in JSON text.
 

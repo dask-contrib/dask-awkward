@@ -68,7 +68,7 @@ def daa_old(ndjson_points1: str) -> dak.Array:
 
 
 @pytest.fixture(scope="session")
-def pq_points_dir(daa_old, tmp_path_factory) -> str:
+def pq_points_dir(daa_old: dak.Array, tmp_path_factory: pytest.TempPathFactory) -> str:
     pqdir = tmp_path_factory.mktemp("pqfiles")
     dak.to_parquet(daa_old, str(pqdir), compute=True)
     return str(pqdir)
@@ -168,7 +168,7 @@ def L4() -> list[list[dict[str, float]] | None]:
 
 @pytest.fixture(scope="session")
 def caa_parquet(caa: ak.Array, tmp_path_factory: pytest.TempPathFactory) -> str:
-    fname = tmp_path_factory.mktemp("parquet_data") / "caa.parquet"  # type: ignore
+    fname = tmp_path_factory.mktemp("parquet_data") / "caa.parquet"
     ak.to_parquet(caa, str(fname), extensionarray=False)
     return str(fname)
 

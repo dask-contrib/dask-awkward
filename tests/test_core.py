@@ -666,7 +666,7 @@ def test_optimize_chain_single(daa):
     arr = ((daa.points.x + 1) + 6).map_partitions(lambda x: x + 1)
 
     # first a simple test by calling the one optimisation directly
-    dsk2 = rewrite_layer_chains(arr.dask)
+    dsk2 = rewrite_layer_chains(arr.dask, arr.keys)
     (out,) = dask.compute(arr, optimize_graph=False)
     arr._dask = dsk2
     (out2,) = dask.compute(arr, optimize_graph=False)

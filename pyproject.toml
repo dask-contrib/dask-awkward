@@ -37,7 +37,7 @@ classifiers = [
 dependencies = [
   "awkward >=2.4.0",
   "dask >=2023.04.0",
-  "typing_extensions>=4.8.0; python_version < \"3.11\"",
+  "typing_extensions >=4.8.0",
 ]
 dynamic = ["version"]
 
@@ -142,6 +142,10 @@ warn_unreachable = true
 
 [[tool.mypy.overrides]]
   module = ["tlz.*"]
+  ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+  module = ["uproot.*"]
   ignore_missing_imports = true
 
 [tool.pyright]
