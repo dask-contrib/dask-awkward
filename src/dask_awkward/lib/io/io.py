@@ -763,9 +763,9 @@ def to_rdataframe(
         keys.append(k)
         if optimize_graph:
             graph = coll.__dask_graph__()
-            keys = coll.__dask_keys__()
+            dkeys = coll.__dask_keys__()
             layer = coll.__dask_layers__()[0]
-            graph = coll.__dask_optimize__(graph, keys)
+            graph = coll.__dask_optimize__(graph, dkeys)
             graph = HighLevelGraph.from_collections(layer, graph, dependencies=())
             colls.append(
                 new_array_object(
