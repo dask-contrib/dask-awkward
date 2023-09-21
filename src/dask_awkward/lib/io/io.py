@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, Mapping, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 import awkward as ak
 import numpy as np
@@ -738,3 +738,53 @@ def _bytes_with_sample(
             sample_bytes = sample_bytes[:rfind]
 
     return out, sample_bytes
+
+
+class ToRDataFrame:
+    def __init__(self, keys: Sequence[str], flatlist_as_rvec: bool = True) -> None:
+        self.keys = keys
+        self.flatlist_as_rvec = flatlist_as_rvec
+
+    def __call__(self, *args: ak.Array) -> Any:
+        # import awkward._connect.rdataframe.to_rdataframe
+
+        array_dict = {k: p for k, p in zip(self.keys, list(args))}
+        return ak.to_rdataframe(array_dict, flatlist_as_rvec=self.flatlist_as_rvec)
+
+
+def to_rdataframe(
+    arrays: dict[str, Array],
+    *,
+    flatlist_as_rvec: bool = True,
+    optimize_graph: bool = False,
+):
+    keys, colls = [], []
+    for k, coll in arrays.items():
+        keys.append(k)
+        if optimize_graph:
+            graph = coll.__dask_graph__()
+            keys = coll.__dask_keys__()
+            layer = coll.__dask_layers__()[0]
+            graph = coll.__dask_optimize__(graph, keys)
+            graph = HighLevelGraph.from_collections(layer, graph, dependencies=())
+            colls.append(
+                new_array_object(
+                    graph,
+                    layer,
+                    meta=coll._meta,
+                    divisions=coll.divisions,
+                )
+            )
+        else:
+            colls.append(coll)
+
+    fn = ToRDataFrame(keys, flatlist_as_rvec=flatlist_as_rvec)
+
+    mp_res = map_partitions(
+        fn,
+        *colls,
+        label="to-rdataframe",
+        meta=empty_typetracer(),
+    )
+
+    return to_delayed(mp_res, optimize_graph=False)
