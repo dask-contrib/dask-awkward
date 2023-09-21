@@ -758,25 +758,29 @@ def to_rdataframe(
     flatlist_as_rvec: bool = True,
     optimize_graph: bool = False,
 ):
+    import dask
+
+    if optimize_graph:
+        (arrays,) = dask.optimize(arrays)
     keys, colls = [], []
     for k, coll in arrays.items():
         keys.append(k)
-        if optimize_graph:
-            graph = coll.__dask_graph__()
-            dkeys = coll.__dask_keys__()
-            layer = coll.__dask_layers__()[0]
-            graph = coll.__dask_optimize__(graph, dkeys)
-            graph = HighLevelGraph.from_collections(layer, graph, dependencies=())
-            colls.append(
-                new_array_object(
-                    graph,
-                    layer,
-                    meta=coll._meta,
-                    divisions=coll.divisions,
-                )
-            )
-        else:
-            colls.append(coll)
+        # if optimize_graph:
+        #     graph = coll.__dask_graph__()
+        #     dkeys = coll.__dask_keys__()
+        #     layer = coll.__dask_layers__()[0]
+        #     graph = coll.__dask_optimize__(graph, dkeys)
+        #     graph = HighLevelGraph.from_collections(layer, graph, dependencies=())
+        #     colls.append(
+        #         new_array_object(
+        #             graph,
+        #             layer,
+        #             meta=coll._meta,
+        #             divisions=coll.divisions,
+        #         )
+        #     )
+        # else:
+        colls.append(coll)
 
     fn = ToRDataFrame(keys, flatlist_as_rvec=flatlist_as_rvec)
 
