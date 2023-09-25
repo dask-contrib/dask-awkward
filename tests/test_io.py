@@ -277,7 +277,7 @@ def test_to_dataframe_str(
     assert_eq(dd, df, check_index=False)
 
 
-def test_from_awkward_empty_array(daa) -> None:
+def test_from_awkward_empty_array(daa: dak.Array) -> None:
     # no form
     c1 = ak.Array([])
     assert len(c1) == 0

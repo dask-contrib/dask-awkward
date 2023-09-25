@@ -6,7 +6,7 @@ import logging
 import math
 import operator
 from collections.abc import Sequence
-from typing import Any, Literal, overload
+from typing import Any, Literal
 
 import awkward as ak
 import awkward.operations.ak_from_parquet as ak_from_parquet
@@ -461,72 +461,6 @@ class _ToParquetFn:
         return ak.to_parquet(
             data, filename, **self.kwargs, storage_options=self.storage_options
         )
-
-
-@overload
-def to_parquet(
-    array: Array,
-    destination: str,
-    list_to32: bool = False,
-    string_to32: bool = True,
-    bytestring_to32: bool = True,
-    emptyarray_to: Any | None = None,
-    categorical_as_dictionary: bool = False,
-    extensionarray: bool = False,
-    count_nulls: bool = True,
-    compression: str | dict | None = "zstd",
-    compression_level: int | dict | None = None,
-    row_group_size: int | None = 64 * 1024 * 1024,
-    data_page_size: int | None = None,
-    parquet_flavor: Literal["spark"] | None = None,
-    parquet_version: Literal["1.0"] | Literal["2.4"] | Literal["2.6"] = "2.4",
-    parquet_page_version: Literal["1.0"] | Literal["2.0"] = "1.0",
-    parquet_metadata_statistics: bool | dict = True,
-    parquet_dictionary_encoding: bool | dict = False,
-    parquet_byte_stream_split: bool | dict = False,
-    parquet_coerce_timestamps: Literal["ms"] | Literal["us"] | None = None,
-    parquet_old_int96_timestamps: bool | None = None,
-    parquet_compliant_nested: bool = False,
-    parquet_extra_options: dict | None = None,
-    storage_options: dict[str, Any] | None = None,
-    write_metadata: bool = False,
-    compute: Literal[True] = True,
-    prefix: str | None = None,
-) -> None:
-    ...
-
-
-@overload
-def to_parquet(
-    array: Array,
-    destination: str,
-    list_to32: bool,
-    string_to32: bool,
-    bytestring_to32: bool,
-    emptyarray_to: Any | None,
-    categorical_as_dictionary: bool,
-    extensionarray: bool,
-    count_nulls: bool,
-    compression: str | dict | None,
-    compression_level: int | dict | None,
-    row_group_size: int | None,
-    data_page_size: int | None,
-    parquet_flavor: Literal["spark"] | None,
-    parquet_version: Literal["1.0"] | Literal["2.4"] | Literal["2.6"],
-    parquet_page_version: Literal["1.0"] | Literal["2.0"],
-    parquet_metadata_statistics: bool | dict,
-    parquet_dictionary_encoding: bool | dict,
-    parquet_byte_stream_split: bool | dict,
-    parquet_coerce_timestamps: Literal["ms"] | Literal["us"] | None,
-    parquet_old_int96_timestamps: bool | None,
-    parquet_compliant_nested: bool,
-    parquet_extra_options: dict | None,
-    storage_options: dict[str, Any] | None,
-    write_metadata: bool,
-    compute: Literal[False],
-    prefix: str | None,
-) -> Scalar:
-    ...
 
 
 def to_parquet(

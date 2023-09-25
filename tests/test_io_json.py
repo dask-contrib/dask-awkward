@@ -190,7 +190,7 @@ def test_to_and_from_json(
 
     p1 = os.path.join(tdir, "z", "z")
 
-    dak.to_json(array=daa, path=p1, compute=True)
+    dak.to_json(daa, p1)
     paths = list((Path(tdir) / "z" / "z").glob("part*.json"))
     assert len(paths) == daa.npartitions
     arrays = ak.concatenate([ak.from_json(p, line_delimited=True) for p in paths])
@@ -205,6 +205,7 @@ def test_to_and_from_json(
         compression=compression,
         compute=False,
     )
+    assert isinstance(s, dak.Scalar)
     s.compute()
     suffix = "gz" if compression == "gzip" else compression
     r = dak.from_json(os.path.join(tdir, f"*.json.{suffix}"))

@@ -70,7 +70,7 @@ def daa_old(ndjson_points1: str) -> dak.Array:
 @pytest.fixture(scope="session")
 def pq_points_dir(daa_old: dak.Array, tmp_path_factory: pytest.TempPathFactory) -> str:
     pqdir = tmp_path_factory.mktemp("pqfiles")
-    dak.to_parquet(daa_old, str(pqdir), compute=True)
+    dak.to_parquet(daa_old, str(pqdir))
     return str(pqdir)
 
 

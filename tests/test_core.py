@@ -145,7 +145,7 @@ def test_partitions_divisions(ndjson_points_file: str) -> None:
     assert not t1.known_divisions
     t2 = daa.partitions[1]
     assert t2.known_divisions
-    assert t2.divisions == (0, divs[2] - divs[1])
+    assert t2.divisions == (0, divs[2] - divs[1])  # type: ignore
 
 
 def test_array_rebuild(ndjson_points_file: str) -> None:
@@ -178,7 +178,7 @@ def test_typestr(daa: Array) -> None:
     assert len(daa._typestr(max=20)) == 20 + extras
 
 
-def test_head(daa: Array):
+def test_head(daa: Array) -> None:
     out = daa.head(1)
     assert out.tolist() == daa.compute()[:1].tolist()
 
@@ -233,7 +233,7 @@ def test_scalar_getitem_getattr() -> None:
         slice(None, None, 3),
     ],
 )
-def test_getitem_zero_slice_single(daa: Array, where):
+def test_getitem_zero_slice_single(daa: Array, where: slice) -> None:
     out = daa[where]
     assert out.compute().tolist() == daa.compute()[where].tolist()
     assert len(out) == len(daa.compute()[where])
@@ -257,7 +257,11 @@ def test_getitem_zero_slice_single(daa: Array, where):
     ],
 )
 @pytest.mark.parametrize("rest", [slice(None, None, None), slice(0, 1)])
-def test_getitem_zero_slice_tuple(daa: Array, where, rest):
+def test_getitem_zero_slice_tuple(
+    daa: Array,
+    where: slice,
+    rest: slice,
+) -> None:
     out = daa[where, rest]
     assert out.compute().tolist() == daa.compute()[where, rest].tolist()
     assert len(out) == len(daa.compute()[where, rest])
@@ -476,7 +480,7 @@ def test_compatible_partitions_after_slice() -> None:
     assert_eq(lazy, ccrt)
 
     # sanity
-    assert dak.compatible_partitions(lazy, lazy + 2)
+    assert dak.compatible_partitions(lazy, lazy + 2)  # type: ignore
     assert dak.compatible_partitions(lazy, dak.num(lazy, axis=1) > 2)
 
     assert not dak.compatible_partitions(lazy[:-2], lazy)
