@@ -426,7 +426,7 @@ def _necessary_columns(dsk: HighLevelGraph) -> dict[str, list[str]]:
 
         necessary_columns = []
         for key in sorted(touched_data_keys):
-            if key == name:
+            if key == name or key == "None":
                 continue
 
             layer, column = key.split(".", 1)
