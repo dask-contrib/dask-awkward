@@ -231,6 +231,9 @@ def rewrite_layer_chains(dsk: HighLevelGraph, keys: Any) -> HighLevelGraph:
     chains = []
     deps = copy.copy(dsk.dependencies)
 
+    # TODO: add some comments to the chaining algorithm w.r.t. when we
+    # use it and when we don't.
+    required_layers = {k[0] for k in keys}
     layers = {}
     # find chains; each chain list is at least two keys long
     dependents = dsk.dependents
@@ -250,6 +253,7 @@ def rewrite_layer_chains(dsk: HighLevelGraph, keys: Any) -> HighLevelGraph:
             and dsk.dependencies[list(children)[0]] == {lay}
             and isinstance(dsk.layers[list(children)[0]], AwkwardBlockwiseLayer)
             and len(dsk.layers[lay]) == len(dsk.layers[list(children)[0]])
+            and lay not in required_layers
         ):
             # walk forwards
             lay = list(children)[0]
@@ -263,6 +267,7 @@ def rewrite_layer_chains(dsk: HighLevelGraph, keys: Any) -> HighLevelGraph:
             and dependents[list(parents)[0]] == {lay}
             and isinstance(dsk.layers[list(parents)[0]], AwkwardBlockwiseLayer)
             and len(dsk.layers[lay]) == len(dsk.layers[list(parents)[0]])
+            and list(parents)[0] not in required_layers
         ):
             # walk backwards
             lay = list(parents)[0]
