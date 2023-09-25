@@ -3,11 +3,14 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
 
+from typing_extensions import ParamSpec
+
 if TYPE_CHECKING:
     from dask_awkward.lib.core import Array
 
 
 T = TypeVar("T")
+P = ParamSpec("P")
 
 
 class DaskAwkwardNotImplemented(NotImplementedError):
@@ -68,8 +71,8 @@ class LazyInputsDict(Mapping):
         return ((i,) for i in range(len(self.inputs)))
 
 
-def borrow_docstring(original: Callable[..., T]) -> Callable[..., T]:
-    def wrapper(method):
+def borrow_docstring(original: Callable) -> Callable:
+    def wrapper(method: Callable[P, T]) -> Callable[P, T]:
         method.__doc__ = (
             f"Partitioned version of ak.{original.__name__}\n" f"{original.__doc__}"
         )

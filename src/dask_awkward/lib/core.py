@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any, Literal, TypeVar, Union, overload
 import awkward as ak
 import dask.config
 import numpy as np
+from awkward._do import remove_structure as ak_do_remove_structure
 from awkward._nplikes.typetracer import (
     MaybeNone,
     OneOf,
@@ -833,26 +834,22 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             label=label,
         )
 
-    def _getitem_outer_bool_or_int_lazy_array(
-        self, where: Array | tuple[Any, ...]
-    ) -> Any:
+    def _getitem_outer_bool_or_int_lazy_array(self, where):
         ba = where if isinstance(where, Array) else where[0]
         if partition_compatibility(self, ba) == PartitionCompatibility.NO:
             raise IncompatiblePartitions("getitem", self, ba)
 
-        new_meta: Any | None = None
-        if self._meta is not None:
-            if isinstance(where, tuple):
-                raise DaskAwkwardNotImplemented(
-                    "tuple style input boolean/int selection is not supported."
-                )
-            elif isinstance(where, Array):
-                new_meta = self._meta[where._meta]
-                return self.map_partitions(
-                    operator.getitem,
-                    where,
-                    meta=new_meta,
-                )
+        if isinstance(where, tuple):
+            raise DaskAwkwardNotImplemented(
+                "tuple style input boolean/int selection is not supported."
+            )
+
+        new_meta = self._meta[where._meta]
+        return self.map_partitions(
+            operator.getitem,
+            where,
+            meta=new_meta,
+        )
 
     def _getitem_outer_str_or_list(
         self,
@@ -942,9 +939,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         else:
             return new_scalar_object(hlg, name, meta=new_meta)
 
-    def _getitem_slice_on_zero(self, where: tuple[slice, ...]):
+    def _getitem_slice_on_zero(self, where):
         # normalise
-        sl: slice = where[0]
+        sl = where[0]
         rest = tuple(where[1:])
         step = sl.step or 1
         start = sl.start or 0
@@ -1014,7 +1011,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             divisions=tuple(divisions),
         )
 
-    def _getitem_tuple(self, where: tuple[Any, ...]) -> Array:
+    def _getitem_tuple(self, where):
         if isinstance(where[0], int):
             return self._getitem_outer_int(where)
 
@@ -1052,7 +1049,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             f"Array.__getitem__ doesn't support multi object: {where}"
         )
 
-    def _getitem_single(self, where: Any) -> Array:
+    def _getitem_single(self, where):
         # a single string
         if isinstance(where, str):
             return self._getitem_outer_str_or_list(where, label=where)
@@ -1089,17 +1086,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         raise DaskAwkwardNotImplemented(f"__getitem__ doesn't support where={where}.")
 
-    @overload
-    def __getitem__(self, where: Array | str | Sequence[str] | slice) -> Array:
-        ...
-
-    @overload
-    def __getitem__(self, where: int) -> Scalar:
-        ...
-
-    def __getitem__(
-        self, where: Array | str | Sequence[str] | int | slice
-    ) -> Array | Scalar:
+    def __getitem__(self, where):
         """Select items from the collection.
 
         Heavily under construction.
@@ -1369,9 +1356,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         By default this is then processed eagerly and returned.
         """
-        out: Array = self.partitions[0].map_partitions(
-            lambda x: x[:nrow], meta=self._meta
-        )
+        out = self.partitions[0].map_partitions(lambda x: x[:nrow], meta=self._meta)
         if compute:
             return out.compute()
         if self.known_divisions:
@@ -1727,16 +1712,13 @@ def map_partitions(
         )
 
 
-PartialReductionType = ak.Array
-
-
 def _chunk_reducer_non_positional(
-    chunk: ak.Array | PartialReductionType,
+    chunk: ak.Array,
     is_axis_none: bool,
     *,
     reducer: Callable,
     mask_identity: bool,
-) -> PartialReductionType:
+) -> ak.Array:
     return reducer(
         chunk,
         keepdims=True,
@@ -1746,14 +1728,14 @@ def _chunk_reducer_non_positional(
 
 
 def _concat_reducer_non_positional(
-    partials: list[PartialReductionType], is_axis_none: bool
+    partials: list[ak.Array], is_axis_none: bool
 ) -> ak.Array:
     concat_axis = -1 if is_axis_none else 0
     return ak.concatenate(partials, axis=concat_axis)
 
 
 def _finalise_reducer_non_positional(
-    partial: PartialReductionType,
+    partial: ak.Array,
     is_axis_none: bool,
     *,
     reducer: Callable,
@@ -1771,7 +1753,7 @@ def _finalise_reducer_non_positional(
 def _prepare_axis_none_chunk(chunk: ak.Array) -> ak.Array:
     # TODO: this is private Awkward code. We should figure out how to export it
     # if needed
-    (layout,) = ak._do.remove_structure(
+    (layout,) = ak_do_remove_structure(
         ak.to_layout(chunk),
         flatten_records=False,
         drop_nones=False,
@@ -1785,7 +1767,7 @@ def non_trivial_reduction(
     *,
     label: str,
     array: Array,
-    axis: Literal[0] | None,
+    axis: int | None,
     is_positional: bool,
     keepdims: bool,
     mask_identity: bool,
@@ -1794,7 +1776,7 @@ def non_trivial_reduction(
     token: str | None = None,
     dtype: Any | None = None,
     split_every: int | bool | None = None,
-):
+) -> Array | Scalar:
     if is_positional:
         raise NotImplementedError("positional reducers at axis=0 or axis=None")
 
@@ -1807,8 +1789,9 @@ def non_trivial_reduction(
     if combiner is None:
         combiner = reducer
 
-    if is_positional:
-        assert combiner is reducer
+    # is_positional == True is not implemented
+    # if is_positional:
+    #     assert combiner is reducer
 
     # For `axis=None`, we prepare each array to have the following structure:
     #   [[[ ... [x1 x2 x3 ... xN] ... ]]] (length-1 outer lists)

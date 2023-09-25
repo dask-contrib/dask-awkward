@@ -191,7 +191,7 @@ def test_to_parquet_with_prefix(
     tmp_path: pathlib.Path,
     prefix: str | None,
 ) -> None:
-    dak.to_parquet(daa, str(tmp_path), prefix=prefix, compute=True)
+    dak.to_parquet(daa, str(tmp_path), prefix=prefix)
     files = list(tmp_path.glob("*"))
     for ifile in files:
         fname = ifile.parts[-1]

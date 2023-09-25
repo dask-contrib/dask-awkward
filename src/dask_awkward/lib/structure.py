@@ -820,7 +820,7 @@ def unzip(
     if len(fields) == 0:
         return (array,)
     else:
-        return tuple(array[field] for field in fields)  # type: ignore
+        return tuple(array[field] for field in fields)
 
 
 @borrow_docstring(ak.values_astype)
@@ -1141,7 +1141,7 @@ def _repartition_func(*stuff):
     return ak.concatenate(data)
 
 
-def repartition_layer(arr: Array, key: str, divisions: tuple[int, ...]):
+def repartition_layer(arr: Array, key: str, divisions: tuple[int, ...]) -> dict:
     layer = {}
 
     indivs = arr.defined_divisions
