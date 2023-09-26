@@ -13,7 +13,8 @@ from dask.highlevelgraph import HighLevelGraph
 from dask.utils import funcname, is_integer, parse_bytes
 from fsspec.utils import infer_compression
 
-from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardInputLayer
+from dask_awkward.layers import ImplementsIOFunction, AwkwardBlockwiseLayer, AwkwardInputLayer, \
+    ImplementsBufferProjection
 from dask_awkward.layers.layers import AwkwardMaterializedLayer
 from dask_awkward.lib.core import (
     empty_typetracer,
@@ -42,11 +43,11 @@ class ImplementsFormTransformation(Protocol):
         raise NotImplementedError
 
     def create_column_mapping_and_key(
-        self,
-        column_source: Any,
-        start: int,
-        stop: int,
-        **kwargs: Any,
+            self,
+            column_source: Any,
+            start: int,
+            stop: int,
+            **kwargs: Any,
     ) -> tuple[Mapping[str, ak.Array], Callable[[str, ak.forms.Form, str], str] | str]:
         raise NotImplementedError
 
@@ -60,10 +61,10 @@ class _FromAwkwardFn:
 
 
 def from_awkward(
-    source: ak.Array,
-    npartitions: int,
-    behavior: dict | None = None,
-    label: str | None = None,
+        source: ak.Array,
+        npartitions: int,
+        behavior: dict | None = None,
+        label: str | None = None,
 ) -> Array:
     """Create an Array collection from a concrete :class:`awkward.Array` object.
 
@@ -153,16 +154,17 @@ def from_lists(source: list[list[Any]], behavior: dict | None = None) -> Array:
         lists,
         meta=typetracer_array(ak.Array(lists[0])),
         divisions=divs,
+        behavior=behavior,
         label="from-lists",
     )
 
 
 def from_delayed(
-    source: list[Delayed] | Delayed,
-    meta: ak.Array | None = None,
-    behavior: dict | None = None,
-    divisions: tuple[int | None, ...] | None = None,
-    prefix: str = "from-delayed",
+        source: list[Delayed] | Delayed,
+        meta: ak.Array | None = None,
+        behavior: dict | None = None,
+        divisions: tuple[int | None, ...] | None = None,
+        prefix: str = "from-delayed",
 ) -> Array:
     """Create an Array collection from a set of :class:`~dask.delayed.Delayed` objects.
 
@@ -244,10 +246,10 @@ def to_dask_bag(array: Array) -> DaskBag:
 
 
 def to_dask_array(
-    array: Array,
-    *,
-    dtype: Any = None,
-    optimize_graph: bool = True,
+        array: Array,
+        *,
+        dtype: Any = None,
+        optimize_graph: bool = True,
 ) -> DaskArray:
     """Convert Array collection to a :class:`dask.array.Array` collection.
 
@@ -383,9 +385,9 @@ def from_dask_array(array: DaskArray, behavior: dict | None = None) -> Array:
 
 
 def to_dataframe(
-    array,
-    optimize_graph: bool = True,
-    **kwargs: Any,
+        array,
+        optimize_graph: bool = True,
+        **kwargs: Any,
 ) -> DaskDataFrame:
     """Convert :class:`dask_awkward.Array` collection to :class:`~dask.dataframe.DataFrame`.
 
@@ -436,11 +438,11 @@ class PackedArgCallable:
     """
 
     def __init__(
-        self,
-        func: Callable,
-        args: tuple[Any, ...] | None = None,
-        kwargs: dict[str, Any] | None = None,
-        packed: bool = False,
+            self,
+            func: Callable,
+            args: tuple[Any, ...] | None = None,
+            kwargs: dict[str, Any] | None = None,
+            packed: bool = False,
     ):
         self.func = func
         self.args = args
@@ -458,15 +460,15 @@ class PackedArgCallable:
 
 
 def from_map(
-    func: Callable,
-    *iterables: Iterable,
-    args: tuple[Any, ...] | None = None,
-    label: str | None = None,
-    token: str | None = None,
-    divisions: tuple[int, ...] | None = None,
-    meta: ak.Array | None = None,
-    behavior: dict | None = None,
-    **kwargs: Any,
+        func: ImplementsIOFunction | ImplementsBufferProjection,
+        *iterables: Iterable,
+        args: tuple[Any, ...] | None = None,
+        label: str | None = None,
+        token: str | None = None,
+        divisions: tuple[int, ...] | None = None,
+        meta: ak.Array | None = None,
+        behavior: dict | None = None,
+        **kwargs: Any,
 ) -> Array:
     """Create an Array collection from a custom mapping.
 
@@ -547,6 +549,8 @@ def from_map(
     name = f"{label}-{token}"
 
     # Define io_func
+
+    # FIXME: projection etc.
     if packed or args or kwargs:
         func = PackedArgCallable(
             func,
@@ -557,7 +561,6 @@ def from_map(
 
     dsk = AwkwardInputLayer(
         name=name,
-        columns=None,
         inputs=inputs,
         io_func=func,
         meta=meta,
@@ -598,13 +601,13 @@ class _BytesReadingInstructions:
 
 
 def _bytes_with_sample(
-    fs: AbstractFileSystem,
-    paths: list[str],
-    compression: str | None,
-    delimiter: bytes,
-    not_zero: bool,
-    blocksize: str | int,
-    sample: str | int | bool,
+        fs: AbstractFileSystem,
+        paths: list[str],
+        compression: str | None,
+        delimiter: bytes,
+        not_zero: bool,
+        blocksize: str | int,
+        sample: str | int | bool,
 ) -> tuple[list[list[_BytesReadingInstructions]], bytes]:
     """Generate instructions for reading bytes from paths in a filesystem.
 
@@ -727,7 +730,7 @@ def _bytes_with_sample(
                         break
                     if delimiter in new:
                         sample_buff = (
-                            sample_buff + new.split(delimiter, 1)[0] + delimiter
+                                sample_buff + new.split(delimiter, 1)[0] + delimiter
                         )
                         break
                     sample_buff = sample_buff + new

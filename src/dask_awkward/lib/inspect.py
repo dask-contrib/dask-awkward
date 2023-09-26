@@ -12,7 +12,9 @@ if TYPE_CHECKING:
     from dask_awkward.lib.core import Array
 
 
-def necessary_columns(*args: Any, traverse: bool = True) -> dict[str, list[str]]:
+def necessary_buffers(
+    *args: Any, traverse: bool = True
+) -> dict[str, dict[str, set[str]]]:
     r"""Determine the columns necessary to compute a collection.
 
     Parameters
@@ -26,11 +28,10 @@ def necessary_columns(*args: Any, traverse: bool = True) -> dict[str, list[str]]
 
     Returns
     -------
-    dict[str, list[str]]
+    dict[str, dict[str, set[str]]]
         Mapping that pairs the input layers in the graph to the
-        columns that have been determined necessary from that layer.
-        These are not necessarily in the same order as the original
-        input.
+        (data, shape) buffers that have been determined necessary from that layer.
+        These are not necessarily in the same order as the original input.
 
     Examples
     --------
@@ -55,8 +56,8 @@ def necessary_columns(*args: Any, traverse: bool = True) -> dict[str, list[str]]
     >>> ds.baz.fields
     ["x", "y"]
     >>> x = ds.bar + ds.baz.x
-    >>> dak.necessary_columns(x)
-    {"from-parquet-abc123": ["bar", "baz.x"]}
+    >>> dak.necessary_buffers(x)
+    {"from-parquet-abc123": {"data: ["bar", "baz.x"], "shape": []}}
 
     Notice that ``foo`` and ``baz.y`` are not determined to be
     necessary.
@@ -68,21 +69,15 @@ def necessary_columns(*args: Any, traverse: bool = True) -> dict[str, list[str]]
     if not collections:
         return {}
 
-    out: dict[str, list[str]] = {}
+    out: dict[str, dict[str, set[str]]] = {}
     for obj in collections:
         dsk = obj if isinstance(obj, HighLevelGraph) else obj.dask
-        cols_this_dsk = o._necessary_columns(dsk)
+        dsk_buffers = o._necessary_buffers(dsk)
 
-        for name in cols_this_dsk:
-            neccols = cols_this_dsk[name]["data"]
-            if not isinstance(dsk.layers[name], AwkwardInputLayer):
-                raise TypeError(f"Layer {name} should be an AwkwardInputLayer.")
-            cols_this_dsk[name] = o._prune_wildcards(neccols, dsk.layers[name]._meta)
-
-        for key, cols in cols_this_dsk.items():
-            prev = out.get(key, [])
-            update = list(set(prev + cols))
-            out[key] = update
+        for key, buffers in dsk_buffers.items():
+            out_key_buffers = out.setdefault(key, {"data": set(), "shape": set()})
+            out_key_buffers["data"].update(buffers["data"])
+            out_key_buffers["shape"].update(buffers["shape"])
 
     return out
 

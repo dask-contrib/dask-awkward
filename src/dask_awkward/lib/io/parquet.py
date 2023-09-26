@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+import copy
 import itertools
 import logging
 import math
@@ -65,12 +66,42 @@ class _FromParquetFn:
     def __call__(self, source: Any) -> ak.Array:
         ...
 
+    def prepare_annotated_form(self) -> tuple[Form, dict]:
+        path_stash = {}
+        children_stash = {}
+
+        def set_form_keys(form: Form, key: str, path: tuple[str, ...]):
+            # Record path for any form key
+            path_stash[key] = path
+            # If the form is a record we need to loop over all fields in the
+            # record and set form that include the field name; this will keep
+            # recursing as well.
+            if form.is_record:
+                for field in form.fields:
+                    full_key = f"{key}.{field}"
+                    set_form_keys(form.content(field), full_key, path + (field,))
+                    # Keep track of children
+                    children_stash.setdefault(key, []).append(full_key)
+
+            elif form.is_union:
+                for i, entry in enumerate(form.contents):
+                    set_form_keys(entry, f"{key}#{i}", path)
+
+            # NumPy like array is easy
+            elif form.is_numpy:
+                form.form_key = key
+
+            # Anything else grab the content and keep recursing
+            else:
+                set_form_keys(form.content, f"{key}.content", path)
+
+        form = copy.deepcopy(self.form)
+        set_form_keys(form, "root", ())
+        return form, {"path": path_stash, "children": children_stash}
+
     @abc.abstractmethod
-    def project_columns(
-        self,
-        columns: Sequence[str] | None,
-        orignal_form: Form | None = None,
-        necessary_shape_columns: Sequence[str] | None = None,
+    def project_buffers(
+        self, data_buffers: set[str], shape_buffers: set[str], stash: dict
     ) -> _FromParquetFn:
         ...
 
@@ -127,17 +158,43 @@ class _FromParquetFileWiseFn(_FromParquetFn):
         )
         return ak.Array(unproject_layout(self.original_form, array.layout))
 
-    def project_columns(
+    def project_buffers(
         self,
-        columns: Sequence[str] | None,
-        original_form: Form | None = None,
-        necessary_shape_columns: Sequence[str] | None = None,
+        data_buffers: set[str],
+        shape_buffers: set[str],
+        stash,
     ) -> _FromParquetFileWiseFn:
         if not _use_optimization():
             return self
 
-        if columns is None:
-            return self
+        form_key_to_child_keys = stash["children"]
+        form_key_to_path = stash["path"]
+
+        wildcard_form_keys = []
+        columns = set()
+
+        for buffer_key, buffer_name in data_buffers:
+            form_key, attribute = buffer_key.rsplit("-", 1)
+
+            if attribute in ("starts", "stops", "offsets"):
+                wildcard_form_keys.append(form_key)
+            else:
+                columns.add(form_key_to_path[form_key])
+
+        for form_key in wildcard_form_keys:
+            try:
+                child_keys = form_key_to_child_keys[form_key]
+            except KeyError:
+                columns.add(form_key_to_path[form_key])
+            else:
+                child_column: tuple[str]
+                for child_form_key in child_keys:
+                    child_column = form_key_to_path[child_form_key]
+                    if child_column in columns:
+                        break
+                else:
+                    # Add the final column
+                    columns.add(child_column)
 
         new_form = self.form.select_columns(columns)
         new = _FromParquetFileWiseFn(
@@ -145,7 +202,7 @@ class _FromParquetFileWiseFn(_FromParquetFn):
             form=new_form,
             listsep=self.listsep,
             unnamed_root=self.unnamed_root,
-            original_form=original_form,
+            original_form=self.original_form,
             behavior=self.behavior,
             **self.kwargs,
         )

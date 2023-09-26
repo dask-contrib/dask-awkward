@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import copy
+import itertools
 import pickle
 from collections.abc import Callable, Mapping
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
 from dask.highlevelgraph import MaterializedLayer
@@ -12,6 +13,8 @@ from dask.layers import DataFrameTreeReduction
 from dask_awkward.utils import LazyInputsDict
 
 if TYPE_CHECKING:
+    from awkward import Array as AwkwardArray
+    from awkward.forms import Form
     from awkward.typetracer import TypeTracerReport
 
 
@@ -24,12 +27,12 @@ class AwkwardBlockwiseLayer(Blockwise):
         ob.__dict__.update(layer.__dict__)
         return ob
 
-    def mock(self) -> tuple[AwkwardBlockwiseLayer, Any | None]:
+    def mock(self) -> AwkwardBlockwiseLayer:
         layer = copy.copy(self)
         nb = layer.numblocks
         layer.numblocks = {k: tuple(1 for _ in v) for k, v in nb.items()}
         layer.__dict__.pop("_dims", None)
-        return layer, None
+        return layer
 
     def __getstate__(self) -> dict:
         d = self.__dict__.copy()
@@ -45,6 +48,24 @@ class AwkwardBlockwiseLayer(Blockwise):
         return "Awkward" + super().__repr__()
 
 
+T = TypeVar("T")
+
+
+class ImplementsIOFunction(Protocol):
+    def __call__(self, *args, **kwargs) -> AwkwardArray:
+        ...
+
+
+class ImplementsBufferProjection(ImplementsIOFunction, Protocol):
+    def prepare_annotated_form(self) -> tuple[Form, T]:
+        ...
+
+    def project_buffers(
+        self, data_buffers: set[str], shape_buffers: set[str], stash: T
+    ) -> ImplementsIOFunction:
+        ...
+
+
 class AwkwardInputLayer(AwkwardBlockwiseLayer):
     """A layer known to perform IO and produce Awkward arrays
 
@@ -55,9 +76,8 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         self,
         *,
         name: str,
-        columns: str | list[str] | None,
         inputs: Any,
-        io_func: Callable,
+        io_func: ImplementsIOFunction | ImplementsBufferProjection,
         meta: Any,
         behavior: dict | None,
         label: str | None = None,
@@ -66,7 +86,6 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         annotations: Mapping[str, Any] | None = None,
     ) -> None:
         self.name = name
-        self.columns = columns
         self.inputs = inputs
         self.io_func = io_func
         self.label = label
@@ -93,7 +112,7 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
     def __repr__(self) -> str:
         return f"AwkwardInputLayer<{self.output}>"
 
-    def mock(self) -> tuple[AwkwardInputLayer, TypeTracerReport]:
+    def mock(self) -> tuple[AwkwardInputLayer, TypeTracerReport, frozenset[str], T]:
         """Mock the input layer as starting with a dataless typetracer.
 
         This method is used to create new dask task graphs that
@@ -128,25 +147,28 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         -------
         AwkwardInputLayer
             Copy of the input layer with data-less input.
-        TypeTracerReport
-            The mutable report object that is updated upon computation
-            of a graph starting with the new AwkwardInputLayer.
 
         """
         import awkward as ak
 
-        from dask_awkward.lib._utils import set_form_keys
+        # Ask IO source to annotate form with form keys, allowing the code
+        # to return some stashed state
+        form, stash = self.io_func.prepare_annotated_form()
 
-        starting_form = copy.deepcopy(self._meta.layout.form)
-        set_form_keys(starting_form, key=self.name)
-
+        # Create meta-array using fixed buffer-key pattern
+        buffer_key = f"{self.name}-{{form_key}}-{{attribute}}"
         new_meta_array, report = ak.typetracer.typetracer_with_report(
-            starting_form, highlevel=True, behavior=self._behavior
+            form,
+            highlevel=True,
+            behavior=self._behavior,
+            buffer_key=buffer_key,
         )
+        # Record all possible buffer keys
+        known_buffer_keys = frozenset(form.expected_from_buffers(buffer_key=buffer_key))
+
 
         new_input_layer = AwkwardInputLayer(
             name=self.name,
-            columns=self.columns,
             inputs=[None][: int(list(self.numblocks.values())[0][0])],
             io_func=lambda *_, **__: new_meta_array,
             label=self.label,
@@ -156,54 +178,80 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
             meta=new_meta_array,
             behavior=self._behavior,
         )
-        return new_input_layer, report
+        return new_input_layer, report, known_buffer_keys, stash
 
-    def project_columns(
+    @property
+    def is_projectable(self) -> bool:
+        return hasattr(self.io_func, "project_buffers")
+
+    def _trace_parentage(self, form: Form) -> dict:
+        key_to_parent = {}
+
+        def impl_with_parent(parent, child):
+            key_to_parent[child.form_key] = parent.form_key
+
+        def _impl(form: Form):
+            if form.is_union:
+                for i, entry in enumerate(form.contents):
+                    impl_with_parent(form, entry)
+            elif form.is_indexed:
+                impl_with_parent(form, form.content)
+            elif form.is_list:
+                impl_with_parent(form, form.content)
+            elif form.is_option:
+                impl_with_parent(form, form.content)
+            elif form.is_record:
+                for field in form.fields:
+                    impl_with_parent(form, form.content(field))
+            elif form.is_unknown or form.is_numpy:
+                pass
+            else:
+                raise AssertionError(form)
+
+        _impl(form)
+
+        return key_to_parent
+
+    def recursive_parents(self, node, parentage: dict):
+        while node := parentage.get(node) is not None:
+            yield node
+
+    def project_buffers(
         self,
-        columns: list[str],
-        *,
-        necessary_shape_columns: list[str] | None = None,
-    ) -> AwkwardInputLayer:
-        if hasattr(self.io_func, "project_columns"):
-            # TODO: make project_columns call sites never pass in an
-            # empty list.
-            if len(columns) == 0:
-                columns = self._meta.fields[:1]
+        data_buffers: set[str],
+        shape_buffers: set[str],
+        stash: T,
+    ):
+        try:
+            impl = self.io_func.project_buffers
+        except AttributeError:
+            return self
 
-            # original form
-            original_form = self._meta.layout.form
+        # Strip layer name from buffer key
+        # TODO: we probably don't need this - reports should be per layer
+        layer_data_buffers = {
+            key[len(self.name).rsplit("-", 1) :] for key in data_buffers
+        }
+        layer_shape_buffers = {
+            key[len(self.name).rsplit("-", 1) :] for key in shape_buffers
+        }
 
-            # original columns before column projection
-            original_form_columns = original_form.columns()
-
-            # make sure that the requested columns match the order of
-            # the original columns; tack on "new" columns that are
-            # likely the wildcard columns.
-            original = [c for c in original_form_columns if c in columns]
-            new = [c for c in columns if c not in original_form_columns]
-            columns = original + new
-
-            try:
-                io_func = self.io_func.project_columns(
-                    columns,
-                    original_form=original_form,
-                    necessary_shape_columns=necessary_shape_columns,
-                )
-            except TypeError:
-                io_func = self.io_func.project_columns(columns)
-            return AwkwardInputLayer(
-                name=self.name,
-                columns=columns,
-                inputs=self.inputs,
-                io_func=io_func,
-                label=self.label,
-                produces_tasks=self.produces_tasks,
-                creation_info=self.creation_info,
-                annotations=self.annotations,
-                meta=self._meta,
-                behavior=self._behavior,
-            )
-        return self
+        io_func = impl(
+            data_buffers=layer_data_buffers,
+            shape_buffers=layer_shape_buffers,
+            stash=stash,
+        )
+        return AwkwardInputLayer(
+            name=self.name,
+            inputs=self.inputs,
+            io_func=io_func,
+            label=self.label,
+            produces_tasks=self.produces_tasks,
+            creation_info=self.creation_info,
+            annotations=self.annotations,
+            meta=self._meta,
+            behavior=self._behavior,
+        )
 
 
 class AwkwardMaterializedLayer(MaterializedLayer):
@@ -219,11 +267,11 @@ class AwkwardMaterializedLayer(MaterializedLayer):
         self.fn = fn
         super().__init__(mapping, **kwargs)
 
-    def mock(self) -> tuple[MaterializedLayer, Any | None]:
+    def mock(self) -> MaterializedLayer:
         mapping = self.mapping.copy()
         if not mapping:
             # no partitions at all
-            return self, None
+            return self
         name = next(iter(mapping))[0]
 
         # one previous layer name
@@ -247,7 +295,7 @@ class AwkwardMaterializedLayer(MaterializedLayer):
                 if len(task) == 2 and task[1] > 0:
                     task = (task[0], 0)
                 return MaterializedLayer({(name, 0): task}), None
-            return self, None
+            return self
 
         # more than one previous_layer_names
         #
@@ -260,24 +308,21 @@ class AwkwardMaterializedLayer(MaterializedLayer):
                 )
             name0s = tuple((name, 0) for name in self.previous_layer_names)
             task = (self.fn, *name0s)
-            return MaterializedLayer({(name, 0): task}), None
+            return MaterializedLayer({(name, 0): task})
 
         # failed to cull during column opt
-        return self, None
+        return self
 
 
 class AwkwardTreeReductionLayer(DataFrameTreeReduction):
-    def mock(self) -> tuple[AwkwardTreeReductionLayer, Any | None]:
-        return (
-            AwkwardTreeReductionLayer(
-                name=self.name,
-                name_input=self.name_input,
-                npartitions_input=1,
-                concat_func=self.concat_func,
-                tree_node_func=self.tree_node_func,
-                finalize_func=self.finalize_func,
-                split_every=self.split_every,
-                tree_node_name=self.tree_node_name,
-            ),
-            None,
+    def mock(self) -> AwkwardTreeReductionLayer:
+        return AwkwardTreeReductionLayer(
+            name=self.name,
+            name_input=self.name_input,
+            npartitions_input=1,
+            concat_func=self.concat_func,
+            tree_node_func=self.tree_node_func,
+            finalize_func=self.finalize_func,
+            split_every=self.split_every,
+            tree_node_name=self.tree_node_name,
         )

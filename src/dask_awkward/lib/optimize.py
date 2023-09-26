@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 import logging
 import warnings
-from collections.abc import Hashable, Mapping
+from collections.abc import Hashable, Mapping, Iterable
 from typing import TYPE_CHECKING, Any
 
 import dask.config
@@ -13,14 +13,12 @@ from dask.highlevelgraph import HighLevelGraph
 from dask.local import get_sync
 
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardInputLayer
-from dask_awkward.lib._utils import LIST_KEY
 
 log = logging.getLogger(__name__)
 
-
 if TYPE_CHECKING:
-    from awkward import Array as AwkwardArray
-
+    from awkward.forms import Form
+    from awkward.typetracer import TypeTracerReport
 
 COLUMN_OPT_FAILED_WARNING_MSG = """The necessary columns optimization failed; exception raised:
 
@@ -118,14 +116,13 @@ def optimize_columns(dsk: HighLevelGraph) -> HighLevelGraph:
     layers = dsk.layers.copy()  # type: ignore
     deps = dsk.dependencies.copy()  # type: ignore
 
-    layer_to_necessary_columns = _necessary_columns(dsk)
+    layer_to_necessary_buffers = _necessary_buffers(dsk)
 
-    for name, neccolsdict in layer_to_necessary_columns.items():
-        meta = layers[name]._meta
-        nec_data_cols = _prune_wildcards(neccolsdict["data"], meta)
-        layers[name] = layers[name].project_columns(
-            nec_data_cols,
-            necessary_shape_columns=None,
+    for name, necessary_column_info in layer_to_necessary_buffers.items():
+        layers[name] = layers[name].project_buffers(
+            necessary_column_info["data"],
+            necessary_column_info["shape"],
+            necessary_column_info["stash"],
         )
 
     return HighLevelGraph(layers, deps)
@@ -149,9 +146,7 @@ def _projectable_input_layer_names(dsk: HighLevelGraph) -> list[str]:
     return [
         n
         for n, v in dsk.layers.items()
-        if isinstance(v, AwkwardInputLayer) and hasattr(v.io_func, "project_columns")
-        # following condition means dep/pickled layers cannot be optimised
-        and hasattr(v, "_meta")
+        if isinstance(v, AwkwardInputLayer) and v.is_projectable
     ]
 
 
@@ -186,7 +181,7 @@ def _opt_touch_all_layer_names(dsk: HighLevelGraph) -> list[str]:
 def _has_projectable_awkward_io_layer(dsk: HighLevelGraph) -> bool:
     """Check if a graph at least one AwkwardInputLayer that is project-able."""
     for _, v in dsk.layers.items():
-        if isinstance(v, AwkwardInputLayer) and hasattr(v.io_func, "project_columns"):
+        if isinstance(v, AwkwardInputLayer) and v.is_projectable:
             return True
     return False
 
@@ -344,7 +339,9 @@ def _recursive_replace(args, layer, parent, indices):
     return args2
 
 
-def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
+def _get_column_reports(
+    dsk: HighLevelGraph,
+) -> dict[str, tuple[TypeTracerReport, frozenset[str], Any]]:
     """Get the TypeTracerReport for each input layer in a task graph."""
     if not _has_projectable_awkward_io_layer(dsk):
         return {}
@@ -355,16 +352,16 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
     deps = dsk.dependencies.copy()  # type: ignore
     dependents = dsk.dependents
 
-    reports = {}
+    layer_mock_state: dict[str, tuple[TypeTracerReport, frozenset[str], Any]] = {}
 
     # make labelled report
     projectable = _projectable_input_layer_names(dsk)
     for name, lay in dsk.layers.copy().items():
         if name in projectable:
-            layers[name], report = lay.mock()
-            reports[name] = report
+            layers[name], *mock_state = lay.mock()
+            layer_mock_state[name] = mock_state
         elif hasattr(lay, "mock"):
-            layers[name], _ = lay.mock()
+            layers[name] = lay.mock()
 
     for name in _ak_output_layer_names(dsk):
         layers[name] = _mock_output(layers[name])
@@ -418,123 +415,24 @@ def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
                 "Valid options are 'warn', 'pass', or 'raise'."
             )
 
-    return reports
+    return layer_mock_state
 
 
-def _wildcarded_list(touched_keys: set[str], layer_name: str) -> list[str]:
-    necessary_columns: list[str] = []
-    for key in sorted(touched_keys):
-        if key == layer_name:
-            continue
-
-        layer, column = key.split(".", 1)
-        if layer != layer_name:
-            continue
-
-        # List offsets are tagged as {key}.{LIST_KEY}. This routine resolve
-        # _columns_, so we use a wildcard to indicate that we want to load
-        # *any* child column of this list. If the list contains no records,
-        if column.endswith(LIST_KEY):
-            list_parent_path = column[: -(len(LIST_KEY) + 1)].rstrip(".")
-            if list_parent_path not in necessary_columns:
-                necessary_columns.append(f"{list_parent_path}.*")
-        else:
-            necessary_columns.append(column)
-
-    return necessary_columns
+def _buffer_keys_for_layer(
+    buffer_keys: Iterable[str], known_buffer_keys: frozenset[str]
+):
+    return {k for k in buffer_keys if k in known_buffer_keys}
 
 
-def _necessary_columns(dsk: HighLevelGraph) -> dict[str, dict[str, list[str]]]:
-    """Pair layer names with lists of necessary columns."""
+def _necessary_buffers(dsk: HighLevelGraph) -> dict[str, dict[str, set[str]]]:
+    """Pair layer names with a mapping of necessary buffers."""
     layer_to_columns = {}
-    for name, report in _get_column_reports(dsk).items():
-        touched_data_keys = {_ for _ in report.data_touched if _ is not None}
-        shape_touched_keys = {_ for _ in report.shape_touched if _ is not None}
 
-        data_necessary_columns = _wildcarded_list(touched_data_keys, name)
-        shape_necessary_columns = _wildcarded_list(shape_touched_keys, name)
-
+    layer_mock_state = _get_column_reports(dsk)
+    for name, (report, known_buffer_keys, stash) in layer_mock_state.items():
         layer_to_columns[name] = {
-            "data": data_necessary_columns,
-            "shape": shape_necessary_columns,
+            "data": set(report.data_touched) & known_buffer_keys,
+            "shape": set(report.shape_touched) & known_buffer_keys,
+            "stash": stash,
         }
     return layer_to_columns
-
-
-def _prune_wildcards(columns: list[str], meta: AwkwardArray) -> list[str]:
-    """Prune wildcard '.*' suffix from necessary columns results.
-
-    The _necessary_columns logic will provide some results of the
-    form:
-
-    "foo.bar.*"
-
-    This function will eliminate the wildcard in one of two ways
-    (continuing to use "foo.bar.*" as an example):
-
-    1. If "foo.bar" has leaves (subfields) "x", "y" and "z", and _any_
-       of those (so "foo.bar.x", for example) also appears in the
-       columns list, then essentially nothing will happen (except we
-       drop the wildcard string), because we can be sure that a leaf
-       of "foo.bar" will be read (in this case it's "foo.bar.x").
-
-    2. If "foo.bar" has multiple leaves but none of them appear in the
-       columns list, we will just pick the first one that we find
-       (that is, foo.bar.fields[0]).
-
-    Parameters
-    ----------
-    columns : list[str]
-        The "raw" columns deemed necessary by the necessary columns
-        logic; can still contain the wildcard syntax we've adopted.
-    meta : ak.Array
-        The metadata (typetracer array) from the AwkwardInputLayer
-        that is getting optimized.
-
-    Returns
-    -------
-    list[str]
-        Columns with the wildcard syntax pruned and (also augmented
-        with a leaf node if necessary).
-
-    """
-
-    good_columns: list[str] = []
-    wildcard_columns: list[str] = []
-    for column in columns:
-        if column.endswith(".*"):
-            wildcard_columns.append(column)
-        else:
-            good_columns.append(column)
-
-    for column in wildcard_columns:
-        definite_column = column[:-2]
-        # each time we meet a wildcard column we need to start back
-        # with the original meta array.
-        imeta = meta
-        reverse_column_parts = [*definite_column.split(".")]
-        reverse_column_parts.reverse()
-
-        while reverse_column_parts:
-            part = reverse_column_parts.pop()
-            # for unnamed roots part may be an empty string, so we
-            # need this if statement.
-            if part:
-                imeta = imeta[part]
-        # The given wildcard column contains no sub-columns, so load
-        # the column itself
-        if not imeta.fields:
-            good_columns.append(definite_column)
-
-        # Otherwise, prefer a column that we already need to load
-        else:
-            for field in imeta.fields:
-                field_column = f"{definite_column}.{field}"
-                if field_column in good_columns:
-                    break
-            # Or, pick an arbitrary (first) column if no other fields are yet
-            # required
-            else:
-                good_columns.append(f"{definite_column}.{imeta.fields[0]}")
-
-    return good_columns
