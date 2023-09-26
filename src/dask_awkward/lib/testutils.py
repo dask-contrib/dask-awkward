@@ -53,6 +53,7 @@ def assert_eq_arrays(
     check_forms: bool = False,
     check_divisions: bool = True,
     scheduler: Any | None = None,
+    convert_to_lists: bool = False,
 ) -> None:
     scheduler = scheduler or DEFAULT_SCHEDULER
     a_is_coll = is_dask_collection(a)
@@ -86,15 +87,12 @@ def assert_eq_arrays(
 
     # finally check the values
     if isclose_equal_nan:
-        assert ak.all(
-            ak.isclose(
-                ak.from_iter(a_comp.tolist()),
-                ak.from_iter(b_comp.tolist()),
-                equal_nan=True,
-            )
-        )
+        assert ak.all(ak.isclose(a_comp, b_comp, equal_nan=True))
     else:
-        assert a_comp.tolist() == b_comp.tolist()
+        if convert_to_lists:
+            assert a_comp.tolist() == b_comp.tolist()
+        else:
+            assert ak.almost_equal(a_comp, b_comp, dtype_exact=True)
 
 
 def assert_eq_records(
