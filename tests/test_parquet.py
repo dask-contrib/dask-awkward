@@ -182,7 +182,7 @@ def test_unnamed_root(
         unnamed_root_parquet_file,
         columns=columns,
     )
-    assert_eq(daa, caa, check_forms=False)
+    assert_eq(daa, caa, convert_to_lists=True)
 
 
 @pytest.mark.parametrize("prefix", [None, "abc"])
