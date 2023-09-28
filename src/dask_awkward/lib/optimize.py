@@ -116,14 +116,10 @@ def optimize_columns(dsk: HighLevelGraph) -> HighLevelGraph:
     layers = dsk.layers.copy()  # type: ignore
     deps = dsk.dependencies.copy()  # type: ignore
 
-    layer_to_necessary_buffers = _necessary_buffers(dsk)
+    layer_to_reports = _get_column_reports(dsk)
 
-    for name, necessary_column_info in layer_to_necessary_buffers.items():
-        layers[name] = layers[name].project_buffers(
-            necessary_column_info["data"],
-            necessary_column_info["shape"],
-            necessary_column_info["stash"],
-        )
+    for name, state in layer_to_reports.items():
+        layers[name] = layers[name].project(state)
 
     return HighLevelGraph(layers, deps)
 
@@ -352,7 +348,7 @@ def _get_column_reports(
     deps = dsk.dependencies.copy()  # type: ignore
     dependents = dsk.dependents
 
-    layer_mock_state: dict[str, tuple[TypeTracerReport, frozenset[str], Any]] = {}
+    layer_mock_state: dict[str, tuple[TypeTracerReport, Any]] = {}
 
     # make labelled report
     projectable = _projectable_input_layer_names(dsk)
@@ -422,17 +418,3 @@ def _buffer_keys_for_layer(
     buffer_keys: Iterable[str], known_buffer_keys: frozenset[str]
 ):
     return {k for k in buffer_keys if k in known_buffer_keys}
-
-
-def _necessary_buffers(dsk: HighLevelGraph) -> dict[str, dict[str, set[str]]]:
-    """Pair layer names with a mapping of necessary buffers."""
-    layer_to_columns = {}
-
-    layer_mock_state = _get_column_reports(dsk)
-    for name, (report, known_buffer_keys, stash) in layer_mock_state.items():
-        layer_to_columns[name] = {
-            "data": set(report.data_touched) & known_buffer_keys,
-            "shape": set(report.shape_touched) & known_buffer_keys,
-            "stash": stash,
-        }
-    return layer_to_columns

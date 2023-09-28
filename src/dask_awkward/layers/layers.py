@@ -34,16 +34,6 @@ class AwkwardBlockwiseLayer(Blockwise):
         layer.__dict__.pop("_dims", None)
         return layer
 
-    def __getstate__(self) -> dict:
-        d = self.__dict__.copy()
-        try:
-            pickle.dumps(d["_meta"])
-        except (ValueError, TypeError, KeyError):
-            d.pop(
-                "_meta", None
-            )  # must be a typetracer, does not pickle and not needed on scheduler
-        return d
-
     def __repr__(self) -> str:
         return "Awkward" + super().__repr__()
 
@@ -56,14 +46,47 @@ class ImplementsIOFunction(Protocol):
         ...
 
 
-class ImplementsBufferProjection(ImplementsIOFunction, Protocol):
-    def prepare_annotated_form(self) -> tuple[Form, T]:
+class ImplementsProjection(Protocol):
+    @property
+    def meta(self) -> AwkwardArray:
         ...
 
-    def project_buffers(
-        self, data_buffers: set[str], shape_buffers: set[str], stash: T
-    ) -> ImplementsIOFunction:
+    def prepare_for_projection(self) -> tuple[AwkwardArray, T]:
         ...
+
+    def project(self, state: T) -> ImplementsIOFunction:
+        ...
+
+
+# IO functions may not end up performing buffer projection, so they
+# should also support directly returning the result
+class ImplementsIOFunctionWithProjection(
+    ImplementsProjection, ImplementsIOFunction, Protocol
+):
+    ...
+
+
+class IOFunctionWithMeta(ImplementsIOFunctionWithProjection):
+    def __init__(self, meta: AwkwardArray, io_func: ImplementsIOFunction):
+        self._meta = meta
+        self._io_func = io_func
+
+    def __call__(self, *args, **kwargs) -> AwkwardArray:
+        return self._io_func(*args, **kwargs)
+
+    @property
+    def meta(self):
+        return self._meta
+
+    def prepare_for_projection(self) -> tuple[AwkwardArray, None]:
+        return self._meta, None
+
+    def project(self, state: None):
+        return self._io_func
+
+
+def io_func_implements_project(func: ImplementsIOFunction) -> bool:
+    return hasattr(func, "project")
 
 
 class AwkwardInputLayer(AwkwardBlockwiseLayer):
@@ -77,9 +100,7 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         *,
         name: str,
         inputs: Any,
-        io_func: ImplementsIOFunction | ImplementsBufferProjection,
-        meta: Any,
-        behavior: dict | None,
+        io_func: ImplementsIOFunction | ImplementsIOFunctionWithProjection,
         label: str | None = None,
         produces_tasks: bool = False,
         creation_info: dict | None = None,
@@ -92,8 +113,6 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         self.produces_tasks = produces_tasks
         self.annotations = annotations
         self.creation_info = creation_info
-        self._meta = meta
-        self._behavior = behavior
 
         io_arg_map = BlockwiseDepDict(
             mapping=LazyInputsDict(self.inputs),  # type: ignore
@@ -112,60 +131,14 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
     def __repr__(self) -> str:
         return f"AwkwardInputLayer<{self.output}>"
 
-    def mock(self) -> tuple[AwkwardInputLayer, TypeTracerReport, frozenset[str], T]:
-        """Mock the input layer as starting with a dataless typetracer.
+    @property
+    def is_projectable(self) -> bool:
+        # isinstance(self.io_func, ImplementsProjection)
+        return io_func_implements_project(self.io_func)
 
-        This method is used to create new dask task graphs that
-        operate purely on typetracer Arrays (that is, array with
-        awkward structure but without real data buffers). This allows
-        us to test which parts of a real awkward array will be used in
-        a real computation. We do this by running a graph which starts
-        with mocked AwkwardInputLayers
-
-        We mock an AwkwardInputLayer in these steps:
-
-        1. Copy the original ``_meta`` form.
-        2. Create a new typetracer array from that form.
-        3. Take the form from the new typetracer array.
-        4. Label the components of the new form.
-        5. Pass the new labelled form to the typetracer_with_report
-           function from upstream awkward. This creates a report
-           object that tells us which buffers in a form get used.
-        6. Create a new typetracer array that represents an array that
-           would come from a real input layer, and make that the
-           result of the input layer.
-        7. Return the new layer (which only results in a typetracer
-           array) along with the mutable report object.
-
-        When this new layer is added to a dask task graph and that
-        graph is computed, the report object will be mutated.
-        Inspecting the report object after the compute tells us which
-        buffers from the original form would be required for a real
-        compute with the same graph.
-
-        Returns
-        -------
-        AwkwardInputLayer
-            Copy of the input layer with data-less input.
-
-        """
-        import awkward as ak
-
-        # Ask IO source to annotate form with form keys, allowing the code
-        # to return some stashed state
-        form, stash = self.io_func.prepare_annotated_form()
-
-        # Create meta-array using fixed buffer-key pattern
-        buffer_key = f"{self.name}-{{form_key}}-{{attribute}}"
-        new_meta_array, report = ak.typetracer.typetracer_with_report(
-            form,
-            highlevel=True,
-            behavior=self._behavior,
-            buffer_key=buffer_key,
-        )
-        # Record all possible buffer keys
-        known_buffer_keys = frozenset(form.expected_from_buffers(buffer_key=buffer_key))
-
+    def mock(self) -> tuple[AwkwardInputLayer, T]:
+        assert self.is_projectable
+        new_meta_array, state = self.io_func.prepare_for_projection()
 
         new_input_layer = AwkwardInputLayer(
             name=self.name,
@@ -175,82 +148,21 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
             produces_tasks=self.produces_tasks,
             creation_info=self.creation_info,
             annotations=self.annotations,
-            meta=new_meta_array,
-            behavior=self._behavior,
         )
-        return new_input_layer, report, known_buffer_keys, stash
+        return new_input_layer, state
 
-    @property
-    def is_projectable(self) -> bool:
-        return hasattr(self.io_func, "project_buffers")
-
-    def _trace_parentage(self, form: Form) -> dict:
-        key_to_parent = {}
-
-        def impl_with_parent(parent, child):
-            key_to_parent[child.form_key] = parent.form_key
-
-        def _impl(form: Form):
-            if form.is_union:
-                for i, entry in enumerate(form.contents):
-                    impl_with_parent(form, entry)
-            elif form.is_indexed:
-                impl_with_parent(form, form.content)
-            elif form.is_list:
-                impl_with_parent(form, form.content)
-            elif form.is_option:
-                impl_with_parent(form, form.content)
-            elif form.is_record:
-                for field in form.fields:
-                    impl_with_parent(form, form.content(field))
-            elif form.is_unknown or form.is_numpy:
-                pass
-            else:
-                raise AssertionError(form)
-
-        _impl(form)
-
-        return key_to_parent
-
-    def recursive_parents(self, node, parentage: dict):
-        while node := parentage.get(node) is not None:
-            yield node
-
-    def project_buffers(
+    def project(
         self,
-        data_buffers: set[str],
-        shape_buffers: set[str],
-        stash: T,
+        state: T,
     ):
-        try:
-            impl = self.io_func.project_buffers
-        except AttributeError:
-            return self
-
-        # Strip layer name from buffer key
-        # TODO: we probably don't need this - reports should be per layer
-        layer_data_buffers = {
-            key[len(self.name).rsplit("-", 1) :] for key in data_buffers
-        }
-        layer_shape_buffers = {
-            key[len(self.name).rsplit("-", 1) :] for key in shape_buffers
-        }
-
-        io_func = impl(
-            data_buffers=layer_data_buffers,
-            shape_buffers=layer_shape_buffers,
-            stash=stash,
-        )
         return AwkwardInputLayer(
             name=self.name,
             inputs=self.inputs,
-            io_func=io_func,
+            io_func=self.io_func.project(state=state),
             label=self.label,
             produces_tasks=self.produces_tasks,
             creation_info=self.creation_info,
             annotations=self.annotations,
-            meta=self._meta,
-            behavior=self._behavior,
         )
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import warnings
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable, Mapping, Protocol
@@ -13,8 +14,14 @@ from dask.highlevelgraph import HighLevelGraph
 from dask.utils import funcname, is_integer, parse_bytes
 from fsspec.utils import infer_compression
 
-from dask_awkward.layers import ImplementsIOFunction, AwkwardBlockwiseLayer, AwkwardInputLayer, \
-    ImplementsBufferProjection
+from dask_awkward.layers import (
+    ImplementsIOFunction,
+    AwkwardBlockwiseLayer,
+    AwkwardInputLayer,
+    ImplementsProjection,
+    io_func_implements_project,
+    IOFunctionWithMeta,
+)
 from dask_awkward.layers.layers import AwkwardMaterializedLayer
 from dask_awkward.lib.core import (
     empty_typetracer,
@@ -43,11 +50,11 @@ class ImplementsFormTransformation(Protocol):
         raise NotImplementedError
 
     def create_column_mapping_and_key(
-            self,
-            column_source: Any,
-            start: int,
-            stop: int,
-            **kwargs: Any,
+        self,
+        column_source: Any,
+        start: int,
+        stop: int,
+        **kwargs: Any,
     ) -> tuple[Mapping[str, ak.Array], Callable[[str, ak.forms.Form, str], str] | str]:
         raise NotImplementedError
 
@@ -61,10 +68,10 @@ class _FromAwkwardFn:
 
 
 def from_awkward(
-        source: ak.Array,
-        npartitions: int,
-        behavior: dict | None = None,
-        label: str | None = None,
+    source: ak.Array,
+    npartitions: int,
+    behavior: dict | None = None,
+    label: str | None = None,
 ) -> Array:
     """Create an Array collection from a concrete :class:`awkward.Array` object.
 
@@ -160,11 +167,11 @@ def from_lists(source: list[list[Any]], behavior: dict | None = None) -> Array:
 
 
 def from_delayed(
-        source: list[Delayed] | Delayed,
-        meta: ak.Array | None = None,
-        behavior: dict | None = None,
-        divisions: tuple[int | None, ...] | None = None,
-        prefix: str = "from-delayed",
+    source: list[Delayed] | Delayed,
+    meta: ak.Array | None = None,
+    behavior: dict | None = None,
+    divisions: tuple[int | None, ...] | None = None,
+    prefix: str = "from-delayed",
 ) -> Array:
     """Create an Array collection from a set of :class:`~dask.delayed.Delayed` objects.
 
@@ -246,10 +253,10 @@ def to_dask_bag(array: Array) -> DaskBag:
 
 
 def to_dask_array(
-        array: Array,
-        *,
-        dtype: Any = None,
-        optimize_graph: bool = True,
+    array: Array,
+    *,
+    dtype: Any = None,
+    optimize_graph: bool = True,
 ) -> DaskArray:
     """Convert Array collection to a :class:`dask.array.Array` collection.
 
@@ -385,9 +392,9 @@ def from_dask_array(array: DaskArray, behavior: dict | None = None) -> Array:
 
 
 def to_dataframe(
-        array,
-        optimize_graph: bool = True,
-        **kwargs: Any,
+    array,
+    optimize_graph: bool = True,
+    **kwargs: Any,
 ) -> DaskDataFrame:
     """Convert :class:`dask_awkward.Array` collection to :class:`~dask.dataframe.DataFrame`.
 
@@ -438,11 +445,11 @@ class PackedArgCallable:
     """
 
     def __init__(
-            self,
-            func: Callable,
-            args: tuple[Any, ...] | None = None,
-            kwargs: dict[str, Any] | None = None,
-            packed: bool = False,
+        self,
+        func: Callable,
+        args: tuple[Any, ...] | None = None,
+        kwargs: dict[str, Any] | None = None,
+        packed: bool = False,
     ):
         self.func = func
         self.args = args
@@ -460,15 +467,15 @@ class PackedArgCallable:
 
 
 def from_map(
-        func: ImplementsIOFunction | ImplementsBufferProjection,
-        *iterables: Iterable,
-        args: tuple[Any, ...] | None = None,
-        label: str | None = None,
-        token: str | None = None,
-        divisions: tuple[int, ...] | None = None,
-        meta: ak.Array | None = None,
-        behavior: dict | None = None,
-        **kwargs: Any,
+    func: ImplementsIOFunction | ImplementsProjection,
+    *iterables: Iterable,
+    args: tuple[Any, ...] | None = None,
+    label: str | None = None,
+    token: str | None = None,
+    divisions: tuple[int, ...] | None = None,
+    meta: ak.Array | None = None,
+    behavior: dict | None = None,
+    **kwargs: Any,
 ) -> Array:
     """Create an Array collection from a custom mapping.
 
@@ -559,23 +566,31 @@ def from_map(
             packed=packed,
         )
 
-    dsk = AwkwardInputLayer(
-        name=name,
-        inputs=inputs,
-        io_func=func,
-        meta=meta,
-        behavior=behavior,
-    )
+    # Special `io_func` implementations can
+    if io_func_implements_project(func):
+        io_func = func
+        array_meta = func.meta
+    # Without `meta`, the meta will be computed by executing the graph
+    elif meta is None:
+        io_func = func
+        array_meta = None
+    # If we know the meta, we can spoof projection
+    else:
+        io_func = IOFunctionWithMeta(meta, func)
+        array_meta = meta
+
+    dsk = AwkwardInputLayer(name=name, inputs=inputs, io_func=io_func)
+
+    if behavior is not None:
+        warnings.warn(
+            "The `behavior` argument is deprecated for `from_map`, and consequently ignored."
+        )
 
     hlg = HighLevelGraph.from_collections(name, dsk)
     if divisions is not None:
-        result = new_array_object(
-            hlg, name, meta=meta, behavior=dsk._behavior, divisions=divisions
-        )
+        result = new_array_object(hlg, name, meta=array_meta, divisions=divisions)
     else:
-        result = new_array_object(
-            hlg, name, meta=meta, behavior=dsk._behavior, npartitions=len(inputs)
-        )
+        result = new_array_object(hlg, name, meta=array_meta, npartitions=len(inputs))
 
     return result
 
@@ -601,13 +616,13 @@ class _BytesReadingInstructions:
 
 
 def _bytes_with_sample(
-        fs: AbstractFileSystem,
-        paths: list[str],
-        compression: str | None,
-        delimiter: bytes,
-        not_zero: bool,
-        blocksize: str | int,
-        sample: str | int | bool,
+    fs: AbstractFileSystem,
+    paths: list[str],
+    compression: str | None,
+    delimiter: bytes,
+    not_zero: bool,
+    blocksize: str | int,
+    sample: str | int | bool,
 ) -> tuple[list[list[_BytesReadingInstructions]], bytes]:
     """Generate instructions for reading bytes from paths in a filesystem.
 
@@ -730,7 +745,7 @@ def _bytes_with_sample(
                         break
                     if delimiter in new:
                         sample_buff = (
-                                sample_buff + new.split(delimiter, 1)[0] + delimiter
+                            sample_buff + new.split(delimiter, 1)[0] + delimiter
                         )
                         break
                     sample_buff = sample_buff + new
