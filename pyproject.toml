@@ -35,7 +35,7 @@ classifiers = [
   "Topic :: Software Development",
 ]
 dependencies = [
-  "awkward >=2.4.0",
+  "awkward >=2.4.3",
   "dask >=2023.04.0",
   "typing_extensions >=4.8.0",
 ]
@@ -95,17 +95,10 @@ write_to = "src/dask_awkward/_version.py"
 [tool.pytest.ini_options]
 minversion = "6.0"
 testpaths = ["tests"]
-addopts = [
-  "-v",
-  "-ra",
-  "--showlocals",
-  "--strict-markers",
-  "--strict-config",
-]
+addopts = ["-v", "-ra", "--showlocals", "--strict-markers", "--strict-config"]
 log_cli_level = "DEBUG"
-filterwarnings = [
-  "ignore:There is no current event loop",
-]
+filterwarnings = ["ignore:There is no current event loop"]
+xfail_strict = true
 
 [tool.isort]
 profile = "black"
@@ -125,31 +118,15 @@ warn_unused_ignores = true
 warn_unreachable = true
 
 [[tool.mypy.overrides]]
-  module = ["awkward.*"]
-  ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-  module = ["IPython.*"]
-  ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-  module = ["fsspec.*"]
-  ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-  module = ["pyarrow.*"]
-  ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-  module = ["tlz.*"]
-  ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-  module = ["uproot.*"]
-  ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-  module = ["cloudpickle.*"]
+  module = [
+    "awkward.*",
+    "IPython.*",
+    "fsspec.*",
+    "pyarrow.*",
+    "tlz.*",
+    "uproot.*",
+    "cloudpickle.*"
+  ]
   ignore_missing_imports = true
 
 [tool.pyright]
