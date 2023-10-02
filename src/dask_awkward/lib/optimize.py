@@ -174,13 +174,14 @@ def optimize_columns(dsk: HighLevelGraph) -> HighLevelGraph:
                 f"Invalid awkward.optimization.on-fail option: {on_fail}.\n"
                 "Valid options are 'warn', 'pass', or 'raise'."
             )
+        return dsk
+    else:
+        # Project layers using projection state
+        layers = dsk.layers.copy()  # type: ignore
+        for name, state in layer_to_projection_state.items():
+            layers[name] = layers[name].project(state)
 
-    # Project layers using projection state
-    layers = dsk.layers.copy()  # type: ignore
-    for name, state in layer_to_projection_state.items():
-        layers[name] = layers[name].project(state)
-
-    return HighLevelGraph(layers, dsk.dependencies)
+        return HighLevelGraph(layers, dsk.dependencies)
 
 
 def _projectable_input_layer_names(dsk: HighLevelGraph) -> list[str]:
