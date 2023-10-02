@@ -15,12 +15,12 @@ from dask.utils import funcname, is_integer, parse_bytes
 from fsspec.utils import infer_compression
 
 from dask_awkward.layers import (
-    ImplementsIOFunction,
     AwkwardBlockwiseLayer,
     AwkwardInputLayer,
+    ImplementsIOFunction,
     ImplementsProjection,
-    io_func_implements_project,
     IOFunctionWithMeta,
+    io_func_implements_project,
 )
 from dask_awkward.layers.layers import AwkwardMaterializedLayer
 from dask_awkward.lib.core import (

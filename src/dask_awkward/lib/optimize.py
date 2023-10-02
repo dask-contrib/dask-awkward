@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 import logging
 import warnings
-from collections.abc import Hashable, Mapping, Iterable
+from collections.abc import Hashable, Iterable, Mapping
 from typing import TYPE_CHECKING, Any
 
 import dask.config
@@ -17,7 +17,6 @@ from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardInputLayer
 log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from awkward.forms import Form
     from awkward.typetracer import TypeTracerReport
 
 COLUMN_OPT_FAILED_WARNING_MSG = """The necessary columns optimization failed; exception raised:
@@ -354,7 +353,7 @@ def _get_column_reports(
     projectable = _projectable_input_layer_names(dsk)
     for name, lay in dsk.layers.copy().items():
         if name in projectable:
-            layers[name], *mock_state = lay.mock()
+            layers[name], mock_state = lay.mock()
             layer_mock_state[name] = mock_state
         elif hasattr(lay, "mock"):
             layers[name] = lay.mock()
