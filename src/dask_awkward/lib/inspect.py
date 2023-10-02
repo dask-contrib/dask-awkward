@@ -6,8 +6,6 @@ import numpy as np
 from dask.base import unpack_collections
 from dask.highlevelgraph import HighLevelGraph
 
-from dask_awkward.layers import AwkwardInputLayer
-
 if TYPE_CHECKING:
     from dask_awkward.lib.core import Array
 
@@ -82,6 +80,25 @@ def necessary_buffers(
     return out
 
 
+def _random_boolean_like(array_like, probability):
+    import awkward as ak
+
+    backend = ak.backend(array_like)
+    layout = ak.to_layout(array_like)
+
+    if ak.backend(array_like) == "typetracer":
+        return ak.Array(
+            ak.to_layout(np.empty(0, dtype=np.bool_)).to_typetracer(forget_length=True),
+            behavior=array_like.behavior,
+        )
+    else:
+        return ak.Array(
+            np.random.random(layout.length) < probability,
+            behavior=array_like.behavior,
+            backend=backend,
+        )
+
+
 def sample(arr, factor: int | None = None, probability: float | None = None) -> Array:
     """Decimate the data to a smaller number of rows.
 
@@ -106,5 +123,5 @@ def sample(arr, factor: int | None = None, probability: float | None = None) -> 
         return arr.map_partitions(lambda x: x[::factor], meta=arr._meta)
     else:
         return arr.map_partitions(
-            lambda x: x[np.random.random(len(x)) < probability], meta=arr._meta
+            lambda x: x[_random_boolean_like(x, probability)], meta=arr._meta
         )
