@@ -4,7 +4,7 @@ import copy
 import logging
 import warnings
 from collections.abc import Hashable, Iterable, Mapping
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import dask.config
 from dask.blockwise import fuse_roots, optimize_blockwise
@@ -15,9 +15,6 @@ from dask.local import get_sync
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardInputLayer
 
 log = logging.getLogger(__name__)
-
-if TYPE_CHECKING:
-    from awkward.typetracer import TypeTracerReport
 
 COLUMN_OPT_FAILED_WARNING_MSG = """The necessary columns optimization failed; exception raised:
 
@@ -112,15 +109,78 @@ def optimize_columns(dsk: HighLevelGraph) -> HighLevelGraph:
         New dask graph with a modified ``AwkwardInputLayer``.
 
     """
+    import awkward as ak
+
+    if not _has_projectable_awkward_io_layer(dsk):
+        return dsk
+
+    layer_to_projection_state: dict[str, Any] = {}
+    projection_layers = dsk.layers.copy()  # type:
+    projectable = _projectable_input_layer_names(dsk)
+    for name, lay in dsk.layers.items():
+        if name in projectable:
+            # Insert mocked array into layers, replacing generation func
+            # Keep track of mocked state
+            projection_layers[name], layer_to_projection_state[name] = lay.mock()
+        elif hasattr(lay, "mock"):
+            projection_layers[name] = lay.mock()
+
+    for name in _ak_output_layer_names(dsk):
+        projection_layers[name] = _mock_output(projection_layers[name])
+
+    for name in _opt_touch_all_layer_names(dsk):
+        projection_layers[name] = _touch_and_call(projection_layers[name])
+
+    hlg = HighLevelGraph(projection_layers, dsk.dependencies)
+
+    # this loop builds up what are the possible final leaf nodes by
+    # inspecting the dependents dictionary. If something does not have
+    # a dependent, it must be the end of a graph. These are the things
+    # we need to compute for; we only use a single partition (the
+    # first). for a single collection `.compute()` this list will just
+    # be length 1; but if we are using `dask.compute` to pass in
+    # multiple collections to be computed simultaneously, this list
+    # will increase in length.
+    leaf_layers_keys = [
+        (k, 0) for k, v in dsk.dependents.items() if isinstance(v, set) and len(v) == 0
+    ]
+
+    # now we try to compute for each possible output layer key (leaf
+    # node on partition 0); this will cause the typetacer reports to
+    # get correct fields/columns touched. If the result is a record or
+    # an array we of course want to touch all of the data/fields.
+    try:
+        for layer in hlg.layers.values():
+            layer.__dict__.pop("_cached_dict", None)
+        results = get_sync(hlg, leaf_layers_keys)
+        for out in results:
+            if isinstance(out, (ak.Array, ak.Record)):
+                ak.typetracer.touch_data(out)
+    except Exception as err:
+        on_fail = dask.config.get("awkward.optimization.on-fail")
+        # this is the default, throw a warning but skip the optimization.
+        if on_fail == "warn":
+            warnings.warn(
+                COLUMN_OPT_FAILED_WARNING_MSG.format(exception=type(err), message=err)
+            )
+        # option "pass" means do not throw warning but skip the optimization.
+        elif on_fail == "pass":
+            log.debug("Column projection optimization failed; optimization skipped.")
+        # option "raise" to raise the exception here
+        elif on_fail == "raise":
+            raise
+        else:
+            raise ValueError(
+                f"Invalid awkward.optimization.on-fail option: {on_fail}.\n"
+                "Valid options are 'warn', 'pass', or 'raise'."
+            )
+
+    # Project layers using projection state
     layers = dsk.layers.copy()  # type: ignore
-    deps = dsk.dependencies.copy()  # type: ignore
-
-    layer_to_reports = _get_column_reports(dsk)
-
-    for name, state in layer_to_reports.items():
+    for name, state in layer_to_projection_state.items():
         layers[name] = layers[name].project(state)
 
-    return HighLevelGraph(layers, deps)
+    return HighLevelGraph(layers, dsk.dependencies)
 
 
 def _projectable_input_layer_names(dsk: HighLevelGraph) -> list[str]:
@@ -332,85 +392,6 @@ def _recursive_replace(args, layer, parent, indices):
         else:
             args2.append(arg)
     return args2
-
-
-def _get_column_reports(
-    dsk: HighLevelGraph,
-) -> dict[str, tuple[TypeTracerReport, frozenset[str], Any]]:
-    """Get the TypeTracerReport for each input layer in a task graph."""
-    if not _has_projectable_awkward_io_layer(dsk):
-        return {}
-
-    import awkward as ak
-
-    layers = dsk.layers.copy()  # type: ignore
-    deps = dsk.dependencies.copy()  # type: ignore
-    dependents = dsk.dependents
-
-    layer_mock_state: dict[str, tuple[TypeTracerReport, Any]] = {}
-
-    # make labelled report
-    projectable = _projectable_input_layer_names(dsk)
-    for name, lay in dsk.layers.copy().items():
-        if name in projectable:
-            layers[name], mock_state = lay.mock()
-            layer_mock_state[name] = mock_state
-        elif hasattr(lay, "mock"):
-            layers[name] = lay.mock()
-
-    for name in _ak_output_layer_names(dsk):
-        layers[name] = _mock_output(layers[name])
-
-    for name in _opt_touch_all_layer_names(dsk):
-        layers[name] = _touch_and_call(layers[name])
-
-    hlg = HighLevelGraph(layers, deps)
-
-    # this loop builds up what are the possible final leaf nodes by
-    # inspecting the dependents dictionary. If something does not have
-    # a dependent, it must be the end of a graph. These are the things
-    # we need to compute for; we only use a single partition (the
-    # first). for a single collection `.compute()` this list will just
-    # be length 1; but if we are using `dask.compute` to pass in
-    # multiple collections to be computed simultaneously, this list
-    # will increase in length.
-    leaf_layers_keys = [
-        (k, 0) for k, v in dependents.items() if isinstance(v, set) and len(v) == 0
-    ]
-
-    # now we try to compute for each possible output layer key (leaf
-    # node on partition 0); this will cause the typetacer reports to
-    # get correct fields/columns touched. If the result is a record or
-    # an array we of course want to touch all of the data/fields.
-    try:
-        for layer in hlg.layers.values():
-            layer.__dict__.pop("_cached_dict", None)
-        results = get_sync(hlg, leaf_layers_keys)
-        for out in results:
-            if isinstance(out, (ak.Array, ak.Record)):
-                ak.typetracer.touch_data(out)
-    except Exception as err:
-        on_fail = dask.config.get("awkward.optimization.on-fail")
-        # this is the default, throw a warning but skip the optimization.
-        if on_fail == "warn":
-            warnings.warn(
-                COLUMN_OPT_FAILED_WARNING_MSG.format(exception=type(err), message=err)
-            )
-            return {}
-        # option "pass" means do not throw warning but skip the optimization.
-        elif on_fail == "pass":
-            log.debug("Column projection optimization failed; optimization skipped.")
-            return {}
-        # option "raise" to raise the exception here
-        elif on_fail == "raise":
-            raise
-        else:
-            raise ValueError(
-                f"Invalid awkward.optimization.on-fail option: {on_fail}.\n"
-                "Valid options are 'warn', 'pass', or 'raise'."
-            )
-
-    return layer_mock_state
 
 
 def _buffer_keys_for_layer(
