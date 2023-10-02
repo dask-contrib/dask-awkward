@@ -173,10 +173,14 @@ class _FromParquetFileWiseFn(_FromParquetFn):
         }
 
         columns = {
-            ".".join(form_key_to_path[form_key])
-            for form_key, attribute in (
-                parse_buffer_key(buffer_key) for buffer_key in data_buffers
+            ".".join(p)
+            for p in (
+                form_key_to_path[form_key]
+                for form_key, attribute in (
+                    parse_buffer_key(buffer_key) for buffer_key in data_buffers
+                )
             )
+            if p
         }
 
         new = _FromParquetFileWiseFn(
@@ -260,10 +264,14 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
         }
 
         columns = {
-            ".".join(form_key_to_path[form_key])
-            for form_key, attribute in (
-                parse_buffer_key(buffer_key) for buffer_key in data_buffers
+            ".".join(p)
+            for p in (
+                form_key_to_path[form_key]
+                for form_key, attribute in (
+                    parse_buffer_key(buffer_key) for buffer_key in data_buffers
+                )
             )
+            if p
         }
 
         return _FromParquetFragmentWiseFn(
