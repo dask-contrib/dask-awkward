@@ -8,5 +8,9 @@ def test_idempotent_layer_column_project(caa):
     for _, v in daa.dask.layers.items():
         if isinstance(v, AwkwardInputLayer):
             n += 1
-            assert v is v.project_columns(["abc"])
+            meta, state = v.mock()
+            # Don't touch anything!
+            projected = v.project(state)
+            # Assert that non-projectable source is idempotent
+            assert v is projected
     assert n > 0

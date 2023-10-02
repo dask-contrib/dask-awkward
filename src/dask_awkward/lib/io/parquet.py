@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import abc
-import copy
 import itertools
 import logging
 import math
 import operator
-from collections.abc import Sequence
-from typing import Any, Literal, overload
+from typing import TYPE_CHECKING, Any, Literal, overload
 
 import awkward as ak
 import awkward.operations.ak_from_parquet as ak_from_parquet
@@ -19,15 +17,19 @@ from dask.highlevelgraph import HighLevelGraph
 from fsspec import AbstractFileSystem
 from fsspec.core import get_fs_token_paths, url_to_fs
 
-from dask_awkward.lib.core import (
-    Array,
-    Scalar,
-    map_partitions,
-    new_scalar_object,
-    typetracer_array,
-)
+from dask_awkward.lib.core import Array, Scalar, map_partitions, new_scalar_object
 from dask_awkward.lib.io.io import from_map
 from dask_awkward.lib.unproject_layout import unproject_layout
+from dask_awkward.lib.utils import (
+    buffer_keys_required_to_compute_shapes,
+    form_with_unique_keys,
+    parse_buffer_key,
+    render_buffer_key,
+    trace_form_structure,
+)
+
+if TYPE_CHECKING:
+    from awkward import Array as AwkwardArray
 
 log = logging.getLogger(__name__)
 
@@ -66,43 +68,28 @@ class _FromParquetFn:
     def __call__(self, source: Any) -> ak.Array:
         ...
 
-    def prepare_annotated_form(self) -> tuple[Form, dict]:
-        path_stash = {}
-        children_stash = {}
+    def prepare_for_projection(self) -> tuple[AwkwardArray, dict]:
+        form = form_with_unique_keys(self.form, "<root>")
 
-        def set_form_keys(form: Form, key: str, path: tuple[str, ...]):
-            # Record path for any form key
-            path_stash[key] = path
-            # If the form is a record we need to loop over all fields in the
-            # record and set form that include the field name; this will keep
-            # recursing as well.
-            if form.is_record:
-                for field in form.fields:
-                    full_key = f"{key}.{field}"
-                    set_form_keys(form.content(field), full_key, path + (field,))
-                    # Keep track of children
-                    children_stash.setdefault(key, []).append(full_key)
+        # Build typetracer and associated report object
+        (meta, report) = ak.typetracer.typetracer_with_report(
+            form,
+            highlevel=True,
+            behavior=self.behavior,
+            buffer_key=render_buffer_key,
+        )  # type: ignore
 
-            elif form.is_union:
-                for i, entry in enumerate(form.contents):
-                    set_form_keys(entry, f"{key}#{i}", path)
+        return meta, {
+            "trace": trace_form_structure(form, buffer_key=render_buffer_key),
+            "report": report,
+        }
 
-            # NumPy like array is easy
-            elif form.is_numpy:
-                form.form_key = key
-
-            # Anything else grab the content and keep recursing
-            else:
-                set_form_keys(form.content, f"{key}.content", path)
-
-        form = copy.deepcopy(self.form)
-        set_form_keys(form, "root", ())
-        return form, {"path": path_stash, "children": children_stash}
+    @property
+    def meta(self) -> AwkwardArray:
+        return ak.typetracer.typetracer_from_form(self.form, behavior=self.behavior)
 
     @abc.abstractmethod
-    def project_buffers(
-        self, data_buffers: set[str], shape_buffers: set[str], stash: dict
-    ) -> _FromParquetFn:
+    def project(self, state: dict) -> _FromParquetFn:
         ...
 
     def __repr__(self) -> str:
@@ -158,51 +145,46 @@ class _FromParquetFileWiseFn(_FromParquetFn):
         )
         return ak.Array(unproject_layout(self.original_form, array.layout))
 
-    def project_buffers(
-        self,
-        data_buffers: set[str],
-        shape_buffers: set[str],
-        stash,
-    ) -> _FromParquetFileWiseFn:
+    def project(self, state: dict) -> _FromParquetFileWiseFn:
         if not _use_optimization():
             return self
 
-        form_key_to_child_keys = stash["children"]
-        form_key_to_path = stash["path"]
+        assert self.original_form is None
 
-        wildcard_form_keys = []
-        columns = set()
+        ## Read from stash
+        # Form hierarchy information
+        form_key_to_parent_key: dict = state["trace"]["form_key_to_parent_key"]
+        # Buffer hierarchy information
+        form_key_to_buffer_keys: dict = state["trace"]["form_key_to_buffer_keys"]
+        # Parquet hierarchy information
+        form_key_to_path = state["trace"]["form_key_to_path"]
+        # Typetracer report
+        report = state["report"]
 
-        for buffer_key, buffer_name in data_buffers:
-            form_key, attribute = buffer_key.rsplit("-", 1)
+        # Require the data of metadata buffers above shape-only requests
+        data_buffers = {
+            *report.data_touched,
+            *buffer_keys_required_to_compute_shapes(
+                parse_buffer_key,
+                report.shape_touched,
+                form_key_to_parent_key,
+                form_key_to_buffer_keys,
+            ),
+        }
 
-            if attribute in ("starts", "stops", "offsets"):
-                wildcard_form_keys.append(form_key)
-            else:
-                columns.add(form_key_to_path[form_key])
+        columns = {
+            ".".join(form_key_to_path[form_key])
+            for form_key, attribute in (
+                parse_buffer_key(buffer_key) for buffer_key in data_buffers
+            )
+        }
 
-        for form_key in wildcard_form_keys:
-            try:
-                child_keys = form_key_to_child_keys[form_key]
-            except KeyError:
-                columns.add(form_key_to_path[form_key])
-            else:
-                child_column: tuple[str]
-                for child_form_key in child_keys:
-                    child_column = form_key_to_path[child_form_key]
-                    if child_column in columns:
-                        break
-                else:
-                    # Add the final column
-                    columns.add(child_column)
-
-        new_form = self.form.select_columns(columns)
         new = _FromParquetFileWiseFn(
             fs=self.fs,
-            form=new_form,
+            form=self.form.select_columns(columns),
             listsep=self.listsep,
             unnamed_root=self.unnamed_root,
-            original_form=self.original_form,
+            original_form=self.form,
             behavior=self.behavior,
             **self.kwargs,
         )
@@ -247,23 +229,48 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
         )
         return ak.Array(unproject_layout(self.original_form, array.layout))
 
-    def project_columns(
+    def project(
         self,
-        columns: Sequence[str] | None,
-        original_form: Form | None = None,
-        necessary_shape_columns: Sequence[str] | None = None,
+        state: dict,
     ) -> _FromParquetFragmentWiseFn:
         if not _use_optimization():
             return self
 
-        if columns is None:
-            return self
+        assert self.original_form is None
+
+        ## Read from stash
+        # Form hierarchy information
+        form_key_to_parent_key: dict = state["trace"]["form_key_to_parent_key"]
+        # Buffer hierarchy information
+        form_key_to_buffer_keys: dict = state["trace"]["form_key_to_buffer_keys"]
+        # Parquet hierarchy information
+        form_key_to_path = state["trace"]["form_key_to_path"]
+        # Typetracer report
+        report = state["report"]
+
+        # Require the data of metadata buffers above shape-only requests
+        data_buffers = {
+            *report.data_touched,
+            *buffer_keys_required_to_compute_shapes(
+                parse_buffer_key,
+                report.shape_touched,
+                form_key_to_parent_key,
+                form_key_to_buffer_keys,
+            ),
+        }
+
+        columns = {
+            ".".join(form_key_to_path[form_key])
+            for form_key, attribute in (
+                parse_buffer_key(buffer_key) for buffer_key in data_buffers
+            )
+        }
 
         return _FromParquetFragmentWiseFn(
             fs=self.fs,
             form=self.form.select_columns(columns),
             unnamed_root=self.unnamed_root,
-            original_form=original_form,
+            original_form=self.form,
             behavior=self.behavior,
             **self.kwargs,
         )
@@ -379,8 +386,6 @@ def from_parquet(
     if split_row_groups is None:
         split_row_groups = row_counts is not None and len(row_counts) > 1
 
-    meta = ak.typetracer.typetracer_from_form(subform, behavior=behavior)
-
     if split_row_groups is False or subrg is None:
         # file-wise
         return from_map(
@@ -398,7 +403,6 @@ def from_parquet(
             actual_paths,
             label=label,
             token=token,
-            meta=meta,
         )
     else:
         # row-group wise
@@ -438,7 +442,6 @@ def from_parquet(
             label=label,
             token=token,
             divisions=tuple(divisions),
-            meta=typetracer_array(meta),
         )
 
 

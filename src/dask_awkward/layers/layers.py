@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import copy
-import itertools
-import pickle
 from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
@@ -14,8 +12,6 @@ from dask_awkward.utils import LazyInputsDict
 
 if TYPE_CHECKING:
     from awkward import Array as AwkwardArray
-    from awkward.forms import Form
-    from awkward.typetracer import TypeTracerReport
 
 
 class AwkwardBlockwiseLayer(Blockwise):
@@ -36,6 +32,19 @@ class AwkwardBlockwiseLayer(Blockwise):
 
     def __repr__(self) -> str:
         return "Awkward" + super().__repr__()
+
+    def __getstate__(self) -> dict:
+        d = self.__dict__.copy()
+        import pickle
+
+        try:
+            pickle.dumps(d["_meta"])
+        except (ValueError, TypeError, KeyError):
+            print("POP META", self)
+            d.pop(
+                "_meta", None
+            )  # must be a typetracer, does not pickle and not needed on scheduler
+        return d
 
 
 T = TypeVar("T")
@@ -206,7 +215,7 @@ class AwkwardMaterializedLayer(MaterializedLayer):
                 # just want the first partition.
                 if len(task) == 2 and task[1] > 0:
                     task = (task[0], 0)
-                return MaterializedLayer({(name, 0): task}), None
+                return MaterializedLayer({(name, 0): task})
             return self
 
         # more than one previous_layer_names

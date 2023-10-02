@@ -23,8 +23,16 @@ from dask_awkward.lib.io.io import (
     _BytesReadingInstructions,
     from_map,
 )
+from dask_awkward.lib.utils import (
+    buffer_keys_required_to_compute_shapes,
+    form_with_unique_keys,
+    parse_buffer_key,
+    render_buffer_key,
+    trace_form_structure,
+)
 
 if TYPE_CHECKING:
+    from awkward import Array as AwkwardArray
     from awkward.contents.content import Content
     from fsspec.spec import AbstractFileSystem
     from typing_extensions import Self
@@ -51,6 +59,7 @@ class FromJsonFn:
         schema: str | dict | list | None = None,
         form: Form | None = None,
         original_form: Form | None = None,
+        behavior: dict | None = None,
         **kwargs: Any,
     ) -> None:
         self.compression = compression
@@ -59,35 +68,85 @@ class FromJsonFn:
         self.kwargs = kwargs
         self.form = form
         self.original_form = original_form
+        self.behavior = behavior
 
     @abc.abstractmethod
     def __call__(self, source: Any) -> ak.Array:
         ...
 
-    def _default_project_columns(
-        self,
-        columns: Sequence[str],
-        original_form: Form | None = None,
-        necessary_shape_columns: Sequence[str] | None = None,
-    ) -> Self:
+    @property
+    def meta(self) -> AwkwardArray:
+        return ak.typetracer.typetracer_from_form(self.form, behavior=self.behavior)
+
+    def prepare_for_projection(self) -> tuple[AwkwardArray, dict]:
+        form = form_with_unique_keys(self.form, "<root>")
+
+        # Build typetracer and associated report object
+        (meta, report) = ak.typetracer.typetracer_with_report(
+            form,
+            highlevel=True,
+            behavior=self.behavior,
+            buffer_key=render_buffer_key,
+        )  # type: ignore
+
+        return meta, {
+            "trace": trace_form_structure(form, buffer_key=render_buffer_key),
+            "report": report,
+        }
+
+    def project(self, state) -> Self:
+        if not _use_optimization():
+            return self
+
         if self.schema is not None:
             return self
 
-        if self.form is not None:
-            form = self.form.select_columns(columns)
-            assert form is not None
-            schema = layout_to_jsonschema(form.length_zero_array(highlevel=False))
+        if self.form is None:
+            return self
 
-            return type(self)(
-                schema=schema,
-                form=form,
-                storage=self.storage,
-                compression=self.compression,
-                original_form=original_form,
-                **self.kwargs,
+        assert self.original_form is None
+
+        ## Read from stash
+        # Form hierarchy information
+        form_key_to_parent_key: dict = state["trace"]["form_key_to_parent_key"]
+        # Buffer hierarchy information
+        form_key_to_buffer_keys: dict = state["trace"]["form_key_to_buffer_keys"]
+        # Parquet hierarchy information
+        form_key_to_path = state["trace"]["form_key_to_path"]
+        # Typetracer report
+        report = state["report"]
+
+        # Require the data of metadata buffers above shape-only requests
+        data_buffers = {
+            *report.data_touched,
+            *buffer_keys_required_to_compute_shapes(
+                parse_buffer_key,
+                report.shape_touched,
+                form_key_to_parent_key,
+                form_key_to_buffer_keys,
+            ),
+        }
+
+        columns = {
+            ".".join(form_key_to_path[form_key])
+            for form_key, attribute in (
+                parse_buffer_key(buffer_key) for buffer_key in data_buffers
             )
+        }
 
-        return self
+        form = self.form.select_columns(columns)
+        assert form is not None
+        schema = layout_to_jsonschema(form.length_zero_array(highlevel=False))
+
+        return type(self)(
+            schema=schema,
+            form=form,
+            storage=self.storage,
+            compression=self.compression,
+            original_form=self.form,
+            behavior=self.behavior,
+            **self.kwargs,
+        )
 
 
 class FromJsonLineDelimitedFn(FromJsonFn):
@@ -99,6 +158,7 @@ class FromJsonLineDelimitedFn(FromJsonFn):
         schema: str | dict | list | None = None,
         form: Form | None = None,
         original_form: Form | None = None,
+        behavior: dict | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(
@@ -107,6 +167,7 @@ class FromJsonLineDelimitedFn(FromJsonFn):
             schema=schema,
             form=form,
             original_form=original_form,
+            behavior=behavior,
             **kwargs,
         )
 
@@ -123,21 +184,6 @@ class FromJsonLineDelimitedFn(FromJsonFn):
         return array
         # return ak.Array(unproject_layout(self.original_form, array.layout))
 
-    def project_columns(
-        self,
-        columns: Sequence[str],
-        original_form: Form | None = None,
-        necessary_shape_columns: Sequence[str] | None = None,
-    ) -> Self:
-        if not _use_optimization():
-            return self
-
-        return self._default_project_columns(
-            columns=columns,
-            original_form=original_form,
-            necessary_shape_columns=necessary_shape_columns,
-        )
-
 
 class FromJsonSingleObjPerFile(FromJsonFn):
     def __init__(
@@ -148,6 +194,7 @@ class FromJsonSingleObjPerFile(FromJsonFn):
         schema: str | dict | list | None = None,
         form: Form | None = None,
         original_form: Form | None = None,
+        behavior: dict | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(
@@ -156,6 +203,7 @@ class FromJsonSingleObjPerFile(FromJsonFn):
             schema=schema,
             form=form,
             original_form=original_form,
+            behavior=behavior,
             **kwargs,
         )
 
@@ -176,21 +224,6 @@ class FromJsonSingleObjPerFile(FromJsonFn):
         return array
         # return ak.Array(unproject_layout(self.original_form, array.layout))
 
-    def project_columns(
-        self,
-        columns: Sequence[str],
-        original_form: Form | None = None,
-        necessary_shape_columns: Sequence[str] | None = None,
-    ) -> Self:
-        if not _use_optimization():
-            return self
-
-        return self._default_project_columns(
-            columns=columns,
-            original_form=original_form,
-            necessary_shape_columns=necessary_shape_columns,
-        )
-
 
 class FromJsonBytesFn(FromJsonFn):
     def __init__(
@@ -201,6 +234,7 @@ class FromJsonBytesFn(FromJsonFn):
         schema: str | dict | list | None = None,
         form: Form | None = None,
         original_form: Form | None = None,
+        behavior: dict | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(
@@ -209,6 +243,7 @@ class FromJsonBytesFn(FromJsonFn):
             schema=schema,
             form=form,
             original_form=original_form,
+            behavior=behavior,
             **kwargs,
         )
 
@@ -236,21 +271,6 @@ class FromJsonBytesFn(FromJsonFn):
         assert isinstance(array, ak.Array)
         return array
         # return ak.Array(unproject_layout(self.original_form, array.layout))
-
-    def project_columns(
-        self,
-        columns: Sequence[str],
-        original_form: Form | None = None,
-        necessary_shape_columns: Sequence[str] | None = None,
-    ) -> Self:
-        if not _use_optimization():
-            return self
-
-        return self._default_project_columns(
-            columns=columns,
-            original_form=original_form,
-            necessary_shape_columns=necessary_shape_columns,
-        )
 
 
 def meta_from_single_file(
