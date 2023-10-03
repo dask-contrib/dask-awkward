@@ -4,10 +4,11 @@ import abc
 import logging
 import math
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Literal, overload
+from typing import TYPE_CHECKING, Any, Literal, cast, overload
 
 import awkward as ak
 import dask
+from awkward import Array as AwkwardArray
 from awkward.forms.form import Form
 from dask.base import tokenize
 from dask.blockwise import BlockIndex
@@ -32,12 +33,13 @@ from dask_awkward.lib.utils import (
 )
 
 if TYPE_CHECKING:
-    from awkward import Array as AwkwardArray
+    from awkward._nplikes.typetracer import TypeTracerReport
     from awkward.contents.content import Content
     from fsspec.spec import AbstractFileSystem
     from typing_extensions import Self
 
     from dask_awkward.lib.core import Array, Scalar
+    from dask_awkward.lib.utils import FormStructure
 
 
 log = logging.getLogger(__name__)
@@ -77,7 +79,9 @@ class FromJsonFn:
     def mock(self) -> AwkwardArray:
         return ak.typetracer.typetracer_from_form(self.form, behavior=self.behavior)
 
-    def prepare_for_projection(self) -> tuple[AwkwardArray, dict]:
+    def prepare_for_projection(
+        self,
+    ) -> tuple[AwkwardArray, TypeTracerReport, FormStructure]:
         form = form_with_unique_keys(self.form, "<root>")
 
         # Build typetracer and associated report object
@@ -88,12 +92,13 @@ class FromJsonFn:
             buffer_key=render_buffer_key,
         )  # type: ignore
 
-        return meta, {
-            "trace": trace_form_structure(form, buffer_key=render_buffer_key),
-            "report": report,
-        }
+        return (
+            cast(AwkwardArray, meta),
+            report,
+            trace_form_structure(form, buffer_key=render_buffer_key),
+        )
 
-    def project(self, state) -> Self:
+    def project(self, report: TypeTracerReport, state: FormStructure) -> Self:
         if not _use_optimization():
             return self
 
@@ -107,13 +112,11 @@ class FromJsonFn:
 
         ## Read from stash
         # Form hierarchy information
-        form_key_to_parent_key: dict = state["trace"]["form_key_to_parent_key"]
+        form_key_to_parent_key: dict = state["form_key_to_parent_key"]
         # Buffer hierarchy information
-        form_key_to_buffer_keys: dict = state["trace"]["form_key_to_buffer_keys"]
+        form_key_to_buffer_keys: dict = state["form_key_to_buffer_keys"]
         # Parquet hierarchy information
-        form_key_to_path = state["trace"]["form_key_to_path"]
-        # Typetracer report
-        report = state["report"]
+        form_key_to_path = state["form_key_to_path"]
 
         # Require the data of metadata buffers above shape-only requests
         data_buffers = {

@@ -12,6 +12,7 @@ from dask_awkward.utils import LazyInputsDict
 
 if TYPE_CHECKING:
     from awkward import Array as AwkwardArray
+    from awkward._nplikes.typetracer import TypeTracerReport
 
 
 class AwkwardBlockwiseLayer(Blockwise):
@@ -60,10 +61,10 @@ class ImplementsMocking(Protocol):
 
 
 class ImplementsProjection(ImplementsMocking, Protocol):
-    def prepare_for_projection(self) -> tuple[AwkwardArray, T]:
+    def prepare_for_projection(self) -> tuple[AwkwardArray, TypeTracerReport, T]:
         ...
 
-    def project(self, state: T) -> ImplementsIOFunction:
+    def project(self, report: TypeTracerReport, state: T) -> ImplementsIOFunction:
         ...
 
 
@@ -168,7 +169,7 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
             annotations=self.annotations,
         )
 
-    def prepare_for_projection(self) -> tuple[AwkwardInputLayer, T]:
+    def prepare_for_projection(self) -> tuple[AwkwardInputLayer, TypeTracerReport, T]:
         """Mock the input layer as starting with a data-less typetracer.
         This method is used to create new dask task graphs that
         operate purely on typetracer Arrays (that is, array with
@@ -193,11 +194,13 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         -------
         AwkwardInputLayer
             Copy of the input layer with data-less input.
+        TypeTracerReport
+            The report object used to track touched buffers.
         Any
             The black-box state object returned by the IO function.
         """
         assert self.is_projectable
-        new_meta_array, state = self.io_func.prepare_for_projection()
+        new_meta_array, report, state = self.io_func.prepare_for_projection()
 
         new_input_layer = AwkwardInputLayer(
             name=self.name,
@@ -208,16 +211,17 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
             creation_info=self.creation_info,
             annotations=self.annotations,
         )
-        return new_input_layer, state
+        return new_input_layer, report, state
 
     def project(
         self,
+        report: TypeTracerReport,
         state: T,
     ):
         return AwkwardInputLayer(
             name=self.name,
             inputs=self.inputs,
-            io_func=self.io_func.project(state=state),
+            io_func=self.io_func.project(report=report, state=state),
             label=self.label,
             produces_tasks=self.produces_tasks,
             creation_info=self.creation_info,

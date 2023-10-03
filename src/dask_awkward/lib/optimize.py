@@ -4,7 +4,7 @@ import copy
 import logging
 import warnings
 from collections.abc import Hashable, Iterable, Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 import dask.config
 from awkward.typetracer import touch_data
@@ -14,6 +14,9 @@ from dask.highlevelgraph import HighLevelGraph
 from dask.local import get_sync
 
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardInputLayer
+
+if TYPE_CHECKING:
+    from awkward._nplikes.typetracer import TypeTracerReport
 
 log = logging.getLogger(__name__)
 
@@ -81,42 +84,19 @@ def optimize(
     return dsk
 
 
-def optimize_columns(dsk: HighLevelGraph) -> HighLevelGraph:
-    """Run column projection optimization.
-
-    This optimization determines which columns from an
-    ``AwkwardInputLayer`` are necessary for a complete computation.
-
-    For example, if a parquet dataset is loaded with fields:
-    ``["foo", "bar", "baz.x", "baz.y"]``
-
-    And the following task graph is made:
-
-    >>> ds = dak.from_parquet("/path/to/dataset")
-    >>> z = ds["foo"] - ds["baz"]["y"]
-
-    Upon calling z.compute() the AwkwardInputLayer created in the
-    from_parquet call will only read the parquet columns ``foo`` and
-    ``baz.y``.
-
-    Parameters
-    ----------
-    dsk : HighLevelGraph
-        Task graph to optimize.
-
-    Returns
-    -------
-    HighLevelGraph
-        New, optimized task graph with column-projected ``AwkwardInputLayer``.
-
-    """
+def _prepare_buffer_projection(
+    dsk: HighLevelGraph,
+) -> tuple[dict[str, TypeTracerReport], dict[str, Any]] | None:
+    """Pair layer names with lists of necessary columns."""
     import awkward as ak
 
     if not _has_projectable_awkward_io_layer(dsk):
-        return dsk
+        return None
 
     layer_to_projection_state: dict[str, Any] = {}
-    projection_layers = dsk.layers.copy()  # type:
+    layer_to_reports: dict[str, TypeTracerReport] = {}
+    projection_layers = dict(dsk.layers)
+
     for name, lay in dsk.layers.items():
         if isinstance(lay, AwkwardInputLayer):
             if lay.is_projectable:
@@ -124,6 +104,7 @@ def optimize_columns(dsk: HighLevelGraph) -> HighLevelGraph:
                 # Keep track of mocked state
                 (
                     projection_layers[name],
+                    layer_to_reports[name],
                     layer_to_projection_state[name],
                 ) = lay.prepare_for_projection()
             elif lay.is_mockable:
@@ -180,14 +161,55 @@ def optimize_columns(dsk: HighLevelGraph) -> HighLevelGraph:
                 f"Invalid awkward.optimization.on-fail option: {on_fail}.\n"
                 "Valid options are 'warn', 'pass', or 'raise'."
             )
-        return dsk
+        return None
     else:
-        # Project layers using projection state
-        layers = dsk.layers.copy()  # type: ignore
-        for name, state in layer_to_projection_state.items():
-            layers[name] = layers[name].project(state)
+        return layer_to_reports, layer_to_projection_state
 
-        return HighLevelGraph(layers, dsk.dependencies)
+
+def optimize_columns(dsk: HighLevelGraph) -> HighLevelGraph:
+    """Run column projection optimization.
+
+    This optimization determines which columns from an
+    ``AwkwardInputLayer`` are necessary for a complete computation.
+
+    For example, if a parquet dataset is loaded with fields:
+    ``["foo", "bar", "baz.x", "baz.y"]``
+
+    And the following task graph is made:
+
+    >>> ds = dak.from_parquet("/path/to/dataset")
+    >>> z = ds["foo"] - ds["baz"]["y"]
+
+    Upon calling z.compute() the AwkwardInputLayer created in the
+    from_parquet call will only read the parquet columns ``foo`` and
+    ``baz.y``.
+
+    Parameters
+    ----------
+    dsk : HighLevelGraph
+        Task graph to optimize.
+
+    Returns
+    -------
+    HighLevelGraph
+        New, optimized task graph with column-projected ``AwkwardInputLayer``.
+
+    """
+    projection_data = _prepare_buffer_projection(dsk)
+    if projection_data is None:
+        return dsk
+
+    # Unpack result
+    layer_to_reports, layer_to_projection_state = projection_data
+
+    # Project layers using projection state
+    layers = dict(dsk.layers)
+    for name, state in layer_to_projection_state.items():
+        layers[name] = cast(AwkwardInputLayer, layers[name]).project(
+            report=layer_to_reports[name], state=state
+        )
+
+    return HighLevelGraph(layers, dsk.dependencies)
 
 
 def _layers_with_annotation(dsk: HighLevelGraph, key: str) -> list[str]:
