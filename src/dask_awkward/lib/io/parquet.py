@@ -68,6 +68,9 @@ class _FromParquetFn:
     def __call__(self, source: Any) -> ak.Array:
         ...
 
+    def mock(self) -> AwkwardArray:
+        return ak.typetracer.typetracer_from_form(self.form, behavior=self.behavior)
+
     def prepare_for_projection(self) -> tuple[AwkwardArray, dict]:
         form = form_with_unique_keys(self.form, "<root>")
 
@@ -83,10 +86,6 @@ class _FromParquetFn:
             "trace": trace_form_structure(form, buffer_key=render_buffer_key),
             "report": report,
         }
-
-    @property
-    def meta(self) -> AwkwardArray:
-        return ak.typetracer.typetracer_from_form(self.form, behavior=self.behavior)
 
     @abc.abstractmethod
     def project(self, state: dict) -> _FromParquetFn:

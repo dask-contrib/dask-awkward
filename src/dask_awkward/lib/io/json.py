@@ -74,8 +74,7 @@ class FromJsonFn:
     def __call__(self, source: Any) -> ak.Array:
         ...
 
-    @property
-    def meta(self) -> AwkwardArray:
+    def mock(self) -> AwkwardArray:
         return ak.typetracer.typetracer_from_form(self.form, behavior=self.behavior)
 
     def prepare_for_projection(self) -> tuple[AwkwardArray, dict]:

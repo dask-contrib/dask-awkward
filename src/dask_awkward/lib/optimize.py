@@ -126,6 +126,8 @@ def optimize_columns(dsk: HighLevelGraph) -> HighLevelGraph:
                     projection_layers[name],
                     layer_to_projection_state[name],
                 ) = lay.prepare_for_projection()
+            elif lay.is_mockable:
+                projection_layers[name] = lay.mock()
         elif hasattr(lay, "mock"):
             projection_layers[name] = lay.mock()
 

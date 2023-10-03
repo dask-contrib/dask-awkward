@@ -4,7 +4,7 @@ import math
 import warnings
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, Mapping, Protocol
+from typing import TYPE_CHECKING, Any, Callable, Mapping, Protocol, cast
 
 import awkward as ak
 import numpy as np
@@ -19,10 +19,13 @@ from dask_awkward.layers import (
     AwkwardInputLayer,
     ImplementsIOFunction,
     ImplementsProjection,
-    IOFunctionWithMeta,
-    io_func_implements_project,
 )
-from dask_awkward.layers.layers import AwkwardMaterializedLayer
+from dask_awkward.layers.layers import (
+    AwkwardMaterializedLayer,
+    ImplementsMocking,
+    IOFunctionWithMocking,
+    io_func_implements_mocking,
+)
 from dask_awkward.lib.core import (
     empty_typetracer,
     map_partitions,
@@ -566,18 +569,19 @@ def from_map(
             packed=packed,
         )
 
-    # Special `io_func` implementations can
-    if io_func_implements_project(func):
+    # Special `io_func` implementations can implement mocking and optionally
+    # support buffer projection.
+    if io_func_implements_mocking(func):
         io_func = func
-        array_meta = func.meta
+        array_meta = cast(ImplementsMocking, func).mock()
+    # If we know the meta, we can spoof mocking
+    elif meta is not None:
+        io_func = IOFunctionWithMocking(meta, func)
+        array_meta = meta
     # Without `meta`, the meta will be computed by executing the graph
-    elif meta is None:
+    else:
         io_func = func
         array_meta = None
-    # If we know the meta, we can spoof projection
-    else:
-        io_func = IOFunctionWithMeta(meta, func)
-        array_meta = meta
 
     dsk = AwkwardInputLayer(name=name, inputs=inputs, io_func=io_func)
 

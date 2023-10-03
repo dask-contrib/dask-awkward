@@ -54,11 +54,12 @@ class ImplementsIOFunction(Protocol):
 T = TypeVar("T")
 
 
-class ImplementsProjection(Protocol):
-    @property
-    def meta(self) -> AwkwardArray:
+class ImplementsMocking(Protocol):
+    def mock(self) -> AwkwardArray:
         ...
 
+
+class ImplementsProjection(ImplementsMocking, Protocol):
     def prepare_for_projection(self) -> tuple[AwkwardArray, T]:
         ...
 
@@ -66,15 +67,21 @@ class ImplementsProjection(Protocol):
         ...
 
 
-# IO functions may not end up performing buffer projection, so they
-# should also support directly returning the result
+# IO functions can implement full-blown projection
 class ImplementsIOFunctionWithProjection(
     ImplementsProjection, ImplementsIOFunction, Protocol
 ):
     ...
 
 
-class IOFunctionWithMeta(ImplementsIOFunctionWithProjection):
+# Or they can implement simple mocking
+class ImplementsIOFunctionWithMocking(
+    ImplementsMocking, ImplementsIOFunction, Protocol
+):
+    ...
+
+
+class IOFunctionWithMocking(ImplementsIOFunctionWithMocking):
     def __init__(self, meta: AwkwardArray, io_func: ImplementsIOFunction):
         self._meta = meta
         self._io_func = io_func
@@ -82,19 +89,16 @@ class IOFunctionWithMeta(ImplementsIOFunctionWithProjection):
     def __call__(self, *args, **kwargs) -> AwkwardArray:
         return self._io_func(*args, **kwargs)
 
-    @property
-    def meta(self) -> AwkwardArray:
+    def mock(self) -> AwkwardArray:
         return self._meta
 
-    def prepare_for_projection(self) -> tuple[AwkwardArray, None]:
-        return self._meta, None
 
-    def project(self, state: None):
-        return self._io_func
+def io_func_implements_projection(func: ImplementsIOFunction) -> bool:
+    return hasattr(func, "prepare_for_projection")
 
 
-def io_func_implements_project(func: ImplementsIOFunction) -> bool:
-    return hasattr(func, "project")
+def io_func_implements_mocking(func: ImplementsIOFunction) -> bool:
+    return hasattr(func, "mock")
 
 
 class AwkwardInputLayer(AwkwardBlockwiseLayer):
@@ -108,7 +112,9 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         *,
         name: str,
         inputs: Any,
-        io_func: ImplementsIOFunction | ImplementsIOFunctionWithProjection,
+        io_func: ImplementsIOFunction
+        | ImplementsIOFunctionWithMocking
+        | ImplementsIOFunctionWithProjection,
         label: str | None = None,
         produces_tasks: bool = False,
         creation_info: dict | None = None,
@@ -142,11 +148,25 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
     @property
     def is_projectable(self) -> bool:
         # isinstance(self.io_func, ImplementsProjection)
-        return io_func_implements_project(self.io_func)
+        return io_func_implements_projection(self.io_func)
+
+    @property
+    def is_mockable(self) -> bool:
+        # isinstance(self.io_func, ImplementsMocking)
+        return io_func_implements_mocking(self.io_func)
 
     def mock(self) -> AwkwardInputLayer:
-        layer, _ = self.prepare_for_projection()
-        return layer
+        assert self.is_mockable
+
+        return AwkwardInputLayer(
+            name=self.name,
+            inputs=[None][: int(list(self.numblocks.values())[0][0])],
+            io_func=lambda *_, **__: self.io_func.mock(),
+            label=self.label,
+            produces_tasks=self.produces_tasks,
+            creation_info=self.creation_info,
+            annotations=self.annotations,
+        )
 
     def prepare_for_projection(self) -> tuple[AwkwardInputLayer, T]:
         """Mock the input layer as starting with a data-less typetracer.
