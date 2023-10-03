@@ -2,9 +2,10 @@ from __future__ import annotations
 
 __all__ = ("trace_form_structure", "buffer_keys_required_to_compute_shapes")
 
-import copy
 from collections.abc import Callable, Iterable, Iterator
 from typing import TYPE_CHECKING, TypedDict, TypeVar
+
+import awkward as ak
 
 if TYPE_CHECKING:
     from awkward.forms import Form
@@ -114,8 +115,7 @@ def form_with_unique_keys(form: Form, key: str) -> Form:
         # recursing as well.
         if form.is_record:
             for field in form.fields:
-                full_key = f"{key}.{field}"
-                impl(form.content(field), full_key)
+                impl(form.content(field), f"{key}.{field}")
 
         elif form.is_union:
             for i, entry in enumerate(form.contents):
@@ -129,6 +129,7 @@ def form_with_unique_keys(form: Form, key: str) -> Form:
         else:
             impl(form.content, f"{key}.content")
 
-    form = copy.deepcopy(form)
+    # Perform a "deep" copy without preserving references
+    form = ak.from_dict(ak.to_dict(form))
     impl(form, key)
     return form
