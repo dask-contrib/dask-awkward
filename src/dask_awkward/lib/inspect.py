@@ -1,83 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import numpy as np
-from dask.base import unpack_collections
-from dask.highlevelgraph import HighLevelGraph
 
 if TYPE_CHECKING:
     from dask_awkward.lib.core import Array
-
-
-def necessary_buffers(
-    *args: Any, traverse: bool = True
-) -> dict[str, dict[str, set[str]]]:
-    r"""Determine the columns necessary to compute a collection.
-
-    Parameters
-    ----------
-    *args : Dask collections or HighLevelGraphs
-        The collection (or collection graph) of interest. These can be
-        individual objects, lists, sets, or dictionaries.
-    traverse : bool, optional
-        If True (default), builtin Python collections are traversed
-        looking for any Dask collections they might contain.
-
-    Returns
-    -------
-    dict[str, dict[str, set[str]]]
-        Mapping that pairs the input layers in the graph to the
-        (data, shape) buffers that have been determined necessary from that layer.
-        These are not necessarily in the same order as the original input.
-
-    Examples
-    --------
-    If we have a hypothetical parquet dataset (``ds``) with the fields
-
-    - "foo"
-    - "bar"
-    - "baz"
-
-    And the "baz" field has fields
-
-    - "x"
-    - "y"
-
-    The calculation of ``ds.bar + ds.baz.x`` will only require the
-    ``bar`` and ``baz.x`` columns from the parquet file.
-
-    >>> import dask_awkward as dak
-    >>> ds = dak.from_parquet("some-dataset")
-    >>> ds.fields
-    ["foo", "bar", "baz"]
-    >>> ds.baz.fields
-    ["x", "y"]
-    >>> x = ds.bar + ds.baz.x
-    >>> dak.necessary_buffers(x)
-    {"from-parquet-abc123": {"data: ["bar", "baz.x"], "shape": []}}
-
-    Notice that ``foo`` and ``baz.y`` are not determined to be
-    necessary.
-
-    """
-    import dask_awkward.lib.optimize as o
-
-    collections, _ = unpack_collections(*args, traverse=traverse)
-    if not collections:
-        return {}
-
-    out: dict[str, dict[str, set[str]]] = {}
-    for obj in collections:
-        dsk = obj if isinstance(obj, HighLevelGraph) else obj.dask
-        dsk_buffers = o._necessary_buffers(dsk)
-
-        for key, buffers in dsk_buffers.items():
-            out_key_buffers = out.setdefault(key, {"data": set(), "shape": set()})
-            out_key_buffers["data"].update(buffers["data"])
-            out_key_buffers["shape"].update(buffers["shape"])
-
-    return out
 
 
 def _random_boolean_like(array_like, probability):
