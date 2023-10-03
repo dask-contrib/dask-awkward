@@ -5,10 +5,12 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
+    from awkward.highlevel import Array as AwkArray
+
     from dask_awkward.lib.core import Array
 
 
-def _random_boolean_like(array_like, probability):
+def _random_boolean_like(array_like: AwkArray, probability: float) -> AwkArray:
     import awkward as ak
 
     backend = ak.backend(array_like)
