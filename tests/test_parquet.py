@@ -182,7 +182,7 @@ def test_unnamed_root(
         unnamed_root_parquet_file,
         columns=columns,
     )
-    assert_eq(daa, caa, check_forms=False)
+    assert_eq(daa, caa, convert_to_lists=True)
 
 
 @pytest.mark.parametrize("prefix", [None, "abc"])
@@ -191,7 +191,7 @@ def test_to_parquet_with_prefix(
     tmp_path: pathlib.Path,
     prefix: str | None,
 ) -> None:
-    dak.to_parquet(daa, str(tmp_path), prefix=prefix, compute=True)
+    dak.to_parquet(daa, str(tmp_path), prefix=prefix)
     files = list(tmp_path.glob("*"))
     for ifile in files:
         fname = ifile.parts[-1]

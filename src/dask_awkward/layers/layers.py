@@ -188,7 +188,7 @@ class AwkwardMaterializedLayer(MaterializedLayer):
         super().__init__(mapping, **kwargs)
 
     def mock(self) -> MaterializedLayer:
-        mapping = self.mapping.copy()
+        mapping = copy.copy(self.mapping)
         if not mapping:
             # no partitions at all
             return self
@@ -229,9 +229,6 @@ class AwkwardMaterializedLayer(MaterializedLayer):
             name0s = tuple((name, 0) for name in self.previous_layer_names)
             task = (self.fn, *name0s)
             return MaterializedLayer({(name, 0): task})
-
-        # failed to cull during column opt
-        return self
 
 
 class AwkwardTreeReductionLayer(DataFrameTreeReduction):

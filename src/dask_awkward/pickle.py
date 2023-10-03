@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 __all__ = ("plugin",)
 
 from pickle import PickleBuffer
@@ -8,7 +10,7 @@ import awkward as ak
 from awkward.typetracer import PlaceholderArray
 
 
-def maybe_make_pickle_buffer(buffer) -> PlaceholderArray | PickleBuffer:
+def maybe_make_pickle_buffer(buffer: Any) -> PlaceholderArray | PickleBuffer:
     if isinstance(buffer, PlaceholderArray):
         return buffer
     else:
@@ -65,7 +67,7 @@ def pickle_array(array: ak.Array, protocol: int) -> tuple:
     )
 
 
-def plugin(obj, protocol: int) -> tuple | NotImplemented:
+def plugin(obj: Any, protocol: int) -> tuple:
     if isinstance(obj, ak.Record):
         return pickle_record(obj, protocol)
     elif isinstance(obj, ak.Array):

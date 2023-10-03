@@ -29,7 +29,11 @@ def _random_boolean_like(array_like: AwkArray, probability: float) -> AwkArray:
         )
 
 
-def sample(arr, factor: int | None = None, probability: float | None = None) -> Array:
+def sample(
+    arr: Array,
+    factor: int | None = None,
+    probability: float | None = None,
+) -> Array:
     """Decimate the data to a smaller number of rows.
 
     Must give either `factor` or `probability`.

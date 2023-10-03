@@ -100,12 +100,12 @@ def from_text(
 
     bytes_ingredients, _ = _bytes_with_sample(
         fs,
-        paths,
-        compression,
-        delimiter,
-        False,
-        blocksize,
-        False,
+        paths=paths,
+        compression=compression,
+        delimiter=delimiter,
+        not_zero=False,
+        blocksize=blocksize,
+        sample=False,
     )
 
     # meta is _always_ an unknown length array of strings.

@@ -445,13 +445,13 @@ def _from_json_bytes(
     )
 
     bytes_ingredients, the_sample_bytes = _bytes_with_sample(
-        fs,
-        paths,
-        compression,
-        delimiter,
-        not_zero,
-        blocksize,
-        sample_bytes,
+        fs=fs,
+        paths=paths,
+        compression=compression,
+        delimiter=delimiter,
+        not_zero=not_zero,
+        blocksize=blocksize,
+        sample=sample_bytes,
     )
 
     sample_array = ak.from_json(the_sample_bytes, line_delimited=True, **kwargs)
@@ -505,7 +505,7 @@ def from_json(
     resize: float = 8,
     highlevel: bool = True,
     behavior: dict | None = None,
-    blocksize: str | None = None,
+    blocksize: int | str | None = None,
     delimiter: bytes | None = None,
     compression: str | None = "infer",
     storage_options: dict[str, Any] | None = None,
@@ -553,10 +553,10 @@ def from_json(
         dask-awkward.
     behavior : dict, optional
         See :func:`ak.from_json`
-    blocksize : str, optional
+    blocksize : int, str, optional
         If ``None`` (default), the collection will be partitioned on a
         per-file bases. If defined, this sets the size (in bytes) of
-        each partition.
+        each partition. Can be a string of the form ``"10 MiB"``.
     delimiter : bytes, optional
         Delimiter to use for separating blocks; if ``blocksize`` is
         defined but this argument is not defined, the default is the
@@ -728,11 +728,10 @@ class ToJsonFn:
         return None
 
 
-@overload
 def to_json(
     array: Array,
     path: str,
-    line_delimited: bool | str = True,
+    line_delimited: bool = True,
     num_indent_spaces: int | None = None,
     num_readability_spaces: int = 0,
     nan_string: str | None = None,
@@ -743,46 +742,7 @@ def to_json(
     convert_other: Callable | None = None,
     storage_options: dict[str, Any] | None = None,
     compression: str | None = None,
-    compute: Literal[False] = False,
-) -> Scalar:
-    ...
-
-
-@overload
-def to_json(
-    array: Array,
-    path: str,
-    line_delimited: bool | str,
-    num_indent_spaces: int | None,
-    num_readability_spaces: int,
-    nan_string: str | None,
-    posinf_string: str | None,
-    neginf_string: str | None,
-    complex_record_fields: tuple[str, str] | None,
-    convert_bytes: Callable | None,
-    convert_other: Callable | None,
-    storage_options: dict[str, Any] | None,
-    compression: str | None,
-    compute: Literal[True],
-) -> None:
-    ...
-
-
-def to_json(
-    array: Array,
-    path: str,
-    line_delimited: bool | str = True,
-    num_indent_spaces: int | None = None,
-    num_readability_spaces: int = 0,
-    nan_string: str | None = None,
-    posinf_string: str | None = None,
-    neginf_string: str | None = None,
-    complex_record_fields: tuple[str, str] | None = None,
-    convert_bytes: Callable | None = None,
-    convert_other: Callable | None = None,
-    storage_options: dict[str, Any] | None = None,
-    compression: str | None = None,
-    compute: bool = False,
+    compute: bool = True,
 ) -> Scalar | None:
     """Store Array collection in JSON text.
 
@@ -794,7 +754,7 @@ def to_json(
         Root directory to save data; interpreted by filesystem-spec
         (can be a remote filesystem path, for example an s3 bucket:
         ``"s3://bucket/data"``).
-    line_delimited : bool | str
+    line_delimited : bool
         See docstring for :py:func:`ak.to_json`.
     num_indent_spaces : int, optional
         See docstring for :py:func:`ak.to_json`.

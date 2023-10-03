@@ -14,17 +14,14 @@ def test_visualize_works(daa):
         dask.compute(query, optimize_graph=True)
 
 
-def test_basic_root_works(daa):
+def test_basic_root_works():
     pytest.importorskip("hist")
     pytest.importorskip("uproot")
     import hist.dask as hda
     import uproot
 
     events = uproot.dask(
-        {
-            "https://github.com/CoffeaTeam/coffea/blob/master/"
-            "tests/samples/nano_dy.root?raw=true": "Events"
-        },
+        {"/tmp/tmp.zODEvn19Lm/nano_dy.root": "Events"},
         steps_per_file=3,
     )
 

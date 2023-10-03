@@ -7,6 +7,7 @@ from collections.abc import Hashable, Iterable, Mapping
 from typing import Any
 
 import dask.config
+from awkward.typetracer import touch_data
 from dask.blockwise import fuse_roots, optimize_blockwise
 from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
@@ -60,7 +61,7 @@ def all_optimizations(
 
 
 def optimize(
-    dsk: Mapping,
+    dsk: HighLevelGraph,
     keys: Hashable | list[Hashable] | set[Hashable],
     **_: Any,
 ) -> Mapping:
@@ -73,9 +74,9 @@ def optimize(
     if dask.config.get("awkward.optimization.enabled"):
         which = dask.config.get("awkward.optimization.which")
         if "columns" in which:
-            dsk = optimize_columns(dsk)  # type: ignore
+            dsk = optimize_columns(dsk)
         if "layer-chains" in which:
-            dsk = rewrite_layer_chains(dsk)
+            dsk = rewrite_layer_chains(dsk, keys)
 
     return dsk
 
@@ -101,12 +102,12 @@ def optimize_columns(dsk: HighLevelGraph) -> HighLevelGraph:
     Parameters
     ----------
     dsk : HighLevelGraph
-        Original high level dask graph
+        Task graph to optimize.
 
     Returns
     -------
     HighLevelGraph
-        New dask graph with a modified ``AwkwardInputLayer``.
+        New, optimized task graph with column-projected ``AwkwardInputLayer``.
 
     """
     import awkward as ak
@@ -155,7 +156,7 @@ def optimize_columns(dsk: HighLevelGraph) -> HighLevelGraph:
         results = get_sync(hlg, leaf_layers_keys)
         for out in results:
             if isinstance(out, (ak.Array, ak.Record)):
-                ak.typetracer.touch_data(out)
+                touch_data(out)
     except Exception as err:
         on_fail = dask.config.get("awkward.optimization.on-fail")
         # this is the default, throw a warning but skip the optimization.
@@ -244,10 +245,8 @@ def _has_projectable_awkward_io_layer(dsk: HighLevelGraph) -> bool:
 
 def _touch_all_data(*args, **kwargs):
     """Mock writing an ak.Array to disk by touching data buffers."""
-    import awkward as ak
-
     for arg in args + tuple(kwargs.values()):
-        ak.typetracer.touch_data(arg)
+        touch_data(arg)
 
 
 def _mock_output(layer):
@@ -278,13 +277,41 @@ def _touch_and_call(layer):
     return new_layer
 
 
-def rewrite_layer_chains(dsk: HighLevelGraph) -> HighLevelGraph:
+def rewrite_layer_chains(dsk: HighLevelGraph, keys: Any) -> HighLevelGraph:
+    """Smush chains of blockwise layers into a single layer.
+
+    The logic here identifies chains by popping layers (in arbitrary
+    order) from a set of all layers in the task graph and walking
+    through the dependencies (parent layers) and dependents (child
+    layers). If a multi layer chain is discovered we compress it into
+    a single layer with the second loop below (for chain in chains;
+    that step rewrites the graph). In the chain building logic, if a
+    layer exists in the `keys` argument (the keys necessary for the
+    compute that we are optimizing for), we shortcircuit the logic to
+    ensure we do not chain layers that contain a necessary key inside
+    (these layers are called `required_layers` below).
+
+    Parameters
+    ----------
+    dsk : HighLevelGraph
+        Task graph to optimize.
+    keys : Any
+        Keys that are requested by the compute that is being
+        optimized.
+
+    Returns
+    -------
+    HighLevelGraph
+        New, optimized task graph.
+
+    """
     # dask.optimization.fuse_liner for blockwise layers
     import copy
 
     chains = []
-    deps = dsk.dependencies.copy()
+    deps = copy.copy(dsk.dependencies)
 
+    required_layers = {k[0] for k in keys}
     layers = {}
     # find chains; each chain list is at least two keys long
     dependents = dsk.dependents
@@ -304,6 +331,7 @@ def rewrite_layer_chains(dsk: HighLevelGraph) -> HighLevelGraph:
             and dsk.dependencies[list(children)[0]] == {lay}
             and isinstance(dsk.layers[list(children)[0]], AwkwardBlockwiseLayer)
             and len(dsk.layers[lay]) == len(dsk.layers[list(children)[0]])
+            and lay not in required_layers
         ):
             # walk forwards
             lay = list(children)[0]
@@ -317,6 +345,7 @@ def rewrite_layer_chains(dsk: HighLevelGraph) -> HighLevelGraph:
             and dependents[list(parents)[0]] == {lay}
             and isinstance(dsk.layers[list(parents)[0]], AwkwardBlockwiseLayer)
             and len(dsk.layers[lay]) == len(dsk.layers[list(parents)[0]])
+            and list(parents)[0] not in required_layers
         ):
             # walk backwards
             lay = list(parents)[0]
@@ -339,32 +368,32 @@ def rewrite_layer_chains(dsk: HighLevelGraph) -> HighLevelGraph:
         outkey = chain[-1]
         layer0 = dsk.layers[chain[0]]
         outlayer = layers[outkey]
-        numblocks = [nb[0] for nb in layer0.numblocks.values() if nb[0] is not None][0]
-        deps[outkey] = deps[chain[0]]
-        [deps.pop(ch) for ch in chain[:-1]]
+        numblocks = [nb[0] for nb in layer0.numblocks.values() if nb[0] is not None][0]  # type: ignore
+        deps[outkey] = deps[chain[0]]  # type: ignore
+        [deps.pop(ch) for ch in chain[:-1]]  # type: ignore
 
-        subgraph = layer0.dsk.copy()
-        indices = list(layer0.indices)
+        subgraph = layer0.dsk.copy()  # type: ignore
+        indices = list(layer0.indices)  # type: ignore
         parent = chain[0]
 
-        outlayer.io_deps = layer0.io_deps
+        outlayer.io_deps = layer0.io_deps  # type: ignore
         for chain_member in chain[1:]:
             layer = dsk.layers[chain_member]
-            for k in layer.io_deps:
-                outlayer.io_deps[k] = layer.io_deps[k]
-            func, *args = layer.dsk[chain_member]
+            for k in layer.io_deps:  # type: ignore
+                outlayer.io_deps[k] = layer.io_deps[k]  # type: ignore
+            func, *args = layer.dsk[chain_member]  # type: ignore
             args2 = _recursive_replace(args, layer, parent, indices)
             subgraph[chain_member] = (func,) + tuple(args2)
             parent = chain_member
-        outlayer.numblocks = {i[0]: (numblocks,) for i in indices if i[1] is not None}
-        outlayer.dsk = subgraph
+        outlayer.numblocks = {i[0]: (numblocks,) for i in indices if i[1] is not None}  # type: ignore
+        outlayer.dsk = subgraph  # type: ignore
         if hasattr(outlayer, "_dims"):
             del outlayer._dims
-        outlayer.indices = tuple(
+        outlayer.indices = tuple(  # type: ignore
             (i[0], (".0",) if i[1] is not None else None) for i in indices
         )
-        outlayer.output_indices = (".0",)
-        outlayer.inputs = getattr(layer0, "inputs", set())
+        outlayer.output_indices = (".0",)  # type: ignore
+        outlayer.inputs = getattr(layer0, "inputs", set())  # type: ignore
         if hasattr(outlayer, "_cached_dict"):
             del outlayer._cached_dict  # reset, since original can be mutated
     return HighLevelGraph(layers, deps)

@@ -50,14 +50,15 @@ def concatenate(
                 i += 1
 
         meta = ak.concatenate(metas)
+        assert isinstance(meta, ak.Array)
 
         prev_names = [iarr.name for iarr in arrays]
-        g = AwkwardMaterializedLayer(
+        aml = AwkwardMaterializedLayer(
             g,
             previous_layer_names=prev_names,
             fn=_concatenate_axis0_multiarg,
         )
-        hlg = HighLevelGraph.from_collections(name, g, dependencies=arrays)
+        hlg = HighLevelGraph.from_collections(name, aml, dependencies=arrays)
         return new_array_object(hlg, name, meta=meta, npartitions=npartitions)
 
     if axis > 0:
