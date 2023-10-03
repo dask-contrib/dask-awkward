@@ -40,7 +40,6 @@ class AwkwardBlockwiseLayer(Blockwise):
         try:
             pickle.dumps(d["_meta"])
         except (ValueError, TypeError, KeyError):
-            print("POP META", self)
             d.pop(
                 "_meta", None
             )  # must be a typetracer, does not pickle and not needed on scheduler
