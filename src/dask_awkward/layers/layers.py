@@ -149,6 +149,33 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         return layer
 
     def prepare_for_projection(self) -> tuple[AwkwardInputLayer, T]:
+        """Mock the input layer as starting with a data-less typetracer.
+        This method is used to create new dask task graphs that
+        operate purely on typetracer Arrays (that is, array with
+        awkward structure but without real data buffers). This allows
+        us to test which parts of a real awkward array will be used in
+        a real computation. We do this by running a graph which starts
+        with mocked AwkwardInputLayers.
+
+        We mock an AwkwardInputLayer in these steps:
+        1. Ask the IO function to prepare a new meta array, and return
+           any transient state.
+        2. Build a new AwkwardInputLayer whose IO function just returns
+           this meta (typetracer) array
+        3. Return the new input layer and the transient state
+
+        When this new layer is added to a dask task graph and that
+        graph is computed, the report object will be mutated.
+        Inspecting the report object after the compute tells us which
+        buffers from the original form would be required for a real
+        compute with the same graph.
+        Returns
+        -------
+        AwkwardInputLayer
+            Copy of the input layer with data-less input.
+        Any
+            The black-box state object returned by the IO function.
+        """
         assert self.is_projectable
         new_meta_array, state = self.io_func.prepare_for_projection()
 
