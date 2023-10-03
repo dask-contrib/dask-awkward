@@ -80,7 +80,7 @@ class _FromParquetFn:
     def prepare_for_projection(
         self,
     ) -> tuple[AwkwardArray, TypeTracerReport, FormStructure]:
-        form = form_with_unique_keys(self.form, "<root>")
+        form = form_with_unique_keys(self.form, "@")
 
         # Build typetracer and associated report object
         (meta, report) = ak.typetracer.typetracer_with_report(

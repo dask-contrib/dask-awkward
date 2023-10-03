@@ -16,9 +16,9 @@ def test_necessary_buffers(
         assert v == (
             frozenset(
                 {
-                    "<root>.points-offsets",
-                    "<root>.points.content.y-data",
-                    "<root>.points.content.x-data",
+                    "@.points-offsets",
+                    "@.points.content.y-data",
+                    "@.points.content.x-data",
                 }
             ),
             frozenset(),
@@ -29,7 +29,7 @@ def test_necessary_buffers(
     )
     for k, v in dak.report_necessary_buffers(w).items():
         assert v == (
-            frozenset({"<root>.points-offsets", "<root>.points.content.x-data"}),
+            frozenset({"@.points-offsets", "@.points.content.x-data"}),
             frozenset(),
         )
 
@@ -38,9 +38,9 @@ def test_necessary_buffers(
         assert v == (
             frozenset(
                 {
-                    "<root>.points-offsets",
-                    "<root>.points.content.x-data",
-                    "<root>.points.content.y-data",
+                    "@.points-offsets",
+                    "@.points.content.x-data",
+                    "@.points.content.y-data",
                 }
             ),
             frozenset(),
@@ -49,8 +49,8 @@ def test_necessary_buffers(
     z = dak.zeros_like(daa.points.x)
     for k, v in dak.report_necessary_buffers(z).items():
         assert v == (
-            frozenset({"<root>.points-offsets"}),
-            frozenset({"<root>.points.content.x-data"}),
+            frozenset({"@.points-offsets"}),
+            frozenset({"@.points.content.x-data"}),
         )
 
 
