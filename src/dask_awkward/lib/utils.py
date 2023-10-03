@@ -3,7 +3,6 @@ from __future__ import annotations
 __all__ = ("trace_form_structure", "buffer_keys_required_to_compute_shapes")
 
 import copy
-import itertools
 from collections.abc import Callable, Iterable, Iterator
 from typing import TYPE_CHECKING, TypedDict, TypeVar
 
@@ -85,15 +84,8 @@ def buffer_keys_required_to_compute_shapes(
     for buffer_key in shape_buffers:
         form_key, attribute = parse_buffer_key(buffer_key)
 
-        # Identify impacted form keys above this node
-        impacted_form_keys = walk_parents(form_key, form_key_to_parent_key)
-        # Are we asking for the length of a content buffer?
-        if attribute in DATA_ATTRIBUTES:
-            # If so, include the current form key in set of impacted forms
-            impacted_form_keys = itertools.chain((form_key,), impacted_form_keys)
-
-        # For each impacted form key:
-        for impacted_form_key in impacted_form_keys:
+        # For impacted form keys above this node
+        for impacted_form_key in walk_parents(form_key, form_key_to_parent_key):
             # Identify the associated buffers
             for impacted_buffer_key in form_key_to_buffer_keys[impacted_form_key]:
                 _, other_attribute = parse_buffer_key(impacted_buffer_key)
