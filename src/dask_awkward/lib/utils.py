@@ -130,6 +130,6 @@ def form_with_unique_keys(form: Form, key: str) -> Form:
             impl(form.content, f"{key}.content")
 
     # Perform a "deep" copy without preserving references
-    form = ak.from_dict(ak.to_dict(form))
+    form = ak.forms.from_dict(form.to_dict())
     impl(form, key)
     return form
