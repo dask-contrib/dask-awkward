@@ -332,8 +332,6 @@ def test_record_str(daa: Array) -> None:
 
 
 def test_record_to_delayed(daa: Array) -> None:
-    dask.config.set({"awkward.raise-failed-meta": True})
-    dask.config.set({"awkward.optimization.on-fail": "raise"})
     r = daa[0]
     assert type(r) == dak.Record
     d = r.to_delayed()
