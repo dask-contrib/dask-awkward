@@ -7,7 +7,7 @@ from dask_awkward.lib.core import (
     partition_compatibility,
 )
 from dask_awkward.lib.describe import fields
-from dask_awkward.lib.inspect import sample
+from dask_awkward.lib.inspect import report_necessary_buffers, sample
 from dask_awkward.lib.io.io import (
     ImplementsFormTransformation,
     from_awkward,

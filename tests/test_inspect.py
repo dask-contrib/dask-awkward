@@ -1,9 +1,57 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import dask
 import pytest
 
 import dask_awkward as dak
+
+
+def test_necessary_buffers(
+    daa: dak.Array, tmpdir_factory: pytest.TempdirFactory
+) -> None:
+    z = daa.points.x + daa.points.y
+    for k, v in dak.report_necessary_buffers(z).items():
+        assert v == (
+            frozenset(
+                {
+                    "<root>.points-offsets",
+                    "<root>.points.content.y-data",
+                    "<root>.points.content.x-data",
+                }
+            ),
+            frozenset(),
+        )
+
+    w = dak.to_parquet(
+        daa.points.x, str(Path(tmpdir_factory.mktemp("pq")) / "out"), compute=False
+    )
+    for k, v in dak.report_necessary_buffers(w).items():
+        assert v == (
+            frozenset({"<root>.points-offsets", "<root>.points.content.x-data"}),
+            frozenset(),
+        )
+
+    q = {"z": z, "w": w}
+    for k, v in dak.report_necessary_buffers(q).items():
+        assert v == (
+            frozenset(
+                {
+                    "<root>.points-offsets",
+                    "<root>.points.content.x-data",
+                    "<root>.points.content.y-data",
+                }
+            ),
+            frozenset(),
+        )
+
+    z = dak.zeros_like(daa.points.x)
+    for k, v in dak.report_necessary_buffers(z).items():
+        assert v == (
+            frozenset({"<root>.points-offsets"}),
+            frozenset({"<root>.points.content.x-data"}),
+        )
 
 
 def test_visualize_works(daa):
