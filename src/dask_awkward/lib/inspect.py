@@ -6,6 +6,8 @@ import numpy as np
 from dask.base import unpack_collections
 from dask.highlevelgraph import HighLevelGraph
 
+from dask_awkward.layers import AwkwardInputLayer
+
 if TYPE_CHECKING:
     from awkward.highlevel import Array as AwkArray
 
@@ -74,9 +76,13 @@ def report_necessary_buffers(
     for obj in collections:
         dsk = obj if isinstance(obj, HighLevelGraph) else obj.dask
         projection_data = o._prepare_buffer_projection(dsk)
+
+        # If the projection failed, or there are no input layers
         if projection_data is None:
-            # Ensure that we have a record of this layer
-            seen_names.update(dsk.keys())
+            # Ensure that we have a record of the seen layers, if they're inputs
+            for name, layer in dsk.items():
+                if isinstance(layer, AwkwardInputLayer):
+                    seen_names.add(name)
             continue
 
         # Unpack projection information
@@ -85,6 +91,7 @@ def report_necessary_buffers(
             existing_buffers = name_to_necessary_buffers.setdefault(
                 name, NecessaryBuffers(frozenset(), frozenset())
             )
+            # Compute the shape-only keys in addition to the data and shape
             data_and_shape = frozenset(report.data_touched)
             shape_only = frozenset(report.shape_touched) - data_and_shape
 
