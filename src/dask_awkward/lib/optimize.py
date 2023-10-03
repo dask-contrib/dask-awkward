@@ -117,12 +117,15 @@ def optimize_columns(dsk: HighLevelGraph) -> HighLevelGraph:
 
     layer_to_projection_state: dict[str, Any] = {}
     projection_layers = dsk.layers.copy()  # type:
-    projectable = _projectable_input_layer_names(dsk)
     for name, lay in dsk.layers.items():
-        if name in projectable:
-            # Insert mocked array into layers, replacing generation func
-            # Keep track of mocked state
-            projection_layers[name], layer_to_projection_state[name] = lay.mock()
+        if isinstance(lay, AwkwardInputLayer):
+            if lay.is_projectable:
+                # Insert mocked array into layers, replacing generation func
+                # Keep track of mocked state
+                (
+                    projection_layers[name],
+                    layer_to_projection_state[name],
+                ) = lay.prepare_for_projection()
         elif hasattr(lay, "mock"):
             projection_layers[name] = lay.mock()
 
@@ -183,28 +186,6 @@ def optimize_columns(dsk: HighLevelGraph) -> HighLevelGraph:
             layers[name] = layers[name].project(state)
 
         return HighLevelGraph(layers, dsk.dependencies)
-
-
-def _projectable_input_layer_names(dsk: HighLevelGraph) -> list[str]:
-    """Get list of column-projectable AwkwardInputLayer names.
-
-    Parameters
-    ----------
-    dsk : HighLevelGraph
-        Task graph of interest
-
-    Returns
-    -------
-    list[str]
-        Names of the AwkwardInputLayers in the graph that are
-        column-projectable.
-
-    """
-    return [
-        n
-        for n, v in dsk.layers.items()
-        if isinstance(v, AwkwardInputLayer) and v.is_projectable
-    ]
 
 
 def _layers_with_annotation(dsk: HighLevelGraph, key: str) -> list[str]:

@@ -46,12 +46,12 @@ class AwkwardBlockwiseLayer(Blockwise):
         return d
 
 
-T = TypeVar("T")
-
-
 class ImplementsIOFunction(Protocol):
     def __call__(self, *args, **kwargs) -> AwkwardArray:
         ...
+
+
+T = TypeVar("T")
 
 
 class ImplementsProjection(Protocol):
@@ -83,7 +83,7 @@ class IOFunctionWithMeta(ImplementsIOFunctionWithProjection):
         return self._io_func(*args, **kwargs)
 
     @property
-    def meta(self):
+    def meta(self) -> AwkwardArray:
         return self._meta
 
     def prepare_for_projection(self) -> tuple[AwkwardArray, None]:
@@ -144,7 +144,11 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         # isinstance(self.io_func, ImplementsProjection)
         return io_func_implements_project(self.io_func)
 
-    def mock(self) -> tuple[AwkwardInputLayer, T]:
+    def mock(self) -> AwkwardInputLayer:
+        layer, _ = self.prepare_for_projection()
+        return layer
+
+    def prepare_for_projection(self) -> tuple[AwkwardInputLayer, T]:
         assert self.is_projectable
         new_meta_array, state = self.io_func.prepare_for_projection()
 
