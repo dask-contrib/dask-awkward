@@ -3,7 +3,7 @@ from __future__ import annotations
 import abc
 import logging
 import math
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Literal, overload
 
 import awkward as ak
