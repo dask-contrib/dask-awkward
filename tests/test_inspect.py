@@ -69,7 +69,10 @@ def test_basic_root_works():
     import uproot
 
     events = uproot.dask(
-        {"/tmp/tmp.zODEvn19Lm/nano_dy.root": "Events"},
+        {
+            "https://github.com/CoffeaTeam/coffea/blob/master/"
+            "tests/samples/nano_dy.root?raw=true": "Events"
+        },
         steps_per_file=3,
     )
 
