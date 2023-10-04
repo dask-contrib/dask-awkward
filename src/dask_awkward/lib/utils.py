@@ -42,9 +42,6 @@ def trace_form_structure(form: Form, buffer_key: Callable) -> FormStructure:
         form_key_to_buffer_keys[form.form_key] = form.expected_from_buffers(
             recursive=False, buffer_key=buffer_key
         )
-        return impl(form, column_path)
-
-    def impl(form: Form, column_path: tuple[str, ...]):
         if form.is_union:
             for _i, entry in enumerate(form.contents):
                 impl_with_parent(entry, form, column_path)
