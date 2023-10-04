@@ -18,6 +18,8 @@ if TYPE_CHECKING:
 class AwkwardBlockwiseLayer(Blockwise):
     """Just like upstream Blockwise, except we override pickling"""
 
+    has_been_unpickled: bool = False
+
     @classmethod
     def from_blockwise(cls, layer: Blockwise) -> AwkwardBlockwiseLayer:
         ob = object.__new__(cls)
@@ -31,20 +33,14 @@ class AwkwardBlockwiseLayer(Blockwise):
         layer.__dict__.pop("_dims", None)
         return layer
 
+    def __getstate__(self) -> dict:
+        # Indicator that this layer has been serialised
+        state = self.__dict__.copy()
+        state["has_been_unpickled"] = True
+        return state
+
     def __repr__(self) -> str:
         return "Awkward" + super().__repr__()
-
-    def __getstate__(self) -> dict:
-        d = self.__dict__.copy()
-        import pickle
-
-        try:
-            pickle.dumps(d["_meta"])
-        except (ValueError, TypeError, KeyError):
-            d.pop(
-                "_meta", None
-            )  # must be a typetracer, does not pickle and not needed on scheduler
-        return d
 
 
 class ImplementsIOFunction(Protocol):
@@ -149,7 +145,9 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
     @property
     def is_projectable(self) -> bool:
         # isinstance(self.io_func, ImplementsProjection)
-        return io_func_implements_projection(self.io_func)
+        return (
+            io_func_implements_projection(self.io_func) and not self.has_been_unpickled
+        )
 
     @property
     def is_mockable(self) -> bool:
