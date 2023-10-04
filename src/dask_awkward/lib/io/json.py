@@ -4,11 +4,10 @@ import abc
 import logging
 import math
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Literal, cast, overload
+from typing import TYPE_CHECKING, Any, Literal, overload
 
 import awkward as ak
 import dask
-from awkward import Array as AwkwardArray
 from awkward.forms.form import Form
 from dask.base import tokenize
 from dask.blockwise import BlockIndex
@@ -19,48 +18,30 @@ from fsspec.core import get_fs_token_paths, url_to_fs
 from fsspec.utils import infer_compression, read_block
 
 from dask_awkward.lib.core import map_partitions, new_scalar_object, typetracer_array
+from dask_awkward.lib.io.columnar import ColumnProjectionMixin
 from dask_awkward.lib.io.io import (
     _bytes_with_sample,
     _BytesReadingInstructions,
     from_map,
 )
-from dask_awkward.lib.utils import (
-    buffer_keys_required_to_compute_shapes,
-    form_with_unique_keys,
-    parse_buffer_key,
-    render_buffer_key,
-    trace_form_structure,
-)
 
 if TYPE_CHECKING:
-    from awkward._nplikes.typetracer import TypeTracerReport
     from awkward.contents.content import Content
     from fsspec.spec import AbstractFileSystem
-    from typing_extensions import Self
 
     from dask_awkward.lib.core import Array, Scalar
-    from dask_awkward.lib.utils import FormStructure
-
 
 log = logging.getLogger(__name__)
 
 
-def _use_optimization() -> bool:
-    return "json" in dask.config.get(
-        "awkward.optimization.columns-opt-formats",
-        default=[],
-    )
-
-
-class FromJsonFn:
+class FromJsonFn(ColumnProjectionMixin):
     def __init__(
         self,
         *,
         storage: AbstractFileSystem,
+        form: Form,
         compression: str | None = None,
         schema: str | dict | list | None = None,
-        form: Form | None = None,
-        original_form: Form | None = None,
         behavior: dict | None = None,
         **kwargs: Any,
     ) -> None:
@@ -69,83 +50,33 @@ class FromJsonFn:
         self.schema = schema
         self.kwargs = kwargs
         self.form = form
-        self.original_form = original_form
         self.behavior = behavior
 
     @abc.abstractmethod
     def __call__(self, source: Any) -> ak.Array:
         ...
 
-    def mock(self) -> AwkwardArray:
-        return ak.typetracer.typetracer_from_form(self.form, behavior=self.behavior)
-
-    def prepare_for_projection(
-        self,
-    ) -> tuple[AwkwardArray, TypeTracerReport, FormStructure]:
-        form = form_with_unique_keys(self.form, "@")
-
-        # Build typetracer and associated report object
-        (meta, report) = ak.typetracer.typetracer_with_report(
-            form,
-            highlevel=True,
-            behavior=self.behavior,
-            buffer_key=render_buffer_key,
-        )  # type: ignore
-
+    @property
+    def use_optimization(self) -> bool:
         return (
-            cast(AwkwardArray, meta),
-            report,
-            trace_form_structure(form, buffer_key=render_buffer_key),
+            "json"
+            in dask.config.get(
+                "awkward.optimization.columns-opt-formats",
+                default=[],
+            )
+            and self.schema is not None
         )
 
-    def project(self, report: TypeTracerReport, state: FormStructure) -> Self:
-        if not _use_optimization():
-            return self
-
-        if self.schema is not None:
-            return self
-
-        if self.form is None:
-            return self
-
-        assert self.original_form is None
-
-        ## Read from stash
-        # Form hierarchy information
-        form_key_to_parent_key: dict = state["form_key_to_parent_key"]
-        # Buffer hierarchy information
-        form_key_to_buffer_keys: dict = state["form_key_to_buffer_keys"]
-        # Parquet hierarchy information
-        form_key_to_path = state["form_key_to_path"]
-
-        # Require the data of metadata buffers above shape-only requests
-        data_buffers = {
-            *report.data_touched,
-            *buffer_keys_required_to_compute_shapes(
-                parse_buffer_key,
-                report.shape_touched,
-                form_key_to_parent_key,
-                form_key_to_buffer_keys,
-            ),
-        }
-
-        columns = {
-            ".".join(form_key_to_path[form_key])
-            for form_key, attribute in (
-                parse_buffer_key(buffer_key) for buffer_key in data_buffers
-            )
-        }
-
+    def project_columns(self, columns: set[str]):
         form = self.form.select_columns(columns)
         assert form is not None
         schema = layout_to_jsonschema(form.length_zero_array(highlevel=False))
 
         return type(self)(
             schema=schema,
-            form=form,
+            form=self.form,
             storage=self.storage,
             compression=self.compression,
-            original_form=self.form,
             behavior=self.behavior,
             **self.kwargs,
         )
@@ -156,10 +87,9 @@ class FromJsonLineDelimitedFn(FromJsonFn):
         self,
         *,
         storage: AbstractFileSystem,
+        form: Form,
         compression: str | None = None,
         schema: str | dict | list | None = None,
-        form: Form | None = None,
-        original_form: Form | None = None,
         behavior: dict | None = None,
         **kwargs: Any,
     ) -> None:
@@ -168,7 +98,6 @@ class FromJsonLineDelimitedFn(FromJsonFn):
             compression=compression,
             schema=schema,
             form=form,
-            original_form=original_form,
             behavior=behavior,
             **kwargs,
         )
@@ -192,10 +121,9 @@ class FromJsonSingleObjPerFile(FromJsonFn):
         self,
         *,
         storage: AbstractFileSystem,
+        form: Form,
         compression: str | None = None,
         schema: str | dict | list | None = None,
-        form: Form | None = None,
-        original_form: Form | None = None,
         behavior: dict | None = None,
         **kwargs: Any,
     ) -> None:
@@ -204,7 +132,6 @@ class FromJsonSingleObjPerFile(FromJsonFn):
             compression=compression,
             schema=schema,
             form=form,
-            original_form=original_form,
             behavior=behavior,
             **kwargs,
         )
@@ -232,10 +159,9 @@ class FromJsonBytesFn(FromJsonFn):
         self,
         *,
         storage: AbstractFileSystem,
+        form: Form,
         compression: str | None = None,
         schema: str | dict | list | None = None,
-        form: Form | None = None,
-        original_form: Form | None = None,
         behavior: dict | None = None,
         **kwargs: Any,
     ) -> None:
@@ -243,9 +169,8 @@ class FromJsonBytesFn(FromJsonFn):
             storage=storage,
             compression=compression,
             schema=schema,
-            form=form,
-            original_form=original_form,
             behavior=behavior,
+            form=form,
             **kwargs,
         )
 

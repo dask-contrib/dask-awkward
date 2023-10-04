@@ -21,12 +21,14 @@ class FormStructure(TypedDict):
     form_key_to_parent_key: dict[str, str]
     form_key_to_buffer_keys: dict[str, tuple[str, ...]]
     form_key_to_path: dict[str, tuple[str, ...]]
+    path_to_child_paths: dict[tuple[str, ...], tuple[tuple[str, ...]]]
 
 
 def trace_form_structure(form: Form, buffer_key: Callable) -> FormStructure:
     form_key_to_parent_key: dict[str, str] = {}
     form_key_to_buffer_keys: dict[str, tuple[str, ...]] = {}
     form_key_to_path: dict[str, tuple[str, ...]] = {}
+    path_to_child_paths: dict[tuple[str, ...], tuple[tuple[str, ...]]] = {}
 
     def impl_with_parent(form: Form, parent_form: Form, path: tuple[str, ...]):
         # Associate child form key with parent form key
@@ -38,7 +40,7 @@ def trace_form_structure(form: Form, buffer_key: Callable) -> FormStructure:
         form_key_to_buffer_keys[form.form_key] = tuple(
             form.expected_from_buffers(recursive=False, buffer_key=buffer_key)
         )
-        # Store columnar path
+        # Map form key to current path
         form_key_to_path[form.form_key] = column_path
 
         if form.is_union:
@@ -52,7 +54,15 @@ def trace_form_structure(form: Form, buffer_key: Callable) -> FormStructure:
             impl_with_parent(form.content, form, column_path)
         elif form.is_record:
             for field in form.fields:
-                impl_with_parent(form.content(field), form, column_path + (field,))
+                next_column_path = column_path + (field,)
+                # Associate child with parent
+                current_child_paths = path_to_child_paths.get(column_path, ())
+                path_to_child_paths[column_path] = (
+                    *current_child_paths,
+                    next_column_path,
+                )
+                # Recurse
+                impl_with_parent(form.content(field), form, next_column_path)
         elif form.is_unknown or form.is_numpy:
             pass
         else:
@@ -64,6 +74,7 @@ def trace_form_structure(form: Form, buffer_key: Callable) -> FormStructure:
         "form_key_to_parent_key": form_key_to_parent_key,
         "form_key_to_buffer_keys": form_key_to_buffer_keys,
         "form_key_to_path": form_key_to_path,
+        "path_to_child_paths": path_to_child_paths,
     }
 
 
@@ -79,7 +90,7 @@ def buffer_keys_required_to_compute_shapes(
     parse_buffer_key: Callable[[str], tuple[str, str]],
     shape_buffers: Iterable[str],
     form_key_to_parent_key: dict[str, str],
-    form_key_to_buffer_keys: dict[str, str],
+    form_key_to_buffer_keys: dict[str, tuple[str]],
 ):
     # Buffers needing known shapes must traverse all the way up the tree.
     for buffer_key in shape_buffers:

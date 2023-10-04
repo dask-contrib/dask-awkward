@@ -5,12 +5,11 @@ import itertools
 import logging
 import math
 import operator
-from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 import awkward as ak
 import awkward.operations.ak_from_parquet as ak_from_parquet
 import dask
-from awkward import Array as AwkwardArray
 from awkward.forms.form import Form
 from dask.base import tokenize
 from dask.blockwise import BlockIndex
@@ -19,35 +18,20 @@ from fsspec import AbstractFileSystem
 from fsspec.core import get_fs_token_paths, url_to_fs
 
 from dask_awkward.lib.core import Array, Scalar, map_partitions, new_scalar_object
+from dask_awkward.lib.io.columnar import ColumnProjectionMixin
 from dask_awkward.lib.io.io import from_map
 from dask_awkward.lib.unproject_layout import unproject_layout
-from dask_awkward.lib.utils import (
-    buffer_keys_required_to_compute_shapes,
-    form_with_unique_keys,
-    parse_buffer_key,
-    render_buffer_key,
-    trace_form_structure,
-)
 
 if TYPE_CHECKING:
-    from awkward._nplikes.typetracer import TypeTracerReport
-
-    from dask_awkward.lib.utils import FormStructure
+    pass
 
 log = logging.getLogger(__name__)
-
-
-def _use_optimization() -> bool:
-    return "parquet" in dask.config.get(
-        "awkward.optimization.columns-opt-formats",
-        default=[],
-    )
 
 
 T = TypeVar("T")
 
 
-class _FromParquetFn:
+class _FromParquetFn(ColumnProjectionMixin):
     def __init__(
         self,
         *,
@@ -74,72 +58,16 @@ class _FromParquetFn:
     def __call__(self, source: Any) -> ak.Array:
         ...
 
-    def mock(self) -> AwkwardArray:
-        return ak.typetracer.typetracer_from_form(self.form, behavior=self.behavior)
-
-    def prepare_for_projection(
-        self,
-    ) -> tuple[AwkwardArray, TypeTracerReport, FormStructure]:
-        form = form_with_unique_keys(self.form, "@")
-
-        # Build typetracer and associated report object
-        (meta, report) = ak.typetracer.typetracer_with_report(
-            form,
-            highlevel=True,
-            behavior=self.behavior,
-            buffer_key=render_buffer_key,
-        )
-
-        return (
-            cast(AwkwardArray, meta),
-            report,
-            trace_form_structure(form, buffer_key=render_buffer_key),
-        )
-
-    def project(
-        self: T,
-        report: TypeTracerReport,
-        state: FormStructure,
-    ) -> T:
-        if not _use_optimization():
-            return self
-
-        assert self.original_form is None
-
-        ## Read from stash
-        # Form hierarchy information
-        form_key_to_parent_key: dict = state["form_key_to_parent_key"]
-        # Buffer hierarchy information
-        form_key_to_buffer_keys: dict = state["form_key_to_buffer_keys"]
-        # Parquet hierarchy information
-        form_key_to_path = state["form_key_to_path"]
-
-        # Require the data of metadata buffers above shape-only requests
-        data_buffers = {
-            *report.data_touched,
-            *buffer_keys_required_to_compute_shapes(
-                parse_buffer_key,
-                report.shape_touched,
-                form_key_to_parent_key,
-                form_key_to_buffer_keys,
-            ),
-        }
-
-        columns = {
-            ".".join(p)
-            for p in (
-                form_key_to_path[form_key]
-                for form_key, attribute in (
-                    parse_buffer_key(buffer_key) for buffer_key in data_buffers
-                )
-            )
-            if p
-        }
-        return self.project_columns(columns)
-
     @abc.abstractmethod
-    def project_columns(self: T, columns: set[str]) -> T:
+    def project_columns(self, columns: set[str]):
         ...
+
+    @property
+    def use_optimization(self) -> bool:
+        return "parquet" in dask.config.get(
+            "awkward.optimization.columns-opt-formats",
+            default=[],
+        )
 
     def __repr__(self) -> str:
         s = (
@@ -195,7 +123,7 @@ class _FromParquetFileWiseFn(_FromParquetFn):
         return ak.Array(unproject_layout(self.original_form, array.layout))
 
     def project_columns(self, columns: set[str]):
-        new = _FromParquetFileWiseFn(
+        return _FromParquetFileWiseFn(
             fs=self.fs,
             form=self.form.select_columns(columns),
             listsep=self.listsep,
@@ -204,7 +132,6 @@ class _FromParquetFileWiseFn(_FromParquetFn):
             behavior=self.behavior,
             **self.kwargs,
         )
-        return new
 
 
 class _FromParquetFragmentWiseFn(_FromParquetFn):
