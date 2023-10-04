@@ -10,7 +10,6 @@ import awkward as ak
 if TYPE_CHECKING:
     from awkward.forms import Form
 
-
 KNOWN_LENGTH_ATTRIBUTES = frozenset(("mask",))
 UNKNOWN_LENGTH_ATTRIBUTES = frozenset(("offsets", "starts", "stops", "index", "tags"))
 DATA_ATTRIBUTES = frozenset(("data",))
@@ -18,31 +17,34 @@ METADATA_ATTRIBUTES = UNKNOWN_LENGTH_ATTRIBUTES | KNOWN_LENGTH_ATTRIBUTES
 
 
 class FormStructure(TypedDict):
-    form_key_to_parent_key: dict[str, str]
-    form_key_to_buffer_keys: dict[str, tuple[str, ...]]
+    form_key_to_form: dict[str, Form]
+    form_key_to_parent_form_key: dict[str, str]
     form_key_to_path: dict[str, tuple[str, ...]]
-    path_to_child_paths: dict[tuple[str, ...], tuple[tuple[str, ...]]]
+    form_key_to_buffer_keys: dict[str, tuple[str, ...]]
 
 
 def trace_form_structure(form: Form, buffer_key: Callable) -> FormStructure:
-    form_key_to_parent_key: dict[str, str] = {}
-    form_key_to_buffer_keys: dict[str, tuple[str, ...]] = {}
+    form_key_to_form: dict[str, Form] = {}
+    form_key_to_parent_form_key: dict[str, str | None] = {}
     form_key_to_path: dict[str, tuple[str, ...]] = {}
-    path_to_child_paths: dict[tuple[str, ...], tuple[tuple[str, ...]]] = {}
+    form_key_to_buffer_keys: dict[str, tuple[str, ...]] = {}
 
-    def impl_with_parent(form: Form, parent_form: Form, path: tuple[str, ...]):
+    def impl_with_parent(form: Form, parent_form: Form | None, column_path):
         # Associate child form key with parent form key
-        form_key_to_parent_key[form.form_key] = parent_form.form_key
-        return impl(form, path)
+        form_key_to_parent_form_key[form.form_key] = (
+            None if parent_form is None else parent_form.form_key
+        )
+        # Keep track of column-level path
+        form_key_to_path[form.form_key] = column_path
+        # Identify each form with a form key
+        form_key_to_form[form.form_key] = form
+        # Pre-compute the buffer keys for each form
+        form_key_to_buffer_keys[form.form_key] = form.expected_from_buffers(
+            recursive=False, buffer_key=buffer_key
+        )
+        return impl(form, column_path)
 
     def impl(form: Form, column_path: tuple[str, ...]):
-        # Keep track of which buffer keys are associated with which form-keys
-        form_key_to_buffer_keys[form.form_key] = tuple(
-            form.expected_from_buffers(recursive=False, buffer_key=buffer_key)
-        )
-        # Map form key to current path
-        form_key_to_path[form.form_key] = column_path
-
         if form.is_union:
             for _i, entry in enumerate(form.contents):
                 impl_with_parent(entry, form, column_path)
@@ -55,12 +57,6 @@ def trace_form_structure(form: Form, buffer_key: Callable) -> FormStructure:
         elif form.is_record:
             for field in form.fields:
                 next_column_path = column_path + (field,)
-                # Associate child with parent
-                current_child_paths = path_to_child_paths.get(column_path, ())
-                path_to_child_paths[column_path] = (
-                    *current_child_paths,
-                    next_column_path,
-                )
                 # Recurse
                 impl_with_parent(form.content(field), form, next_column_path)
         elif form.is_unknown or form.is_numpy:
@@ -68,36 +64,56 @@ def trace_form_structure(form: Form, buffer_key: Callable) -> FormStructure:
         else:
             raise AssertionError(form)
 
-    impl(form, ())
+    impl_with_parent(form, None, ())
 
     return {
-        "form_key_to_parent_key": form_key_to_parent_key,
-        "form_key_to_buffer_keys": form_key_to_buffer_keys,
+        "form_key_to_form": form_key_to_form,
+        "form_key_to_parent_form_key": form_key_to_parent_form_key,
         "form_key_to_path": form_key_to_path,
-        "path_to_child_paths": path_to_child_paths,
+        "form_key_to_buffer_keys": form_key_to_buffer_keys,
     }
 
 
 T = TypeVar("T")
 
 
-def walk_parents(node: T, parentage: dict[T, T | None]) -> Iterator[T]:
-    while (node := parentage.get(node)) is not None:
+def walk_bijective_graph(node: T, graph: dict[T, T | None]) -> Iterator[T]:
+    while (node := graph.get(node)) is not None:
         yield node
+
+
+def walk_graph_breadth_first(
+    node: T, graph: dict[T, Iterable[T] | None]
+) -> Iterator[T]:
+    children = graph.get(node)
+    if children is None:
+        return
+    yield from children
+    for node in children:
+        yield from walk_graph_breadth_first(node, graph)
+
+
+def walk_graph_depth_first(node: T, graph: dict[T, Iterable[T] | None]) -> Iterator[T]:
+    children = graph.get(node)
+    if children is None:
+        return
+    for node in children:
+        yield node
+        yield from walk_graph_depth_first(node, graph)
 
 
 def buffer_keys_required_to_compute_shapes(
     parse_buffer_key: Callable[[str], tuple[str, str]],
     shape_buffers: Iterable[str],
     form_key_to_parent_key: dict[str, str],
-    form_key_to_buffer_keys: dict[str, tuple[str]],
+    form_key_to_buffer_keys: dict[str, Iterable[str]],
 ):
     # Buffers needing known shapes must traverse all the way up the tree.
     for buffer_key in shape_buffers:
         form_key, attribute = parse_buffer_key(buffer_key)
 
         # For impacted form keys above this node
-        for impacted_form_key in walk_parents(form_key, form_key_to_parent_key):
+        for impacted_form_key in walk_bijective_graph(form_key, form_key_to_parent_key):
             # Identify the associated buffers
             for impacted_buffer_key in form_key_to_buffer_keys[impacted_form_key]:
                 _, other_attribute = parse_buffer_key(impacted_buffer_key)
