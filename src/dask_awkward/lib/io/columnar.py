@@ -53,6 +53,14 @@ T = TypeVar("T", bound=ImplementsColumnProjectionImpl)
 
 
 class ColumnProjectionMixin:
+    """A mixin to add column-centric buffer projection to an IO function.
+
+    Classes that inherit from this mixin are assumed to be able to read at the
+    granularity of _fields_ in a form. As such, the buffer projection is performed
+    such that the smallest possible number of fields (columns) are read, even
+    when only metadata buffers are required.
+    """
+
     def mock(self: ImplementsColumnProjectionImpl) -> AwkwardArray:
         return ak.typetracer.typetracer_from_form(self.form, behavior=self.behavior)
 
