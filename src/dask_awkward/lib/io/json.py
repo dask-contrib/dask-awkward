@@ -64,7 +64,7 @@ class FromJsonFn(ColumnProjectionMixin):
                 "awkward.optimization.columns-opt-formats",
                 default=[],
             )
-            and self.schema is not None
+            and self.schema is None
         )
 
     def project_columns(self, columns: set[str]):

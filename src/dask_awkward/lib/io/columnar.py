@@ -83,8 +83,6 @@ class ColumnProjectionMixin:
         if not self.use_optimization:
             return self
 
-        assert self.original_form is None
-
         ## Read from stash
         # Form hierarchy information
         form_key_to_parent_form_key = state["form_key_to_parent_form_key"]
