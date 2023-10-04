@@ -8,7 +8,7 @@ Inspection
 
    partition_compatibility
    PartitionCompatibility
-   necessary_columns
+   report_necessary_buffers
    sample
 
 .. raw:: html
