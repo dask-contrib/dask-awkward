@@ -83,10 +83,16 @@ class IOFunctionWithMocking(ImplementsIOFunctionWithMocking):
         self._meta = meta
         self._io_func = io_func
 
+    def __getstate__(self) -> dict:
+        state = self.__dict__.copy()
+        state["_meta"] = None
+        return state
+
     def __call__(self, *args, **kwargs) -> AwkwardArray:
         return self._io_func(*args, **kwargs)
 
     def mock(self) -> AwkwardArray:
+        assert self._meta is not None
         return self._meta
 
 
