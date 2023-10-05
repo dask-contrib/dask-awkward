@@ -21,6 +21,9 @@ from dask_awkward.lib.inspect import (
     report_necessary_columns,
     sample,
 )
+
+necessary_columns = report_necessary_columns  # Export for backwards compatibility.
+
 from dask_awkward.lib.io.io import (
     ImplementsFormTransformation,
     from_awkward,
