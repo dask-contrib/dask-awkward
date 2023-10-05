@@ -18,7 +18,6 @@ from dask_awkward.layers import (
     AwkwardBlockwiseLayer,
     AwkwardInputLayer,
     ImplementsIOFunction,
-    ImplementsProjection,
 )
 from dask_awkward.layers.layers import (
     AwkwardMaterializedLayer,
@@ -470,7 +469,7 @@ class PackedArgCallable:
 
 
 def from_map(
-    func: ImplementsIOFunction | ImplementsProjection,
+    func: ImplementsIOFunction,
     *iterables: Iterable,
     args: tuple[Any, ...] | None = None,
     label: str | None = None,
