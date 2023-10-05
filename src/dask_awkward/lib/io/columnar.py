@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Protocol, TypeVar, cast
+from typing import TYPE_CHECKING, TypeVar, cast
 
 import awkward as ak
 from awkward import Array as AwkwardArray
-from awkward.forms.form import Form
 
+from dask_awkward.layers.layers import ImplementsNecessaryColumns
 from dask_awkward.lib.utils import (
     METADATA_ATTRIBUTES,
+    FormStructure,
     buffer_keys_required_to_compute_shapes,
     form_with_unique_keys,
     parse_buffer_key,
@@ -20,39 +21,12 @@ from dask_awkward.lib.utils import (
 if TYPE_CHECKING:
     from awkward._nplikes.typetracer import TypeTracerReport
 
-    from dask_awkward.lib.utils import FormStructure
-
 log = logging.getLogger(__name__)
 
-
-U = TypeVar("U")
-
-
-class ImplementsColumnProjectionImpl(Protocol):
-    @property
-    def use_optimization(self) -> bool:
-        ...
-
-    def project_columns(self: U, columns: set[str]) -> U:
-        ...
-
-    @property
-    def form(self) -> Form:
-        ...
-
-    @property
-    def original_form(self) -> Form:
-        ...
-
-    @property
-    def behavior(self) -> dict | None:
-        ...
+T = TypeVar("T")
 
 
-T = TypeVar("T", bound=ImplementsColumnProjectionImpl)
-
-
-class ColumnProjectionMixin:
+class ColumnProjectionMixin(ImplementsNecessaryColumns[FormStructure]):
     """A mixin to add column-centric buffer projection to an IO function.
 
     Classes that inherit from this mixin are assumed to be able to read at the
@@ -61,11 +35,11 @@ class ColumnProjectionMixin:
     when only metadata buffers are required.
     """
 
-    def mock(self: ImplementsColumnProjectionImpl) -> AwkwardArray:
+    def mock(self) -> AwkwardArray:
         return ak.typetracer.typetracer_from_form(self.form, behavior=self.behavior)
 
     def prepare_for_projection(
-        self: ImplementsColumnProjectionImpl,
+        self,
     ) -> tuple[AwkwardArray, TypeTracerReport, FormStructure]:
         form = form_with_unique_keys(self.form, "@")
 
@@ -83,14 +57,11 @@ class ColumnProjectionMixin:
             trace_form_structure(form, buffer_key=render_buffer_key),
         )
 
-    def project(
-        self: T,
+    def necessary_columns(
+        self,
         report: TypeTracerReport,
         state: FormStructure,
-    ) -> T:
-        if not self.use_optimization:
-            return self
-
+    ) -> frozenset[str]:
         ## Read from stash
         # Form hierarchy information
         form_key_to_parent_form_key = state["form_key_to_parent_form_key"]
@@ -157,5 +128,14 @@ class ColumnProjectionMixin:
             # Otherwise, add the last child
             else:
                 paths.add(any_child_path)
+        return frozenset({".".join(p) for p in paths if p})
 
-        return self.project_columns({".".join(p) for p in paths if p})
+    def project(
+        self: T,
+        report: TypeTracerReport,
+        state: FormStructure,
+    ) -> T:
+        if not self.use_optimization:
+            return self
+
+        return self.project_columns(self.necessary_columns(report, state))

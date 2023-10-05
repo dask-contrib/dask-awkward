@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Callable, Mapping
-from typing import TYPE_CHECKING, Any, Protocol, TypeVar
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar, cast
 
 from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
 from dask.highlevelgraph import MaterializedLayer
@@ -56,7 +56,7 @@ class ImplementsMocking(Protocol):
         ...
 
 
-class ImplementsProjection(ImplementsMocking, Protocol):
+class ImplementsProjection(ImplementsMocking, Protocol[T]):
     def prepare_for_projection(self) -> tuple[AwkwardArray, TypeTracerReport, T]:
         ...
 
@@ -64,21 +64,12 @@ class ImplementsProjection(ImplementsMocking, Protocol):
         ...
 
 
-# IO functions can implement full-blown projection
-class ImplementsIOFunctionWithProjection(
-    ImplementsProjection, ImplementsIOFunction, Protocol
-):
-    ...
+class ImplementsNecessaryColumns(ImplementsProjection[T], Protocol):
+    def necessary_columns(self, report: TypeTracerReport, state: T) -> frozenset[str]:
+        ...
 
 
-# Or they can implement simple mocking
-class ImplementsIOFunctionWithMocking(
-    ImplementsMocking, ImplementsIOFunction, Protocol
-):
-    ...
-
-
-class IOFunctionWithMocking(ImplementsIOFunctionWithMocking):
+class IOFunctionWithMocking(ImplementsMocking, ImplementsIOFunction):
     def __init__(self, meta: AwkwardArray, io_func: ImplementsIOFunction):
         self._meta = meta
         self._io_func = io_func
@@ -104,6 +95,10 @@ def io_func_implements_mocking(func: ImplementsIOFunction) -> bool:
     return hasattr(func, "mock")
 
 
+def io_func_implements_columnar(func: ImplementsIOFunction) -> bool:
+    return hasattr(func, "necessary_columns")
+
+
 class AwkwardInputLayer(AwkwardBlockwiseLayer):
     """A layer known to perform IO and produce Awkward arrays
 
@@ -115,9 +110,7 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         *,
         name: str,
         inputs: Any,
-        io_func: ImplementsIOFunction
-        | ImplementsIOFunctionWithMocking
-        | ImplementsIOFunctionWithProjection,
+        io_func: ImplementsIOFunction,
         label: str | None = None,
         produces_tasks: bool = False,
         creation_info: dict | None = None,
@@ -160,13 +153,17 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         # isinstance(self.io_func, ImplementsMocking)
         return io_func_implements_mocking(self.io_func)
 
+    @property
+    def is_columnar(self) -> bool:
+        return io_func_implements_columnar(self.io_func)
+
     def mock(self) -> AwkwardInputLayer:
         assert self.is_mockable
 
         return AwkwardInputLayer(
             name=self.name,
             inputs=[None][: int(list(self.numblocks.values())[0][0])],
-            io_func=lambda *_, **__: self.io_func.mock(),
+            io_func=lambda *_, **__: cast(ImplementsMocking, self.io_func).mock(),
             label=self.label,
             produces_tasks=self.produces_tasks,
             creation_info=self.creation_info,
@@ -204,7 +201,9 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
             The black-box state object returned by the IO function.
         """
         assert self.is_projectable
-        new_meta_array, report, state = self.io_func.prepare_for_projection()
+        new_meta_array, report, state = cast(
+            ImplementsProjection, self.io_func
+        ).prepare_for_projection()
 
         new_input_layer = AwkwardInputLayer(
             name=self.name,
@@ -222,14 +221,23 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         report: TypeTracerReport,
         state: T,
     ):
+        assert self.is_projectable
         return AwkwardInputLayer(
             name=self.name,
             inputs=self.inputs,
-            io_func=self.io_func.project(report=report, state=state),
+            io_func=cast(ImplementsProjection, self.io_func).project(
+                report=report, state=state
+            ),
             label=self.label,
             produces_tasks=self.produces_tasks,
             creation_info=self.creation_info,
             annotations=self.annotations,
+        )
+
+    def necessary_columns(self, report: TypeTracerReport, state: T) -> frozenset[str]:
+        assert self.is_columnar
+        return cast(ImplementsNecessaryColumns, self.io_func).necessary_columns(
+            report, state
         )
 
 
