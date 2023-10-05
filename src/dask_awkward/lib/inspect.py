@@ -34,9 +34,9 @@ def report_necessary_buffers(
     Returns
     -------
     dict[str, NecessaryBuffers | None]
-        Mapping that pairs the input layers in the graph to the
-        typetracer report objects that have been populated by column
-        optimisation of the given layer.
+        Mapping that pairs the input layers in the graph to objects
+        describing the data and shape buffers that have been tagged
+        as required by column optimisation of the given layer.
     Examples
     --------
     If we have a hypothetical parquet dataset (``ds``) with the fields
@@ -147,11 +147,9 @@ def report_necessary_columns(
     >>> ds.baz.fields
     ["x", "y"]
     >>> x = ds.bar + ds.baz.x
-    >>> dak.report_necessary_buffers(x)
+    >>> dak.report_necessary_columns(x)
     {
-        "from-parquet-abc123": NecessaryBuffers(
-            data_and_shape=frozenset(...), shape_only=frozenset(...)
-        )
+        "from-parquet-abc123": frozenset({"bar", "baz.x"})
     }
 
     """
