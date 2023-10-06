@@ -7,6 +7,8 @@ import pytest
 
 import dask_awkward as dak
 
+test_uproot_path = Path(__file__).parent / "test-uproot"
+
 
 def test_necessary_buffers(
     daa: dak.Array, tmpdir_factory: pytest.TempdirFactory
@@ -69,10 +71,7 @@ def test_basic_root_works():
     import uproot
 
     events = uproot.dask(
-        {
-            "https://github.com/CoffeaTeam/coffea/blob/master/"
-            "tests/samples/nano_dy.root?raw=true": "Events"
-        },
+        {test_uproot_path / "nano_dy.root": "Events"},
         steps_per_file=3,
     )
 
