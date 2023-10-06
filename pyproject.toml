@@ -35,7 +35,7 @@ classifiers = [
   "Topic :: Software Development",
 ]
 dependencies = [
-  "awkward >=2.4.4",
+  "awkward >=2.4.5",
   "dask >=2023.04.0",
   "typing_extensions >=4.8.0",
 ]
