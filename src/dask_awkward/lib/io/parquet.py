@@ -5,8 +5,7 @@ import itertools
 import logging
 import math
 import operator
-from collections.abc import Sequence
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 import awkward as ak
 import awkward.operations.ak_from_parquet as ak_from_parquet
@@ -18,27 +17,21 @@ from dask.highlevelgraph import HighLevelGraph
 from fsspec import AbstractFileSystem
 from fsspec.core import get_fs_token_paths, url_to_fs
 
-from dask_awkward.lib.core import (
-    Array,
-    Scalar,
-    map_partitions,
-    new_scalar_object,
-    typetracer_array,
-)
+from dask_awkward.lib.core import Array, Scalar, map_partitions, new_scalar_object
+from dask_awkward.lib.io.columnar import ColumnProjectionMixin
 from dask_awkward.lib.io.io import from_map
 from dask_awkward.lib.unproject_layout import unproject_layout
+
+if TYPE_CHECKING:
+    pass
 
 log = logging.getLogger(__name__)
 
 
-def _use_optimization() -> bool:
-    return "parquet" in dask.config.get(
-        "awkward.optimization.columns-opt-formats",
-        default=[],
-    )
+T = TypeVar("T")
 
 
-class _FromParquetFn:
+class _FromParquetFn(ColumnProjectionMixin):
     def __init__(
         self,
         *,
@@ -66,12 +59,15 @@ class _FromParquetFn:
         ...
 
     @abc.abstractmethod
-    def project_columns(
-        self,
-        columns: Sequence[str] | None,
-        orignal_form: Form | None = None,
-    ) -> _FromParquetFn:
+    def project_columns(self, columns: set[str]):
         ...
+
+    @property
+    def use_optimization(self) -> bool:
+        return "parquet" in dask.config.get(
+            "awkward.optimization.columns-opt-formats",
+            default=[],
+        )
 
     def __repr__(self) -> str:
         s = (
@@ -126,28 +122,16 @@ class _FromParquetFileWiseFn(_FromParquetFn):
         )
         return ak.Array(unproject_layout(self.original_form, array.layout))
 
-    def project_columns(
-        self,
-        columns: Sequence[str] | None,
-        original_form: Form | None = None,
-    ) -> _FromParquetFileWiseFn:
-        if not _use_optimization():
-            return self
-
-        if columns is None:
-            return self
-
-        new_form = self.form.select_columns(columns)
-        new = _FromParquetFileWiseFn(
+    def project_columns(self, columns: set[str]):
+        return _FromParquetFileWiseFn(
             fs=self.fs,
-            form=new_form,
+            form=self.form.select_columns(columns),
             listsep=self.listsep,
             unnamed_root=self.unnamed_root,
-            original_form=original_form,
+            original_form=self.form,
             behavior=self.behavior,
             **self.kwargs,
         )
-        return new
 
 
 class _FromParquetFragmentWiseFn(_FromParquetFn):
@@ -188,22 +172,12 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
         )
         return ak.Array(unproject_layout(self.original_form, array.layout))
 
-    def project_columns(
-        self,
-        columns: Sequence[str] | None,
-        original_form: Form | None = None,
-    ) -> _FromParquetFragmentWiseFn:
-        if not _use_optimization():
-            return self
-
-        if columns is None:
-            return self
-
+    def project_columns(self, columns: set[str]):
         return _FromParquetFragmentWiseFn(
             fs=self.fs,
             form=self.form.select_columns(columns),
             unnamed_root=self.unnamed_root,
-            original_form=original_form,
+            original_form=self.form,
             behavior=self.behavior,
             **self.kwargs,
         )
@@ -319,8 +293,6 @@ def from_parquet(
     if split_row_groups is None:
         split_row_groups = row_counts is not None and len(row_counts) > 1
 
-    meta = ak.typetracer.typetracer_from_form(subform, behavior=behavior)
-
     if split_row_groups is False or subrg is None:
         # file-wise
         return from_map(
@@ -338,7 +310,6 @@ def from_parquet(
             actual_paths,
             label=label,
             token=token,
-            meta=meta,
         )
     else:
         # row-group wise
@@ -378,7 +349,6 @@ def from_parquet(
             label=label,
             token=token,
             divisions=tuple(divisions),
-            meta=typetracer_array(meta),
         )
 
 

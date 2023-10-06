@@ -335,7 +335,9 @@ def test_record_to_delayed(daa: Array) -> None:
     r = daa[0]
     assert type(r) == dak.Record
     d = r.to_delayed()
-    assert r.compute().tolist() == d.compute().tolist()
+    x = r.compute().tolist()
+    y = d.compute().tolist()
+    assert x == y
 
 
 def test_record_fields(daa: Array) -> None:

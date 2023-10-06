@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import pytest
 
-pytest.importorskip("pyarrow")
+pyarrow = pytest.importorskip("pyarrow")
 
 import awkward as ak
 import awkward.operations.str as akstr
+from packaging.version import Version
 
 import dask_awkward as dak
 from dask_awkward.lib.testutils import assert_eq
+
+PYARROW_GT_13 = Version(pyarrow.__version__) >= Version("13.0")
+
 
 lines1 = [
     "this is line one",
@@ -254,12 +258,13 @@ def test_rtrim_whitespace() -> None:
     assert_eq(akstr.rtrim_whitespace(daa), akstr.rtrim_whitespace(caa))
 
 
+@pytest.mark.skipif(not PYARROW_GT_13, reason="ak.str.slice is broken for pyarrow<13")
 @pytest.mark.parametrize(
     "args",
     [
         (2, 10, 2),
-        (3, None, 1),
         (0, None, 3),
+        (3, None, 1),
     ],
 )
 def test_slice(args: tuple) -> None:

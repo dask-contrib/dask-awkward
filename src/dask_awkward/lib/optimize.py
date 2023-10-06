@@ -3,8 +3,8 @@ from __future__ import annotations
 import copy
 import logging
 import warnings
-from collections.abc import Hashable, Mapping
-from typing import TYPE_CHECKING, Any
+from collections.abc import Hashable, Iterable, Mapping
+from typing import TYPE_CHECKING, Any, cast
 
 import dask.config
 from awkward.typetracer import touch_data
@@ -14,14 +14,11 @@ from dask.highlevelgraph import HighLevelGraph
 from dask.local import get_sync
 
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardInputLayer
-from dask_awkward.lib._utils import LIST_KEY
-
-log = logging.getLogger(__name__)
-
 
 if TYPE_CHECKING:
-    from awkward import Array as AwkwardArray
+    from awkward._nplikes.typetracer import TypeTracerReport
 
+log = logging.getLogger(__name__)
 
 COLUMN_OPT_FAILED_WARNING_MSG = """The necessary columns optimization failed; exception raised:
 
@@ -87,6 +84,88 @@ def optimize(
     return dsk
 
 
+def _prepare_buffer_projection(
+    dsk: HighLevelGraph,
+) -> tuple[dict[str, TypeTracerReport], dict[str, Any]] | None:
+    """Pair layer names with lists of necessary columns."""
+    import awkward as ak
+
+    if not _has_projectable_awkward_io_layer(dsk):
+        return None
+
+    layer_to_projection_state: dict[str, Any] = {}
+    layer_to_reports: dict[str, TypeTracerReport] = {}
+    projection_layers = dict(dsk.layers)
+
+    for name, lay in dsk.layers.items():
+        if isinstance(lay, AwkwardInputLayer):
+            if lay.is_projectable:
+                # Insert mocked array into layers, replacing generation func
+                # Keep track of mocked state
+                (
+                    projection_layers[name],
+                    layer_to_reports[name],
+                    layer_to_projection_state[name],
+                ) = lay.prepare_for_projection()
+            elif lay.is_mockable:
+                projection_layers[name] = lay.mock()
+        elif hasattr(lay, "mock"):
+            projection_layers[name] = lay.mock()
+
+    for name in _ak_output_layer_names(dsk):
+        projection_layers[name] = _mock_output(projection_layers[name])
+
+    for name in _opt_touch_all_layer_names(dsk):
+        projection_layers[name] = _touch_and_call(projection_layers[name])
+
+    hlg = HighLevelGraph(projection_layers, dsk.dependencies)
+
+    # this loop builds up what are the possible final leaf nodes by
+    # inspecting the dependents dictionary. If something does not have
+    # a dependent, it must be the end of a graph. These are the things
+    # we need to compute for; we only use a single partition (the
+    # first). for a single collection `.compute()` this list will just
+    # be length 1; but if we are using `dask.compute` to pass in
+    # multiple collections to be computed simultaneously, this list
+    # will increase in length.
+    leaf_layers_keys = [
+        (k, 0) for k, v in dsk.dependents.items() if isinstance(v, set) and len(v) == 0
+    ]
+
+    # now we try to compute for each possible output layer key (leaf
+    # node on partition 0); this will cause the typetacer reports to
+    # get correct fields/columns touched. If the result is a record or
+    # an array we of course want to touch all of the data/fields.
+    try:
+        for layer in hlg.layers.values():
+            layer.__dict__.pop("_cached_dict", None)
+        results = get_sync(hlg, leaf_layers_keys)
+        for out in results:
+            if isinstance(out, (ak.Array, ak.Record)):
+                touch_data(out)
+    except Exception as err:
+        on_fail = dask.config.get("awkward.optimization.on-fail")
+        # this is the default, throw a warning but skip the optimization.
+        if on_fail == "warn":
+            warnings.warn(
+                COLUMN_OPT_FAILED_WARNING_MSG.format(exception=type(err), message=err)
+            )
+        # option "pass" means do not throw warning but skip the optimization.
+        elif on_fail == "pass":
+            log.debug("Column projection optimization failed; optimization skipped.")
+        # option "raise" to raise the exception here
+        elif on_fail == "raise":
+            raise
+        else:
+            raise ValueError(
+                f"Invalid awkward.optimization.on-fail option: {on_fail}.\n"
+                "Valid options are 'warn', 'pass', or 'raise'."
+            )
+        return None
+    else:
+        return layer_to_reports, layer_to_projection_state
+
+
 def optimize_columns(dsk: HighLevelGraph) -> HighLevelGraph:
     """Run column projection optimization.
 
@@ -116,17 +195,91 @@ def optimize_columns(dsk: HighLevelGraph) -> HighLevelGraph:
         New, optimized task graph with column-projected ``AwkwardInputLayer``.
 
     """
-    layers = dsk.layers.copy()  # type: ignore
-    deps = dsk.dependencies.copy()  # type: ignore
+    projection_data = _prepare_buffer_projection(dsk)
+    if projection_data is None:
+        return dsk
 
-    layer_to_necessary_columns = _necessary_columns(dsk)
+    # Unpack result
+    layer_to_reports, layer_to_projection_state = projection_data
 
-    for name, neccols in layer_to_necessary_columns.items():
-        meta = layers[name]._meta
-        neccols = _prune_wildcards(neccols, meta)
-        layers[name] = layers[name].project_columns(neccols)
+    # Project layers using projection state
+    layers = dict(dsk.layers)
+    for name, state in layer_to_projection_state.items():
+        layers[name] = cast(AwkwardInputLayer, layers[name]).project(
+            report=layer_to_reports[name], state=state
+        )
 
-    return HighLevelGraph(layers, deps)
+    return HighLevelGraph(layers, dsk.dependencies)
+
+
+def _layers_with_annotation(dsk: HighLevelGraph, key: str) -> list[str]:
+    return [n for n, v in dsk.layers.items() if (v.annotations or {}).get(key)]
+
+
+def _ak_output_layer_names(dsk: HighLevelGraph) -> list[str]:
+    """Get a list output layer names.
+
+    Output layer names are annotated with 'ak_output'.
+
+    Parameters
+    ----------
+    dsk : HighLevelGraph
+        Graph of interest.
+
+    Returns
+    -------
+    list[str]
+        Names of the output layers.
+
+    """
+    return _layers_with_annotation(dsk, "ak_output")
+
+
+def _opt_touch_all_layer_names(dsk: HighLevelGraph) -> list[str]:
+    return [n for n, v in dsk.layers.items() if hasattr(v, "_opt_touch_all")]
+    # return _layers_with_annotation(dsk, "ak_touch_all")
+
+
+def _has_projectable_awkward_io_layer(dsk: HighLevelGraph) -> bool:
+    """Check if a graph at least one AwkwardInputLayer that is project-able."""
+    for _, v in dsk.layers.items():
+        if isinstance(v, AwkwardInputLayer) and v.is_projectable:
+            return True
+    return False
+
+
+def _touch_all_data(*args, **kwargs):
+    """Mock writing an ak.Array to disk by touching data buffers."""
+    for arg in args + tuple(kwargs.values()):
+        touch_data(arg)
+
+
+def _mock_output(layer):
+    """Update a layer to run the _touch_all_data."""
+    assert len(layer.dsk) == 1
+
+    new_layer = copy.deepcopy(layer)
+    mp = new_layer.dsk.copy()
+    for k in iter(mp.keys()):
+        mp[k] = (_touch_all_data,) + mp[k][1:]
+    new_layer.dsk = mp
+    return new_layer
+
+
+def _touch_and_call_fn(fn, *args, **kwargs):
+    _touch_all_data(*args, **kwargs)
+    return fn(*args, **kwargs)
+
+
+def _touch_and_call(layer):
+    assert len(layer.dsk) == 1
+
+    new_layer = copy.deepcopy(layer)
+    mp = new_layer.dsk.copy()
+    for k in iter(mp.keys()):
+        mp[k] = (_touch_and_call_fn,) + mp[k]
+    new_layer.dsk = mp
+    return new_layer
 
 
 def rewrite_layer_chains(dsk: HighLevelGraph, keys: Any) -> HighLevelGraph:
@@ -251,100 +404,6 @@ def rewrite_layer_chains(dsk: HighLevelGraph, keys: Any) -> HighLevelGraph:
     return HighLevelGraph(layers, deps)
 
 
-def _projectable_input_layer_names(dsk: HighLevelGraph) -> list[str]:
-    """Get list of column-projectable AwkwardInputLayer names.
-
-    Parameters
-    ----------
-    dsk : HighLevelGraph
-        Task graph of interest
-
-    Returns
-    -------
-    list[str]
-        Names of the AwkwardInputLayers in the graph that are
-        column-projectable.
-
-    """
-    return [
-        n
-        for n, v in dsk.layers.items()
-        if isinstance(v, AwkwardInputLayer) and hasattr(v.io_func, "project_columns")
-        # following condition means dep/pickled layers cannot be optimised
-        and hasattr(v, "_meta")
-    ]
-
-
-def _layers_with_annotation(dsk: HighLevelGraph, key: str) -> list[str]:
-    return [n for n, v in dsk.layers.items() if (v.annotations or {}).get(key)]
-
-
-def _ak_output_layer_names(dsk: HighLevelGraph) -> list[str]:
-    """Get a list output layer names.
-
-    Output layer names are annotated with 'ak_output'.
-
-    Parameters
-    ----------
-    dsk : HighLevelGraph
-        Graph of interest.
-
-    Returns
-    -------
-    list[str]
-        Names of the output layers.
-
-    """
-    return _layers_with_annotation(dsk, "ak_output")
-
-
-def _opt_touch_all_layer_names(dsk: HighLevelGraph) -> list[str]:
-    return [n for n, v in dsk.layers.items() if hasattr(v, "_opt_touch_all")]
-    # return _layers_with_annotation(dsk, "ak_touch_all")
-
-
-def _has_projectable_awkward_io_layer(dsk: HighLevelGraph) -> bool:
-    """Check if a graph at least one AwkwardInputLayer that is project-able."""
-    for _, v in dsk.layers.items():
-        if isinstance(v, AwkwardInputLayer) and hasattr(v.io_func, "project_columns"):
-            return True
-    return False
-
-
-def _touch_all_data(*args, **kwargs):
-    """Mock writing an ak.Array to disk by touching data buffers."""
-    for arg in args + tuple(kwargs.values()):
-        touch_data(arg)
-
-
-def _mock_output(layer):
-    """Update a layer to run the _touch_all_data."""
-    assert len(layer.dsk) == 1
-
-    new_layer = copy.deepcopy(layer)
-    mp = new_layer.dsk.copy()
-    for k in iter(mp.keys()):
-        mp[k] = (_touch_all_data,) + mp[k][1:]
-    new_layer.dsk = mp
-    return new_layer
-
-
-def _touch_and_call_fn(fn, *args, **kwargs):
-    _touch_all_data(*args, **kwargs)
-    return fn(*args, **kwargs)
-
-
-def _touch_and_call(layer):
-    assert len(layer.dsk) == 1
-
-    new_layer = copy.deepcopy(layer)
-    mp = new_layer.dsk.copy()
-    for k in iter(mp.keys()):
-        mp[k] = (_touch_and_call_fn,) + mp[k]
-    new_layer.dsk = mp
-    return new_layer
-
-
 def _recursive_replace(args, layer, parent, indices):
     args2 = []
     for arg in args:
@@ -370,186 +429,7 @@ def _recursive_replace(args, layer, parent, indices):
     return args2
 
 
-def _get_column_reports(dsk: HighLevelGraph) -> dict[str, Any]:
-    """Get the TypeTracerReport for each input layer in a task graph."""
-    if not _has_projectable_awkward_io_layer(dsk):
-        return {}
-
-    import awkward as ak
-
-    layers = dsk.layers.copy()  # type: ignore
-    deps = dsk.dependencies.copy()  # type: ignore
-    dependents = dsk.dependents
-
-    reports = {}
-
-    # make labelled report
-    projectable = _projectable_input_layer_names(dsk)
-    for name, lay in dsk.layers.items():
-        if name in projectable and hasattr(lay, "mock"):
-            layers[name], report = lay.mock()
-            reports[name] = report
-        elif hasattr(lay, "mock"):
-            layers[name], _ = lay.mock()
-
-    for name in _ak_output_layer_names(dsk):
-        layers[name] = _mock_output(layers[name])
-
-    for name in _opt_touch_all_layer_names(dsk):
-        layers[name] = _touch_and_call(layers[name])
-
-    hlg = HighLevelGraph(layers, deps)
-
-    # this loop builds up what are the possible final leaf nodes by
-    # inspecting the dependents dictionary. If something does not have
-    # a dependent, it must be the end of a graph. These are the things
-    # we need to compute for; we only use a single partition (the
-    # first). for a single collection `.compute()` this list will just
-    # be length 1; but if we are using `dask.compute` to pass in
-    # multiple collections to be computed simultaneously, this list
-    # will increase in length.
-    leaf_layers_keys = [
-        (k, 0) for k, v in dependents.items() if isinstance(v, set) and len(v) == 0
-    ]
-
-    # now we try to compute for each possible output layer key (leaf
-    # node on partition 0); this will cause the typetacer reports to
-    # get correct fields/columns touched. If the result is a record or
-    # an array we of course want to touch all of the data/fields.
-    try:
-        for layer in hlg.layers.values():
-            layer.__dict__.pop("_cached_dict", None)
-        results = get_sync(hlg, leaf_layers_keys)
-        for out in results:
-            if isinstance(out, (ak.Array, ak.Record)):
-                touch_data(out)
-    except Exception as err:
-        on_fail = dask.config.get("awkward.optimization.on-fail")
-        # this is the default, throw a warning but skip the optimization.
-        if on_fail == "warn":
-            warnings.warn(
-                COLUMN_OPT_FAILED_WARNING_MSG.format(exception=type(err), message=err)
-            )
-            return {}
-        # option "pass" means do not throw warning but skip the optimization.
-        elif on_fail == "pass":
-            log.debug("Column projection optimization failed; optimization skipped.")
-            return {}
-        # option "raise" to raise the exception here
-        elif on_fail == "raise":
-            raise
-        else:
-            raise ValueError(
-                f"Invalid awkward.optimization.on-fail option: {on_fail}.\n"
-                "Valid options are 'warn', 'pass', or 'raise'."
-            )
-
-    return reports
-
-
-def _necessary_columns(dsk: HighLevelGraph) -> dict[str, list[str]]:
-    """Pair layer names with lists of necessary columns."""
-    layer_to_columns = {}
-    for name, report in _get_column_reports(dsk).items():
-        touched_data_keys = {_ for _ in report.data_touched if _ is not None}
-
-        necessary_columns = []
-        for key in sorted(touched_data_keys):
-            if key == name or key == "None":
-                continue
-
-            layer, column = key.split(".", 1)
-            if layer != name:
-                continue
-
-            # List offsets are tagged as {key}.{LIST_KEY}. This routine resolve
-            # _columns_, so we use a wildcard to indicate that we want to load
-            # *any* child column of this list. If the list contains no records,
-            # then we load
-            if column.endswith(LIST_KEY):
-                list_parent_path = column[: -(len(LIST_KEY) + 1)].rstrip(".")
-                if list_parent_path not in necessary_columns:
-                    necessary_columns.append(f"{list_parent_path}.*")
-            else:
-                necessary_columns.append(column)
-        layer_to_columns[name] = necessary_columns
-    return layer_to_columns
-
-
-def _prune_wildcards(columns: list[str], meta: AwkwardArray) -> list[str]:
-    """Prune wildcard '.*' suffix from necessary columns results.
-
-    The _necessary_columns logic will provide some results of the
-    form:
-
-    "foo.bar.*"
-
-    This function will eliminate the wildcard in one of two ways
-    (continuing to use "foo.bar.*" as an example):
-
-    1. If "foo.bar" has leaves (subfields) "x", "y" and "z", and _any_
-       of those (so "foo.bar.x", for example) also appears in the
-       columns list, then essentially nothing will happen (except we
-       drop the wildcard string), because we can be sure that a leaf
-       of "foo.bar" will be read (in this case it's "foo.bar.x").
-
-    2. If "foo.bar" has multiple leaves but none of them appear in the
-       columns list, we will just pick the first one that we find
-       (that is, foo.bar.fields[0]).
-
-    Parameters
-    ----------
-    columns : list[str]
-        The "raw" columns deemed necessary by the necessary columns
-        logic; can still contain the wildcard syntax we've adopted.
-    meta : ak.Array
-        The metadata (typetracer array) from the AwkwardInputLayer
-        that is getting optimized.
-
-    Returns
-    -------
-    list[str]
-        Columns with the wildcard syntax pruned and (also augmented
-        with a leaf node if necessary).
-
-    """
-
-    good_columns: list[str] = []
-    wildcard_columns: list[str] = []
-    for column in columns:
-        if column.endswith(".*"):
-            wildcard_columns.append(column)
-        else:
-            good_columns.append(column)
-
-    for column in wildcard_columns:
-        definite_column = column[:-2]
-        # each time we meet a wildcard column we need to start back
-        # with the original meta array.
-        imeta = meta
-        reverse_column_parts = [*definite_column.split(".")]
-        reverse_column_parts.reverse()
-
-        while reverse_column_parts:
-            part = reverse_column_parts.pop()
-            # for unnamed roots part may be an empty string, so we
-            # need this if statement.
-            if part:
-                imeta = imeta[part]
-        # The given wildcard column contains no sub-columns, so load
-        # the column itself
-        if not imeta.fields:
-            good_columns.append(definite_column)
-
-        # Otherwise, prefer a column that we already need to load
-        else:
-            for field in imeta.fields:
-                field_column = f"{definite_column}.{field}"
-                if field_column in good_columns:
-                    break
-            # Or, pick an arbitrary (first) column if no other fields are yet
-            # required
-            else:
-                good_columns.append(f"{definite_column}.{imeta.fields[0]}")
-
-    return good_columns
+def _buffer_keys_for_layer(
+    buffer_keys: Iterable[str], known_buffer_keys: frozenset[str]
+):
+    return {k for k in buffer_keys if k in known_buffer_keys}

@@ -85,9 +85,6 @@ def test_column_ordering(tmpdir):
 
     c = b.map_partitions(assert_1)[["b", "a"]].map_partitions(assert_2)
 
-    # arbitrary order here
-    assert set(list(dak.necessary_columns(c).values())[0]) == {"b", "a"}
-
     arr = c.compute()
     assert arr.fields == ["b", "a"]  # output has required order
 

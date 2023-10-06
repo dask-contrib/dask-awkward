@@ -3,7 +3,7 @@ from __future__ import annotations
 import abc
 import logging
 import math
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Literal, overload
 
 import awkward as ak
@@ -18,6 +18,7 @@ from fsspec.core import get_fs_token_paths, url_to_fs
 from fsspec.utils import infer_compression, read_block
 
 from dask_awkward.lib.core import map_partitions, new_scalar_object, typetracer_array
+from dask_awkward.lib.io.columnar import ColumnProjectionMixin
 from dask_awkward.lib.io.io import (
     _bytes_with_sample,
     _BytesReadingInstructions,
@@ -27,30 +28,21 @@ from dask_awkward.lib.io.io import (
 if TYPE_CHECKING:
     from awkward.contents.content import Content
     from fsspec.spec import AbstractFileSystem
-    from typing_extensions import Self
 
     from dask_awkward.lib.core import Array, Scalar
-
 
 log = logging.getLogger(__name__)
 
 
-def _use_optimization() -> bool:
-    return "json" in dask.config.get(
-        "awkward.optimization.columns-opt-formats",
-        default=[],
-    )
-
-
-class FromJsonFn:
+class FromJsonFn(ColumnProjectionMixin):
     def __init__(
         self,
         *,
         storage: AbstractFileSystem,
+        form: Form,
         compression: str | None = None,
         schema: str | dict | list | None = None,
-        form: Form | None = None,
-        original_form: Form | None = None,
+        behavior: dict | None = None,
         **kwargs: Any,
     ) -> None:
         self.compression = compression
@@ -58,35 +50,36 @@ class FromJsonFn:
         self.schema = schema
         self.kwargs = kwargs
         self.form = form
-        self.original_form = original_form
+        self.behavior = behavior
 
     @abc.abstractmethod
     def __call__(self, source: Any) -> ak.Array:
         ...
 
-    def _default_project_columns(
-        self,
-        columns: Sequence[str],
-        original_form: Form | None = None,
-    ) -> Self:
-        if self.schema is not None:
-            return self
-
-        if self.form is not None:
-            form = self.form.select_columns(columns)
-            assert form is not None
-            schema = layout_to_jsonschema(form.length_zero_array(highlevel=False))
-
-            return type(self)(
-                schema=schema,
-                form=form,
-                storage=self.storage,
-                compression=self.compression,
-                original_form=original_form,
-                **self.kwargs,
+    @property
+    def use_optimization(self) -> bool:
+        return (
+            "json"
+            in dask.config.get(
+                "awkward.optimization.columns-opt-formats",
+                default=[],
             )
+            and self.schema is None
+        )
 
-        return self
+    def project_columns(self, columns: set[str]):
+        form = self.form.select_columns(columns)
+        assert form is not None
+        schema = layout_to_jsonschema(form.length_zero_array(highlevel=False))
+
+        return type(self)(
+            schema=schema,
+            form=self.form,
+            storage=self.storage,
+            compression=self.compression,
+            behavior=self.behavior,
+            **self.kwargs,
+        )
 
 
 class FromJsonLineDelimitedFn(FromJsonFn):
@@ -94,10 +87,10 @@ class FromJsonLineDelimitedFn(FromJsonFn):
         self,
         *,
         storage: AbstractFileSystem,
+        form: Form,
         compression: str | None = None,
         schema: str | dict | list | None = None,
-        form: Form | None = None,
-        original_form: Form | None = None,
+        behavior: dict | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(
@@ -105,7 +98,7 @@ class FromJsonLineDelimitedFn(FromJsonFn):
             compression=compression,
             schema=schema,
             form=form,
-            original_form=original_form,
+            behavior=behavior,
             **kwargs,
         )
 
@@ -122,29 +115,16 @@ class FromJsonLineDelimitedFn(FromJsonFn):
         return array
         # return ak.Array(unproject_layout(self.original_form, array.layout))
 
-    def project_columns(
-        self,
-        columns: Sequence[str],
-        original_form: Form | None = None,
-    ) -> Self:
-        if not _use_optimization():
-            return self
-
-        return self._default_project_columns(
-            columns=columns,
-            original_form=original_form,
-        )
-
 
 class FromJsonSingleObjPerFile(FromJsonFn):
     def __init__(
         self,
         *,
         storage: AbstractFileSystem,
+        form: Form,
         compression: str | None = None,
         schema: str | dict | list | None = None,
-        form: Form | None = None,
-        original_form: Form | None = None,
+        behavior: dict | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(
@@ -152,7 +132,7 @@ class FromJsonSingleObjPerFile(FromJsonFn):
             compression=compression,
             schema=schema,
             form=form,
-            original_form=original_form,
+            behavior=behavior,
             **kwargs,
         )
 
@@ -173,37 +153,24 @@ class FromJsonSingleObjPerFile(FromJsonFn):
         return array
         # return ak.Array(unproject_layout(self.original_form, array.layout))
 
-    def project_columns(
-        self,
-        columns: Sequence[str],
-        original_form: Form | None = None,
-    ) -> Self:
-        if not _use_optimization():
-            return self
-
-        return self._default_project_columns(
-            columns=columns,
-            original_form=original_form,
-        )
-
 
 class FromJsonBytesFn(FromJsonFn):
     def __init__(
         self,
         *,
         storage: AbstractFileSystem,
+        form: Form,
         compression: str | None = None,
         schema: str | dict | list | None = None,
-        form: Form | None = None,
-        original_form: Form | None = None,
+        behavior: dict | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(
             storage=storage,
             compression=compression,
             schema=schema,
+            behavior=behavior,
             form=form,
-            original_form=original_form,
             **kwargs,
         )
 
@@ -231,19 +198,6 @@ class FromJsonBytesFn(FromJsonFn):
         assert isinstance(array, ak.Array)
         return array
         # return ak.Array(unproject_layout(self.original_form, array.layout))
-
-    def project_columns(
-        self,
-        columns: Sequence[str],
-        original_form: Form | None = None,
-    ) -> Self:
-        if not _use_optimization():
-            return self
-
-        return self._default_project_columns(
-            columns=columns,
-            original_form=original_form,
-        )
 
 
 def meta_from_single_file(

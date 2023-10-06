@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import math
+import warnings
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, Mapping, Protocol
+from typing import TYPE_CHECKING, Any, Callable, Mapping, Protocol, cast
 
 import awkward as ak
 import numpy as np
@@ -13,8 +14,17 @@ from dask.highlevelgraph import HighLevelGraph
 from dask.utils import funcname, is_integer, parse_bytes
 from fsspec.utils import infer_compression
 
-from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardInputLayer
-from dask_awkward.layers.layers import AwkwardMaterializedLayer
+from dask_awkward.layers import (
+    AwkwardBlockwiseLayer,
+    AwkwardInputLayer,
+    ImplementsIOFunction,
+)
+from dask_awkward.layers.layers import (
+    AwkwardMaterializedLayer,
+    ImplementsMocking,
+    IOFunctionWithMocking,
+    io_func_implements_mocking,
+)
 from dask_awkward.lib.core import (
     empty_typetracer,
     map_partitions,
@@ -153,6 +163,7 @@ def from_lists(source: list, behavior: dict | None = None) -> Array:
         lists,
         meta=typetracer_array(ak.Array(lists[0])),
         divisions=divs,
+        behavior=behavior,
         label="from-lists",
     )
 
@@ -458,7 +469,7 @@ class PackedArgCallable:
 
 
 def from_map(
-    func: Callable,
+    func: ImplementsIOFunction,
     *iterables: Iterable,
     args: tuple[Any, ...] | None = None,
     label: str | None = None,
@@ -547,6 +558,8 @@ def from_map(
     name = f"{label}-{token}"
 
     # Define io_func
+
+    # FIXME: projection etc.
     if packed or args or kwargs:
         func = PackedArgCallable(
             func,
@@ -555,24 +568,32 @@ def from_map(
             packed=packed,
         )
 
-    dsk = AwkwardInputLayer(
-        name=name,
-        columns=None,
-        inputs=inputs,
-        io_func=func,
-        meta=meta,
-        behavior=behavior,
-    )
+    # Special `io_func` implementations can implement mocking and optionally
+    # support buffer projection.
+    if io_func_implements_mocking(func):
+        io_func = func
+        array_meta = cast(ImplementsMocking, func).mock()
+    # If we know the meta, we can spoof mocking
+    elif meta is not None:
+        io_func = IOFunctionWithMocking(meta, func)
+        array_meta = meta
+    # Without `meta`, the meta will be computed by executing the graph
+    else:
+        io_func = func
+        array_meta = None
+
+    dsk = AwkwardInputLayer(name=name, inputs=inputs, io_func=io_func)
+
+    if behavior is not None:
+        warnings.warn(
+            "The `behavior` argument is deprecated for `from_map`, and consequently ignored."
+        )
 
     hlg = HighLevelGraph.from_collections(name, dsk)
     if divisions is not None:
-        result = new_array_object(
-            hlg, name, meta=meta, behavior=dsk._behavior, divisions=divisions
-        )
+        result = new_array_object(hlg, name, meta=array_meta, divisions=divisions)
     else:
-        result = new_array_object(
-            hlg, name, meta=meta, behavior=dsk._behavior, npartitions=len(inputs)
-        )
+        result = new_array_object(hlg, name, meta=array_meta, npartitions=len(inputs))
 
     return result
 

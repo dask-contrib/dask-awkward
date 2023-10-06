@@ -1,4 +1,5 @@
 import dask_awkward.lib.str as str
+import dask_awkward.lib.utils as utils
 from dask_awkward.lib.core import Array, PartitionCompatibility, Record, Scalar
 from dask_awkward.lib.core import _type as type
 from dask_awkward.lib.core import (
@@ -7,7 +8,11 @@ from dask_awkward.lib.core import (
     partition_compatibility,
 )
 from dask_awkward.lib.describe import fields
-from dask_awkward.lib.inspect import necessary_columns, sample
+from dask_awkward.lib.inspect import (
+    report_necessary_buffers,
+    report_necessary_columns,
+    sample,
+)
 from dask_awkward.lib.io.io import (
     ImplementsFormTransformation,
     from_awkward,

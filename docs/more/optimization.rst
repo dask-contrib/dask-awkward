@@ -127,14 +127,14 @@ will only grab ``foo`` and ``bar.x``.
    :py:func:`ak.from_parquet` function at compute time.
 
 You can see which columns are determined to be necessary by calling
-:func:`dask_awkward.necessary_columns` on the collection of interest
+:func:`dask_awkward.report_necessary_columns` on the collection of interest
 (it returns a mapping that pairs an input layer with the list of
 necessary columns):
 
 .. code:: pycon
 
    >>> import dask_awkward as dak
-   >>> dak.necessary_columns(result)
+   >>> dak.report_necessary_columns(result)
    {"some-layer-name": ["foo", "bar.x"]}
 
 The optimization is performed by relying on upstream Awkward-Array
@@ -156,7 +156,7 @@ parameter:
 One can also use the ``columns=`` argument (with
 :func:`~dask_awkward.from_parquet`, for example) to manually define
 which columns should be read from disk. The
-:func:`~dask_awkward.necessary_columns` function can be used to
+:func:`~dask_awkward.report_necessary_columns` function can be used to
 determine how one should use the ``columns=`` argument. Using our
 above example, we write
 
@@ -179,3 +179,12 @@ workflow).
 
    <script data-goatcounter="https://dask-awkward.goatcounter.com/count"
            async src="//gc.zgo.at/count.js"></script>
+
+
+.. note::
+
+    Under the hood, the columns optimization is implemented as a *buffers* optimization; dask-awkward determines the
+    buffers necessary to read from a columnar source, before translating these to column names. Some IO sources might
+    not support :func:`~dask_awkward.report_necessary_columns`, e.g. if the source directly reads buffers from a container.
+
+    For these IO sources, :func:`~dask_awkward.report_necessary_buffers` can be used instead.

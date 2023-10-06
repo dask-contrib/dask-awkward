@@ -3,6 +3,10 @@ from dask_awkward.layers.layers import (
     AwkwardInputLayer,
     AwkwardMaterializedLayer,
     AwkwardTreeReductionLayer,
+    ImplementsIOFunction,
+    ImplementsProjection,
+    IOFunctionWithMocking,
+    io_func_implements_projection,
 )
 
 __all__ = (
@@ -10,4 +14,8 @@ __all__ = (
     "AwkwardBlockwiseLayer",
     "AwkwardMaterializedLayer",
     "AwkwardTreeReductionLayer",
+    "ImplementsProjection",
+    "ImplementsIOFunction",
+    "IOFunctionWithMocking",
+    "io_func_implements_projection",
 )

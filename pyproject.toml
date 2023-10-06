@@ -35,7 +35,7 @@ classifiers = [
   "Topic :: Software Development",
 ]
 dependencies = [
-  "awkward >=2.4.4",
+  "awkward >=2.4.5",
   "dask >=2023.04.0",
   "typing_extensions >=4.8.0",
 ]
@@ -70,7 +70,7 @@ test = [
   "pytest >=6.0",
   "pytest-cov >=3.0.0",
   "requests >=2.27.1",
-  "uproot",
+  "uproot >=5.1.0rc1",
 ]
 
 [project.entry-points."dask.sizeof"]
