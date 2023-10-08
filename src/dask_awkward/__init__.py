@@ -26,7 +26,6 @@ from dask_awkward.lib.inspect import (
 necessary_columns = report_necessary_columns  # Export for backwards compatibility.
 
 from dask_awkward.lib.io.io import (
-    ImplementsFormTransformation,
     from_awkward,
     from_dask_array,
     from_delayed,

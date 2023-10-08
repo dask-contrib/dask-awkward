@@ -42,25 +42,6 @@ if TYPE_CHECKING:
     from dask_awkward.lib.core import Array
 
 
-class ImplementsFormTransformation(Protocol):
-    behavior: dict | None
-
-    def __call__(self, form: ak.form.Form, docstr: str | None) -> ak.form.Form:
-        raise NotImplementedError
-
-    def extract_form_keys_base_columns(self, form_keys: Iterable[str]) -> Iterable[str]:
-        raise NotImplementedError
-
-    def create_column_mapping_and_key(
-        self,
-        column_source: Any,
-        start: int,
-        stop: int,
-        **kwargs: Any,
-    ) -> tuple[Mapping[str, ak.Array], Callable[[str, ak.forms.Form, str], str] | str]:
-        raise NotImplementedError
-
-
 class _FromAwkwardFn:
     def __init__(self, arr: ak.Array) -> None:
         self.arr = arr
