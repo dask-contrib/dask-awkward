@@ -129,8 +129,9 @@ def render_buffer_key(form: Form, form_key: str, attribute: str) -> str:
     return f"{form_key}-{attribute}"
 
 
-def parse_buffer_key(buffer_key: str) -> list[str]:
-    return buffer_key.rsplit("-", maxsplit=1)
+def parse_buffer_key(buffer_key: str) -> tuple[str, str]:
+    head, tail = buffer_key.rsplit("-", maxsplit=1)
+    return head, tail
 
 
 def form_with_unique_keys(form: Form, key: str) -> Form:
