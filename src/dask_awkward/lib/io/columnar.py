@@ -87,8 +87,7 @@ class ColumnProjectionMixin(ImplementsNecessaryColumns[FormStructure]):
         form_key_to_parent_form_key = state["form_key_to_parent_form_key"]
         form_key_to_child_form_keys: dict[str, list[str]] = {}
         for child_key, parent_key in form_key_to_parent_form_key.items():
-            assert parent_key is not None
-            form_key_to_child_form_keys.setdefault(parent_key, []).append(child_key)
+            form_key_to_child_form_keys.setdefault(parent_key, []).append(child_key)  # type: ignore
         form_key_to_form = state["form_key_to_form"]
         # Buffer hierarchy information
         form_key_to_buffer_keys = state["form_key_to_buffer_keys"]

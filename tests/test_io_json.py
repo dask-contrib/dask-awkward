@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -12,12 +13,6 @@ import dask_awkward as dak
 from dask_awkward.lib.core import Array
 from dask_awkward.lib.optimize import optimize as dak_optimize
 from dask_awkward.lib.testutils import assert_eq
-
-try:
-    import ujson as json
-except ImportError:
-    import json  # type: ignore[no-redef]
-
 
 data1 = r"""{"name":"Bob","team":"tigers","goals":[0,0,0,1,2,0,1]}
 {"name":"Alice","team":"bears","goals":[null]}
@@ -85,7 +80,7 @@ def input_layer_array_partition0(collection: Array) -> ak.Array:
     """
     with dask.config.set({"awkward.optimization.which": ["columns"]}):
         optimized_hlg = dak_optimize(collection.dask, [])
-        layers = list(optimized_hlg.layers)  # type: ignore[attr-defined]
+        layers = list(optimized_hlg.layers)  # type: ignore
         layer_name = [name for name in layers if name.startswith("from-json")][0]
         sgc, arg = optimized_hlg[(layer_name, 0)]
         array = sgc.dsk[layer_name][0](arg)
