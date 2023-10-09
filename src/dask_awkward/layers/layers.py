@@ -44,7 +44,7 @@ class AwkwardBlockwiseLayer(Blockwise):
 
 
 class ImplementsIOFunction(Protocol):
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args: Any, **kwargs: Any) -> AwkwardArray:
         ...
 
 
