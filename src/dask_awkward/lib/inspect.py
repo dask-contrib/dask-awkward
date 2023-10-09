@@ -23,6 +23,7 @@ def report_necessary_buffers(
     *args: Any, traverse: bool = True
 ) -> dict[str, NecessaryBuffers | None]:
     r"""Determine the buffer keys necessary to compute a collection.
+
     Parameters
     ----------
     *args : Dask collections or HighLevelGraphs
@@ -31,24 +32,30 @@ def report_necessary_buffers(
     traverse : bool, optional
         If True (default), builtin Python collections are traversed
         looking for any Dask collections they might contain.
+
     Returns
     -------
     dict[str, NecessaryBuffers | None]
         Mapping that pairs the input layers in the graph to objects
         describing the data and shape buffers that have been tagged
         as required by column optimisation of the given layer.
+
     Examples
     --------
     If we have a hypothetical parquet dataset (``ds``) with the fields
+
     - "foo"
     - "bar"
     - "baz"
+
     And the "baz" field has fields
 
     - "x"
     - "y"
+
     The calculation of ``ds.bar + ds.baz.x`` will only require the
     ``bar`` and ``baz.x`` columns from the parquet file.
+
     >>> import dask_awkward as dak
     >>> ds = dak.from_parquet("some-dataset")
     >>> ds.fields
@@ -96,6 +103,7 @@ def report_necessary_buffers(
             shape_only = frozenset(report.shape_touched) - data_and_shape
 
             # Update set of touched keys
+            assert existing_buffers is not None
             name_to_necessary_buffers[name] = NecessaryBuffers(
                 data_and_shape=existing_buffers.data_and_shape | data_and_shape,
                 shape_only=existing_buffers.shape_only | shape_only,
@@ -161,7 +169,7 @@ def report_necessary_columns(
 
     seen_names = set()
 
-    name_to_necessary_columns: dict[str, frozenset] = {}
+    name_to_necessary_columns: dict[str, frozenset | None] = {}
     for obj in collections:
         dsk = obj if isinstance(obj, HighLevelGraph) else obj.dask
         projection_data = o._prepare_buffer_projection(dsk)
@@ -183,6 +191,7 @@ def report_necessary_columns(
 
             existing_columns = name_to_necessary_columns.setdefault(name, frozenset())
 
+            assert existing_columns is not None
             # Update set of touched keys
             name_to_necessary_columns[
                 name
@@ -237,11 +246,14 @@ def sample(
         rows will remain.
 
     """
-    if not (factor is None) ^ (probability is None):
+    if (factor is None and probability is None) or (
+        factor is not None and probability is not None
+    ):
         raise ValueError("Give exactly one of factor or probability")
     if factor:
         return arr.map_partitions(lambda x: x[::factor], meta=arr._meta)
-    else:
-        return arr.map_partitions(
-            lambda x: x[_random_boolean_like(x, probability)], meta=arr._meta
-        )
+    assert probability is not None
+    proba = float(probability)
+    return arr.map_partitions(
+        lambda x: x[_random_boolean_like(x, proba)], meta=arr._meta
+    )

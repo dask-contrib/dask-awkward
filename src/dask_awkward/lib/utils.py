@@ -2,7 +2,7 @@ from __future__ import annotations
 
 __all__ = ("trace_form_structure", "buffer_keys_required_to_compute_shapes")
 
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Mapping, MutableMapping
 from typing import TYPE_CHECKING, TypedDict, TypeVar
 
 import awkward as ak
@@ -17,17 +17,17 @@ METADATA_ATTRIBUTES = UNKNOWN_LENGTH_ATTRIBUTES | KNOWN_LENGTH_ATTRIBUTES
 
 
 class FormStructure(TypedDict):
-    form_key_to_form: dict[str, Form]
-    form_key_to_parent_form_key: dict[str, str]
-    form_key_to_path: dict[str, tuple[str, ...]]
-    form_key_to_buffer_keys: dict[str, tuple[str, ...]]
+    form_key_to_form: MutableMapping[str, Form]
+    form_key_to_parent_form_key: MutableMapping[str, str | None]
+    form_key_to_path: MutableMapping[str, tuple[str, ...]]
+    form_key_to_buffer_keys: MutableMapping[str, tuple[str, ...]]
 
 
 def trace_form_structure(form: Form, buffer_key: Callable) -> FormStructure:
-    form_key_to_form: dict[str, Form] = {}
-    form_key_to_parent_form_key: dict[str, str | None] = {}
-    form_key_to_path: dict[str, tuple[str, ...]] = {}
-    form_key_to_buffer_keys: dict[str, tuple[str, ...]] = {}
+    form_key_to_form: MutableMapping[str, Form] = {}
+    form_key_to_parent_form_key: MutableMapping[str, str | None] = {}
+    form_key_to_path: MutableMapping[str, tuple[str, ...]] = {}
+    form_key_to_buffer_keys: MutableMapping[str, tuple[str, ...]] = {}
 
     def impl_with_parent(
         form: Form,
@@ -78,13 +78,13 @@ def trace_form_structure(form: Form, buffer_key: Callable) -> FormStructure:
 T = TypeVar("T")
 
 
-def walk_bijective_graph(node: T, graph: dict[T, T | None]) -> Iterator[T]:
-    while (node := graph.get(node)) is not None:
+def walk_bijective_graph(node: T, graph: Mapping[T, T | None]) -> Iterator[T]:
+    while (node := graph.get(node)) is not None:  # type: ignore[assignment]
         yield node
 
 
 def walk_graph_breadth_first(
-    node: T, graph: dict[T, Iterable[T] | None]
+    node: T, graph: Mapping[T, Iterable[T] | None]
 ) -> Iterator[T]:
     children = graph.get(node)
     if children is None:
@@ -94,7 +94,9 @@ def walk_graph_breadth_first(
         yield from walk_graph_breadth_first(node, graph)
 
 
-def walk_graph_depth_first(node: T, graph: dict[T, Iterable[T] | None]) -> Iterator[T]:
+def walk_graph_depth_first(
+    node: T, graph: Mapping[T, Iterable[T] | None]
+) -> Iterator[T]:
     children = graph.get(node)
     if children is None:
         return
@@ -106,9 +108,9 @@ def walk_graph_depth_first(node: T, graph: dict[T, Iterable[T] | None]) -> Itera
 def buffer_keys_required_to_compute_shapes(
     parse_buffer_key: Callable[[str], tuple[str, str]],
     shape_buffers: Iterable[str],
-    form_key_to_parent_key: dict[str, str],
-    form_key_to_buffer_keys: dict[str, Iterable[str]],
-):
+    form_key_to_parent_key: Mapping[str, str | None],
+    form_key_to_buffer_keys: Mapping[str, Iterable[str]],
+) -> Iterable[str]:
     # Buffers needing known shapes must traverse all the way up the tree.
     for buffer_key in shape_buffers:
         form_key, attribute = parse_buffer_key(buffer_key)
