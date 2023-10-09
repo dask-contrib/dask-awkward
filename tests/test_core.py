@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import copy
+import json
+import sys
 from collections import namedtuple
 from collections.abc import Callable
 from typing import TYPE_CHECKING
@@ -11,13 +13,6 @@ import dask.config
 import fsspec
 import numpy as np
 import pytest
-
-try:
-    import ujson as json
-except ImportError:
-    import json  # type: ignore[no-redef]
-
-import sys
 
 import dask_awkward as dak
 from dask_awkward.lib.core import (

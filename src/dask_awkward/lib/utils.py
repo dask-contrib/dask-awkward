@@ -29,7 +29,11 @@ def trace_form_structure(form: Form, buffer_key: Callable) -> FormStructure:
     form_key_to_path: dict[str, tuple[str, ...]] = {}
     form_key_to_buffer_keys: dict[str, tuple[str, ...]] = {}
 
-    def impl_with_parent(form: Form, parent_form: Form | None, column_path):
+    def impl_with_parent(
+        form: Form,
+        parent_form: Form | None,
+        column_path: tuple[str, ...],
+    ) -> None:
         # Associate child form key with parent form key
         form_key_to_parent_form_key[form.form_key] = (
             None if parent_form is None else parent_form.form_key
@@ -125,12 +129,12 @@ def render_buffer_key(form: Form, form_key: str, attribute: str) -> str:
     return f"{form_key}-{attribute}"
 
 
-def parse_buffer_key(buffer_key: str) -> tuple[str, str]:
+def parse_buffer_key(buffer_key: str) -> list[str]:
     return buffer_key.rsplit("-", maxsplit=1)
 
 
 def form_with_unique_keys(form: Form, key: str) -> Form:
-    def impl(form: Form, key: str):
+    def impl(form: Form, key: str) -> None:
         # Set form key
         form.form_key = key
 

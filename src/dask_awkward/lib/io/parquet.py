@@ -59,7 +59,7 @@ class _FromParquetFn(ColumnProjectionMixin):
         ...
 
     @abc.abstractmethod
-    def project_columns(self, columns: set[str]):
+    def project_columns(self, columns):
         ...
 
     @property
@@ -122,7 +122,7 @@ class _FromParquetFileWiseFn(_FromParquetFn):
         )
         return ak.Array(unproject_layout(self.original_form, array.layout))
 
-    def project_columns(self, columns: set[str]):
+    def project_columns(self, columns):
         return _FromParquetFileWiseFn(
             fs=self.fs,
             form=self.form.select_columns(columns),
@@ -172,7 +172,7 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
         )
         return ak.Array(unproject_layout(self.original_form, array.layout))
 
-    def project_columns(self, columns: set[str]):
+    def project_columns(self, columns):
         return _FromParquetFragmentWiseFn(
             fs=self.fs,
             form=self.form.select_columns(columns),

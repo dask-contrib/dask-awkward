@@ -44,7 +44,7 @@ class AwkwardBlockwiseLayer(Blockwise):
 
 
 class ImplementsIOFunction(Protocol):
-    def __call__(self, *args, **kwargs) -> AwkwardArray:
+    def __call__(self, *args, **kwargs):
         ...
 
 
@@ -79,7 +79,7 @@ class IOFunctionWithMocking(ImplementsMocking, ImplementsIOFunction):
         state["_meta"] = None
         return state
 
-    def __call__(self, *args, **kwargs) -> AwkwardArray:
+    def __call__(self, *args, **kwargs):
         return self._io_func(*args, **kwargs)
 
     def mock(self) -> AwkwardArray:
@@ -220,7 +220,7 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         self,
         report: TypeTracerReport,
         state: T,
-    ):
+    ) -> AwkwardInputLayer:
         assert self.is_projectable
         return AwkwardInputLayer(
             name=self.name,
