@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import awkward as ak
 import dask
+import pytest
 
 import dask_awkward as dak
 from dask_awkward.lib.testutils import assert_eq
 
 
 def test_multiple_computes(pq_points_dir: str) -> None:
+    pytest.importorskip("pyarrow")
     ds1 = dak.from_parquet(pq_points_dir)
     # add a columns= argument to force a new tokenize result in
     # from_parquet so we get two unique collections.

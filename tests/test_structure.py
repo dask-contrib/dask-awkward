@@ -332,6 +332,8 @@ def test_isclose(daa, caa):
 
 
 def test_singletons(daa, L4, tmp_path):
+    pytest.importorskip("pyarrow")
+
     import warnings
 
     path = str(tmp_path)
