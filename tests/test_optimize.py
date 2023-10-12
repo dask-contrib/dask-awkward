@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import awkward as ak
 import dask
-import pytest
 
 import dask_awkward as dak
 from dask_awkward.lib.testutils import assert_eq
