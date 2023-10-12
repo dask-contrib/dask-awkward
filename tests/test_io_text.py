@@ -3,6 +3,7 @@ from __future__ import annotations
 import awkward as ak
 import awkward.operations.str as akstr
 import fsspec
+import pytest
 
 import dask_awkward as dak
 from dask_awkward.lib.testutils import assert_eq
