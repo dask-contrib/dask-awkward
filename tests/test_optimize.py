@@ -7,11 +7,11 @@ import dask_awkward as dak
 from dask_awkward.lib.testutils import assert_eq
 
 
-def test_multiple_computes(pq_points_dir: str) -> None:
-    ds1 = dak.from_parquet(pq_points_dir)
-    # add a columns= argument to force a new tokenize result in
-    # from_parquet so we get two unique collections.
-    ds2 = dak.from_parquet(pq_points_dir, columns=["points"])
+def test_multiple_computes(ndjson_points_file: str) -> None:
+    ds1 = dak.from_json([ndjson_points_file] * 2)
+    # add a kwarg argument to force a new tokenize result in
+    # from_json so we get two unique collections.
+    ds2 = dak.from_json([ndjson_points_file] * 2, buffersize=65536 // 2)
 
     lists = [[[1, 2, 3], [4, 5]], [[], [0, 0, 0]]]
     ds3 = dak.from_lists(lists)
