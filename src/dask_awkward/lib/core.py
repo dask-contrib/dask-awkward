@@ -42,7 +42,6 @@ from tlz import first
 
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardMaterializedLayer
 from dask_awkward.lib.optimize import all_optimizations
-from dask_awkward.typing import AwkwardDaskCollection
 from dask_awkward.utils import (
     DaskAwkwardNotImplemented,
     IncompatiblePartitions,
@@ -370,7 +369,7 @@ class Record(Scalar):
             raise TypeError(f"meta must be a Record typetracer object, not a {type(m)}")
         return m
 
-    def __getitem__(self, where: str) -> AwkwardDaskCollection:
+    def __getitem__(self, where):
         token = tokenize(self, where)
         new_name = f"{where}-{token}"
         new_meta = self._meta[where]
@@ -397,7 +396,7 @@ class Record(Scalar):
         else:
             return new_scalar_object(hlg, new_name, meta=new_meta)
 
-    def __getattr__(self, attr: str) -> Any:
+    def __getattr__(self, attr):
         if attr not in (self.fields or []):
             raise AttributeError(f"{attr} not in fields.")
         try:

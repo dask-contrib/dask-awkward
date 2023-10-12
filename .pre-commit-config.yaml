@@ -12,7 +12,7 @@ repos:
   - id: mixed-line-ending
   - id: trailing-whitespace
 
-- repo: https://github.com/psf/black
+- repo: https://github.com/psf/black-pre-commit-mirror
   rev: 23.9.1
   hooks:
   - id: black
@@ -54,3 +54,14 @@ repos:
   - id: blacken-docs
     additional_dependencies:
     - black
+
+- repo: https://github.com/pre-commit/mirrors-mypy
+  rev: v1.6.0
+  hooks:
+  - id: mypy
+    args: [--ignore-missing-imports]
+    additional_dependencies:
+    - dask
+    - types-PyYAML
+    - pytest
+    - numpy

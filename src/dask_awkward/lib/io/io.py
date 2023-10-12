@@ -4,7 +4,7 @@ import math
 import warnings
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, Mapping, Protocol, cast
+from typing import TYPE_CHECKING, Any, Callable, cast
 
 import awkward as ak
 import numpy as np

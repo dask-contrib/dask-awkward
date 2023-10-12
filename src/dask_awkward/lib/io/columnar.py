@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Protocol, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar, cast
 
 import awkward as ak
 from awkward import Array as AwkwardArray
 from awkward.forms import Form
 
-from dask_awkward.layers.layers import ImplementsNecessaryColumns
+from dask_awkward.layers.layers import ImplementsIOFunction, ImplementsNecessaryColumns
 from dask_awkward.lib.utils import (
     METADATA_ATTRIBUTES,
     FormStructure,
@@ -37,6 +37,9 @@ class ImplementsColumnProjectionMixin(ImplementsNecessaryColumns, Protocol):
         ...
 
     def project_columns(self: T, columns: frozenset[str]) -> T:
+        ...
+
+    def __call__(self, *args: Any, **kwargs: Any) -> AwkwardArray:
         ...
 
 
@@ -84,7 +87,7 @@ class ColumnProjectionMixin(ImplementsNecessaryColumns[FormStructure]):
         form_key_to_parent_form_key = state["form_key_to_parent_form_key"]
         form_key_to_child_form_keys: dict[str, list[str]] = {}
         for child_key, parent_key in form_key_to_parent_form_key.items():
-            form_key_to_child_form_keys.setdefault(parent_key, []).append(child_key)
+            form_key_to_child_form_keys.setdefault(parent_key, []).append(child_key)  # type: ignore
         form_key_to_form = state["form_key_to_form"]
         # Buffer hierarchy information
         form_key_to_buffer_keys = state["form_key_to_buffer_keys"]
@@ -151,8 +154,8 @@ class ColumnProjectionMixin(ImplementsNecessaryColumns[FormStructure]):
         self: S,
         report: TypeTracerReport,
         state: FormStructure,
-    ) -> S:
-        if not self.use_optimization:
+    ) -> ImplementsIOFunction:
+        if not self.use_optimization:  # type: ignore[attr-defined]
             return self
 
         return self.project_columns(self.necessary_columns(report, state))

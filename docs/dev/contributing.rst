@@ -34,6 +34,14 @@ Commit your changes, push your branch to your fork, and open a Pull
 Request. We suggest that you install `pre-commit <precommit_>`_ to run
 some checks locally when creating new commits.
 
+Typing
+------
+
+We include a pre-commit hook that runs ``mypy`` for static type
+checking. Code added to dask-awkward is *not required* to be typed,
+but the pre-commit check does enforce correctness when type hints are
+present.
+
 Adding documentation
 --------------------
 

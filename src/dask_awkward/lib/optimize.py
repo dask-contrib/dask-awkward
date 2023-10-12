@@ -431,5 +431,5 @@ def _recursive_replace(args, layer, parent, indices):
 
 def _buffer_keys_for_layer(
     buffer_keys: Iterable[str], known_buffer_keys: frozenset[str]
-):
+) -> set[str]:
     return {k for k in buffer_keys if k in known_buffer_keys}
