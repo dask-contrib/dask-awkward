@@ -46,8 +46,9 @@ def test_clear_divisions(ndjson_points_file: str) -> None:
     assert not daa.known_divisions
 
 
-def test_dunder_str(daa: Array) -> None:
-    assert str(daa) == "dask.awkward<from-parquet, npartitions=3>"
+def test_dunder_str(caa: ak.Array) -> None:
+    daa = dak.from_awkward(caa, npartitions=2)
+    assert str(daa) == "dask.awkward<from-awkward, npartitions=2>"
 
 
 def test_calculate_known_divisions(ndjson_points_file: str) -> None:
@@ -820,6 +821,7 @@ def test_map_partitions_no_dask_collections_passed(caa):
 
 @pytest.mark.parametrize("fn", [dak.count, dak.zeros_like, dak.ones_like])
 def test_shape_only_ops(fn: Callable, tmp_path_factory: pytest.TempPathFactory) -> None:
+    pytest.importorskip("pyarrow")
     a = ak.Array([{"a": 1, "b": 2}, {"a": 3, "b": 4}])
     p = tmp_path_factory.mktemp("zeros-like-flat")
     ak.to_parquet(a, str(p / "file.parquet"))

@@ -8,7 +8,8 @@ import dask_awkward as dak
 from dask_awkward.lib.testutils import assert_eq
 
 
-def test_form_text() -> None:
+def test_from_text() -> None:
+    pytest.importorskip("pyarrow")
     f1 = "https://raw.githubusercontent.com/dask-contrib/dask-awkward/main/README.md"
     f2 = "https://raw.githubusercontent.com/dask-contrib/dask-awkward/main/LICENSE"
 
