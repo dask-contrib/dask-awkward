@@ -61,6 +61,7 @@ docs = [
   "sphinx-codeautolink",
 ]
 test = [
+  "aiohttp",
   "dask-awkward[complete]",
   "dask-histogram",
   "distributed",
@@ -68,6 +69,7 @@ test = [
   "pandas",
   "pytest >=6.0",
   "pytest-cov >=3.0.0",
+  "requests",
   "uproot >=5.1.0rc1",
 ]
 
