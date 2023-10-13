@@ -70,7 +70,7 @@ test = [
   "pytest >=6.0",
   "pytest-cov >=3.0.0",
   "requests",
-  "uproot >=5.1.0rc1",
+  "uproot >=5.1.0",
 ]
 
 [project.entry-points."dask.sizeof"]
