@@ -21,7 +21,7 @@ dask-awkward with optional dependencies, and create a new branch:
    $ cd dask-awkward
    $ git remote add upstream https://github.com/dask-contrib/dask-awkward
    $ pip install -e ".[test,docs]"
-   $ git checkout -b name-your-branch upstream/mean
+   $ git checkout -b name-your-branch upstream/main
 
 Make your changes and be sure to add a test. Run ``pytest`` in the
 dask-awkward repository with:
