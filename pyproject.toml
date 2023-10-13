@@ -61,7 +61,7 @@ docs = [
   "sphinx-codeautolink",
 ]
 test = [
-  "aiohttp",
+  "aiohttp;python_version<\"3.12\"",
   "dask-awkward[complete]",
   "dask-histogram",
   "distributed",

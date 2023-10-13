@@ -5,6 +5,8 @@ import pathlib
 import pytest
 
 pytest.importorskip("pyarrow")
+pytest.importorskip("requests")
+pytest.importorskip("aiohttp")
 
 import awkward as ak
 import fsspec
