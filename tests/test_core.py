@@ -822,6 +822,7 @@ def test_map_partitions_no_dask_collections_passed(caa):
 @pytest.mark.parametrize("fn", [dak.count, dak.zeros_like, dak.ones_like])
 def test_shape_only_ops(fn: Callable, tmp_path_factory: pytest.TempPathFactory) -> None:
     pytest.importorskip("pyarrow")
+    pytest.importorskip("pandas")
     a = ak.Array([{"a": 1, "b": 2}, {"a": 3, "b": 4}])
     p = tmp_path_factory.mktemp("zeros-like-flat")
     ak.to_parquet(a, str(p / "file.parquet"))
