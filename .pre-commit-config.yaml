@@ -18,7 +18,10 @@ repos:
   - id: black
     language_version: python3
     args:
-    - --target-version=py38
+    - --target-version=py39
+    - --target-version=py310
+    - --target-version=py311
+    - --target-version=py312
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
   rev: v0.0.292
@@ -36,7 +39,7 @@ repos:
   hooks:
   - id: pyupgrade
     args:
-    - --py38-plus
+    - --py39-plus
 
 - repo: https://github.com/MarcoGorelli/absolufy-imports
   rev: v0.3.1
