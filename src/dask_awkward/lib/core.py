@@ -7,7 +7,7 @@ import math
 import operator
 import sys
 import warnings
-from collections.abc import Callable, Hashable, Mapping, Sequence
+from collections.abc import Callable, Hashable, Sequence
 from enum import IntEnum
 from functools import cached_property, partial
 from numbers import Number
@@ -38,13 +38,13 @@ from dask.delayed import Delayed
 from dask.highlevelgraph import HighLevelGraph
 from dask.threaded import get as threaded_get
 from dask.utils import IndexCallable, funcname, is_arraylike, key_split
-from tlz import first
 
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardMaterializedLayer
 from dask_awkward.lib.optimize import all_optimizations
 from dask_awkward.utils import (
     DaskAwkwardNotImplemented,
     IncompatiblePartitions,
+    first,
     hyphenize,
     is_empty_slice,
 )
@@ -56,6 +56,7 @@ if TYPE_CHECKING:
     from awkward.types.type import Type
     from dask.array.core import Array as DaskArray
     from dask.bag.core import Bag as DaskBag
+    from dask.typing import Graph, Key, NestedKeys, PostComputeCallable
     from numpy.typing import DTypeLike
 
 
@@ -63,37 +64,6 @@ T = TypeVar("T")
 
 
 log = logging.getLogger(__name__)
-
-
-def _finalize_array(results: Sequence[Any]) -> Any:
-    # special cases for length 1 results
-    if len(results) == 1:
-        if isinstance(results[0], (int, ak.Array)):
-            return results[0]
-
-    # a sequence of arrays that need to be concatenated.
-    elif any(isinstance(r, ak.Array) for r in results):
-        return ak.concatenate(results)
-
-    # sometimes we just check the length of partitions so all results
-    # will be integers, just make an array out of that.
-    elif isinstance(results, (tuple, list)) and all(
-        isinstance(r, (int, np.integer)) for r in results
-    ):
-        return ak.Array(list(results))
-
-    # sometimes all partition results will be None (some write-to-disk
-    # operations)
-    elif all(r is None for r in results):
-        return None
-
-    else:
-        msg = (
-            "Unexpected results of a computation.\n "
-            f"results: {results}"
-            f"type of first result: {type(results[0])}"
-        )
-        raise RuntimeError(msg)
 
 
 class Scalar(DaskMethodsMixin):
@@ -122,13 +92,13 @@ class Scalar(DaskMethodsMixin):
         self._meta: Any = self._check_meta(meta)
         self._known_value: Any | None = known_value
 
-    def __dask_graph__(self) -> HighLevelGraph:
+    def __dask_graph__(self) -> Graph:
         return self._dask
 
-    def __dask_keys__(self) -> list[Hashable]:
+    def __dask_keys__(self) -> NestedKeys:
         return [self.key]
 
-    def __dask_layers__(self) -> tuple[str, ...]:
+    def __dask_layers__(self) -> Sequence[str]:
         return (self.name,)
 
     def __dask_tokenize__(self) -> Hashable:
@@ -140,18 +110,13 @@ class Scalar(DaskMethodsMixin):
 
     __dask_scheduler__ = staticmethod(threaded_get)
 
-    def __dask_postcompute__(self) -> tuple[Callable, tuple]:
+    def __dask_postcompute__(self) -> tuple[PostComputeCallable, tuple]:
         return first, ()
 
-    def __dask_postpersist__(self) -> tuple[Callable, tuple]:
+    def __dask_postpersist__(self):
         return self._rebuild, ()
 
-    def _rebuild(
-        self,
-        dsk: HighLevelGraph,
-        *,
-        rename: Mapping[str, str] | None = None,
-    ) -> Any:
+    def _rebuild(self, dsk, *, rename=None):
         name = self._name
         if rename:
             raise ValueError("rename= unsupported in dask-awkward")
@@ -169,7 +134,7 @@ class Scalar(DaskMethodsMixin):
         return self._name
 
     @property
-    def key(self) -> Hashable:
+    def key(self) -> Key:
         return (self._name, 0)
 
     def _check_meta(self, m: Any) -> Any | None:
@@ -227,10 +192,12 @@ class Scalar(DaskMethodsMixin):
         token = tokenize(self, operator.getitem, where)
         label = "getitem"
         name = f"{label}-{token}"
-        d = self.to_delayed(optimize_graph=True)
-        task = {name: (operator.getitem, d.key, where)}
-        hlg = HighLevelGraph.from_collections(name, task, dependencies=(d,))
-        return Delayed(name, hlg)
+        task = AwkwardMaterializedLayer(
+            {(name, 0): (operator.getitem, self.key, where)},
+            previous_layer_names=[self.name],
+        )
+        hlg = HighLevelGraph.from_collections(name, task, dependencies=[self])
+        return new_scalar_object(hlg, name, meta=None)
 
     def __getattr__(self, attr: str) -> Any:
         d = self.to_delayed(optimize_graph=True)
@@ -343,7 +310,7 @@ def new_known_scalar(
             dtype = np.dtype(type(s))
     else:
         dtype = np.dtype(dtype)
-    llg = {(name, 0): s}
+    llg = AwkwardMaterializedLayer({(name, 0): s}, previous_layer_names=[])
     hlg = HighLevelGraph.from_collections(name, llg, dependencies=())
     return Scalar(
         hlg, name, meta=TypeTracerArray._new(dtype=dtype, shape=()), known_value=s
@@ -468,8 +435,35 @@ def new_record_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Record:
     return Record(dsk, name, meta)
 
 
-def _outer_int_getitem_fn(x: Any, gikey: str) -> Any:
-    return x[gikey]
+def _finalize_array(results: Sequence[Any]) -> Any:
+    # special cases for length 1 results
+    if len(results) == 1:
+        if isinstance(results[0], (int, ak.Array)):
+            return results[0]
+
+    # a sequence of arrays that need to be concatenated.
+    elif any(isinstance(r, ak.Array) for r in results):
+        return ak.concatenate(results)
+
+    # sometimes we just check the length of partitions so all results
+    # will be integers, just make an array out of that.
+    elif isinstance(results, (tuple, list)) and all(
+        isinstance(r, (int, np.integer)) for r in results
+    ):
+        return ak.Array(list(results))
+
+    # sometimes all partition results will be None (some write-to-disk
+    # operations)
+    elif all(r is None for r in results):
+        return None
+
+    else:
+        msg = (
+            "Unexpected results of a computation.\n "
+            f"results: {results}"
+            f"type of first result: {type(results[0])}"
+        )
+        raise RuntimeError(msg)
 
 
 class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
@@ -489,17 +483,17 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         dsk: HighLevelGraph,
         name: str,
         meta: ak.Array,
-        divisions: tuple[int | None, ...],
+        divisions: tuple[int, ...] | tuple[None, ...],
     ) -> None:
         self._dask: HighLevelGraph = dsk
         self._name: str = name
-        self._divisions: tuple[int | None, ...] = divisions
+        self._divisions: tuple[int, ...] | tuple[None, ...] = divisions
         self._meta: ak.Array = meta
 
     def __dask_graph__(self) -> HighLevelGraph:
         return self.dask
 
-    def __dask_keys__(self) -> list[Hashable]:
+    def __dask_keys__(self) -> NestedKeys:
         return [(self.name, i) for i in range(self.npartitions)]
 
     def __dask_layers__(self) -> tuple[str]:
@@ -511,7 +505,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     def __dask_postcompute__(self) -> tuple[Callable, tuple]:
         return _finalize_array, ()
 
-    def __dask_postpersist__(self) -> tuple[Callable, tuple]:
+    def __dask_postpersist__(self):
         return self._rebuild, ()
 
     __dask_optimize__ = globalmethod(
@@ -540,12 +534,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         self._dask = appended._dask
         self._name = appended._name
 
-    def _rebuild(
-        self,
-        dsk: HighLevelGraph,
-        *,
-        rename: Mapping[str, str] | None = None,
-    ) -> Array:
+    def _rebuild(self, dsk, *, rename=None):
         name = self.name
         if rename:
             raise ValueError("rename= unsupported in dask-awkward")
@@ -666,7 +655,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return self._dask
 
     @property
-    def keys(self) -> list[Hashable]:
+    def keys(self) -> NestedKeys:
         """Task graph keys."""
         return self.__dask_keys__()
 
@@ -682,7 +671,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return self._meta.ndim
 
     @property
-    def divisions(self) -> tuple[int | None, ...]:
+    def divisions(self) -> tuple[int, ...] | tuple[None, ...]:
         """Location of the collections partition boundaries."""
         return self._divisions
 
@@ -917,7 +906,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         name = f"getitem-{token}"
         dsk = {
             (name, 0): (
-                _outer_int_getitem_fn,
+                operator.getitem,
                 partition.__dask_keys__()[0],
                 where,
             )
@@ -1379,7 +1368,7 @@ def new_array_object(
     meta: ak.Array | None = None,
     behavior: dict | None = None,
     npartitions: int | None = None,
-    divisions: tuple[int | None, ...] | None = None,
+    divisions: tuple[int, ...] | tuple[None, ...] | None = None,
 ) -> Array:
     """Instantiate a new Array collection object.
 
@@ -1411,7 +1400,7 @@ def new_array_object(
     """
     if divisions is None:
         if npartitions is not None:
-            divs: tuple[int | None, ...] = (None,) * (npartitions + 1)
+            divs: tuple[int, ...] | tuple[None, ...] = (None,) * (npartitions + 1)
         else:
             raise ValueError("One of either divisions or npartitions must be defined.")
     else:

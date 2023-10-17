@@ -153,7 +153,7 @@ def from_delayed(
     source: list[Delayed] | Delayed,
     meta: ak.Array | None = None,
     behavior: dict | None = None,
-    divisions: tuple[int | None, ...] | None = None,
+    divisions: tuple[int, ...] | tuple[None, ...] | None = None,
     prefix: str = "from-delayed",
 ) -> Array:
     """Create an Array collection from a set of :class:`~dask.delayed.Delayed` objects.
@@ -185,17 +185,21 @@ def from_delayed(
     name = f"{prefix}-{tokenize(parts)}"
     dsk = AwkwardMaterializedLayer(
         {(name, i): part.key for i, part in enumerate(parts)},
-        previous_layer_names=[parts[0].name],
+        previous_layer_names=[parts[0].key],
     )
     if divisions is None:
-        divs: tuple[int | None, ...] = (None,) * (len(parts) + 1)
+        divs: tuple[int, ...] | tuple[None, ...] = (None,) * (len(parts) + 1)
     else:
-        divs = tuple(divisions)
+        divs = divisions
         if len(divs) != len(parts) + 1:
             raise ValueError("divisions must be a tuple of length len(source) + 1")
     hlg = HighLevelGraph.from_collections(name, dsk, dependencies=parts)
     return new_array_object(
-        hlg, name=name, meta=meta, behavior=behavior, divisions=divs
+        hlg,
+        name=name,
+        meta=meta,
+        behavior=behavior,
+        divisions=divs,
     )
 
 
@@ -320,7 +324,14 @@ def to_dask_array(
             for i, k in enumerate(flatten(array.__dask_keys__()))
         }
 
-        graph = HighLevelGraph.from_collections(name, llg, dependencies=[array])
+        graph = HighLevelGraph.from_collections(
+            name,
+            AwkwardMaterializedLayer(
+                llg,
+                previous_layer_names=[array.name],
+            ),
+            dependencies=[array],
+        )
         return new_da_object(graph, name, meta=None, chunks=chunks, dtype=dtype)
 
 

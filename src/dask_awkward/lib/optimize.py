@@ -46,7 +46,7 @@ def all_optimizations(
     keys = tuple(flatten(keys))
 
     if not isinstance(dsk, HighLevelGraph):
-        dsk = HighLevelGraph.from_collections(id(dsk), dsk, dependencies=())
+        dsk = HighLevelGraph.from_collections(str(id(dsk)), dsk, dependencies=())
 
     else:
         # Perform dask-awkward specific optimizations.

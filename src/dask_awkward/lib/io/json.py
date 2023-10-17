@@ -17,6 +17,7 @@ from dask.utils import parse_bytes
 from fsspec.core import get_fs_token_paths, url_to_fs
 from fsspec.utils import infer_compression, read_block
 
+from dask_awkward.layers.layers import AwkwardMaterializedLayer
 from dask_awkward.lib.core import map_partitions, new_scalar_object, typetracer_array
 from dask_awkward.lib.io.columnar import ColumnProjectionMixin
 from dask_awkward.lib.io.io import (
@@ -746,7 +747,11 @@ def to_json(
     map_res.dask.layers[map_res.name].annotations = {"ak_output": True}
     name = f"to-json-{tokenize(array, path)}"
     dsk = {(name, 0): (lambda *_: None, map_res.__dask_keys__())}
-    graph = HighLevelGraph.from_collections(name, dsk, dependencies=(map_res,))
+    graph = HighLevelGraph.from_collections(
+        name,
+        AwkwardMaterializedLayer(dsk, previous_layer_names=[map_res.name]),
+        dependencies=(map_res,),
+    )
     res = new_scalar_object(graph, name=name, meta=None)
     if compute:
         res.compute()
