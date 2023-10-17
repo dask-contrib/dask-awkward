@@ -7,7 +7,7 @@ import math
 import operator
 import sys
 import warnings
-from collections.abc import Callable, Hashable, Mapping, Sequence
+from collections.abc import Callable, Hashable, Sequence
 from enum import IntEnum
 from functools import cached_property, partial
 from numbers import Number
