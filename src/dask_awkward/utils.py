@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from typing_extensions import ParamSpec
@@ -126,3 +126,20 @@ def is_empty_slice(s: Any) -> bool:
     if s.step is not None:
         return False
     return True
+
+
+def first(seq: Iterable[T]) -> T:
+    """Get the first element of a sequence.
+
+    Parameters
+    ----------
+    seq : Sequence
+        The sequence of interest.
+
+    Returns
+    -------
+    Any
+        The first element of `seq`.
+
+    """
+    return next(iter(seq))
