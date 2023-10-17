@@ -17,6 +17,7 @@ from dask.highlevelgraph import HighLevelGraph
 from fsspec import AbstractFileSystem
 from fsspec.core import get_fs_token_paths, url_to_fs
 
+from dask_awkward.layers.layers import AwkwardMaterializedLayer
 from dask_awkward.lib.core import Array, Scalar, map_partitions, new_scalar_object
 from dask_awkward.lib.io.columnar import ColumnProjectionMixin
 from dask_awkward.lib.io.io import from_map
@@ -609,7 +610,11 @@ def to_parquet(
     else:
         final_name = name + "-finalize"
         dsk[(final_name, 0)] = (lambda *_: None, map_res.__dask_keys__())
-    graph = HighLevelGraph.from_collections(final_name, dsk, dependencies=[map_res])
+    graph = HighLevelGraph.from_collections(
+        final_name,
+        AwkwardMaterializedLayer(dsk, previous_layer_names=[map_res.name]),
+        dependencies=[map_res],
+    )
     out = new_scalar_object(graph, final_name, meta=None)
     if compute:
         out.compute()

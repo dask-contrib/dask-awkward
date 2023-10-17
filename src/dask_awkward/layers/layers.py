@@ -279,7 +279,7 @@ class AwkwardMaterializedLayer(MaterializedLayer):
 
                 # when using Array.partitions we need to mock that we
                 # just want the first partition.
-                if len(task) == 2 and task[1] > 0:
+                if len(task) == 2 and isinstance(task[1], int) and task[1] > 0:
                     task = (task[0], 0)
                 return MaterializedLayer({(name, 0): task})
             return self
