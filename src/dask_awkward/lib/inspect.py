@@ -118,8 +118,9 @@ def report_necessary_buffers(
 def report_necessary_columns(
     *args: Any, traverse: bool = True
 ) -> dict[str, frozenset[str] | None]:
-    r"""Determine the columns necessary to compute a collection built from
-    a columnar source.
+    r"""Get columns necessary to compute a collection
+
+    This function is specific to sources that are columnar (e.g. Parquet).
 
     Parameters
     ----------
@@ -129,6 +130,7 @@ def report_necessary_columns(
     traverse : bool, optional
         If True (default), builtin Python collections are traversed
         looking for any Dask collections they might contain.
+
     Returns
     -------
     dict[str, frozenset[str] | None]
@@ -136,18 +138,23 @@ def report_necessary_columns(
         set of necessary IO columns that have been identified by column
         optimisation of the given layer. If the layer is not backed by a
         columnar source, then None is returned instead of a set.
+
     Examples
     --------
     If we have a hypothetical parquet dataset (``ds``) with the fields
+
     - "foo"
     - "bar"
     - "baz"
+
     And the "baz" field has fields
 
     - "x"
     - "y"
+
     The calculation of ``ds.bar + ds.baz.x`` will only require the
     ``bar`` and ``baz.x`` columns from the parquet file.
+
     >>> import dask_awkward as dak
     >>> ds = dak.from_parquet("some-dataset")
     >>> ds.fields
