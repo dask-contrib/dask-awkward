@@ -10,7 +10,7 @@ import dask_awkward as dak
 test_uproot_path = Path(__file__).parent / "test-uproot"
 
 
-def test_necessary_buffers(
+def test_report_necessary_buffers(
     daa: dak.Array, tmpdir_factory: pytest.TempdirFactory
 ) -> None:
     z = daa.points.x + daa.points.y
@@ -54,6 +54,20 @@ def test_necessary_buffers(
             frozenset({"@.points-offsets"}),
             frozenset({"@.points.content.x-data"}),
         )
+
+
+def test_report_necessary_columns(daa: dak.Array) -> None:
+    result = dak.min(daa.points.x, axis=1)
+    rep = dak.report_necessary_columns(result)
+    for k, v in rep.items():
+        assert sorted(["points.x"]) == sorted(v)
+
+    result = dak.zeros_like(daa.points.y)
+    rep = dak.report_necessary_columns(result)
+    for k, v in rep.items():
+        points, coord = list(v)[0].split(".")
+        assert points == "points"
+        assert coord in ["x", "y"]
 
 
 def test_visualize_works(daa):
