@@ -60,11 +60,13 @@ def test_report_necessary_columns(daa: dak.Array) -> None:
     result = dak.min(daa.points.x, axis=1)
     rep = dak.report_necessary_columns(result)
     for k, v in rep.items():
+        assert v is not None
         assert sorted(["points.x"]) == sorted(v)
 
     result = dak.zeros_like(daa.points.y)
     rep = dak.report_necessary_columns(result)
     for k, v in rep.items():
+        assert v is not None
         points, coord = list(v)[0].split(".")
         assert points == "points"
         assert coord in ["x", "y"]
