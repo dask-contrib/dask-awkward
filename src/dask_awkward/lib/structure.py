@@ -1261,7 +1261,6 @@ def zip(
             *colls,
             label="zip",
             meta=meta,
-            opt_touch_all=True,
         )
 
     elif isinstance(arrays, Sequence):

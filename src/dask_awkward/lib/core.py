@@ -1572,7 +1572,6 @@ def partitionwise_layer(
     func: Callable,
     name: str,
     *args: Any,
-    opt_touch_all: bool = False,
     **kwargs: Any,
 ) -> AwkwardBlockwiseLayer:
     """Create a partitionwise graph layer.
@@ -1627,8 +1626,6 @@ def partitionwise_layer(
         **kwargs,
     )
     layer = AwkwardBlockwiseLayer.from_blockwise(layer)
-    if opt_touch_all:
-        layer._opt_touch_all = True
     return layer
 
 
@@ -1673,7 +1670,6 @@ def map_partitions(
     token: str | None = None,
     meta: Any | None = None,
     output_divisions: int | None = None,
-    opt_touch_all: bool = False,
     traverse: bool = True,
     **kwargs: Any,
 ) -> Array:
@@ -1711,9 +1707,6 @@ def map_partitions(
         value greater than 1 means the divisions were expanded by some
         operation. This argument is mainly for internal library
         function implementations.
-    opt_touch_all : bool
-        Touch all layers in this graph during typetracer based
-        optimization.
     traverse : bool
         Unpack basic python containers to find dask collections.
     **kwargs : Any
@@ -1795,7 +1788,6 @@ def map_partitions(
         name,
         *arg_flat_deps_expanded,
         *kwarg_flat_deps,
-        opt_touch_all=opt_touch_all,
     )
 
     if meta is None:
