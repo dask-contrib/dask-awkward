@@ -9,7 +9,7 @@ import sys
 import warnings
 from collections.abc import Callable, Hashable, Sequence
 from enum import IntEnum
-from functools import cached_property, partial
+from functools import cached_property, partial, wraps
 from numbers import Number
 from typing import TYPE_CHECKING, Any, Literal, TypeVar, Union, overload
 
@@ -142,6 +142,8 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
     def _check_meta(self, m: Any) -> Any | None:
         if isinstance(m, (MaybeNone, OneOf)) or is_unknown_scalar(m):
             return m
+        elif isinstance(m, ak.Array) and len(m) == 1:
+            return m
         raise TypeError(f"meta must be a typetracer object, not a {type(m)}")
 
     @property
@@ -230,7 +232,7 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
 
     def __getattr__(self, attr):
         if attr.startswith("_"):
-            raise AttributeError
+            raise AttributeError  # pragma: no cover
         msg = (
             "Attribute access on Scalars should be done after converting "
             "the Scalar collection to delayed with the to_delayed method."
@@ -244,7 +246,7 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
             deps = [self]
             plns = [self.name]
             if is_dask_collection(other):
-                task = (op, self.key, other.__dask_keys__()[0])
+                task = (op, self.key, *other.__dask_keys__())
                 deps.append(other)
                 plns.append(other.name)
             else:
@@ -280,29 +282,41 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
         return f
 
 
+def _wrap_op(op):
+    @wraps(op)
+    def f(*args, **kwargs):
+        args = tuple(
+            ak.Array(arg.content) if isinstance(arg, MaybeNone) else arg for arg in args
+        )
+        result = op(*args, **kwargs)
+        return result
+
+    return f
+
+
 for op in [
-    operator.abs,
-    operator.neg,
-    operator.pos,
-    operator.invert,
-    operator.add,
-    operator.sub,
-    operator.mul,
-    operator.floordiv,
-    operator.truediv,
-    operator.mod,
-    operator.pow,
-    operator.and_,
-    operator.or_,
-    operator.xor,
-    operator.lshift,
-    operator.rshift,
-    operator.eq,
-    operator.ge,
-    operator.gt,
-    operator.ne,
-    operator.le,
-    operator.lt,
+    _wrap_op(operator.abs),
+    _wrap_op(operator.neg),
+    _wrap_op(operator.pos),
+    _wrap_op(operator.invert),
+    _wrap_op(operator.add),
+    _wrap_op(operator.sub),
+    _wrap_op(operator.mul),
+    _wrap_op(operator.floordiv),
+    _wrap_op(operator.truediv),
+    _wrap_op(operator.mod),
+    _wrap_op(operator.pow),
+    _wrap_op(operator.and_),
+    _wrap_op(operator.or_),
+    _wrap_op(operator.xor),
+    _wrap_op(operator.lshift),
+    _wrap_op(operator.rshift),
+    _wrap_op(operator.eq),
+    _wrap_op(operator.ge),
+    _wrap_op(operator.gt),
+    _wrap_op(operator.ne),
+    _wrap_op(operator.le),
+    _wrap_op(operator.lt),
 ]:
     Scalar._bind_operator(op)
 
@@ -326,10 +340,10 @@ def new_scalar_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Scalar:
 
     """
     if meta is None:
-        meta = TypeTracerArray._new(dtype=np.dtype(None), shape=())
+        meta = ak.Array(TypeTracerArray._new(dtype=np.dtype(None), shape=()))
 
     if isinstance(meta, MaybeNone):
-        pass
+        meta = ak.Array(meta.content)
     else:
         try:
             if ak.backend(meta) != "typetracer":
@@ -695,13 +709,13 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         )
 
     def _ipython_display_(self):
-        return self._meta._ipython_display_()
+        return self._meta._ipython_display_()  # pragma: no cover
 
     def _ipython_canary_method_should_not_exist_(self):
-        return self._meta._ipython_canary_method_should_not_exist_()
+        return self._meta._ipython_canary_method_should_not_exist_()  # pragma: no cover
 
     def _repr_mimebundle_(self):
-        return self._meta._repr_mimebundle_()
+        return self._meta._repr_mimebundle_()  # pragma: no cover
 
     def _ipython_key_completions_(self) -> list[str]:
         if self._meta is not None:
