@@ -37,13 +37,9 @@ from dask.context import globalmethod
 from dask.delayed import Delayed
 from dask.highlevelgraph import HighLevelGraph
 from dask.threaded import get as threaded_get
-from dask.utils import (
-    IndexCallable,
-    OperatorMethodMixin,
-    funcname,
-    is_arraylike,
-    key_split,
-)
+from dask.utils import IndexCallable
+from dask.utils import OperatorMethodMixin as DaskOperatorMethodMixin
+from dask.utils import funcname, is_arraylike, key_split
 
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardMaterializedLayer
 from dask_awkward.lib.optimize import all_optimizations
@@ -72,7 +68,7 @@ T = TypeVar("T")
 log = logging.getLogger(__name__)
 
 
-class Scalar(DaskMethodsMixin, OperatorMethodMixin):
+class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
     """Single partition Dask collection representing a lazy Scalar.
 
     The class constructor is not intended for users. Instances of this
