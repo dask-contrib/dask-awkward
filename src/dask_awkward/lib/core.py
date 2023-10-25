@@ -232,6 +232,15 @@ class Scalar(DaskMethodsMixin, OperatorMethodMixin):
             dsk = HighLevelGraph.from_collections(layer, dsk, dependencies=())
         return Delayed(self.key, dsk, layer=layer)
 
+    def __getattr__(self, attr):
+        if attr.startswith("_"):
+            raise AttributeError
+        msg = (
+            "Attribute access on Scalars should be done after converting "
+            "the Scalar collection to delayed with the to_delayed method."
+        )
+        raise AttributeError(msg)
+
     @classmethod
     def _get_binary_operator(cls, op, inv=False):
         def f(self, other):
