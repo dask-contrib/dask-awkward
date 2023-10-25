@@ -229,9 +229,7 @@ def test_scalar_binary_ops_other_not_dak(
     op: Callable, daa: Array, caa: ak.Array
 ) -> None:
     a1 = dak.max(daa.points.x, axis=None)
-    b1 = dak.min(daa.points.y, axis=None)
     a2 = ak.max(caa.points.x, axis=None)
-    b2 = ak.min(caa.points.y, axis=None)
     assert_eq(op(a1, 5), op(a2, 5))
 
 
