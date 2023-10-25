@@ -282,41 +282,50 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
         return f
 
 
-def _wrap_op(op):
+def _promote_maybenones(op: Callable) -> Callable:
+    """Wrap `op` function such that MaybeNone arguments are promoted.
+
+    Typetracer graphs (i.e. what is run by our necessary buffers
+    optimization) need `MaybeNone` results to be promoted to length 1
+    typetracer arrays. MaybeNone objects don't support these ops, but
+    arrays do.
+
+    """
+
     @wraps(op)
-    def f(*args, **kwargs):
+    def f(*args):
         args = tuple(
             ak.Array(arg.content) if isinstance(arg, MaybeNone) else arg for arg in args
         )
-        result = op(*args, **kwargs)
+        result = op(*args)
         return result
 
     return f
 
 
 for op in [
-    _wrap_op(operator.abs),
-    _wrap_op(operator.neg),
-    _wrap_op(operator.pos),
-    _wrap_op(operator.invert),
-    _wrap_op(operator.add),
-    _wrap_op(operator.sub),
-    _wrap_op(operator.mul),
-    _wrap_op(operator.floordiv),
-    _wrap_op(operator.truediv),
-    _wrap_op(operator.mod),
-    _wrap_op(operator.pow),
-    _wrap_op(operator.and_),
-    _wrap_op(operator.or_),
-    _wrap_op(operator.xor),
-    _wrap_op(operator.lshift),
-    _wrap_op(operator.rshift),
-    _wrap_op(operator.eq),
-    _wrap_op(operator.ge),
-    _wrap_op(operator.gt),
-    _wrap_op(operator.ne),
-    _wrap_op(operator.le),
-    _wrap_op(operator.lt),
+    _promote_maybenones(operator.abs),
+    _promote_maybenones(operator.neg),
+    _promote_maybenones(operator.pos),
+    _promote_maybenones(operator.invert),
+    _promote_maybenones(operator.add),
+    _promote_maybenones(operator.sub),
+    _promote_maybenones(operator.mul),
+    _promote_maybenones(operator.floordiv),
+    _promote_maybenones(operator.truediv),
+    _promote_maybenones(operator.mod),
+    _promote_maybenones(operator.pow),
+    _promote_maybenones(operator.and_),
+    _promote_maybenones(operator.or_),
+    _promote_maybenones(operator.xor),
+    _promote_maybenones(operator.lshift),
+    _promote_maybenones(operator.rshift),
+    _promote_maybenones(operator.eq),
+    _promote_maybenones(operator.ge),
+    _promote_maybenones(operator.gt),
+    _promote_maybenones(operator.ne),
+    _promote_maybenones(operator.le),
+    _promote_maybenones(operator.lt),
 ]:
     Scalar._bind_operator(op)
 
