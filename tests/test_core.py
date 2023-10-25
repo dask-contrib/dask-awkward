@@ -141,7 +141,7 @@ def test_partitions_divisions(ndjson_points_file: str) -> None:
     assert not t1.known_divisions
     t2 = daa.partitions[1]
     assert t2.known_divisions
-    assert t2.divisions == (0, divs[2] - divs[1])  # type: ignore
+    assert t2.divisions == (0, divs[2] - divs[1])
 
 
 def test_array_rebuild(ndjson_points_file: str) -> None:
@@ -209,7 +209,9 @@ def test_scalar_getitem_getattr() -> None:
     Thing = namedtuple("Thing", "a b c")
     t = Thing(c=3, b=2, a=1)
     s = new_known_scalar(t)
-    assert s.c.compute() == t.c
+    with pytest.raises(AttributeError, match="should be done after converting"):
+        s.c.compute()
+    assert s.to_delayed().c.compute() == t.c
 
 
 @pytest.mark.parametrize(
@@ -478,7 +480,7 @@ def test_compatible_partitions_after_slice() -> None:
     assert_eq(lazy, ccrt)
 
     # sanity
-    assert dak.compatible_partitions(lazy, lazy + 2)  # type: ignore
+    assert dak.compatible_partitions(lazy, lazy + 2)
     assert dak.compatible_partitions(lazy, dak.num(lazy, axis=1) > 2)
 
     assert not dak.compatible_partitions(lazy[:-2], lazy)
