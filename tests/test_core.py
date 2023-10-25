@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import operator
 import sys
 from collections import namedtuple
 from collections.abc import Callable
@@ -212,6 +213,15 @@ def test_scalar_getitem_getattr() -> None:
     with pytest.raises(AttributeError, match="should be done after converting"):
         s.c.compute()
     assert s.to_delayed().c.compute() == t.c
+
+
+@pytest.mark.parametrize("op", [operator.add, operator.truediv, operator.mul])
+def test_scalar_binary_ops(op, daa: Array, caa: ak.Array) -> None:
+    a1 = dak.max(daa.points.x, axis=None)
+    b1 = dak.min(daa.points.y, axis=None)
+    a2 = ak.max(caa.points.x, axis=None)
+    b2 = ak.min(caa.points.y, axis=None)
+    assert_eq(op(a1, b1), op(a2, b2))
 
 
 @pytest.mark.parametrize(
