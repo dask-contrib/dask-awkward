@@ -216,12 +216,30 @@ def test_scalar_getitem_getattr() -> None:
 
 
 @pytest.mark.parametrize("op", [operator.add, operator.truediv, operator.mul])
-def test_scalar_binary_ops(op, daa: Array, caa: ak.Array) -> None:
+def test_scalar_binary_ops(op: Callable, daa: Array, caa: ak.Array) -> None:
     a1 = dak.max(daa.points.x, axis=None)
     b1 = dak.min(daa.points.y, axis=None)
     a2 = ak.max(caa.points.x, axis=None)
     b2 = ak.min(caa.points.y, axis=None)
     assert_eq(op(a1, b1), op(a2, b2))
+
+
+@pytest.mark.parametrize("op", [operator.add, operator.truediv, operator.mul])
+def test_scalar_binary_ops_other_not_dak(
+    op: Callable, daa: Array, caa: ak.Array
+) -> None:
+    a1 = dak.max(daa.points.x, axis=None)
+    b1 = dak.min(daa.points.y, axis=None)
+    a2 = ak.max(caa.points.x, axis=None)
+    b2 = ak.min(caa.points.y, axis=None)
+    assert_eq(op(a1, 5), op(a2, 5))
+
+
+@pytest.mark.parametrize("op", [operator.abs])
+def test_scalar_unary_ops(op: Callable, daa: Array, caa: ak.Array) -> None:
+    a1 = dak.max(daa.points.x, axis=None)
+    a2 = ak.max(caa.points.x, axis=None)
+    assert_eq(op(-a1), op(-a2))
 
 
 @pytest.mark.parametrize(
