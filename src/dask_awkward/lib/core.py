@@ -37,7 +37,13 @@ from dask.context import globalmethod
 from dask.delayed import Delayed
 from dask.highlevelgraph import HighLevelGraph
 from dask.threaded import get as threaded_get
-from dask.utils import IndexCallable, funcname, is_arraylike, key_split
+from dask.utils import (
+    IndexCallable,
+    OperatorMethodMixin,
+    funcname,
+    is_arraylike,
+    key_split,
+)
 
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardMaterializedLayer
 from dask_awkward.lib.optimize import all_optimizations
@@ -66,7 +72,7 @@ T = TypeVar("T")
 log = logging.getLogger(__name__)
 
 
-class Scalar(DaskMethodsMixin):
+class Scalar(DaskMethodsMixin, OperatorMethodMixin):
     """Single partition Dask collection representing a lazy Scalar.
 
     The class constructor is not intended for users. Instances of this
@@ -199,10 +205,6 @@ class Scalar(DaskMethodsMixin):
         hlg = HighLevelGraph.from_collections(name, task, dependencies=[self])
         return new_scalar_object(hlg, name, meta=None)
 
-    def __getattr__(self, attr: str) -> Any:
-        d = self.to_delayed(optimize_graph=True)
-        return getattr(d, attr)
-
     @property
     def known_value(self) -> Any | None:
         return self._known_value
@@ -229,6 +231,75 @@ class Scalar(DaskMethodsMixin):
             dsk = self.__dask_optimize__(dsk, self.__dask_keys__())
             dsk = HighLevelGraph.from_collections(layer, dsk, dependencies=())
         return Delayed(self.key, dsk, layer=layer)
+
+    @classmethod
+    def _get_binary_operator(cls, op, inv=False):
+        def f(self, other):
+            name = f"{op.__name__}-{tokenize(self, other)}"
+            deps = [self]
+            plns = [self.name]
+            if is_dask_collection(other):
+                task = (op, self.key, other.__dask_keys__()[0])
+                deps.append(other)
+                plns.append(other.name)
+            else:
+                task = (op, self.key, other)
+            graph = HighLevelGraph.from_collections(
+                name,
+                layer=AwkwardMaterializedLayer(
+                    {(name, 0): task},
+                    previous_layer_names=plns,
+                    fn=op,
+                ),
+                dependencies=tuple(deps),
+            )
+            return new_scalar_object(graph, name, meta=None)
+
+        return f
+
+    @classmethod
+    def _get_unary_operator(cls, op, inv=False):
+        def f(self):
+            name = f"{op.__name__}-{tokenize(self)}"
+            layer = AwkwardMaterializedLayer(
+                {(name, 0): (op, self.key)},
+                previous_layer_names=[self.name],
+            )
+            graph = HighLevelGraph.from_collections(
+                name,
+                layer,
+                dependencies=(self,),
+            )
+            return new_scalar_object(graph, name, meta=None)
+
+        return f
+
+
+for op in [
+    operator.abs,
+    operator.neg,
+    operator.pos,
+    operator.invert,
+    operator.add,
+    operator.sub,
+    operator.mul,
+    operator.floordiv,
+    operator.truediv,
+    operator.mod,
+    operator.pow,
+    operator.and_,
+    operator.or_,
+    operator.xor,
+    operator.lshift,
+    operator.rshift,
+    operator.eq,
+    operator.ge,
+    operator.gt,
+    operator.ne,
+    operator.le,
+    operator.lt,
+]:
+    Scalar._bind_operator(op)
 
 
 def new_scalar_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Scalar:
