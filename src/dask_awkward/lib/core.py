@@ -1744,6 +1744,14 @@ def map_partitions(
     This is effectively the same as `d = c * a`
 
     """
+    opt_touch_all = kwargs.pop("opt_touch_all", None)
+    if opt_touch_all is not None:
+        warnings.warn(
+            "The opt_touch_all argument does nothing.\n"
+            "This warning will be removed in a future version of dask-awkward "
+            "and the function call will likely fail."
+        )
+
     token = token or tokenize(base_fn, *args, meta, **kwargs)
     label = hyphenize(label or funcname(base_fn))
     name = f"{label}-{token}"
