@@ -1562,7 +1562,7 @@ def partitionwise_layer(
 
     """
     pairs: list[Any] = []
-    numblocks: dict[Any, int | tuple[int, ...]] = {}
+    numblocks: dict[str, tuple[int, ...]] = {}
     for arg in args:
         if isinstance(arg, Array):
             pairs.extend([arg.name, "i"])
@@ -1575,6 +1575,9 @@ def partitionwise_layer(
         elif is_arraylike(arg) and is_dask_collection(arg) and arg.ndim == 1:
             pairs.extend([arg.name, "i"])
             numblocks[arg.name] = arg.numblocks
+        elif isinstance(arg, Scalar):
+            pairs.extend([arg.name, "i"])
+            numblocks[arg.name] = (1,)
         elif is_dask_collection(arg):
             raise DaskAwkwardNotImplemented(
                 "Use of Array with other Dask collections is currently unsupported."

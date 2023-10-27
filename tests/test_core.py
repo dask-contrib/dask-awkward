@@ -240,6 +240,27 @@ def test_scalar_unary_ops(op: Callable, daa: Array, caa: ak.Array) -> None:
     assert_eq(op(-a1), op(-a2))
 
 
+@pytest.mark.parametrize("op", [operator.add, operator.sub, operator.pow])
+def test_array_broadcast_scalar(op: Callable, daa: Array, caa: Array) -> None:
+    s1 = new_known_scalar(3)
+    s2 = 3
+    r1 = op(daa.points.x, s1)
+    r2 = op(caa.points.x, s2)
+    assert_eq(r1, r2)
+
+    s3 = dak.min(daa.points.x, axis=None)
+    s4 = ak.min(caa.points.x, axis=None)
+    r3 = op(daa.points.y, s3)
+    r4 = op(caa.points.y, s4)
+    assert_eq(r3, r4)
+
+    s5 = dak.max(daa.points.y, axis=None)
+    s6 = ak.max(caa.points.y, axis=None)
+    r5 = op(daa.points.x, s5)
+    r6 = op(caa.points.x, s6)
+    assert_eq(r5, r6)
+
+
 @pytest.mark.parametrize(
     "where",
     [
