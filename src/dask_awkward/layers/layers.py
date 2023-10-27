@@ -261,12 +261,13 @@ class AwkwardMaterializedLayer(MaterializedLayer):
             return self
         name = next(iter(mapping))[0]
 
+        npln = len(self.previous_layer_names)
         # one previous layer name
         #
         # this case is used for mocking repartition or slicing where
         # we maybe have multiple partitions that need to be included
         # in a task.
-        if len(self.previous_layer_names) == 1:
+        if npln == 1:
             prev_name: str = self.previous_layer_names[0]
             if (name, 0) in mapping:
                 task = mapping[(name, 0)]
@@ -283,6 +284,12 @@ class AwkwardMaterializedLayer(MaterializedLayer):
                     task = (task[0], 0)
                 return MaterializedLayer({(name, 0): task})
             return self
+
+        # zero previous layers; this is likely a known scalar.
+        #
+        # we just use the existing mapping
+        elif npln == 0:
+            return MaterializedLayer({(name, 0): mapping[(name, 0)]})
 
         # more than one previous_layer_names
         #
