@@ -55,6 +55,9 @@ class ImplementsMocking(Protocol):
     def mock(self) -> AwkwardArray:
         ...
 
+    def mock_empty(self, backend: str) -> AwkwardArray:
+        ...
+
 
 class ImplementsProjection(ImplementsMocking, Protocol[T]):
     def prepare_for_projection(self) -> tuple[AwkwardArray, TypeTracerReport, T]:
@@ -86,13 +89,26 @@ class IOFunctionWithMocking(ImplementsMocking, ImplementsIOFunction):
         assert self._meta is not None
         return self._meta
 
+    def mock_empty(self, backend: str = "cpu") -> AwkwardArray:
+        import awkward as ak
+
+        if backend not in ("cpu", "jax", "cuda"):
+            raise ValueError(
+                f"backend must be one of 'cpu', 'jax', or 'cuda', received {backend}"
+            )
+        return ak.to_backend(
+            self._meta.layout.form.length_zero_array(highlevel=False),
+            backend=backend,
+            highlevel=True,
+        )
+
 
 def io_func_implements_projection(func: ImplementsIOFunction) -> bool:
     return hasattr(func, "prepare_for_projection")
 
 
 def io_func_implements_mocking(func: ImplementsIOFunction) -> bool:
-    return hasattr(func, "mock")
+    return hasattr(func, "mock") and hasattr(func, "mock_empty")
 
 
 def io_func_implements_columnar(func: ImplementsIOFunction) -> bool:

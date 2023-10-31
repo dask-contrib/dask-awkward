@@ -471,10 +471,9 @@ def return_empty_on_raise(
     @functools.wraps(fn)
     def wrapped(*args, **kwargs):
         try:
-            result = fn(*args, **kwargs)
-            return result
+            return fn(*args, **kwargs)
         except allowed_exceptions:
-            return ak.Array(fn.form.length_zero_array(highlevel=False))
+            return fn.mock_empty()
 
     return wrapped
 
