@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 from pathlib import Path
 
 import awkward as ak
@@ -11,7 +12,8 @@ from fsspec.core import get_fs_token_paths
 from numpy.typing import DTypeLike
 
 import dask_awkward as dak
-from dask_awkward.lib.io.io import _bytes_with_sample
+from dask_awkward.lib.core import typetracer_array
+from dask_awkward.lib.io.io import _bytes_with_sample, from_map
 from dask_awkward.lib.testutils import assert_eq
 
 
@@ -335,3 +337,56 @@ def test_bytes_with_sample(
         assert sample_bytes == b""
     else:
         assert len(sample_bytes) == 127
+
+
+class RandomFailFromListsFn:
+    def __init__(self, form):
+        self.form = form
+
+    def __call__(self, x: list) -> ak.Array:
+        n = random.randint(0, 9)
+        if n < 5:
+            raise OSError("BAD!")
+
+        return ak.Array(x)
+
+    def mock(self):
+        return ak.typetracer.typetracer_from_form(self.form)
+
+
+def test_random_fail_from_lists() -> Array:
+    single = [[1, 2, 3], [4, 5], [6], [], [1, 2, 3]]
+    many = [single] * 30
+    divs = (0, *np.cumsum(list(map(len, many))))
+    form = ak.Array(many[0]).layout.form
+
+    array = from_map(
+        RandomFailFromListsFn(form),
+        many,
+        meta=typetracer_array(ak.Array(many[0])),
+        divisions=divs,
+        label="from-lists",
+        empty_on_raise=(OSError,),
+    )
+    assert len(array.compute()) < (len(single) * len(many))
+
+    with pytest.raises(OSError, match="BAD"):
+        array = from_map(
+            RandomFailFromListsFn(form),
+            many,
+            meta=typetracer_array(ak.Array(many[0])),
+            divisions=divs,
+            label="from-lists",
+            empty_on_raise=(RuntimeError,),
+        )
+        array.compute()
+
+    with pytest.raises(OSError, match="BAD"):
+        array = from_map(
+            RandomFailFromListsFn(form),
+            many,
+            meta=typetracer_array(ak.Array(many[0])),
+            divisions=divs,
+            label="from-lists",
+        )
+        array.compute()

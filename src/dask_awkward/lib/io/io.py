@@ -474,7 +474,7 @@ def return_empty_on_raise(
             result = fn(*args, **kwargs)
             return result
         except allowed_exceptions:
-            return fn.form.length_zero_array()
+            return ak.Array(fn.form.length_zero_array(highlevel=False))
 
     return wrapped
 
