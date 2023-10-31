@@ -93,7 +93,7 @@ class IOFunctionWithMocking(ImplementsMocking, ImplementsIOFunction):
         assert self._meta is not None
         return self._meta
 
-    def mock_empty(self, backend: str = "cpu") -> AwkwardArray:
+    def mock_empty(self, backend: BackendT = "cpu") -> AwkwardArray:
         import awkward as ak
 
         if backend not in ("cpu", "jax", "cuda"):
