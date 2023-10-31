@@ -353,7 +353,7 @@ class RandomFailFromListsFn:
     def mock(self):
         return ak.typetracer.typetracer_from_form(self.form)
 
-    def mock_empty(self, backend: str = "cpu") -> ak.Array:
+    def mock_empty(self, backend):
         return ak.to_backend(
             self.form.length_zero_array(highlevel=False),
             backend=backend,
