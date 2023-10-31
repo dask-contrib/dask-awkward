@@ -354,7 +354,7 @@ class RandomFailFromListsFn:
         return ak.typetracer.typetracer_from_form(self.form)
 
 
-def test_random_fail_from_lists() -> Array:
+def test_random_fail_from_lists():
     single = [[1, 2, 3], [4, 5], [6], [], [1, 2, 3]]
     many = [single] * 30
     divs = (0, *np.cumsum(list(map(len, many))))
