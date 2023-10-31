@@ -7,7 +7,11 @@ import awkward as ak
 from awkward import Array as AwkwardArray
 from awkward.forms import Form
 
-from dask_awkward.layers.layers import ImplementsIOFunction, ImplementsNecessaryColumns
+from dask_awkward.layers.layers import (
+    BackendT,
+    ImplementsIOFunction,
+    ImplementsNecessaryColumns,
+)
 from dask_awkward.lib.utils import (
     METADATA_ATTRIBUTES,
     FormStructure,
@@ -57,6 +61,13 @@ class ColumnProjectionMixin(ImplementsNecessaryColumns[FormStructure]):
 
     def mock(self: S) -> AwkwardArray:
         return ak.typetracer.typetracer_from_form(self.form, behavior=self.behavior)
+
+    def mock_empty(self: S, backend: BackendT = "cpu") -> AwkwardArray:
+        return ak.to_backend(
+            self.form.length_zero_array(highlevel=False),
+            backend,
+            highlevel=True,
+        )
 
     def prepare_for_projection(
         self: S,

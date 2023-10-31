@@ -2,17 +2,21 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Callable, Mapping
-from typing import TYPE_CHECKING, Any, Protocol, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeVar, Union, cast
 
 from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
 from dask.highlevelgraph import MaterializedLayer
 from dask.layers import DataFrameTreeReduction
+from typing_extensions import TypeAlias
 
 from dask_awkward.utils import LazyInputsDict
 
 if TYPE_CHECKING:
     from awkward import Array as AwkwardArray
     from awkward._nplikes.typetracer import TypeTracerReport
+
+
+BackendT: TypeAlias = Union[Literal["cpu"], Literal["jax"], Literal["cuda"]]
 
 
 class AwkwardBlockwiseLayer(Blockwise):
@@ -55,7 +59,7 @@ class ImplementsMocking(Protocol):
     def mock(self) -> AwkwardArray:
         ...
 
-    def mock_empty(self, backend: str) -> AwkwardArray:
+    def mock_empty(self, backend: BackendT) -> AwkwardArray:
         ...
 
 
