@@ -466,7 +466,7 @@ class PackedArgCallable:
 
 def return_empty_on_raise(
     fn: Callable[P, Array],
-    allowed_exceptions: tuple[Type[BaseException], ...],
+    allowed_exceptions: tuple[type[BaseException], ...],
 ) -> Callable[P, Array]:
     @functools.wraps(fn)
     def wrapped(*args, **kwargs):
@@ -487,7 +487,7 @@ def from_map(
     token: str | None = None,
     divisions: tuple[int, ...] | tuple[None, ...] | None = None,
     meta: ak.Array | None = None,
-    empty_on_raise: tuple[Type[BaseException], ...] | None = None,
+    empty_on_raise: tuple[type[BaseException], ...] | None = None,
     behavior: dict | None = None,
     **kwargs: Any,
 ) -> Array:
