@@ -582,12 +582,11 @@ def from_map(
     if io_func_implements_mocking(func):
         io_func = func
         array_meta = cast(ImplementsMocking, func).mock()
-    # # If we know the meta, we can spoof mocking
+    # If we know the meta, we can spoof mocking
     elif meta is not None:
-        # io_func = IOFunctionWithMocking(meta, func)
-        io_func = func
+        io_func = IOFunctionWithMocking(meta, func)
         array_meta = meta
-    # # Without `meta`, the meta will be computed by executing the graph
+    # Without `meta`, the meta will be computed by executing the graph
     else:
         io_func = func
         array_meta = None
