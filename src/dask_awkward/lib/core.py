@@ -539,10 +539,19 @@ def _finalize_array(results: Sequence[Any]) -> Any:
     if len(results) == 1:
         if isinstance(results[0], (int, ak.Array)):
             return results[0]
+        if isinstance(results[0], np.ndarray) and results[0].shape == ():
+            return results[0].item()
 
     # a sequence of arrays that need to be concatenated.
     elif any(isinstance(r, ak.Array) for r in results):
         return ak.concatenate(results)
+
+    # a sequence of scalars that are stored as np.ndarray(N) where N
+    # is a number (i.e. shapeless numpy array)
+    elif any(isinstance(r, np.ndarray) for r in results) and any(
+        r.shape == () for r in results
+    ):
+        return ak.Array(list(results))
 
     # sometimes we just check the length of partitions so all results
     # will be integers, just make an array out of that.
