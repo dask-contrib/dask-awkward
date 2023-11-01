@@ -537,10 +537,8 @@ def new_record_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Record:
 def _finalize_array(results: Sequence[Any]) -> Any:
     # special cases for length 1 results
     if len(results) == 1:
-        if isinstance(results[0], (int, ak.Array)):
+        if isinstance(results[0], (int, ak.Array, np.ndarray)):
             return results[0]
-        if isinstance(results[0], np.ndarray) and results[0].shape == ():
-            return results[0].item()
 
     # a sequence of arrays that need to be concatenated.
     elif any(isinstance(r, ak.Array) for r in results):
