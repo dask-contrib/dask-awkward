@@ -537,12 +537,19 @@ def new_record_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Record:
 def _finalize_array(results: Sequence[Any]) -> Any:
     # special cases for length 1 results
     if len(results) == 1:
-        if isinstance(results[0], (int, ak.Array)):
+        if isinstance(results[0], (int, ak.Array, np.ndarray)):
             return results[0]
 
     # a sequence of arrays that need to be concatenated.
     elif any(isinstance(r, ak.Array) for r in results):
         return ak.concatenate(results)
+
+    # a sequence of scalars that are stored as np.ndarray(N) where N
+    # is a number (i.e. shapeless numpy array)
+    elif any(isinstance(r, np.ndarray) for r in results) and any(
+        r.shape == () for r in results
+    ):
+        return ak.Array(list(results))
 
     # sometimes we just check the length of partitions so all results
     # will be integers, just make an array out of that.
