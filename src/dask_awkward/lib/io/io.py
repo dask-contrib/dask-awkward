@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import functools
 import math
-import warnings
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
