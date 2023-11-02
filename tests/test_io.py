@@ -374,6 +374,7 @@ def test_random_fail_from_lists():
         divisions=divs,
         label="from-lists",
         empty_on_raise=(OSError,),
+        empty_backend="cpu",
     )
     assert len(array.compute()) < (len(single) * len(many))
 
@@ -385,6 +386,7 @@ def test_random_fail_from_lists():
             divisions=divs,
             label="from-lists",
             empty_on_raise=(RuntimeError,),
+            empty_backend="cpu",
         )
         array.compute()
 
@@ -397,3 +399,23 @@ def test_random_fail_from_lists():
             label="from-lists",
         )
         array.compute()
+
+    with pytest.raises(ValueError, match="must be used together"):
+        array = from_map(
+            RandomFailFromListsFn(form),
+            many,
+            meta=typetracer_array(ak.Array(many[0])),
+            divisions=divs,
+            label="from-lists",
+            empty_on_raise=(OSError,),
+        )
+
+    with pytest.raises(ValueError, match="must be used together"):
+        array = from_map(
+            RandomFailFromListsFn(form),
+            many,
+            meta=typetracer_array(ak.Array(many[0])),
+            divisions=divs,
+            label="from-lists",
+            empty_backend="cpu",
+        )

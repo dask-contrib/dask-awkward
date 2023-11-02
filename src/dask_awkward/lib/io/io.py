@@ -15,13 +15,11 @@ from dask.utils import funcname, is_integer, parse_bytes
 from fsspec.utils import infer_compression
 from typing_extensions import ParamSpec
 
-from dask_awkward.layers import (
+from dask_awkward.layers.layers import (
     AwkwardBlockwiseLayer,
     AwkwardInputLayer,
-    ImplementsIOFunction,
-)
-from dask_awkward.layers.layers import (
     AwkwardMaterializedLayer,
+    BackendT,
     ImplementsMocking,
     IOFunctionWithMocking,
     io_func_implements_mocking,
@@ -50,7 +48,7 @@ class _FromAwkwardFn:
         self.arr = arr
 
     def __call__(self, start: int, stop: int, **kwargs: Any) -> ak.Array:
-        return self.arr[start:stop]
+        return cast(ak.Array, self.arr[start:stop])
 
 
 def from_awkward(
@@ -463,21 +461,22 @@ class PackedArgCallable:
 
 
 def return_empty_on_raise(
-    fn: Callable[P, Array],
+    fn: Callable,
     allowed_exceptions: tuple[type[BaseException], ...],
-) -> Callable[P, Array]:
+    backend: BackendT,
+) -> Callable:
     @functools.wraps(fn)
     def wrapped(*args, **kwargs):
         try:
             return fn(*args, **kwargs)
         except allowed_exceptions:
-            return fn.mock_empty()
+            return fn.mock_empty(backend)
 
     return wrapped
 
 
 def from_map(
-    func: ImplementsIOFunction,
+    func: Callable,
     *iterables: Iterable,
     args: tuple[Any, ...] | None = None,
     label: str | None = None,
@@ -485,6 +484,7 @@ def from_map(
     divisions: tuple[int, ...] | tuple[None, ...] | None = None,
     meta: ak.Array | None = None,
     empty_on_raise: tuple[type[BaseException], ...] | None = None,
+    empty_backend: BackendT | None = None,
     **kwargs: Any,
 ) -> Array:
     """Create an Array collection from a custom mapping.
@@ -504,11 +504,17 @@ def from_map(
         collection-key names.
     token : str, optional
         String to use as the "token" in the output collection-key names.
-    divisions : tuple[int | None, ...], optional
+    divisions : tuple[int, ...] | tuple[None, ...], optional
         Partition boundaries (if known).
     meta : Array, optional
         Collection metadata array, if known (the awkward-array type
         tracer)
+    empty_on_raise : tuple[type[BaseException], ...], optional
+        Set of exceptions that can be caught to return an empty array
+        at compute time if file IO raises.
+    empty_backend : str,
+        The backend for the empty array resulting from a failed read
+        when `empty_on_raise` is defined.
     **kwargs : Any
         Keyword arguments passed to `func`.
 
@@ -590,8 +596,15 @@ def from_map(
         io_func = func
         array_meta = None
 
-    if empty_on_raise:
-        io_func = return_empty_on_raise(io_func, allowed_exceptions=empty_on_raise)
+    if (empty_on_raise and not empty_backend) or (empty_backend and not empty_on_raise):
+        raise ValueError("empty_on_raise and empty_backend must be used together.")
+
+    if empty_on_raise and empty_backend:
+        io_func = return_empty_on_raise(
+            io_func,
+            allowed_exceptions=empty_on_raise,
+            backend=empty_backend,
+        )
 
     dsk = AwkwardInputLayer(name=name, inputs=inputs, io_func=io_func)
 
