@@ -13,7 +13,6 @@ from dask.base import flatten, tokenize
 from dask.highlevelgraph import HighLevelGraph
 from dask.utils import funcname, is_integer, parse_bytes
 from fsspec.utils import infer_compression
-from typing_extensions import ParamSpec
 
 from dask_awkward.layers.layers import (
     AwkwardBlockwiseLayer,
@@ -39,8 +38,6 @@ if TYPE_CHECKING:
     from fsspec.spec import AbstractFileSystem
 
     from dask_awkward.lib.core import Array
-
-P = ParamSpec("P")
 
 
 class _FromAwkwardFn:
