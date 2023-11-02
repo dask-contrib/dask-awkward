@@ -546,9 +546,8 @@ def _is_numpy_or_cupy_like(arr: Any) -> bool:
 def _finalize_array(results: Sequence[Any]) -> Any:
     # special cases for length 1 results
     if len(results) == 1:
-        if isinstance(results[0], (int, ak.Array)) or _is_numpy_or_cupy_like(
-            results[0]
-        ):
+        np_like = _is_numpy_or_cupy_like(results[0])
+        if isinstance(results[0], (int, ak.Array)) or np_like:  # type: ignore[unreachable]
             return results[0]
 
     # a sequence of arrays that need to be concatenated.
@@ -559,6 +558,12 @@ def _finalize_array(results: Sequence[Any]) -> Any:
     # is a number (i.e. shapeless numpy array)
     elif any(_is_numpy_or_cupy_like(r) for r in results) and any(
         r.shape == () for r in results
+    ):
+        return ak.Array(list(results))
+
+    # in awkward < 2.5 we can get integers instead of np.array scalars
+    elif isinstance(results, (tuple, list)) and all(
+        isinstance(r, (int, np.integer)) for r in results
     ):
         return ak.Array(list(results))
 
