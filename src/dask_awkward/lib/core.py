@@ -534,10 +534,20 @@ def new_record_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Record:
     return Record(dsk, name, meta)
 
 
+def _is_numpy_or_cupy_like(arr: Any) -> bool:
+    return (
+        hasattr(arr, "ndim")
+        and hasattr(arr, "shape")
+        and isinstance(arr.shape, tuple)
+        and hasattr(arr, "dtype")
+    )
+
+
 def _finalize_array(results: Sequence[Any]) -> Any:
     # special cases for length 1 results
     if len(results) == 1:
-        if isinstance(results[0], (int, ak.Array, np.ndarray)):
+        np_like = _is_numpy_or_cupy_like(results[0])
+        if isinstance(results[0], (int, ak.Array)) or np_like:  # type: ignore[unreachable]
             return results[0]
 
     # a sequence of arrays that need to be concatenated.
@@ -546,13 +556,12 @@ def _finalize_array(results: Sequence[Any]) -> Any:
 
     # a sequence of scalars that are stored as np.ndarray(N) where N
     # is a number (i.e. shapeless numpy array)
-    elif any(isinstance(r, np.ndarray) for r in results) and any(
+    elif any(_is_numpy_or_cupy_like(r) for r in results) and any(
         r.shape == () for r in results
     ):
         return ak.Array(list(results))
 
-    # sometimes we just check the length of partitions so all results
-    # will be integers, just make an array out of that.
+    # in awkward < 2.5 we can get integers instead of np.array scalars
     elif isinstance(results, (tuple, list)) and all(
         isinstance(r, (int, np.integer)) for r in results
     ):
