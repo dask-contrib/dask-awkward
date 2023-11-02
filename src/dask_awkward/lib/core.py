@@ -557,15 +557,8 @@ def _finalize_array(results: Sequence[Any]) -> Any:
 
     # a sequence of scalars that are stored as np.ndarray(N) where N
     # is a number (i.e. shapeless numpy array)
-    elif any(isinstance(r, np.ndarray) for r in results) and any(
+    elif any(_is_numpy_or_cupy_like(r) for r in results) and any(
         r.shape == () for r in results
-    ):
-        return ak.Array(list(results))
-
-    # sometimes we just check the length of partitions so all results
-    # will be integers, just make an array out of that.
-    elif isinstance(results, (tuple, list)) and all(
-        isinstance(r, (int, np.integer)) for r in results
     ):
         return ak.Array(list(results))
 
