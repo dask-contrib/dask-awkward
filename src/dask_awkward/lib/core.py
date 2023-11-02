@@ -534,10 +534,21 @@ def new_record_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Record:
     return Record(dsk, name, meta)
 
 
+def _is_numpy_or_cupy_like(arr: Any) -> bool:
+    return (
+        hasattr(arr, "ndim")
+        and hasattr(arr, "shape")
+        and isinstance(arr.shape, tuple)
+        and hasattr(arr, "dtype")
+    )
+
+
 def _finalize_array(results: Sequence[Any]) -> Any:
     # special cases for length 1 results
     if len(results) == 1:
-        if isinstance(results[0], (int, ak.Array, np.ndarray)):
+        if isinstance(results[0], (int, ak.Array)) or _is_numpy_or_cupy_like(
+            results[0]
+        ):
             return results[0]
 
     # a sequence of arrays that need to be concatenated.
