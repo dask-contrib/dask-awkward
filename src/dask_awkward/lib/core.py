@@ -11,7 +11,7 @@ from collections.abc import Callable, Hashable, Sequence
 from enum import IntEnum
 from functools import cached_property, partial, wraps
 from numbers import Number
-from typing import TYPE_CHECKING, Any, Literal, TypeVar, Union, overload
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, Union, cast, overload
 
 import awkward as ak
 import dask.config
@@ -24,6 +24,7 @@ from awkward._nplikes.typetracer import (
     is_unknown_scalar,
 )
 from awkward.highlevel import NDArrayOperatorsMixin, _dir_pattern
+from awkward.typetracer import length_zero_if_typetracer, typetracer_from_form
 from dask.base import (
     DaskMethodsMixin,
     dont_optimize,
@@ -58,7 +59,13 @@ if TYPE_CHECKING:
     from awkward.types.type import Type
     from dask.array.core import Array as DaskArray
     from dask.bag.core import Bag as DaskBag
-    from dask.typing import Graph, Key, NestedKeys, PostComputeCallable
+    from dask.typing import (
+        Graph,
+        Key,
+        NestedKeys,
+        PostComputeCallable,
+        PostPersistCallable,
+    )
     from numpy.typing import DTypeLike
 
 
@@ -115,10 +122,10 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
     def __dask_postcompute__(self) -> tuple[PostComputeCallable, tuple]:
         return first, ()
 
-    def __dask_postpersist__(self):
+    def __dask_postpersist__(self) -> tuple[PostPersistCallable, tuple]:
         return self._rebuild, ()
 
-    def _rebuild(self, dsk, *, rename=None):
+    def _rebuild(self, dsk, *args, rename=None):
         name = self._name
         if rename:
             raise ValueError("rename= unsupported in dask-awkward")
@@ -445,13 +452,16 @@ class Record(Scalar):
             graphlayer = {(new_name, 0): (operator.getitem, self.key, where)}
             hlg = HighLevelGraph.from_collections(
                 new_name,
-                graphlayer,
+                AwkwardMaterializedLayer(graphlayer, previous_layer_names=[self.name]),
                 dependencies=[self],
             )
             return new_array_object(hlg, new_name, meta=new_meta, npartitions=1)
 
         # then check for scalar (or record) type
-        graphlayer = {(new_name, 0): (operator.getitem, self.key, where)}
+        graphlayer = AwkwardMaterializedLayer(
+            {(new_name, 0): (operator.getitem, self.key, where)},
+            previous_layer_names=[self.name],
+        )
         hlg = HighLevelGraph.from_collections(
             new_name,
             graphlayer,
@@ -617,10 +627,10 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     def __dask_tokenize__(self) -> Hashable:
         return self.name
 
-    def __dask_postcompute__(self) -> tuple[Callable, tuple]:
+    def __dask_postcompute__(self) -> tuple[PostComputeCallable, tuple]:
         return _finalize_array, ()
 
-    def __dask_postpersist__(self):
+    def __dask_postpersist__(self) -> tuple[PostPersistCallable, tuple]:
         return self._rebuild, ()
 
     __dask_optimize__ = globalmethod(
@@ -649,7 +659,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         self._dask = appended._dask
         self._name = appended._name
 
-    def _rebuild(self, dsk, *, rename=None):
+    def _rebuild(self, dsk, *args, rename=None):
         name = self.name
         if rename:
             raise ValueError("rename= unsupported in dask-awkward")
@@ -748,7 +758,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return []
 
     def __dir__(self) -> list[str]:
-        fields = [] if self._meta is None else self._meta._layout.fields
+        fields = [] if self._meta is None else self._meta.fields
         return sorted(
             set(
                 [x for x in dir(type(self)) if not x.startswith("_")]
@@ -1381,7 +1391,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         dak_arrays = tuple(a for a in inputs if isinstance(a, Array))
         if partition_compatibility(*dak_arrays) == PartitionCompatibility.NO:
-            raise IncompatiblePartitions(*dak_arrays)
+            raise IncompatiblePartitions(ufunc.__name__, *dak_arrays)
 
         return map_partitions(
             ufunc,
@@ -1462,7 +1472,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
 
 def _zero_getitem(arr: ak.Array, zeroth: slice, rest: tuple[slice, ...]) -> ak.Array:
-    return arr.__getitem__((zeroth,) + rest)
+    return cast(ak.Array, arr.__getitem__((zeroth,) + rest))
 
 
 def compute_typetracer(dsk: HighLevelGraph, name: str) -> ak.Array:
@@ -1831,7 +1841,7 @@ def _concat_reducer_non_positional(
     partials: list[ak.Array], is_axis_none: bool
 ) -> ak.Array:
     concat_axis = -1 if is_axis_none else 0
-    return ak.concatenate(partials, axis=concat_axis)
+    return cast(ak.Array, ak.concatenate(partials, axis=concat_axis))
 
 
 def _finalise_reducer_non_positional(
@@ -1974,7 +1984,7 @@ def non_trivial_reduction(
         keepdims=keepdims,
         mask_identity=mask_identity,
     )
-    if isinstance(meta, ak.highlevel.Array):
+    if isinstance(meta, ak.Array):
         return new_array_object(graph, name_finalize, meta=meta, npartitions=1)
     else:
         return new_scalar_object(graph, name_finalize, meta=meta)
@@ -2149,7 +2159,7 @@ def to_meta(objects):
 
 def length_zero_array_or_identity(obj: Any) -> Any:
     if is_awkward_collection(obj):
-        return ak.typetracer.length_zero_if_typetracer(obj._meta, behavior=obj.behavior)
+        return length_zero_if_typetracer(obj._meta, behavior=obj.behavior)
     return obj
 
 
@@ -2185,8 +2195,8 @@ def map_meta(fn: ArgsKwargsPackedFunction, *deps: Any) -> ak.Array | None:
         pass
     try:
         arg_lzas = to_length_zero_arrays(deps)
-        meta = ak.typetracer.typetracer_from_form(fn(*arg_lzas).layout.form)
-        return meta
+        meta = typetracer_from_form(fn(*arg_lzas).layout.form)
+        return cast(ak.Array, meta)
     except Exception:
         # if compute-unknown-meta is True and we've gotten to this
         # point, we want to throw a warning because a compute is going
