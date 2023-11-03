@@ -101,7 +101,7 @@ class IOFunctionWithMocking(ImplementsMocking, ImplementsIOFunction):
                 f"backend must be one of 'cpu', 'jax', or 'cuda', received {backend}"
             )
         return ak.to_backend(
-            self._meta.layout.form.length_zero_array(highlevel=False),
+            self.mock().layout.form.length_zero_array(highlevel=False),
             backend=backend,
             highlevel=True,
         )
