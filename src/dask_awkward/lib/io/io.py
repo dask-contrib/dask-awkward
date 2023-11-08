@@ -104,14 +104,17 @@ def from_awkward(
 
 
 class _FromListsFn:
-    def __init__(self, behavior: dict | None = None):
+    def __init__(self, behavior: dict | None = None, attrs: dict | None = None):
         self.behavior = behavior
+        self.attrs = attrs
 
     def __call__(self, x: list) -> ak.Array:
-        return ak.Array(x, behavior=self.behavior)
+        return ak.Array(x, behavior=self.behavior, attrs=self.attrs)
 
 
-def from_lists(source: list, behavior: dict | None = None) -> Array:
+def from_lists(
+    source: list, behavior: dict | None = None, attrs: dict | None = None
+) -> Array:
     """Create an Array collection from a list of lists.
 
     Parameters
@@ -140,11 +143,10 @@ def from_lists(source: list, behavior: dict | None = None) -> Array:
     lists = list(source)
     divs = (0, *np.cumsum(list(map(len, lists))))
     return from_map(
-        _FromListsFn(behavior=behavior),
+        _FromListsFn(behavior=behavior, attrs=attrs),
         lists,
-        meta=typetracer_array(ak.Array(lists[0])),
+        meta=typetracer_array(ak.Array(lists[0], attrs=attrs, behavior=behavior)),
         divisions=divs,
-        behavior=behavior,
         label="from-lists",
     )
 

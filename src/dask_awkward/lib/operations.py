@@ -33,6 +33,7 @@ def concatenate(
     mergebool: bool = True,
     highlevel: bool = True,
     behavior: dict | None = None,
+    attrs: dict | None = None,
 ) -> Array:
     label = "concatenate"
     token = tokenize(arrays, axis, mergebool, highlevel, behavior)
@@ -49,7 +50,7 @@ def concatenate(
                 g[(name, i)] = k
                 i += 1
 
-        meta = ak.concatenate(metas)
+        meta = ak.concatenate(metas, behavior=behavior, attrs=attrs)
         assert isinstance(meta, ak.Array)
 
         prev_names = [iarr.name for iarr in arrays]
@@ -65,7 +66,7 @@ def concatenate(
         if partition_compatibility(*arrays) == PartitionCompatibility.NO:
             raise IncompatiblePartitions("concatenate", *arrays)
 
-        fn = _ConcatenateFnAxisGT0(axis=axis)
+        fn = _ConcatenateFnAxisGT0(axis=axis, behavior=behavior, attrs=attrs)
         return map_partitions(fn, *arrays)
 
     else:

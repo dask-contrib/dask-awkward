@@ -433,6 +433,7 @@ def from_json(
     resize: float = 8,
     highlevel: bool = True,
     behavior: dict | None = None,
+    attrs: dict | None = None,
     blocksize: int | str | None = None,
     delimiter: bytes | None = None,
     compression: str | None = "infer",

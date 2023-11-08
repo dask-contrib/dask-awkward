@@ -1482,6 +1482,7 @@ def new_array_object(
     *,
     meta: ak.Array | None = None,
     behavior: dict | None = None,
+    attrs: dict | None = None,
     npartitions: int | None = None,
     divisions: tuple[int, ...] | tuple[None, ...] | None = None,
 ) -> Array:
@@ -1500,6 +1501,10 @@ def new_array_object(
         typetracer for the new Array. If the configuration option
         ``awkward.compute-unknown-meta`` is set to ``False``,
         undefined `meta` will be assigned an empty typetracer.
+    behavior : dict, optional
+        Custom #ak.behavior for the output array.
+    attrs : dict, optional
+        Custom attributes for the output array.
     npartitions : int, optional
         Total number of partitions; if used `divisions` will be a
         tuple of length `npartitions` + 1 with all elements``None``.
@@ -1543,6 +1548,8 @@ def new_array_object(
 
     if behavior is not None:
         actual_meta.behavior = behavior
+    if attrs is not None:
+        actual_meta.attrs = attrs
 
     out = Array(dsk, name, actual_meta, divs)
     if actual_meta.__doc__ != actual_meta.__class__.__doc__:
@@ -1872,6 +1879,8 @@ def non_trivial_reduction(
     keepdims: bool,
     mask_identity: bool,
     reducer: Callable,
+    behavior: dict | None = None,
+    attrs: dict | None = None,
     combiner: Callable | None = None,
     token: str | None = None,
     dtype: Any | None = None,

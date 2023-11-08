@@ -291,6 +291,7 @@ def combinations(
     with_name: str | None = None,
     highlevel: bool = True,
     behavior: dict | None = None,
+    attrs: dict | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -341,6 +342,7 @@ def fill_none(
     axis: int = -1,
     highlevel: bool = True,
     behavior: dict | None = None,
+    attrs: dict | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -363,6 +365,7 @@ def drop_none(
     axis: int | None = None,
     highlevel: bool = True,
     behavior: dict | None = None,
+    attrs: dict | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -385,6 +388,7 @@ def firsts(
     axis: int = 1,
     highlevel: bool = True,
     behavior: dict | None = None,
+    attrs: dict | None = None,
 ) -> Any:
     if axis == 1:
         return map_partitions(
@@ -416,6 +420,7 @@ def flatten(
     axis: int | None = 1,
     highlevel: bool = True,
     behavior: dict | None = None,
+    attrs: dict | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -574,6 +579,7 @@ def num(
     axis: int = 1,
     highlevel: bool = True,
     behavior: dict | None = None,
+    attrs: dict | None = None,
 ) -> Any:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -596,7 +602,7 @@ def num(
         return new_scalar_object(
             hlg,
             name,
-            meta=TypeTracerArray._new(dtype=np.int64, shape=()),
+            meta=TypeTracerArray._new(dtype=np.dtype(np.int64), shape=()),
         )
     else:
         return map_partitions(
@@ -614,6 +620,7 @@ def ones_like(
     array: Array,
     highlevel: bool = True,
     behavior: dict | None = None,
+    attrs: dict | None = None,
     dtype: DTypeLike | None = None,
 ) -> Array:
     if not highlevel:
@@ -865,6 +872,7 @@ def where(
     mergebool: bool = True,
     highlevel: bool = True,
     behavior: dict | None = None,
+    attrs: dict | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -952,6 +960,7 @@ def with_name(
     name: str,
     highlevel: bool = True,
     behavior: dict | None = None,
+    attrs: dict | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -986,6 +995,7 @@ def with_parameter(
     value: Any,
     highlevel: bool = True,
     behavior: dict | None = None,
+    attrs: dict | None = None,
 ) -> Array:
     return map_partitions(
         _WithParameterFn(parameter=parameter, value=value, behavior=behavior),
@@ -1008,6 +1018,7 @@ def without_parameters(
     array: Array,
     highlevel: bool = True,
     behavior: dict | None = None,
+    attrs: dict | None = None,
 ) -> Array:
     return map_partitions(
         _WithoutParameterFn(behavior=behavior),
@@ -1022,6 +1033,7 @@ def zeros_like(
     array: Array,
     highlevel: bool = True,
     behavior: dict | None = None,
+    attrs: dict | None = None,
     dtype: DTypeLike | None = None,
 ) -> Array:
     if not highlevel:
@@ -1064,6 +1076,7 @@ def zip(
     with_name: str | None = None,
     highlevel: bool = True,
     behavior: dict | None = None,
+    attrs: dict | None = None,
     right_broadcast: bool = False,
     optiontype_outside_record: bool = False,
 ) -> Array:
