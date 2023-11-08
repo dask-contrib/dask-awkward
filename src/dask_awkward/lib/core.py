@@ -1357,6 +1357,13 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         """Clear the divisions of a Dask Awkward Collection."""
         self._divisions = (None,) * (self.npartitions + 1)
 
+    def __array_function__(self, func, types, args, kwargs):
+        raise NotImplementedError(
+            "overloads of NumPy functions are not supported in dask-awkward. "
+            "Instead, use the Awkward Array equivalent, e.g. `ak.all` instead "
+            "of `np.all`"
+        )
+
     def __awkward_function__(self, func, array_likes, args, kwargs):
         import dask_awkward
 
