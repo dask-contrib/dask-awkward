@@ -339,29 +339,9 @@ def test_bytes_with_sample(
         assert len(sample_bytes) == 127
 
 
-class RandomFailFromListsFn:
-    def __init__(self, form):
-        self.form = form
-
-    def __call__(self, x: list) -> ak.Array:
-        n = random.randint(0, 9)
-        if n < 5:
-            raise OSError("BAD!")
-
-        return ak.Array(x)
-
-    def mock(self):
-        return ak.typetracer.typetracer_from_form(self.form)
-
-    def mock_empty(self, backend="cpu"):
-        return ak.to_backend(
-            self.form.length_zero_array(highlevel=False),
-            backend=backend,
-            highlevel=True,
-        )
-
-
 def test_random_fail_from_lists():
+    from dask_awkward.lib.testutils import RandomFailFromListsFn
+
     single = [[1, 2, 3], [4, 5], [6], [], [1, 2, 3]]
     many = [single] * 30
     divs = (0, *np.cumsum(list(map(len, many))))

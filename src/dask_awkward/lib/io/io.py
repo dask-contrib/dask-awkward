@@ -9,10 +9,17 @@ from typing import TYPE_CHECKING, Any, cast
 import awkward as ak
 import numpy as np
 from awkward.types.numpytype import primitive_to_dtype
+from awkward.typetracer import length_zero_if_typetracer
 from dask.base import flatten, tokenize
 from dask.highlevelgraph import HighLevelGraph
 from dask.utils import funcname, is_integer, parse_bytes
 from fsspec.utils import infer_compression
+
+try:
+    from distributed.queues import Queue
+except ImportError:
+    Queue = None  # type: ignore
+
 
 from dask_awkward.layers.layers import (
     AwkwardBlockwiseLayer,
@@ -417,14 +424,15 @@ def to_dataframe(
         label="to-dataframe",
         **kwargs,
     )
-    meta = ak.to_dataframe(
-        ak.typetracer.length_zero_if_typetracer(array._meta), **kwargs
-    )
-    return new_dd_object(
-        intermediate.dask,
-        intermediate.name,
-        meta,
-        intermediate.divisions,
+    meta = ak.to_dataframe(length_zero_if_typetracer(array._meta), **kwargs)
+    return cast(
+        DaskDataFrame,
+        new_dd_object(
+            intermediate.dask,
+            intermediate.name,
+            meta,
+            intermediate.divisions,
+        ),
     )
 
 
@@ -466,10 +474,24 @@ def return_empty_on_raise(
     def wrapped(*args, **kwargs):
         try:
             return fn(*args, **kwargs)
-        except allowed_exceptions:
+        except allowed_exceptions as err:
+            if Queue is not None:
+                queue = Queue("dak_returned_empty")
+                queue.put((args, kwargs, str(err)))
+
             return fn.mock_empty(backend)
 
     return wrapped
+
+
+def returned_empty_report() -> list[Any]:
+    if Queue is None:
+        return []
+    queue = Queue("dak_returned_empty")
+    things = []
+    while queue.qsize():
+        things.append(queue.get())
+    return things
 
 
 def from_map(
