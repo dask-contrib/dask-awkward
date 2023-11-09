@@ -17,8 +17,10 @@ from fsspec.utils import infer_compression
 
 try:
     from distributed.queues import Queue
+    from distributed.worker import get_worker
 except ImportError:
-    Queue = None  # type: ignore
+    Queue = None
+    get_worker = None
 
 
 from dask_awkward.layers.layers import (
@@ -413,6 +415,7 @@ def to_dataframe(
 
     """
     import dask
+    from dask.dataframe.core import DataFrame as DaskDataFrame
     from dask.dataframe.core import new_dd_object
 
     if optimize_graph:
@@ -475,9 +478,13 @@ def return_empty_on_raise(
         try:
             return fn(*args, **kwargs)
         except allowed_exceptions as err:
-            if Queue is not None:
-                queue = Queue("dak_returned_empty")
-                queue.put((args, kwargs, str(err)))
+            if Queue is not None and get_worker is not None:
+                try:
+                    _ = get_worker()
+                    queue = Queue("dak_returned_empty")
+                    queue.put((args, kwargs, str(err)))
+                except ValueError:
+                    pass
 
             return fn.mock_empty(backend)
 
@@ -485,13 +492,12 @@ def return_empty_on_raise(
 
 
 def returned_empty_report() -> list[Any]:
-    if Queue is None:
-        return []
-    queue = Queue("dak_returned_empty")
-    things = []
-    while queue.qsize():
-        things.append(queue.get())
-    return things
+    report = []
+    if Queue is not None:
+        queue = Queue("dak_returned_empty")
+        while queue.qsize():
+            report.append(queue.get())
+    return report
 
 
 def from_map(
