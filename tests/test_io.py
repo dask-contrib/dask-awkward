@@ -162,10 +162,10 @@ def test_from_map_exceptions() -> None:
         dak.from_map(f, [1, 2], [3, 4, 5])
 
     with pytest.raises(ValueError, match="must be `callable`"):
-        dak.from_map(5, [1], [2])
+        dak.from_map(5, [1], [2])  # type: ignore
 
     with pytest.raises(ValueError, match="must be Iterable"):
-        dak.from_map(f, 1, [1, 2])
+        dak.from_map(f, 1, [1, 2])  # type: ignore
 
     with pytest.raises(ValueError, match="non-zero length"):
         dak.from_map(f, [], [], [])
