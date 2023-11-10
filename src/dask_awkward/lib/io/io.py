@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import logging
 import math
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
@@ -47,6 +48,9 @@ if TYPE_CHECKING:
     from fsspec.spec import AbstractFileSystem
 
     from dask_awkward.lib.core import Array
+
+
+logger = logging.getLogger(__name__)
 
 
 class _FromAwkwardFn:
@@ -478,26 +482,19 @@ def return_empty_on_raise(
         try:
             return fn(*args, **kwargs)
         except allowed_exceptions as err:
-            if Queue is not None and get_worker is not None:
-                try:
-                    _ = get_worker()
-                    queue = Queue("dak_returned_empty")
-                    queue.put((args, kwargs, str(err)))
-                except ValueError:
-                    pass
-
+            logmsg = (
+                "%s call failed with args %s and kwargs %s; empty array returned. %s"
+                % (
+                    str(fn),
+                    str(args),
+                    str(kwargs),
+                    str(err),
+                )
+            )
+            logger.info(logmsg)
             return fn.mock_empty(backend)
 
     return wrapped
-
-
-def returned_empty_report() -> list[Any]:
-    report = []
-    if Queue is not None:
-        queue = Queue("dak_returned_empty")
-        while queue.qsize():
-            report.append(queue.get())
-    return report
 
 
 def from_map(
