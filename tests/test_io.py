@@ -11,7 +11,8 @@ from fsspec.core import get_fs_token_paths
 from numpy.typing import DTypeLike
 
 import dask_awkward as dak
-from dask_awkward.lib.io.io import _bytes_with_sample
+from dask_awkward.lib.core import typetracer_array
+from dask_awkward.lib.io.io import _bytes_with_sample, from_map
 from dask_awkward.lib.testutils import assert_eq
 
 
@@ -335,3 +336,65 @@ def test_bytes_with_sample(
         assert sample_bytes == b""
     else:
         assert len(sample_bytes) == 127
+
+
+def test_random_fail_from_lists():
+    from dask_awkward.lib.testutils import RandomFailFromListsFn
+
+    single = [[1, 2, 3], [4, 5], [6], [], [1, 2, 3]]
+    many = [single] * 30
+    divs = (0, *np.cumsum(list(map(len, many))))
+    form = ak.Array(many[0]).layout.form
+
+    array = from_map(
+        RandomFailFromListsFn(form),
+        many,
+        meta=typetracer_array(ak.Array(many[0])),
+        divisions=divs,
+        label="from-lists",
+        empty_on_raise=(OSError,),
+        empty_backend="cpu",
+    )
+    assert len(array.compute()) < (len(single) * len(many))
+
+    with pytest.raises(OSError, match="BAD"):
+        array = from_map(
+            RandomFailFromListsFn(form),
+            many,
+            meta=typetracer_array(ak.Array(many[0])),
+            divisions=divs,
+            label="from-lists",
+            empty_on_raise=(RuntimeError,),
+            empty_backend="cpu",
+        )
+        array.compute()
+
+    with pytest.raises(OSError, match="BAD"):
+        array = from_map(
+            RandomFailFromListsFn(form),
+            many,
+            meta=typetracer_array(ak.Array(many[0])),
+            divisions=divs,
+            label="from-lists",
+        )
+        array.compute()
+
+    with pytest.raises(ValueError, match="must be used together"):
+        array = from_map(
+            RandomFailFromListsFn(form),
+            many,
+            meta=typetracer_array(ak.Array(many[0])),
+            divisions=divs,
+            label="from-lists",
+            empty_on_raise=(OSError,),
+        )
+
+    with pytest.raises(ValueError, match="must be used together"):
+        array = from_map(
+            RandomFailFromListsFn(form),
+            many,
+            meta=typetracer_array(ak.Array(many[0])),
+            divisions=divs,
+            label="from-lists",
+            empty_backend="cpu",
+        )

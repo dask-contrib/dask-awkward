@@ -48,7 +48,7 @@ Homepage = "https://github.com/dask-contrib/dask-awkward"
 
 [project.optional-dependencies]
 io = [
-  "pyarrow;python_version<\"3.12\"",
+  "pyarrow",
 ]
 complete = [
   "dask-awkward[io]",
