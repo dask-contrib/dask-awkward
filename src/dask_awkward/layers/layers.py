@@ -112,7 +112,11 @@ def io_func_implements_projection(func: ImplementsIOFunction) -> bool:
 
 
 def io_func_implements_mocking(func: ImplementsIOFunction) -> bool:
-    return hasattr(func, "mock") and hasattr(func, "mock_empty")
+    return hasattr(func, "mock")
+
+
+def io_func_implements_mock_empty(func: ImplementsIOFunction) -> bool:
+    return hasattr(func, "mock_empty")
 
 
 def io_func_implements_columnar(func: ImplementsIOFunction) -> bool:

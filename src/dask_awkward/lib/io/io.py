@@ -31,6 +31,7 @@ from dask_awkward.layers.layers import (
     BackendT,
     ImplementsMocking,
     IOFunctionWithMocking,
+    io_func_implements_mock_empty,
     io_func_implements_mocking,
 )
 from dask_awkward.lib.core import (
@@ -622,6 +623,8 @@ def from_map(
         raise ValueError("empty_on_raise and empty_backend must be used together.")
 
     if empty_on_raise and empty_backend:
+        if not io_func_implements_mock_empty(io_func):
+            raise ValueError("io_func must implement mock_empty method.")
         io_func = return_empty_on_raise(
             io_func,
             allowed_exceptions=empty_on_raise,
