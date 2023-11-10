@@ -64,7 +64,7 @@ class ColumnProjectionMixin(ImplementsNecessaryColumns[FormStructure]):
 
     def mock_empty(self: S, backend: BackendT = "cpu") -> AwkwardArray:
         return ak.to_backend(
-            self.form.length_zero_array(highlevel=False),
+            self.form.length_zero_array(highlevel=False, behavior=self.behavior),
             backend,
             highlevel=True,
         )
