@@ -31,6 +31,7 @@ from dask_awkward.layers.layers import (
     BackendT,
     ImplementsMocking,
     IOFunctionWithMocking,
+    io_func_implements_mock_empty,
     io_func_implements_mocking,
 )
 from dask_awkward.lib.core import (

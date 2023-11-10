@@ -398,3 +398,24 @@ def test_random_fail_from_lists():
             label="from-lists",
             empty_backend="cpu",
         )
+
+    class NoMockEmpty:
+        def __init__(self, x):
+            self.x = x
+
+        def mock(self):
+            return 5
+
+        def __call__(self, *args):
+            return self.x * args[0]
+
+    with pytest.raises(ValueError, match="must implement"):
+        array = from_map(
+            NoMockEmpty(5),
+            many,
+            meta=typetracer_array(ak.Array(many[0])),
+            divisions=divs,
+            label="from-lists",
+            empty_on_raise=(RuntimeError,),
+            empty_backend="cpu",
+        )
