@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import inspect
 import keyword
 import logging
 import math
@@ -10,6 +9,7 @@ import warnings
 from collections.abc import Callable, Hashable, Sequence
 from enum import IntEnum
 from functools import cached_property, partial, wraps
+from inspect import getattr_static
 from numbers import Number
 from typing import TYPE_CHECKING, Any, Literal, TypeVar, Union, overload
 
@@ -66,6 +66,56 @@ T = TypeVar("T")
 
 
 log = logging.getLogger(__name__)
+
+
+def make_dask_descriptor(func: Callable) -> Callable[[T, type[T], Array], Any]:
+    def descriptor(instance: T, owner: type[T], dask_array: Array) -> Any:
+        impl = func.__get__(instance, owner)
+        return impl(dask_array)
+
+    return descriptor
+
+
+def make_dask_method(func: Callable) -> Callable[[T, type[T], Array], Callable]:
+    def descriptor(instance: T, owner: type[T], dask_array: Array) -> Any:
+        def impl(*args, **kwargs):
+            impl = func.__get__(instance, owner)
+            return impl(dask_array, *args, **kwargs)
+
+        return impl
+
+    return descriptor
+
+
+F = TypeVar("F", bound=Callable)
+G = TypeVar("G", bound=Callable)
+
+
+class dask_property(property):
+    _dask_get: Callable | None = None
+    _dask_set: Callable | None = None
+    _dask_del: Callable | None = None
+
+    def dask_getter(self, func: F) -> F:
+        self._dask_get = make_dask_descriptor(func)
+        return func
+
+    def dask_setter(self, func: F) -> F:
+        self._dask_set = make_dask_descriptor(func)
+        return func
+
+    def dask_deleter(self, func: F) -> F:
+        self._dask_del = make_dask_descriptor(func)
+        return func
+
+
+def dask_method(func: F) -> F:
+    def dask(dask_func_impl: G) -> G:
+        func._dask_get = make_dask_method(dask_func_impl)  # type: ignore
+        return dask_func_impl
+
+    func.dask = dask  # type: ignore
+    return func
 
 
 class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
@@ -1212,101 +1262,34 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         return self._getitem_single(where)
 
-    def _call_behavior_method(self, method_name: str, *args: Any, **kwargs: Any) -> Any:
-        """Call a behavior method for an awkward array.
-        If the function signature has __dunder__ parameters it is assumed that the
-        user wants to do the map_partitions dispatch themselves and the _meta's
-        behavior is called.
-        If there are no __dunder__ parameters in the function call then the function
-        is wrapped in map_partitions automatically.
-        """
-        if hasattr(self._meta, method_name):
-            themethod = getattr(self._meta, method_name)
-            thesig = inspect.signature(themethod)
-            if "_dask_array_" in thesig.parameters:
-                if "_dask_array_" not in kwargs:
-                    kwargs["_dask_array_"] = self
-                return themethod(*args, **kwargs)
-            return self.map_partitions(
-                _BehaviorMethodFn(method_name, **kwargs),
-                *args,
-                label=hyphenize(method_name),
-            )
-
-        raise AttributeError(
-            f"Method {method_name} is not available to this collection."
-        )
-
-    def _call_behavior_property(self, property_name: str) -> Any:
-        """Call a property for an awkward array.
-        This also allows for some internal state to be tracked via behaviors
-        if a user follows the pattern:
-
-        class SomeMixin:
-
-            @property
-            def the_property(self):
-                ...
-
-            @property
-            def a_property(array_context=None) # note: this can be any name
-
-        This pattern is caught if the property has an argument that single
-        argument is assumed to be the array context (i.e. self) so that self-
-        referenced re-indexing operations can be hidden in properties. The
-        user must do the appropriate dispatch of map_partitions.
-
-        If there is no argument the property call is wrapped in map_partitions.
-        """
-        if hasattr(self._meta.__class__, property_name):
-            thegetter = getattr(self._meta.__class__, property_name).fget.__get__(
-                self._meta
-            )
-            thesig = inspect.signature(thegetter)
-
-            if len(thesig.parameters) == 1:
-                binding = thesig.bind(self)
-                return thegetter(*binding.args, **binding.kwargs)
-            elif len(thesig.parameters) > 1:
-                raise RuntimeError(
-                    "Parametrized property cannot have more than one argument, the array context!"
-                )
-            return self.map_partitions(
-                _BehaviorPropertyFn(property_name),
-                label=hyphenize(property_name),
-            )
-        raise AttributeError(
-            f"Property {property_name} is not available to this collection."
-        )
-
-    def _maybe_behavior_method(self, attr: str) -> bool:
-        try:
-            res = getattr(self._meta.__class__, attr)
-            return (not isinstance(res, property)) and callable(res)
-        except AttributeError:
-            return False
-
-    def _maybe_behavior_property(self, attr: str) -> bool:
-        try:
-            res = getattr(self._meta.__class__, attr)
-            return isinstance(res, property)
-        except AttributeError:
-            return False
+    def _is_method_heuristic(self, resolved: Any) -> bool:
+        return callable(resolved)
 
     def __getattr__(self, attr: str) -> Any:
         if attr not in (self.fields or []):
-            # check for possible behavior method
-            if self._maybe_behavior_method(attr):
+            try:
+                cls_method = getattr_static(self._meta, attr)
+            except AttributeError:
+                raise AttributeError(f"{attr} not in fields.")
+            else:
+                if hasattr(cls_method, "_dask_get"):
+                    return cls_method._dask_get(self._meta, type(self._meta), self)
+                elif self._is_method_heuristic(cls_method):
 
-                def wrapper(*args, **kwargs):
-                    return self._call_behavior_method(attr, *args, **kwargs)
+                    @wraps(cls_method)
+                    def wrapper(*args, **kwargs):
+                        return self.map_partitions(
+                            _BehaviorMethodFn(attr, **kwargs),
+                            *args,
+                            label=hyphenize(attr),
+                        )
 
-                return wrapper
-            # check for possible behavior property
-            elif self._maybe_behavior_property(attr):
-                return self._call_behavior_property(attr)
-
-            raise AttributeError(f"{attr} not in fields.")
+                    return wrapper
+                else:
+                    return self.map_partitions(
+                        _BehaviorPropertyFn(attr),
+                        label=hyphenize(attr),
+                    )
         try:
             # at this point attr is either a field or we'll have to
             # raise an exception.

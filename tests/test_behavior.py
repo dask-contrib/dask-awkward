@@ -23,12 +23,21 @@ class Point:
     def point_abs(self):
         return np.sqrt(self.x**2 + self.y**2)
 
-    @property
-    def non_dask_property(self, _dask_array_=None):
+    @dak.dask_property
+    def some_property(self):
         return "this is a non-dask property"
 
-    def non_dask_method(self, _dask_array_=None):
-        return _dask_array_
+    @some_property.dask_getter
+    def some_property_dask(self, array):
+        return f"this is a dask property ({type(array).__name__})"
+
+    @dak.dask_method
+    def some_method(self):
+        return None
+
+    @some_method.dask  # type: ignore
+    def some_method_dask(self, array):
+        return array
 
 
 @pytest.mark.xfail(
@@ -60,9 +69,11 @@ def test_property_behavior(daa_p1: dak.Array, caa_p1: ak.Array) -> None:
 
     assert daa.behavior == caa.behavior
 
-    assert daa.non_dask_property == caa.non_dask_property
+    assert caa.some_property == "this is a non-dask property"
+    assert daa.some_property == "this is a dask property (Array)"
 
-    assert repr(daa.non_dask_method()) == repr(daa)
+    assert repr(daa.some_method()) == repr(daa)
+    assert repr(caa.some_method()) == repr(None)
 
 
 @pytest.mark.xfail(
