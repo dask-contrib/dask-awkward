@@ -108,7 +108,7 @@ def argcartesian(
             with_name=with_name,
             highlevel=highlevel,
             behavior=behavior,
-            attrs=attrs
+            attrs=attrs,
         )
         return map_partitions(fn, *arrays, label="argcartesian", output_divisions=1)
     raise DaskAwkwardNotImplemented("TODO")
@@ -157,7 +157,7 @@ def argcombinations(
             with_name=with_name,
             highlevel=highlevel,
             behavior=behavior,
-            attrs=attrs
+            attrs=attrs,
         )
         return map_partitions(
             fn,
@@ -191,11 +191,7 @@ def argsort(
     if axis == 0:
         raise DaskAwkwardNotImplemented("TODO")
     fn = _ArgsortFn(
-        axis=axis,
-        ascending=ascending,
-        stable=stable,
-        behavior=behavior,
-        attrs=attrs
+        axis=axis, ascending=ascending, stable=stable, behavior=behavior, attrs=attrs
     )
     return map_partitions(fn, array, label="argsort", output_divisions=1)
 
@@ -722,8 +718,8 @@ def pad_none(
 
 @borrow_docstring(ak.ravel)
 def ravel(
-    array: Array, 
-    highlevel: bool = True, 
+    array: Array,
+    highlevel: bool = True,
     behavior: dict | None = None,
     attrs: Mapping[str, Any] = None,
 ) -> Array:
@@ -744,8 +740,8 @@ def ravel(
 
 @borrow_docstring(ak.run_lengths)
 def run_lengths(
-    array: Array, 
-    highlevel: bool = True, 
+    array: Array,
+    highlevel: bool = True,
     behavior: dict | None = None,
     attrs: Mapping[str, Any] = None,
 ) -> Array:
@@ -779,11 +775,11 @@ class _SingletonsFn:
 
 @borrow_docstring(ak.singletons)
 def singletons(
-    array: Array, 
-    axis: int = 0, 
-    highlevel: bool = True, 
+    array: Array,
+    axis: int = 0,
+    highlevel: bool = True,
     behavior: Mapping | None = None,
-    attrs: Mapping[str, Any] | None = None
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -811,7 +807,7 @@ def sort(
     stable: bool = True,
     highlevel: bool = True,
     behavior: Mapping | None = None,
-    attrs: Mapping[str, Any] | None = None
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -833,7 +829,7 @@ def strings_astype(
     to: np.dtype | str,
     highlevel: bool = True,
     behavior: Mapping | None = None,
-    attrs: Mapping[str, Any] | None = None
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     raise DaskAwkwardNotImplemented("TODO")
 
