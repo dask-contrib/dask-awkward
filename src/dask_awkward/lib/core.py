@@ -200,7 +200,7 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
             "__getitem__ access on Scalars should be done after converting "
             "the Scalar collection to delayed with the to_delayed method."
         )
-        raise RuntimeError(msg)
+        raise NotImplementedError(msg)
 
     @property
     def known_value(self) -> Any | None:
