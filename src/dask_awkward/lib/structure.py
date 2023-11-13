@@ -605,7 +605,7 @@ def num(
     array: Any,
     axis: int = 1,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
     attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     if not highlevel:
@@ -642,7 +642,7 @@ def num(
 def ones_like(
     array: Array,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
     attrs: Mapping[str, Any] | None = None,
     dtype: DTypeLike | None = None,
 ) -> Array:
@@ -720,7 +720,7 @@ def pad_none(
 def ravel(
     array: Array,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
     attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     if not highlevel:
@@ -742,7 +742,7 @@ def ravel(
 def run_lengths(
     array: Array,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
     attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     if not highlevel:
@@ -954,8 +954,8 @@ def where(
     y: Array,
     mergebool: bool = True,
     highlevel: bool = True,
-    behavior: dict | None = None,
-    attrs: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -1048,8 +1048,8 @@ def with_name(
     array: Array,
     name: str | None,
     highlevel: bool = True,
-    behavior: dict | None = None,
-    attrs: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -1083,8 +1083,8 @@ def with_parameter(
     parameter: str,
     value: Any,
     highlevel: bool = True,
-    behavior: dict | None = None,
-    attrs: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -1108,8 +1108,8 @@ class _WithoutParameterFn:
 def without_parameters(
     array: Array,
     highlevel: bool = True,
-    behavior: dict | None = None,
-    attrs: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -1125,8 +1125,8 @@ def without_parameters(
 def zeros_like(
     array: Array,
     highlevel: bool = True,
-    behavior: dict | None = None,
-    attrs: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
     dtype: DTypeLike | None = None,
 ) -> Array:
     if not highlevel:
@@ -1168,8 +1168,8 @@ def zip(
     parameters: Mapping[str, Any] | None = None,
     with_name: str | None = None,
     highlevel: bool = True,
-    behavior: dict | None = None,
-    attrs: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
     right_broadcast: bool = False,
     optiontype_outside_record: bool = False,
 ) -> Array:

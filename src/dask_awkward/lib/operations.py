@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Any
+
 import awkward as ak
 from dask.base import tokenize
 from dask.highlevelgraph import HighLevelGraph
@@ -32,8 +35,8 @@ def concatenate(
     axis: int = 0,
     mergebool: bool = True,
     highlevel: bool = True,
-    behavior: dict | None = None,
-    attrs: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     label = "concatenate"
     token = tokenize(arrays, axis, mergebool, highlevel, behavior)

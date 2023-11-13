@@ -5,6 +5,7 @@ import itertools
 import logging
 import math
 import operator
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 import awkward as ak
@@ -41,8 +42,8 @@ class _FromParquetFn(ColumnProjectionMixin):
         listsep: str = "list.item",
         unnamed_root: bool = False,
         original_form: Form | None = None,
-        behavior: dict | None = None,
-        attrs: dict | None = None,
+        behavior: Mapping | None = None,
+        attrs: Mapping[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
         self.fs = fs
@@ -99,7 +100,7 @@ class _FromParquetFileWiseFn(_FromParquetFn):
         listsep: str = "list.item",
         unnamed_root: bool = False,
         original_form: Form | None = None,
-        behavior: dict | None = None,
+        behavior: Mapping | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(
@@ -152,8 +153,8 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
         listsep: str = "list.item",
         unnamed_root: bool = False,
         original_form: Form | None = None,
-        behavior: dict | None = None,
-        attrs: dict | None = None,
+        behavior: Mapping | None = None,
+        attrs: Mapping[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(
@@ -209,8 +210,8 @@ def from_parquet(
     footer_sample_size: int = 1_000_000,
     generate_bitmasks: bool = False,
     highlevel: bool = True,
-    behavior: dict | None = None,
-    attrs: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
     ignore_metadata: bool = True,
     scan_files: bool = False,
     split_row_groups: bool | None = False,

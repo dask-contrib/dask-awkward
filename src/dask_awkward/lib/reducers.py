@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 import awkward as ak
@@ -39,8 +40,8 @@ def all(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = False,
-    behavior: dict | None = None,
-    attrs: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     if axis is None or axis == 0 or axis == -1 * array.ndim:
         return non_trivial_reduction(
@@ -73,8 +74,8 @@ def any(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = False,
-    behavior: dict | None = None,
-    attrs: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     if axis is None or axis == 0 or axis == -1 * array.ndim:
         return non_trivial_reduction(
@@ -107,8 +108,8 @@ def argmax(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = True,
-    behavior: dict | None = None,
-    attrs: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     if axis is None or axis == 0 or axis == -1 * array.ndim:
         return non_trivial_reduction(
@@ -141,8 +142,8 @@ def argmin(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = True,
-    behavior: dict | None = None,
-    attrs: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     if axis is None or axis == 0 or axis == -1 * array.ndim:
         return non_trivial_reduction(
@@ -177,8 +178,8 @@ def corr(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = False,
-    behavior: dict | None = None,
-    attrs: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     raise DaskAwkwardNotImplemented("TODO")
 
@@ -189,8 +190,8 @@ def count(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = False,
-    behavior: dict | None = None,
-    attrs: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     if axis is None or axis == 0 or axis == -1 * array.ndim:
         return non_trivial_reduction(
@@ -224,8 +225,8 @@ def count_nonzero(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = False,
-    behavior: dict | None = None,
-    attrs: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     if axis is None or axis == 0 or axis == -1 * array.ndim:
         return non_trivial_reduction(
@@ -261,8 +262,8 @@ def covar(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = False,
-    behavior: dict | None = None,
-    attrs: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     raise DaskAwkwardNotImplemented("TODO")
 
@@ -275,8 +276,8 @@ def linear_fit(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = False,
-    behavior: dict | None = None,
-    attrs: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     raise DaskAwkwardNotImplemented("TODO")
 
@@ -296,8 +297,8 @@ def max(
     keepdims: bool = False,
     initial: float | None = None,
     mask_identity: bool = True,
-    behavior: dict | None = None,
-    attrs: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     if axis is None or axis == 0 or axis == -1 * array.ndim:
         return non_trivial_reduction(
@@ -331,8 +332,8 @@ def mean(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = False,
-    behavior: dict | None = None,
-    attrs: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     if weight is not None:
         raise DaskAwkwardNotImplemented(
@@ -372,8 +373,8 @@ def min(
     keepdims: bool = False,
     initial: float | None = None,
     mask_identity: bool = True,
-    behavior: dict | None = None,
-    attrs: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     if axis is None or axis == 0 or axis == -1 * array.ndim:
         return non_trivial_reduction(
@@ -408,8 +409,8 @@ def moment(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = False,
-    behavior: dict | None = None,
-    attrs: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     raise DaskAwkwardNotImplemented("TODO")
 
@@ -420,8 +421,8 @@ def prod(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = False,
-    behavior: dict | None = None,
-    attrs: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     if axis is None or axis == 0 or axis == -1 * array.ndim:
         return non_trivial_reduction(
@@ -484,8 +485,8 @@ def std(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = False,
-    behavior: dict | None = None,
-    attrs: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     if weight is not None:
         raise DaskAwkwardNotImplemented("weight argument is not supported.")
@@ -515,8 +516,8 @@ def sum(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = False,
-    behavior: dict | None = None,
-    attrs: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     if axis is None or axis == 0 or axis == -1 * array.ndim:
         return non_trivial_reduction(
@@ -559,8 +560,8 @@ def var(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = False,
-    behavior: dict | None = None,
-    attrs: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     if weight is not None:
         raise DaskAwkwardNotImplemented("weight argument is not supported.")

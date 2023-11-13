@@ -3,7 +3,7 @@ from __future__ import annotations
 import abc
 import logging
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any, Literal, overload
 
 import awkward as ak
@@ -43,7 +43,7 @@ class FromJsonFn(ColumnProjectionMixin):
         form: Form,
         compression: str | None = None,
         schema: str | dict | list | None = None,
-        behavior: dict | None = None,
+        behavior: Mapping | None = None,
         **kwargs: Any,
     ) -> None:
         self.compression = compression
@@ -91,7 +91,7 @@ class FromJsonLineDelimitedFn(FromJsonFn):
         form: Form,
         compression: str | None = None,
         schema: str | dict | list | None = None,
-        behavior: dict | None = None,
+        behavior: Mapping | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(
@@ -125,7 +125,7 @@ class FromJsonSingleObjPerFile(FromJsonFn):
         form: Form,
         compression: str | None = None,
         schema: str | dict | list | None = None,
-        behavior: dict | None = None,
+        behavior: Mapping | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(
@@ -163,7 +163,7 @@ class FromJsonBytesFn(FromJsonFn):
         form: Form,
         compression: str | None = None,
         schema: str | dict | list | None = None,
-        behavior: dict | None = None,
+        behavior: Mapping | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(
@@ -432,8 +432,8 @@ def from_json(
     initial: int = 1024,
     resize: float = 8,
     highlevel: bool = True,
-    behavior: dict | None = None,
-    attrs: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
     blocksize: int | str | None = None,
     delimiter: bytes | None = None,
     compression: str | None = "infer",

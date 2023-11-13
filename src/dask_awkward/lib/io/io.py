@@ -3,7 +3,7 @@ from __future__ import annotations
 import functools
 import logging
 import math
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
@@ -65,7 +65,7 @@ class _FromAwkwardFn:
 def from_awkward(
     source: ak.Array,
     npartitions: int,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
     label: str | None = None,
 ) -> Array:
     """Create an Array collection from a concrete :class:`awkward.Array` object.
@@ -116,7 +116,9 @@ def from_awkward(
 
 
 class _FromListsFn:
-    def __init__(self, behavior: dict | None = None, attrs: dict | None = None):
+    def __init__(
+        self, behavior: Mapping | None = None, attrs: Mapping[str, Any] | None = None
+    ):
         self.behavior = behavior
         self.attrs = attrs
 
@@ -125,7 +127,9 @@ class _FromListsFn:
 
 
 def from_lists(
-    source: list, behavior: dict | None = None, attrs: dict | None = None
+    source: list,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     """Create an Array collection from a list of lists.
 
@@ -166,7 +170,7 @@ def from_lists(
 def from_delayed(
     source: list[Delayed] | Delayed,
     meta: ak.Array | None = None,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
     divisions: tuple[int, ...] | tuple[None, ...] | None = None,
     prefix: str = "from-delayed",
 ) -> Array:
@@ -349,7 +353,7 @@ def to_dask_array(
         return new_da_object(graph, name, meta=None, chunks=chunks, dtype=dtype)
 
 
-def from_dask_array(array: DaskArray, behavior: dict | None = None) -> Array:
+def from_dask_array(array: DaskArray, behavior: Mapping | None = None) -> Array:
     """Convert a Dask Array collection to a Dask Awkard Array collection.
 
     Parameters

@@ -7,7 +7,7 @@ import math
 import operator
 import sys
 import warnings
-from collections.abc import Callable, Hashable, Sequence
+from collections.abc import Callable, Hashable, Mapping, Sequence
 from enum import IntEnum
 from functools import cached_property, partial, wraps
 from numbers import Number
@@ -1479,8 +1479,8 @@ def new_array_object(
     name: str,
     *,
     meta: ak.Array | None = None,
-    behavior: dict | None = None,
-    attrs: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
     npartitions: int | None = None,
     divisions: tuple[int, ...] | tuple[None, ...] | None = None,
 ) -> Array:
@@ -1877,8 +1877,8 @@ def non_trivial_reduction(
     keepdims: bool,
     mask_identity: bool,
     reducer: Callable,
-    behavior: dict | None = None,
-    attrs: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
     combiner: Callable | None = None,
     token: str | None = None,
     dtype: Any | None = None,
