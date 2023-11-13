@@ -316,10 +316,15 @@ def combinations(
 
 @borrow_docstring(ak.copy)
 def copy(array: Array) -> Array:
+    # Make a copy of meta, but don't try and copy the layout;
+    # dask-awkward's copy is metadata-only
+    old_meta = array._meta
+    new_meta = ak.Array(old_meta.layout, behavior=deepcopy(old_meta._behavior))
+
     return Array(
         array._dask,
         array._name,
-        deepcopy(array._meta),
+        new_meta,
         array._divisions,
     )
 
