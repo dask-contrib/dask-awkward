@@ -93,19 +93,9 @@ G = TypeVar("G", bound=Callable)
 
 class dask_property(property):
     _dask_get: Callable | None = None
-    _dask_set: Callable | None = None
-    _dask_del: Callable | None = None
 
-    def dask_getter(self, func: F) -> F:
+    def dask(self, func: F) -> F:
         self._dask_get = make_dask_descriptor(func)
-        return func
-
-    def dask_setter(self, func: F) -> F:
-        self._dask_set = make_dask_descriptor(func)
-        return func
-
-    def dask_deleter(self, func: F) -> F:
-        self._dask_del = make_dask_descriptor(func)
         return func
 
 
