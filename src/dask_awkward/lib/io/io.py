@@ -1,28 +1,37 @@
 from __future__ import annotations
 
+import functools
+import logging
 import math
-import warnings
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import awkward as ak
 import numpy as np
 from awkward.types.numpytype import primitive_to_dtype
+from awkward.typetracer import length_zero_if_typetracer
 from dask.base import flatten, tokenize
 from dask.highlevelgraph import HighLevelGraph
 from dask.utils import funcname, is_integer, parse_bytes
 from fsspec.utils import infer_compression
 
-from dask_awkward.layers import (
+try:
+    from distributed.queues import Queue
+    from distributed.worker import get_worker
+except ImportError:
+    Queue = None
+    get_worker = None
+
+
+from dask_awkward.layers.layers import (
     AwkwardBlockwiseLayer,
     AwkwardInputLayer,
-    ImplementsIOFunction,
-)
-from dask_awkward.layers.layers import (
     AwkwardMaterializedLayer,
+    BackendT,
     ImplementsMocking,
     IOFunctionWithMocking,
+    io_func_implements_mock_empty,
     io_func_implements_mocking,
 )
 from dask_awkward.lib.core import (
@@ -42,12 +51,15 @@ if TYPE_CHECKING:
     from dask_awkward.lib.core import Array
 
 
+logger = logging.getLogger(__name__)
+
+
 class _FromAwkwardFn:
     def __init__(self, arr: ak.Array) -> None:
         self.arr = arr
 
     def __call__(self, start: int, stop: int, **kwargs: Any) -> ak.Array:
-        return self.arr[start:stop]
+        return cast(ak.Array, self.arr[start:stop])
 
 
 def from_awkward(
@@ -411,6 +423,7 @@ def to_dataframe(
 
     """
     import dask
+    from dask.dataframe.core import DataFrame as DaskDataFrame
     from dask.dataframe.core import new_dd_object
 
     if optimize_graph:
@@ -422,14 +435,15 @@ def to_dataframe(
         label="to-dataframe",
         **kwargs,
     )
-    meta = ak.to_dataframe(
-        ak.typetracer.length_zero_if_typetracer(array._meta), **kwargs
-    )
-    return new_dd_object(
-        intermediate.dask,
-        intermediate.name,
-        meta,
-        intermediate.divisions,
+    meta = ak.to_dataframe(length_zero_if_typetracer(array._meta), **kwargs)
+    return cast(
+        DaskDataFrame,
+        new_dd_object(
+            intermediate.dask,
+            intermediate.name,
+            meta,
+            intermediate.divisions,
+        ),
     )
 
 
@@ -462,15 +476,41 @@ class PackedArgCallable:
         )
 
 
+def return_empty_on_raise(
+    fn: Callable,
+    allowed_exceptions: tuple[type[BaseException], ...],
+    backend: BackendT,
+) -> Callable:
+    @functools.wraps(fn)
+    def wrapped(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except allowed_exceptions as err:
+            logmsg = (
+                "%s call failed with args %s and kwargs %s; empty array returned. %s"
+                % (
+                    str(fn),
+                    str(args),
+                    str(kwargs),
+                    str(err),
+                )
+            )
+            logger.info(logmsg)
+            return fn.mock_empty(backend)
+
+    return wrapped
+
+
 def from_map(
-    func: ImplementsIOFunction,
+    func: Callable,
     *iterables: Iterable,
     args: tuple[Any, ...] | None = None,
     label: str | None = None,
     token: str | None = None,
     divisions: tuple[int, ...] | tuple[None, ...] | None = None,
     meta: ak.Array | None = None,
-    behavior: dict | None = None,
+    empty_on_raise: tuple[type[BaseException], ...] | None = None,
+    empty_backend: BackendT | None = None,
     **kwargs: Any,
 ) -> Array:
     """Create an Array collection from a custom mapping.
@@ -490,11 +530,17 @@ def from_map(
         collection-key names.
     token : str, optional
         String to use as the "token" in the output collection-key names.
-    divisions : tuple[int | None, ...], optional
+    divisions : tuple[int, ...] | tuple[None, ...], optional
         Partition boundaries (if known).
     meta : Array, optional
         Collection metadata array, if known (the awkward-array type
         tracer)
+    empty_on_raise : tuple[type[BaseException], ...], optional
+        Set of exceptions that can be caught to return an empty array
+        at compute time if file IO raises.
+    empty_backend : str,
+        The backend for the empty array resulting from a failed read
+        when `empty_on_raise` is defined.
     **kwargs : Any
         Keyword arguments passed to `func`.
 
@@ -576,12 +622,19 @@ def from_map(
         io_func = func
         array_meta = None
 
-    dsk = AwkwardInputLayer(name=name, inputs=inputs, io_func=io_func)
+    if (empty_on_raise and not empty_backend) or (empty_backend and not empty_on_raise):
+        raise ValueError("empty_on_raise and empty_backend must be used together.")
 
-    if behavior is not None:
-        warnings.warn(
-            "The `behavior` argument is deprecated for `from_map`, and consequently ignored."
+    if empty_on_raise and empty_backend:
+        if not io_func_implements_mock_empty(io_func):
+            raise ValueError("io_func must implement mock_empty method.")
+        io_func = return_empty_on_raise(
+            io_func,
+            allowed_exceptions=empty_on_raise,
+            backend=empty_backend,
         )
+
+    dsk = AwkwardInputLayer(name=name, inputs=inputs, io_func=io_func)
 
     hlg = HighLevelGraph.from_collections(name, dsk)
     if divisions is not None:

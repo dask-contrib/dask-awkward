@@ -5,6 +5,7 @@ from typing import Any
 
 import awkward as ak
 import numpy as np
+from awkward.typetracer import typetracer_from_form
 from dask.base import is_dask_collection
 from packaging.version import Version
 
@@ -223,3 +224,25 @@ def unnamed_root_ds() -> Array:
         ],
     ]
     return ak.Array(ds * 3)
+
+
+class RandomFailFromListsFn:
+    def __init__(self, form):
+        self.form = form
+
+    def __call__(self, x: list) -> ak.Array:
+        n = random.randint(0, 9)
+        if n < 5:
+            raise OSError("BAD!")
+
+        return ak.Array(x)
+
+    def mock(self):
+        return typetracer_from_form(self.form)
+
+    def mock_empty(self, backend="cpu"):
+        return ak.to_backend(
+            self.form.length_zero_array(highlevel=False),
+            backend=backend,
+            highlevel=True,
+        )
