@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 import awkward as ak
 import numpy as np
-from awkward._nplikes.typetracer import TypeTracerArray
+from awkward.typetracer import create_unknown_scalar
 from dask.base import is_dask_collection, tokenize
 from dask.highlevelgraph import HighLevelGraph
 
@@ -94,7 +94,7 @@ def argcartesian(
     with_name: str | None = None,
     highlevel: bool = True,
     behavior: Mapping | None = None,
-    attrs: Mapping[str, Any] = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -135,7 +135,7 @@ def argcombinations(
     with_name: str | None = None,
     highlevel: bool = True,
     behavior: Mapping | None = None,
-    attrs: Mapping[str, Any] = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -184,7 +184,7 @@ def argsort(
     stable: bool = True,
     highlevel: bool = True,
     behavior: Mapping | None = None,
-    attrs: Mapping[str, Any] = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -362,7 +362,7 @@ def drop_none(
     axis: int | None = None,
     highlevel: bool = True,
     behavior: Mapping | None = None,
-    attrs: Mapping[str, Any] = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -491,6 +491,7 @@ def isclose(
     equal_nan: bool = False,
     highlevel: bool = True,
     behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -534,6 +535,7 @@ def local_index(
     axis: int = -1,
     highlevel: bool = True,
     behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -555,6 +557,7 @@ def mask(
     valid_when: bool = True,
     highlevel: bool = True,
     behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     if partition_compatibility(array, mask) == PartitionCompatibility.NO:
         raise IncompatiblePartitions("mask", array, mask)
@@ -603,7 +606,7 @@ def num(
     axis: int = 1,
     highlevel: bool = True,
     behavior: dict | None = None,
-    attrs: Mapping[str, Any] = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -623,11 +626,7 @@ def num(
             {(name, 0): (_numaxis0, *keys)}, previous_layer_names=[per_axis.name]
         )
         hlg = HighLevelGraph.from_collections(name, matlayer, dependencies=(per_axis,))
-        return new_scalar_object(
-            hlg,
-            name,
-            meta=TypeTracerArray._new(dtype=np.dtype(np.int64), shape=()),
-        )
+        return new_scalar_object(hlg, name, meta=create_unknown_scalar(np.int64))
     else:
         return map_partitions(
             ak.num,
@@ -644,7 +643,7 @@ def ones_like(
     array: Array,
     highlevel: bool = True,
     behavior: dict | None = None,
-    attrs: Mapping[str, Any] = None,
+    attrs: Mapping[str, Any] | None = None,
     dtype: DTypeLike | None = None,
 ) -> Array:
     if not highlevel:
@@ -697,6 +696,7 @@ def pad_none(
     clip: bool = False,
     highlevel: bool = True,
     behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -721,7 +721,7 @@ def ravel(
     array: Array,
     highlevel: bool = True,
     behavior: dict | None = None,
-    attrs: Mapping[str, Any] = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -743,7 +743,7 @@ def run_lengths(
     array: Array,
     highlevel: bool = True,
     behavior: dict | None = None,
-    attrs: Mapping[str, Any] = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -863,6 +863,7 @@ def unflatten(
     axis: int = 0,
     highlevel: bool = True,
     behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -911,6 +912,7 @@ def values_astype(
     to: np.dtype | str,
     highlevel: bool = True,
     behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -1005,6 +1007,7 @@ def with_field(
     where: str | Sequence[str] | None = None,
     highlevel: bool = True,
     behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")

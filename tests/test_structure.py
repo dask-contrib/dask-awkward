@@ -388,11 +388,7 @@ def test_sort(daa, caa, ascending):
 
 
 def test_copy(daa):
-    with pytest.raises(
-        DaskAwkwardNotImplemented,
-        match="This function is not necessary in the context of dask-awkward.",
-    ):
-        dak.copy(daa)
+    assert dak.copy(daa) is daa
 
 
 @pytest.mark.parametrize(
