@@ -27,7 +27,7 @@ class Point:
     def some_property(self):
         return "this is a non-dask property"
 
-    @some_property.dask_getter
+    @some_property.dask
     def some_property_dask(self, array):
         return f"this is a dask property ({type(array).__name__})"
 
