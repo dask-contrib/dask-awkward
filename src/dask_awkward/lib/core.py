@@ -196,15 +196,11 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
         return f"dask.awkward<{key_split(self.name)}, type=Scalar, dtype={dt}>"
 
     def __getitem__(self, where: Any) -> Any:
-        token = tokenize(self, operator.getitem, where)
-        label = "getitem"
-        name = f"{label}-{token}"
-        task = AwkwardMaterializedLayer(
-            {(name, 0): (operator.getitem, self.key, where)},
-            previous_layer_names=[self.name],
+        msg = (
+            "__getitem__ access on Scalars should be done after converting "
+            "the Scalar collection to delayed with the to_delayed method."
         )
-        hlg = HighLevelGraph.from_collections(name, task, dependencies=[self])
-        return new_scalar_object(hlg, name, meta=None)
+        raise RuntimeError(msg)
 
     @property
     def known_value(self) -> Any | None:

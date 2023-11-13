@@ -219,7 +219,9 @@ def test_scalar_collection(daa: Array) -> None:
 def test_scalar_getitem_getattr() -> None:
     d = {"a": 5}
     s = new_known_scalar(d)
-    assert s["a"].compute() == d["a"]
+    with pytest.raises(RuntimeError, match="should be done after converting"):
+        s["a"].compute() == d["a"]
+    s.to_delayed()["a"].compute() == d["a"]
     Thing = namedtuple("Thing", "a b c")
     t = Thing(c=3, b=2, a=1)
     s = new_known_scalar(t)
