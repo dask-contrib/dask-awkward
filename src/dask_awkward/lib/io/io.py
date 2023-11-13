@@ -20,8 +20,8 @@ try:
     from distributed.queues import Queue
     from distributed.worker import get_worker
 except ImportError:
-    Queue = None
-    get_worker = None
+    Queue = None  # type: ignore
+    get_worker = None  # type: ignore
 
 
 from dask_awkward.layers.layers import (
