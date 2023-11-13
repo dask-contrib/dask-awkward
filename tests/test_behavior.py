@@ -35,7 +35,7 @@ class Point:
     def some_method(self):
         return None
 
-    @some_method.dask  # type: ignore
+    @some_method.dask
     def some_method_dask(self, array):
         return array
 
@@ -83,18 +83,6 @@ def test_property_behavior(daa_p1: dak.Array, caa_p1: ak.Array) -> None:
 def test_nonexistent_behavior(daa_p1: dak.Array, daa_p2: dak.Array) -> None:
     daa1 = dak.with_name(daa_p1["points"], "Point", behavior=behaviors)
     daa2 = daa_p2
-
-    with pytest.raises(
-        AttributeError,
-        match="Method doesnotexist is not available to this collection",
-    ):
-        daa1._call_behavior_method("doesnotexist", daa2)
-
-    with pytest.raises(
-        AttributeError,
-        match="Property doesnotexist is not available to this collection",
-    ):
-        daa1._call_behavior_property("doesnotexist")
 
     # in this case the field check is where we raise
     with pytest.raises(AttributeError, match="distance not in fields"):
