@@ -109,7 +109,7 @@ def test_from_map_with_args_kwargs() -> None:
 
     # concrete version
     y = list(zip(a, b, c))
-    y = dask.core.flatten(list(map(list, y)))  # type: ignore
+    y = dask.core.flatten(list(map(list, y)))
     y = map(lambda x: x * n, y)  # type: ignore
     y = ak.from_iter(y)
 
@@ -120,7 +120,7 @@ def test_from_map_with_args_kwargs() -> None:
 
     # concrete version
     y = list(zip(a, b, c, [0, 0, 0]))  # type: ignore
-    y = dask.core.flatten(list(map(list, y)))  # type: ignore
+    y = dask.core.flatten(list(map(list, y)))
     y = map(lambda x: x * n, y)  # type: ignore
     y = ak.from_iter(y)
 
