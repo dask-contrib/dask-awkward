@@ -721,7 +721,7 @@ def from_map(
         result = new_array_object(hlg, name, meta=array_meta, npartitions=len(inputs))
 
     if empty_on_raise and empty_backend:
-        res = result.map_partitions(first, meta=array_meta)
+        res = result.map_partitions(first, meta=array_meta, output_divisions=1)
         rep = result.map_partitions(second, meta=empty_typetracer())
         return res, rep
 
