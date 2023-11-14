@@ -388,7 +388,8 @@ def test_sort(daa, caa, ascending):
 
 
 def test_copy(daa):
-    assert dak.copy(daa) is daa
+    result = dak.copy(daa)
+    assert result._meta is not daa._meta
 
 
 @pytest.mark.parametrize(
