@@ -704,6 +704,12 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     def __len__(self) -> int:
         if not self.known_divisions:
+            warnings.warn(
+                "The divisions of this collection are unknown.\n"
+                "An eager computation of the divisions will be performed. "
+                "This may be expensive.",
+                UserWarning,
+            )
             self.eager_compute_divisions()
         return self.divisions[-1]  # type: ignore
 
