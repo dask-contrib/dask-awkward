@@ -352,7 +352,7 @@ def test_random_fail_from_lists():
     divs = (0, *np.cumsum(list(map(len, many))))
     form = ak.Array(many[0]).layout.form
 
-    array = from_map(
+    array, report = from_map(
         RandomFailFromListsFn(form),
         many,
         meta=typetracer_array(ak.Array(many[0])),
@@ -363,8 +363,13 @@ def test_random_fail_from_lists():
     )
     assert len(array.compute()) < (len(single) * len(many))
 
+    computed_report = report.compute()
+    assert len(computed_report[computed_report["args"] == "None"]) < len(
+        computed_report
+    )
+
     with pytest.raises(OSError, match="BAD"):
-        array = from_map(
+        array, report = from_map(
             RandomFailFromListsFn(form),
             many,
             meta=typetracer_array(ak.Array(many[0])),
@@ -386,7 +391,7 @@ def test_random_fail_from_lists():
         array.compute()
 
     with pytest.raises(ValueError, match="must be used together"):
-        array = from_map(
+        from_map(
             RandomFailFromListsFn(form),
             many,
             meta=typetracer_array(ak.Array(many[0])),
@@ -396,7 +401,7 @@ def test_random_fail_from_lists():
         )
 
     with pytest.raises(ValueError, match="must be used together"):
-        array = from_map(
+        from_map(
             RandomFailFromListsFn(form),
             many,
             meta=typetracer_array(ak.Array(many[0])),
@@ -416,7 +421,7 @@ def test_random_fail_from_lists():
             return self.x * args[0]
 
     with pytest.raises(ValueError, match="must implement"):
-        array = from_map(
+        from_map(
             NoMockEmpty(5),
             many,
             meta=typetracer_array(ak.Array(many[0])),

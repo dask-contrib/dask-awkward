@@ -5,7 +5,7 @@ import logging
 import math
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, cast, overload
 
 import awkward as ak
 import numpy as np
@@ -32,6 +32,7 @@ from dask_awkward.lib.core import (
     new_array_object,
     typetracer_array,
 )
+from dask_awkward.utils import first, second
 
 if TYPE_CHECKING:
     from dask.array.core import Array as DaskArray
@@ -496,6 +497,28 @@ class PackedArgCallable:
         )
 
 
+@dataclass
+class ReadFailure:
+    args: tuple[Any, ...] | None
+    kwargs: dict[str, Any] | None
+    exception: Any | None
+    error: Any | None
+
+    def as_array(self):
+        return ak.Array(
+            [
+                {
+                    "args": str(self.args),
+                    "kwargs": str(self.kwargs),
+                    "exception": str(self.exception.__name__)
+                    if self.exception is not None
+                    else "None",
+                    "error": str(self.error),
+                }
+            ]
+        )
+
+
 def return_empty_on_raise(
     fn: Callable,
     allowed_exceptions: tuple[type[BaseException], ...],
@@ -504,8 +527,9 @@ def return_empty_on_raise(
     @functools.wraps(fn)
     def wrapped(*args, **kwargs):
         try:
-            return fn(*args, **kwargs)
+            return fn(*args, **kwargs), ReadFailure(None, None, None, None).as_array()
         except allowed_exceptions as err:
+            rf = ReadFailure(args, kwargs, type(err), err)
             logmsg = (
                 "%s call failed with args %s and kwargs %s; empty array returned. %s"
                 % (
@@ -516,9 +540,41 @@ def return_empty_on_raise(
                 )
             )
             logger.info(logmsg)
-            return fn.mock_empty(backend)
+            return fn.mock_empty(backend), rf.as_array()
 
     return wrapped
+
+
+@overload
+def from_map(
+    func: Callable,
+    *iterables: Iterable,
+    args: tuple[Any, ...] | None = None,
+    label: str | None = None,
+    token: str | None = None,
+    divisions: tuple[int, ...] | tuple[None, ...] | None = None,
+    meta: ak.Array | None = None,
+    empty_on_raise: None = None,
+    empty_backend: None = None,
+    **kwargs: Any,
+) -> Array:
+    ...
+
+
+@overload
+def from_map(
+    func: Callable,
+    *iterables: Iterable,
+    empty_on_raise: tuple[type[BaseException], ...],
+    empty_backend: BackendT,
+    args: tuple[Any, ...] | None = None,
+    label: str | None = None,
+    token: str | None = None,
+    divisions: tuple[int, ...] | tuple[None, ...] | None = None,
+    meta: ak.Array | None = None,
+    **kwargs: Any,
+) -> tuple[Array, Array]:
+    ...
 
 
 def from_map(
@@ -532,7 +588,7 @@ def from_map(
     empty_on_raise: tuple[type[BaseException], ...] | None = None,
     empty_backend: BackendT | None = None,
     **kwargs: Any,
-) -> Array:
+) -> Array | tuple[Array, Array]:
     """Create an Array collection from a custom mapping.
 
     Parameters
@@ -663,6 +719,11 @@ def from_map(
         result = new_array_object(hlg, name, meta=array_meta, divisions=divisions)
     else:
         result = new_array_object(hlg, name, meta=array_meta, npartitions=len(inputs))
+
+    if empty_on_raise and empty_backend:
+        res = result.map_partitions(first, meta=array_meta)
+        rep = result.map_partitions(second, meta=empty_typetracer())
+        return res, rep
 
     return result
 
