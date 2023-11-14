@@ -707,7 +707,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             warnings.warn(
                 "The divisions of this collection are unknown.\n"
                 "An eager computation of the divisions will be performed. "
-                "This may be expensive.",
+                "This may be expensive.\n"
+                "Use `dask_awkward.num(..., axis=0)` if you want a lazy Scalar of the length.",
                 UserWarning,
             )
             self.eager_compute_divisions()
