@@ -706,7 +706,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if not self.known_divisions:
             raise NotImplementedError(
                 "Cannot determine length of collection with unknown partition sizes without executing the graph.\n"
-                "Use `dask_awkward.num(..., axis=0)` if you want a lazy Scalar of the length."
+                "Use `dask_awkward.num(..., axis=0)` if you want a lazy Scalar of the length.\n"
+                "If you want to eagerly compute the partition sizes to have the ability to call `len` on the collection"
+                ", use `.eager_compute_divisions()` on the collection."
             )
         return self.divisions[-1]  # type: ignore
 
