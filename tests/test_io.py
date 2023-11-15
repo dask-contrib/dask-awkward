@@ -284,7 +284,7 @@ def test_from_awkward_empty_array(daa: dak.Array) -> None:
     assert not a1.known_divisions
     a1.eager_compute_divisions()
     assert a1.known_divisions
-    assert len(a1) == 0
+    assert len(a1) == 0  # type: ignore
 
     # with a form
     c2 = ak.typetracer.length_zero_if_typetracer(daa.layout)
