@@ -626,7 +626,7 @@ def num(
         return new_scalar_object(
             hlg,
             name,
-            meta=TypeTracerArray._new(dtype=np.int64, shape=()),
+            meta=ak.Array(TypeTracerArray._new(dtype=np.dtype("int64"), shape=())),
         )
     else:
         return map_partitions(
