@@ -26,6 +26,7 @@ from dask_awkward.utils import (
     DaskAwkwardNotImplemented,
     IncompatiblePartitions,
     borrow_docstring,
+    first,
 )
 
 if TYPE_CHECKING:
@@ -595,6 +596,9 @@ def nan_to_num(
 
 
 def _numaxis0(*integers):
+    f = first(integers)
+    if isinstance(f, TypeTracerArray):
+        return f
     return np.sum(np.array(integers))
 
 
@@ -626,7 +630,7 @@ def num(
         return new_scalar_object(
             hlg,
             name,
-            meta=TypeTracerArray._new(dtype=np.int64, shape=()),
+            meta=ak.Array(TypeTracerArray._new(dtype=np.dtype("int64"), shape=())),
         )
     else:
         return map_partitions(
