@@ -109,6 +109,9 @@ def test_len(ndjson_points_file: str) -> None:
         ),
     ):
         assert len(daa) == 10
+    daa.eager_compute_divisions()
+    assert daa.known_divisions
+    assert len(daa) == 10
 
 
 def test_meta_exists(daa: Array) -> None:
