@@ -104,7 +104,7 @@ def test_len(ndjson_points_file: str) -> None:
     with pytest.raises(
         NotImplementedError,
         match=(
-            "Cannot determine length of collection with unknown partitions sizes without executing the graph.\\n"
+            "Cannot determine length of collection with unknown partition sizes without executing the graph.\\n"
             "Use `dask_awkward.num\\(\\.\\.\\., axis=0\\)` if you want a lazy Scalar of the length."
         ),
     ):
