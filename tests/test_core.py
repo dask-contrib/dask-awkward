@@ -216,16 +216,13 @@ def test_scalar_collection(daa: Array) -> None:
     assert type(daa["points", "x"][0][0]) is Scalar
 
 
-def test_scalar_getitem_getattr() -> None:
-    d = {"a": 5}
-    s = new_known_scalar(d)
-    assert s["a"].compute() == d["a"]
-    Thing = namedtuple("Thing", "a b c")
-    t = Thing(c=3, b=2, a=1)
-    s = new_known_scalar(t)
+def test_known_scalar() -> None:
+    i = 5
+    s = new_known_scalar(5)
+    assert s.compute() == 5
     with pytest.raises(AttributeError, match="should be done after converting"):
-        s.c.compute()
-    assert s.to_delayed().c.compute() == t.c
+        s.denominator.compute()
+    assert s.to_delayed().denominator.compute() == i.denominator
 
 
 @pytest.mark.parametrize("op", [operator.add, operator.truediv, operator.mul])
@@ -474,8 +471,6 @@ def test_scalar_dtype() -> None:
     s = 2
     c = new_known_scalar(s)
     assert c.dtype == np.dtype(type(s))
-    c._meta = None
-    assert c.dtype is None
 
 
 def test_scalar_pickle(daa: Array) -> None:

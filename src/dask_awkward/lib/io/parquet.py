@@ -615,7 +615,7 @@ def to_parquet(
         AwkwardMaterializedLayer(dsk, previous_layer_names=[map_res.name]),
         dependencies=[map_res],
     )
-    out = new_scalar_object(graph, final_name, meta=None)
+    out = new_scalar_object(graph, final_name, dtype="f8")
     if compute:
         out.compute()
         return None
