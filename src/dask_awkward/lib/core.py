@@ -704,14 +704,10 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     def __len__(self) -> int:
         if not self.known_divisions:
-            warnings.warn(
-                "The divisions of this collection are unknown.\n"
-                "An eager computation of the divisions will be performed. "
-                "This may be expensive.\n"
-                "Use `dask_awkward.num(..., axis=0)` if you want a lazy Scalar of the length.",
-                UserWarning,
+            raise NotImplementedError(
+                "Cannot determine length of collection with unknown partitions sizes without executing the graph.\n"
+                "Use `dask_awkward.num(..., axis=0)` if you want a lazy Scalar of the length."
             )
-            self.eager_compute_divisions()
         return self.divisions[-1]  # type: ignore
 
     def _shorttypestr(self, max: int = 10) -> str:
