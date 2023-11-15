@@ -100,7 +100,15 @@ def test_compute_typetracer(daa: Array) -> None:
 
 def test_len(ndjson_points_file: str) -> None:
     daa = dak.from_json([ndjson_points_file] * 2)
-    assert len(daa) == 10
+    assert not daa.known_divisions
+    with pytest.raises(
+        NotImplementedError,
+        match=(
+            "Cannot determine length of collection with unknown partitions sizes without executing the graph.\\n"
+            "Use `dask_awkward.num\\(\\.\\.\\., axis=0\\)` if you want a lazy Scalar of the length."
+        ),
+    ):
+        assert len(daa) == 10
 
 
 def test_meta_exists(daa: Array) -> None:
