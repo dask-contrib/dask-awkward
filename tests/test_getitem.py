@@ -47,6 +47,7 @@ def test_list_with_ints_raise(daa: dak.Array) -> None:
 
 
 def test_single_int(daa: dak.Array, caa: ak.Array) -> None:
+    daa = dak.copy(daa)
     daa.eager_compute_divisions()
     total = len(daa)
     assert daa.known_divisions
