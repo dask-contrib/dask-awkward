@@ -88,7 +88,9 @@ def test_zip_tuple_input(caa: ak.Array, daa: dak.Array) -> None:
 def test_zip_bad_input(daa: dak.Array) -> None:
     da1 = daa.points.x
     gd = (x for x in (da1, da1))
-    with pytest.raises(DaskAwkwardNotImplemented, match="only sized iterables"):
+    with pytest.raises(
+        DaskAwkwardNotImplemented, match="only mappings or sequences are supported"
+    ):
         dak.zip(gd)
 
 

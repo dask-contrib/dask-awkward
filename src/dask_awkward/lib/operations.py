@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Any
+
 import awkward as ak
 from dask.base import tokenize
 from dask.highlevelgraph import HighLevelGraph
@@ -32,7 +35,8 @@ def concatenate(
     axis: int = 0,
     mergebool: bool = True,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     label = "concatenate"
     token = tokenize(arrays, axis, mergebool, highlevel, behavior)
@@ -49,7 +53,7 @@ def concatenate(
                 g[(name, i)] = k
                 i += 1
 
-        meta = ak.concatenate(metas)
+        meta = ak.concatenate(metas, behavior=behavior, attrs=attrs)
         assert isinstance(meta, ak.Array)
 
         prev_names = [iarr.name for iarr in arrays]
@@ -65,7 +69,7 @@ def concatenate(
         if partition_compatibility(*arrays) == PartitionCompatibility.NO:
             raise IncompatiblePartitions("concatenate", *arrays)
 
-        fn = _ConcatenateFnAxisGT0(axis=axis)
+        fn = _ConcatenateFnAxisGT0(axis=axis, behavior=behavior, attrs=attrs)
         return map_partitions(fn, *arrays)
 
     else:

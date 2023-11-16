@@ -7,7 +7,7 @@ import math
 import operator
 import sys
 import warnings
-from collections.abc import Callable, Hashable, Sequence
+from collections.abc import Callable, Hashable, Mapping, Sequence
 from enum import IntEnum
 from functools import cached_property, partial, wraps
 from numbers import Number
@@ -17,13 +17,14 @@ import awkward as ak
 import dask.config
 import numpy as np
 from awkward._do import remove_structure as ak_do_remove_structure
-from awkward._nplikes.typetracer import (
+from awkward.highlevel import NDArrayOperatorsMixin, _dir_pattern
+from awkward.typetracer import (
     MaybeNone,
     OneOf,
     TypeTracerArray,
+    create_unknown_scalar,
     is_unknown_scalar,
 )
-from awkward.highlevel import NDArrayOperatorsMixin, _dir_pattern
 from dask.base import (
     DaskMethodsMixin,
     dont_optimize,
@@ -140,7 +141,9 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
         return (self._name, 0)
 
     def _check_meta(self, m: Any) -> Any | None:
-        if isinstance(m, (MaybeNone, OneOf)) or is_unknown_scalar(m):
+        if m is None:
+            return m
+        elif isinstance(m, (MaybeNone, OneOf)) or is_unknown_scalar(m):
             return m
         elif isinstance(m, ak.Array) and len(m) == 1:
             return m
@@ -348,12 +351,9 @@ def new_scalar_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Scalar:
         Resulting collection.
 
     """
-    if meta is None:
-        meta = ak.Array(TypeTracerArray._new(dtype=np.dtype(None), shape=()))
-
     if isinstance(meta, MaybeNone):
         meta = ak.Array(meta.content)
-    else:
+    elif meta is not None:
         try:
             if ak.backend(meta) != "typetracer":
                 raise TypeError(
@@ -411,9 +411,7 @@ def new_known_scalar(
         dtype = np.dtype(dtype)
     llg = AwkwardMaterializedLayer({(name, 0): s}, previous_layer_names=[])
     hlg = HighLevelGraph.from_collections(name, llg, dependencies=())
-    return Scalar(
-        hlg, name, meta=TypeTracerArray._new(dtype=dtype, shape=()), known_value=s
-    )
+    return Scalar(hlg, name, meta=create_unknown_scalar(dtype), known_value=s)
 
 
 class Record(Scalar):
@@ -819,7 +817,14 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         raise ValueError("This collection's meta is None; unknown layout.")
 
     @property
-    def behavior(self) -> dict:
+    def attrs(self) -> dict:
+        """awkward Array attrs dictionary."""
+        if self._meta is not None:
+            return self._meta.attrs
+        raise ValueError("This collection's meta is None; no attrs property available.")
+
+    @property
+    def behavior(self) -> Mapping:
         """awkward Array behavior dictionary."""
         if self._meta is not None:
             return self._meta.behavior
@@ -1486,7 +1491,8 @@ def new_array_object(
     name: str,
     *,
     meta: ak.Array | None = None,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
     npartitions: int | None = None,
     divisions: tuple[int, ...] | tuple[None, ...] | None = None,
 ) -> Array:
@@ -1505,6 +1511,10 @@ def new_array_object(
         typetracer for the new Array. If the configuration option
         ``awkward.compute-unknown-meta`` is set to ``False``,
         undefined `meta` will be assigned an empty typetracer.
+    behavior : dict, optional
+        Custom ak.behavior for the output array.
+    attrs : dict, optional
+        Custom attributes for the output array.
     npartitions : int, optional
         Total number of partitions; if used `divisions` will be a
         tuple of length `npartitions` + 1 with all elements``None``.
@@ -1548,6 +1558,8 @@ def new_array_object(
 
     if behavior is not None:
         actual_meta.behavior = behavior
+    if attrs is not None:
+        actual_meta.attrs = attrs
 
     out = Array(dsk, name, actual_meta, divs)
     if actual_meta.__doc__ != actual_meta.__class__.__doc__:
@@ -1877,6 +1889,8 @@ def non_trivial_reduction(
     keepdims: bool,
     mask_identity: bool,
     reducer: Callable,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
     combiner: Callable | None = None,
     token: str | None = None,
     dtype: Any | None = None,
@@ -2225,7 +2239,11 @@ def typetracer_array(a: ak.Array | Array) -> ak.Array:
     if isinstance(a, Array):
         return a._meta
     elif isinstance(a, ak.Array):
-        return ak.Array(a.layout.to_typetracer(forget_length=True))
+        return ak.Array(
+            a.layout.to_typetracer(forget_length=True),
+            behavior=a._behavior,
+            attrs=a._attrs,
+        )
     else:
         msg = (
             "`a` should be an awkward array or a Dask awkward collection.\n"
