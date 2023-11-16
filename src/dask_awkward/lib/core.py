@@ -817,7 +817,14 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         raise ValueError("This collection's meta is None; unknown layout.")
 
     @property
-    def behavior(self) -> dict:
+    def attrs(self) -> dict:
+        """awkward Array attrs dictionary."""
+        if self._meta is not None:
+            return self._meta.attrs
+        raise ValueError("This collection's meta is None; no attrs property available.")
+
+    @property
+    def behavior(self) -> Mapping:
         """awkward Array behavior dictionary."""
         if self._meta is not None:
             return self._meta.behavior
@@ -2232,7 +2239,11 @@ def typetracer_array(a: ak.Array | Array) -> ak.Array:
     if isinstance(a, Array):
         return a._meta
     elif isinstance(a, ak.Array):
-        return ak.Array(a.layout.to_typetracer(forget_length=True))
+        return ak.Array(
+            a.layout.to_typetracer(forget_length=True),
+            behavior=a._behavior,
+            attrs=a._attrs,
+        )
     else:
         msg = (
             "`a` should be an awkward array or a Dask awkward collection.\n"

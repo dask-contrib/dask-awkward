@@ -67,6 +67,7 @@ def from_awkward(
     npartitions: int,
     behavior: Mapping | None = None,
     label: str | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     """Create an Array collection from a concrete :class:`awkward.Array` object.
 
@@ -76,8 +77,12 @@ def from_awkward(
         The concrete awkward array.
     npartitions : int
         The total number of partitions for the collection.
+    behavior : dict, optional
+        Custom ak.behavior for the output array.
     label : str, optional
         Label for the task.
+    attrs : mapping, optional
+        Custom attributes for the output array.
 
     Returns
     -------
@@ -112,6 +117,7 @@ def from_awkward(
         divisions=locs,
         meta=meta,
         behavior=behavior,
+        attrs=attrs,
     )
 
 
