@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 import awkward as ak
 import numpy as np
-from awkward.typetracer import create_unknown_scalar
+from awkward.typetracer import create_unknown_scalar, is_unknown_scalar
 from dask.base import is_dask_collection, tokenize
 from dask.highlevelgraph import HighLevelGraph
 
@@ -310,6 +310,7 @@ def combinations(
             with_name=with_name,
             highlevel=highlevel,
             behavior=behavior,
+            attrs=attrs,
         )
         return map_partitions(
             fn,
@@ -356,7 +357,9 @@ def fill_none(
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
 
-    fn = _FillNoneFn(value, axis=axis, highlevel=highlevel, behavior=behavior)
+    fn = _FillNoneFn(
+        value, axis=axis, highlevel=highlevel, behavior=behavior, attrs=attrs
+    )
     return map_partitions(fn, array, label="fill-none", output_divisions=1)
 
 
@@ -379,7 +382,7 @@ def drop_none(
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
 
-    fn = _DropNoneFn(axis=axis, highlevel=highlevel, behavior=behavior)
+    fn = _DropNoneFn(axis=axis, highlevel=highlevel, behavior=behavior, attrs=attrs)
     return map_partitions(fn, array, label="drop-none", output_divisions=1)
 
 
@@ -401,11 +404,7 @@ def firsts(
 ) -> Any:
     if axis == 1:
         return map_partitions(
-            _FirstsFn(
-                axis=axis,
-                highlevel=highlevel,
-                behavior=behavior,
-            ),
+            _FirstsFn(axis=axis, highlevel=highlevel, behavior=behavior, attrs=attrs),
             array,
             label="firsts",
             output_divisions=1,
@@ -434,11 +433,7 @@ def flatten(
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
     return map_partitions(
-        _FlattenFn(
-            axis=axis,
-            highlevel=highlevel,
-            behavior=behavior,
-        ),
+        _FlattenFn(axis=axis, highlevel=highlevel, behavior=behavior, attrs=attrs),
         array,
         label="flatten",
         output_divisions=None,
@@ -447,7 +442,11 @@ def flatten(
 
 @borrow_docstring(ak.from_regular)
 def from_regular(
-    array: Array, axis: int = 1, highlevel: bool = True, behavior: Mapping | None = None
+    array: Array,
+    axis: int = 1,
+    highlevel: bool = True,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -462,6 +461,7 @@ def from_regular(
         highlevel=highlevel,
         behavior=behavior,
         label="from-regular",
+        attrs=attrs,
     )
 
 
@@ -471,7 +471,8 @@ def full_like(
     fill_value: Any,
     highlevel: bool = True,
     behavior: Mapping | None = None,
-    dtype: np.dtype | str | None = None,
+    dtype: DTypeLike | str | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -489,6 +490,7 @@ def full_like(
         fill_value,
         highlevel=highlevel,
         behavior=behavior,
+        attrs=attrs,
         dtype=dtype,
         output_divisions=1,
     )
@@ -522,6 +524,7 @@ def isclose(
         behavior=behavior,
         label="is-close",
         output_divisions=1,
+        attrs=attrs,
     )
 
 
@@ -535,9 +538,13 @@ class _IsNoneFn:
 
 @borrow_docstring(ak.is_none)
 def is_none(
-    array: Array, axis: int = 0, highlevel: bool = True, behavior: Mapping | None = None
+    array: Array,
+    axis: int = 0,
+    highlevel: bool = True,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
-    fn = _IsNoneFn(axis=axis, highlevel=highlevel, behavior=behavior)
+    fn = _IsNoneFn(axis=axis, highlevel=highlevel, behavior=behavior, attrs=attrs)
     return map_partitions(fn, array, label="is-none", output_divisions=1)
 
 
@@ -559,6 +566,7 @@ def local_index(
         axis=axis,
         highlevel=highlevel,
         behavior=behavior,
+        attrs=attrs,
     )
 
 
@@ -576,11 +584,7 @@ def mask(
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
     return map_partitions(
-        ak.mask,
-        array,
-        mask,
-        valid_when=valid_when,
-        behavior=behavior,
+        ak.mask, array, mask, valid_when=valid_when, behavior=behavior, attrs=attrs
     )
 
 
@@ -593,6 +597,7 @@ def nan_to_num(
     neginf: Any | None = None,
     highlevel: bool = True,
     behavior: Any | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     # return map_partitions(
     #     ak.nan_to_num,
@@ -610,7 +615,7 @@ def nan_to_num(
 
 def _numaxis0(*integers):
     f = first(integers)
-    if isinstance(f, TypeTracerArray):
+    if is_unknown_scalar(f):
         return f
     return np.sum(np.array(integers))
 
@@ -676,16 +681,15 @@ def ones_like(
 
 @borrow_docstring(ak.to_packed)
 def to_packed(
-    array: Array, highlevel: bool = True, behavior: Mapping | None = None
+    array: Array,
+    highlevel: bool = True,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
 
-    return map_partitions(
-        ak.to_packed,
-        array,
-        behavior=behavior,
-    )
+    return map_partitions(ak.to_packed, array, behavior=behavior, attrs=attrs)
 
 
 class _PadNoneFn:
@@ -719,12 +723,7 @@ def pad_none(
     if axis == 0:
         DaskAwkwardNotImplemented("axis=0 for pad_none is not supported")
     return map_partitions(
-        _PadNoneFn(
-            target=target,
-            axis=axis,
-            clip=clip,
-            behavior=behavior,
-        ),
+        _PadNoneFn(target=target, axis=axis, clip=clip, behavior=behavior, attrs=attrs),
         array,
         label="pad-none",
         output_divisions=1,
@@ -851,7 +850,11 @@ def strings_astype(
 
 @borrow_docstring(ak.to_regular)
 def to_regular(
-    array: Array, axis: int = 1, highlevel: bool = True, behavior: Mapping | None = None
+    array: Array,
+    axis: int = 1,
+    highlevel: bool = True,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
@@ -868,6 +871,7 @@ def to_regular(
         axis=axis,
         behavior=behavior,
         label="to-regular",
+        attrs=attrs,
     )
 
 
@@ -900,25 +904,36 @@ def unflatten(
     )
 
 
-def _array_with_behavior(array: Array, behavior: Mapping | None) -> Array:
+def _array_with_rebuilt_meta(
+    array: Array, behavior: Mapping | None, attrs: Mapping[str, Any] | None
+) -> Array:
+    if attrs is None:
+        attrs = array._meta.attrs
+
     if behavior is None:
-        new_meta = array._meta
-    else:
-        new_meta = ak.Array(array._meta, behavior=behavior)
+        behavior = array._meta.behavior
+
+    new_meta = ak.Array(array._meta, behavior=behavior, attrs=attrs)
+
     return Array(array.dask, array.name, new_meta, array.divisions)
 
 
 @borrow_docstring(ak.unzip)
 def unzip(
-    array: Array, highlevel: bool = True, behavior: Mapping | None = None
+    array: Array,
+    highlevel: bool = True,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> tuple[Array, ...]:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
     fields = ak.fields(array._meta)
     if len(fields) == 0:
-        return (_array_with_behavior(array, behavior),)
+        return (_array_with_rebuilt_meta(array, behavior, attrs),)
     else:
-        return tuple(_array_with_behavior(array[field], behavior) for field in fields)
+        return tuple(
+            _array_with_rebuilt_meta(array[field], behavior, attrs) for field in fields
+        )
 
 
 @borrow_docstring(ak.values_astype)
@@ -937,6 +952,7 @@ def values_astype(
         to=to,
         behavior=behavior,
         label="values-astype",
+        attrs=attrs,
     )
 
 
@@ -946,10 +962,12 @@ class _WhereFn:
         mergebool: bool = True,
         highlevel: bool = True,
         behavior: Mapping | None = None,
+        attrs: Mapping[str, Any] | None = None,
     ) -> None:
         self.mergebool = mergebool
         self.highlevel = highlevel
         self.behavior = behavior
+        self.attrs = attrs
 
     def __call__(self, condition: ak.Array, x: ak.Array, y: ak.Array) -> ak.Array:
         return ak.where(
@@ -959,6 +977,7 @@ class _WhereFn:
             mergebool=self.mergebool,
             highlevel=self.highlevel,
             behavior=self.behavior,
+            attrs=self.attrs,
         )
 
 
@@ -987,7 +1006,7 @@ def where(
         raise IncompatiblePartitions("where", *dask_args)
 
     return map_partitions(
-        _WhereFn(mergebool=mergebool, behavior=behavior),
+        _WhereFn(mergebool=mergebool, behavior=behavior, attrs=attrs),
         condition,
         x,
         y,
@@ -998,20 +1017,19 @@ def where(
 class _WithFieldFn:
     def __init__(
         self,
-        where: str | Sequence[str] | None = None,
-        highlevel: bool = True,
-        behavior: Mapping | None = None,
+        where: str | Sequence[str] | None,
+        highlevel: bool,
+        behavior: Mapping | None,
+        attrs: Mapping[str, Any] | None,
     ) -> None:
         self.where = where
         self.highlevel = highlevel
         self.behavior = behavior
+        self.attrs = attrs
 
     def __call__(self, base: ak.Array, what: ak.Array) -> ak.Array:
         return ak.with_field(
-            base,
-            what,
-            where=self.where,
-            behavior=self.behavior,
+            base, what, where=self.where, behavior=self.behavior, attrs=self.attrs
         )
 
 
@@ -1041,7 +1059,7 @@ def with_field(
     if partition_compatibility(*dask_args) == PartitionCompatibility.NO:
         raise IncompatiblePartitions("with_field", *dask_args)
     return map_partitions(
-        _WithFieldFn(where=where, highlevel=highlevel, behavior=behavior),
+        _WithFieldFn(where=where, highlevel=highlevel, behavior=behavior, attrs=attrs),
         base,
         what,
         label="with-field",
@@ -1050,12 +1068,18 @@ def with_field(
 
 
 class _WithNameFn:
-    def __init__(self, name: str | None, behavior: Mapping | None = None) -> None:
+    def __init__(
+        self,
+        name: str | None,
+        behavior: Mapping | None,
+        attrs: Mapping[str, Any] | None,
+    ) -> None:
         self.name = name
         self.behavior = behavior
+        self.attrs = attrs
 
     def __call__(self, array: ak.Array) -> ak.Array:
-        return ak.with_name(array, self.name, behavior=self.behavior)
+        return ak.with_name(array, self.name, behavior=self.behavior, attrs=self.attrs)
 
 
 @borrow_docstring(ak.with_name)
@@ -1070,7 +1094,7 @@ def with_name(
         raise ValueError("Only highlevel=True is supported")
 
     return map_partitions(
-        _WithNameFn(name=name, behavior=behavior),
+        _WithNameFn(name=name, behavior=behavior, attrs=attrs),
         array,
         label="with-name",
         output_divisions=1,
@@ -1078,10 +1102,17 @@ def with_name(
 
 
 class _WithParameterFn:
-    def __init__(self, parameter, value, behavior):
+    def __init__(
+        self,
+        parameter: str,
+        value: Any,
+        behavior: Mapping | None,
+        attrs: Mapping[str, Any] | None,
+    ):
         self.parameter = parameter
         self.value = value
         self.behavior = behavior
+        self.attrs = attrs
 
     def __call__(self, array):
         return ak.with_parameter(
@@ -1089,6 +1120,7 @@ class _WithParameterFn:
             parameter=self.parameter,
             value=self.value,
             behavior=self.behavior,
+            attrs=self.attrs,
         )
 
 
@@ -1104,7 +1136,9 @@ def with_parameter(
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
     return map_partitions(
-        _WithParameterFn(parameter=parameter, value=value, behavior=behavior),
+        _WithParameterFn(
+            parameter=parameter, value=value, behavior=behavior, attrs=attrs
+        ),
         array,
         label="with-parameter",
         output_divisions=1,
@@ -1112,11 +1146,12 @@ def with_parameter(
 
 
 class _WithoutParameterFn:
-    def __init__(self, behavior):
+    def __init__(self, behavior: Mapping | None, attrs: Mapping[str, Any] | None):
         self.behavior = behavior
+        self.attrs = attrs
 
     def __call__(self, array):
-        return ak.without_parameters(array, behavior=self.behavior)
+        return ak.without_parameters(array, behavior=self.behavior, attrs=self.attrs)
 
 
 @borrow_docstring(ak.without_parameters)
@@ -1129,7 +1164,7 @@ def without_parameters(
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
     return map_partitions(
-        _WithoutParameterFn(behavior=behavior),
+        _WithoutParameterFn(behavior=behavior, attrs=attrs),
         array,
         label="without-parameters",
         output_divisions=1,
@@ -1153,6 +1188,7 @@ def zeros_like(
         behavior=behavior,
         dtype=dtype,
         output_divisions=1,
+        attrs=attrs,
     )
 
 
@@ -1184,14 +1220,14 @@ def zip(
     with_name: str | None = None,
     highlevel: bool = True,
     behavior: Mapping | None = None,
-    attrs: Mapping[str, Any] | None = None,
     right_broadcast: bool = False,
     optiontype_outside_record: bool = False,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
 
-    if isinstance(arrays, dict):
+    if isinstance(arrays, Mapping):
         keys, colls, metadict = [], [], {}
         for k, coll in arrays.items():
             keys.append(k)
@@ -1207,6 +1243,7 @@ def zip(
             behavior=behavior,
             right_broadcast=right_broadcast,
             optiontype_outside_record=optiontype_outside_record,
+            attrs=attrs,
         )
 
         return map_partitions(
@@ -1219,6 +1256,7 @@ def zip(
                 behavior=behavior,
                 right_broadcast=right_broadcast,
                 optiontype_outside_record=optiontype_outside_record,
+                attrs=attrs,
             ),
             *colls,
             label="zip",
@@ -1226,7 +1264,7 @@ def zip(
             opt_touch_all=True,
         )
 
-    elif isinstance(arrays, (list, tuple)):
+    elif isinstance(arrays, Sequence):
         fn = _ZipListInputFn(
             depth_limit=depth_limit,
             parameters=parameters,
@@ -1235,6 +1273,7 @@ def zip(
             behavior=behavior,
             right_broadcast=right_broadcast,
             optiontype_outside_record=optiontype_outside_record,
+            attrs=attrs,
         )
         return map_partitions(
             fn,
@@ -1244,7 +1283,7 @@ def zip(
 
     else:
         raise DaskAwkwardNotImplemented(
-            "only sized iterables are supported by dak.zip (dict, list, or tuple)"
+            "only mappings or sequences are supported by dak.zip (e.g. dict, list, or tuple)"
         )
 
 

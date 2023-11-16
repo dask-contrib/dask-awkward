@@ -455,6 +455,8 @@ def ptp(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = True,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     raise DaskAwkwardNotImplemented("TODO")
 
@@ -465,6 +467,8 @@ def softmax(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = False,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     raise DaskAwkwardNotImplemented("TODO")
 
