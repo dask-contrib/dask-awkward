@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import no_type_check
+
 import awkward as ak
 import numpy as np
 import pytest
@@ -35,6 +37,7 @@ class Point:
     def some_method(self):
         return None
 
+    @no_type_check
     @some_method.dask
     def some_method_dask(self, array):
         return array
