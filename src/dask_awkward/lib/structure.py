@@ -26,6 +26,7 @@ from dask_awkward.utils import (
     DaskAwkwardNotImplemented,
     IncompatiblePartitions,
     borrow_docstring,
+    first,
 )
 
 if TYPE_CHECKING:
@@ -608,6 +609,9 @@ def nan_to_num(
 
 
 def _numaxis0(*integers):
+    f = first(integers)
+    if isinstance(f, TypeTracerArray):
+        return f
     return np.sum(np.array(integers))
 
 
