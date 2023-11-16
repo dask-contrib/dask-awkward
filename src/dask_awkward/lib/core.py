@@ -24,6 +24,7 @@ from awkward._nplikes.typetracer import (
     is_unknown_scalar,
 )
 from awkward.highlevel import NDArrayOperatorsMixin, _dir_pattern
+from awkward.typetracer import create_unknown_scalar
 from dask.base import (
     DaskMethodsMixin,
     dont_optimize,
@@ -96,7 +97,7 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
             self._meta = self._check_meta(meta)
             self._dtype = np.dtype(self._meta.type.content.primitive)
         elif meta is None and dtype is not None:
-            self._meta = ak.Array(TypeTracerArray._new(dtype=dtype, shape=()))
+            self._meta = ak.Array(create_unknown_scalar(dtype))
             self._dtype = np.dtype(self._meta.type.content.primitive)
         else:
             ValueError("One (and only one) of dtype or meta can be defined.")
@@ -147,7 +148,7 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
     def key(self) -> Key:
         return (self._name, 0)
 
-    def _check_meta(self, m: Any) -> Any | None:
+    def _check_meta(self, m):
         if isinstance(m, MaybeNone):
             return ak.Array(m.content)
         elif isinstance(m, ak.Array) and len(m) == 1:
@@ -370,7 +371,7 @@ def new_scalar_object(
     if meta is not None and dtype is None:
         pass
     elif meta is None and dtype is not None:
-        meta = ak.Array(TypeTracerArray._new(dtype=np.dtype(dtype), shape=()))
+        meta = ak.Array(create_unknown_scalar(dtype))
     else:
         ValueError("One (and only one) of dtype or meta can be defined.")
 

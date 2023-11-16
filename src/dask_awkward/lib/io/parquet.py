@@ -42,6 +42,7 @@ class _FromParquetFn(ColumnProjectionMixin):
         unnamed_root: bool = False,
         original_form: Form | None = None,
         behavior: dict | None = None,
+        attrs: dict | None = None,
         **kwargs: Any,
     ) -> None:
         self.fs = fs
@@ -53,6 +54,7 @@ class _FromParquetFn(ColumnProjectionMixin):
             self.columns = [f".{c}" for c in self.columns]
         self.original_form = original_form
         self.behavior = behavior
+        self.attrs = attrs
         self.kwargs = kwargs
 
     @abc.abstractmethod
@@ -119,6 +121,7 @@ class _FromParquetFileWiseFn(_FromParquetFn):
             highlevel=True,
             fs=self.fs,
             behavior=self.behavior,
+            attrs=self.attrs,
             **self.kwargs,
         )
         return ak.Array(unproject_layout(self.original_form, array.layout))
@@ -169,6 +172,7 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
             highlevel=True,
             fs=self.fs,
             behavior=self.behavior,
+            attrs=self.attrs,
             **self.kwargs,
         )
         return ak.Array(unproject_layout(self.original_form, array.layout))

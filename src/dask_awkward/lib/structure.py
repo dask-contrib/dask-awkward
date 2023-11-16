@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 import awkward as ak
 import numpy as np
 from awkward._nplikes.typetracer import TypeTracerArray
+from awkward.typetracer import create_unknown_scalar
 from dask.base import is_dask_collection, tokenize
 from dask.highlevelgraph import HighLevelGraph
 
@@ -630,7 +631,7 @@ def num(
         return new_scalar_object(
             hlg,
             name,
-            meta=ak.Array(TypeTracerArray._new(dtype=np.dtype("int64"), shape=())),
+            meta=ak.Array(create_unknown_scalar(np.dtype("int64"))),
         )
     else:
         return map_partitions(
