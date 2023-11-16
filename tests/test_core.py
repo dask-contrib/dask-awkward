@@ -4,7 +4,6 @@ import copy
 import json
 import operator
 import sys
-from collections import namedtuple
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
