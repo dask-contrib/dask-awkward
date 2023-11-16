@@ -98,7 +98,7 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
             self._dtype = np.dtype(self._meta.type.content.primitive)
         elif meta is None and dtype is not None:
             self._meta = ak.Array(create_unknown_scalar(dtype))
-            self._dtype = np.dtype(self._meta.type.content.primitive)
+            self._dtype = dtype
         else:
             ValueError("One (and only one) of dtype or meta can be defined.")
         self._known_value: Any | None = known_value
