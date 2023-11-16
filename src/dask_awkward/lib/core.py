@@ -1505,7 +1505,7 @@ def new_array_object(
         ``awkward.compute-unknown-meta`` is set to ``False``,
         undefined `meta` will be assigned an empty typetracer.
     behavior : dict, optional
-        Custom #ak.behavior for the output array.
+        Custom ak.behavior for the output array.
     attrs : dict, optional
         Custom attributes for the output array.
     npartitions : int, optional

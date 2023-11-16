@@ -173,6 +173,7 @@ def from_delayed(
     behavior: Mapping | None = None,
     divisions: tuple[int, ...] | tuple[None, ...] | None = None,
     prefix: str = "from-delayed",
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     """Create an Array collection from a set of :class:`~dask.delayed.Delayed` objects.
 
@@ -186,10 +187,14 @@ def from_delayed(
         Metadata (typetracer array) if known, if ``None`` the first
         partition (first element of the list of ``Delayed`` objects)
         will be computed to determine the metadata.
+    behavior : dict, optional
+        Custom ak.behavior for the output array.
     divisions : tuple[int | None, ...], optional
         Partition boundaries (if known).
     prefix : str
         Prefix for the keys in the task graph.
+    attrs : mapping, optional
+        Custom attributes for the output array.
 
     Returns
     -------
@@ -213,11 +218,7 @@ def from_delayed(
             raise ValueError("divisions must be a tuple of length len(source) + 1")
     hlg = HighLevelGraph.from_collections(name, dsk, dependencies=parts)
     return new_array_object(
-        hlg,
-        name=name,
-        meta=meta,
-        behavior=behavior,
-        divisions=divs,
+        hlg, name=name, meta=meta, behavior=behavior, divisions=divs, attrs=attrs
     )
 
 
@@ -353,13 +354,21 @@ def to_dask_array(
         return new_da_object(graph, name, meta=None, chunks=chunks, dtype=dtype)
 
 
-def from_dask_array(array: DaskArray, behavior: Mapping | None = None) -> Array:
+def from_dask_array(
+    array: DaskArray,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
+) -> Array:
     """Convert a Dask Array collection to a Dask Awkard Array collection.
 
     Parameters
     ----------
     array : dask.array.Array
         Array to convert.
+    behavior : dict, optional
+        Custom ak.behavior for the output array.
+    attrs : mapping, optional
+        Custom attributes for the output array.
 
     Returns
     -------
@@ -396,11 +405,18 @@ def from_dask_array(array: DaskArray, behavior: Mapping | None = None) -> Array:
     hlg = HighLevelGraph.from_collections(name, layer, dependencies=[array])
     if np.any(np.isnan(array.chunks)):
         return new_array_object(
-            hlg, name, npartitions=array.npartitions, meta=meta, behavior=behavior
+            hlg,
+            name,
+            npartitions=array.npartitions,
+            meta=meta,
+            behavior=behavior,
+            attrs=attrs,
         )
     else:
         divs = (0, *np.cumsum(array.chunks))
-        return new_array_object(hlg, name, divisions=divs, meta=meta, behavior=behavior)
+        return new_array_object(
+            hlg, name, divisions=divs, meta=meta, behavior=behavior, attrs=attrs
+        )
 
 
 def to_dataframe(
