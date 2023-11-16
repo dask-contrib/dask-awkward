@@ -116,9 +116,7 @@ def from_awkward(
 
 
 class _FromListsFn:
-    def __init__(
-        self, behavior: Mapping | None = None, attrs: Mapping[str, Any] | None = None
-    ):
+    def __init__(self, behavior: Mapping | None, attrs: Mapping[str, Any] | None):
         self.behavior = behavior
         self.attrs = attrs
 
@@ -138,6 +136,10 @@ def from_lists(
     source : list[list[Any]]
         List of lists, each outer list will become a partition in the
         collection.
+    behavior : dict, optional
+        Custom ak.behavior for the output array.
+    attrs : mapping, optional
+        Custom attributes for the output array.
 
     Returns
     -------
@@ -545,6 +547,8 @@ def from_map(
         number of partitions in the output collection (only one
         element of each iterable will be passed to `func` for each
         partition).
+    args : tuple
+        Tuple of positional arguments to append after mapped arguments.
     label : str, optional
         String to use as the function-name label in the output
         collection-key names.
