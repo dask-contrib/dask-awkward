@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import functools
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any, TypeVar
 
 import awkward.operations.str as akstr
@@ -28,7 +28,8 @@ def capitalize(
     array: Array,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.capitalize,
@@ -45,7 +46,8 @@ def center(
     padding: str | bytes = " ",
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.center,
@@ -64,7 +66,8 @@ def count_substring(
     *,
     ignore_case: bool = False,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.count_substring,
@@ -83,7 +86,8 @@ def count_substring_regex(
     *,
     ignore_case: bool = False,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.count_substring_regex,
@@ -102,7 +106,8 @@ def ends_with(
     *,
     ignore_case: bool = False,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.ends_with,
@@ -120,7 +125,8 @@ def extract_regex(
     pattern: bytes | str,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.extract_regex,
@@ -138,7 +144,8 @@ def find_substring(
     *,
     ignore_case: bool = False,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.find_substring,
@@ -157,7 +164,8 @@ def find_substring_regex(
     *,
     ignore_case: bool = False,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.find_substring_regex,
@@ -176,7 +184,8 @@ def index_in(
     *,
     skip_nones: bool = False,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.index_in,
@@ -193,7 +202,8 @@ def is_alnum(
     array: Array,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.is_alnum,
@@ -208,7 +218,8 @@ def is_alpha(
     array: Array,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.is_alpha,
@@ -223,7 +234,8 @@ def is_ascii(
     array: Array,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.is_ascii,
@@ -238,7 +250,8 @@ def is_decimal(
     array: Array,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.is_decimal,
@@ -253,7 +266,8 @@ def is_digit(
     array: Array,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.is_digit,
@@ -270,7 +284,8 @@ def is_in(
     *,
     skip_nones: bool = False,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.is_in,
@@ -287,7 +302,8 @@ def is_lower(
     array: Array,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.is_lower,
@@ -302,7 +318,8 @@ def is_numeric(
     array: Array,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.is_numeric,
@@ -317,7 +334,8 @@ def is_printable(
     array: Array,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.is_printable,
@@ -332,7 +350,8 @@ def is_space(
     array: Array,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.is_space,
@@ -347,7 +366,8 @@ def is_title(
     array: Array,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.is_title,
@@ -362,7 +382,8 @@ def is_upper(
     array: Array,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.is_upper,
@@ -378,7 +399,8 @@ def join(
     separator: Any,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.join,
@@ -393,7 +415,8 @@ def join(
 def join_element_wise(
     *arrays: Array,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.join_element_wise,
@@ -408,7 +431,8 @@ def length(
     array: Array,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.length,
@@ -423,7 +447,8 @@ def lower(
     array: Array,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.lower,
@@ -440,7 +465,8 @@ def lpad(
     padding: str | bytes = " ",
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.lpad,
@@ -458,7 +484,8 @@ def ltrim(
     characters: str | bytes,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.ltrim,
@@ -474,7 +501,8 @@ def ltrim_whitespace(
     array: Array,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.ltrim_whitespace,
@@ -491,7 +519,8 @@ def match_like(
     *,
     ignore_case: bool = False,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.match_like,
@@ -510,7 +539,8 @@ def match_substring(
     *,
     ignore_case: bool = False,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.match_substring,
@@ -529,7 +559,8 @@ def match_substring_regex(
     *,
     ignore_case: bool = False,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.match_substring_regex,
@@ -547,7 +578,8 @@ def repeat(
     num_repeats: Any,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.repeat,
@@ -566,7 +598,8 @@ def replace_slice(
     replacement: str | bytes,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.replace_slice,
@@ -587,7 +620,8 @@ def replace_substring(
     *,
     max_replacements: int | None = None,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.replace_substring,
@@ -608,7 +642,8 @@ def replace_substring_regex(
     *,
     max_replacements: int | None = None,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.replace_substring_regex,
@@ -626,7 +661,8 @@ def reverse(
     array: Array,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.reverse,
@@ -643,7 +679,8 @@ def rpad(
     padding: str | bytes = " ",
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.rpad,
@@ -661,7 +698,8 @@ def rtrim(
     characters: str | bytes,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.rtrim,
@@ -677,7 +715,8 @@ def rtrim_whitespace(
     array: Array,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.rtrim_whitespace,
@@ -695,7 +734,8 @@ def slice(
     step: int = 1,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.slice,
@@ -716,7 +756,8 @@ def split_pattern(
     max_splits: int | None = None,
     reverse: bool = False,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.split_pattern,
@@ -737,7 +778,8 @@ def split_pattern_regex(
     max_splits: int | None = None,
     reverse: bool = False,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.split_pattern_regex,
@@ -757,7 +799,8 @@ def split_whitespace(
     max_splits: int | None = None,
     reverse: bool = False,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.split_whitespace,
@@ -775,7 +818,8 @@ def starts_with(
     *,
     ignore_case: bool = False,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.starts_with,
@@ -792,7 +836,8 @@ def swapcase(
     array: Array,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.swapcase,
@@ -807,7 +852,8 @@ def title(
     array: Array,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.title,
@@ -822,7 +868,8 @@ def to_categorical(
     array: Array,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.to_categorical,
@@ -838,7 +885,8 @@ def trim(
     characters: str | bytes,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.trim,
@@ -854,7 +902,8 @@ def trim_whitespace(
     array: Array,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.trim_whitespace,
@@ -869,7 +918,8 @@ def upper(
     array: Array,
     *,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
     return map_partitions(
         akstr.upper,

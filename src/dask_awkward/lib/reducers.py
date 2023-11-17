@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 import awkward as ak
@@ -39,6 +40,8 @@ def all(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = False,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     if axis is None or axis == 0 or axis == -1 * array.ndim:
         return non_trivial_reduction(
@@ -49,6 +52,8 @@ def all(
             is_positional=False,
             keepdims=keepdims,
             mask_identity=mask_identity,
+            behavior=behavior,
+            attrs=attrs,
         )
     else:
         return map_partitions(
@@ -58,6 +63,8 @@ def all(
             axis=axis,
             keepdims=keepdims,
             mask_identity=mask_identity,
+            behavior=behavior,
+            attrs=attrs,
         )
 
 
@@ -67,6 +74,8 @@ def any(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = False,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     if axis is None or axis == 0 or axis == -1 * array.ndim:
         return non_trivial_reduction(
@@ -77,6 +86,8 @@ def any(
             is_positional=False,
             keepdims=keepdims,
             mask_identity=mask_identity,
+            behavior=behavior,
+            attrs=attrs,
         )
     else:
         return map_partitions(
@@ -86,6 +97,8 @@ def any(
             axis=axis,
             keepdims=keepdims,
             mask_identity=mask_identity,
+            behavior=behavior,
+            attrs=attrs,
         )
 
 
@@ -95,6 +108,8 @@ def argmax(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = True,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     if axis is None or axis == 0 or axis == -1 * array.ndim:
         return non_trivial_reduction(
@@ -105,6 +120,8 @@ def argmax(
             is_positional=True,
             keepdims=keepdims,
             mask_identity=mask_identity,
+            behavior=behavior,
+            attrs=attrs,
         )
     else:
         return map_partitions(
@@ -114,6 +131,8 @@ def argmax(
             axis=axis,
             keepdims=keepdims,
             mask_identity=mask_identity,
+            behavior=behavior,
+            attrs=attrs,
         )
 
 
@@ -123,6 +142,8 @@ def argmin(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = True,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     if axis is None or axis == 0 or axis == -1 * array.ndim:
         return non_trivial_reduction(
@@ -133,6 +154,8 @@ def argmin(
             is_positional=True,
             keepdims=keepdims,
             mask_identity=mask_identity,
+            behavior=behavior,
+            attrs=attrs,
         )
     else:
         return map_partitions(
@@ -142,18 +165,22 @@ def argmin(
             axis=axis,
             keepdims=keepdims,
             mask_identity=mask_identity,
+            behavior=behavior,
+            attrs=attrs,
         )
 
 
 @borrow_docstring(ak.corr)
 def corr(
-    x,
-    y,
-    weight=None,
-    axis=None,
-    keepdims=False,
-    mask_identity=False,
-):
+    x: Array,
+    y: Array,
+    weight: Array | int | float | complex | None = None,
+    axis: int | None = None,
+    keepdims: bool = False,
+    mask_identity: bool = False,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
+) -> Any:
     raise DaskAwkwardNotImplemented("TODO")
 
 
@@ -163,6 +190,8 @@ def count(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = False,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     if axis is None or axis == 0 or axis == -1 * array.ndim:
         return non_trivial_reduction(
@@ -174,6 +203,8 @@ def count(
             is_positional=False,
             keepdims=keepdims,
             mask_identity=mask_identity,
+            behavior=behavior,
+            attrs=attrs,
         )
     else:
         return map_partitions(
@@ -183,6 +214,8 @@ def count(
             axis=axis,
             keepdims=keepdims,
             mask_identity=mask_identity,
+            behavior=behavior,
+            attrs=attrs,
         )
 
 
@@ -192,6 +225,8 @@ def count_nonzero(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = False,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     if axis is None or axis == 0 or axis == -1 * array.ndim:
         return non_trivial_reduction(
@@ -203,6 +238,8 @@ def count_nonzero(
             is_positional=False,
             keepdims=keepdims,
             mask_identity=mask_identity,
+            behavior=behavior,
+            attrs=attrs,
         )
     else:
         return map_partitions(
@@ -212,31 +249,45 @@ def count_nonzero(
             axis=axis,
             keepdims=keepdims,
             mask_identity=mask_identity,
+            behavior=behavior,
+            attrs=attrs,
         )
 
 
 @borrow_docstring(ak.covar)
 def covar(
-    x,
-    y,
-    weight=None,
-    axis=None,
-    keepdims=False,
-    mask_identity=False,
-):
+    x: Array,
+    y: Array,
+    weight: Array | int | float | complex | None = None,
+    axis: int | None = None,
+    keepdims: bool = False,
+    mask_identity: bool = False,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
+) -> Any:
     raise DaskAwkwardNotImplemented("TODO")
 
 
 @borrow_docstring(ak.linear_fit)
 def linear_fit(
-    x,
-    y,
-    weight=None,
-    axis=None,
-    keepdims=False,
-    mask_identity=False,
-):
+    x: Array,
+    y: Array,
+    weight: Array | int | float | complex | None = None,
+    axis: int | None = None,
+    keepdims: bool = False,
+    mask_identity: bool = False,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
+) -> Any:
     raise DaskAwkwardNotImplemented("TODO")
+
+
+class _MaxFn:
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __call__(self, array, **kwargs):
+        return ak.max(array, **self.kwargs, **kwargs)
 
 
 @borrow_docstring(ak.max)
@@ -246,36 +297,49 @@ def max(
     keepdims: bool = False,
     initial: float | None = None,
     mask_identity: bool = True,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     if axis is None or axis == 0 or axis == -1 * array.ndim:
         return non_trivial_reduction(
             axis=axis,
             label="max",
             array=array,
-            reducer=ak.max,
+            reducer=_MaxFn(initial=initial),
             is_positional=False,
             keepdims=keepdims,
             mask_identity=mask_identity,
+            behavior=behavior,
+            attrs=attrs,
         )
     else:
         return map_partitions(
-            ak.max,
+            _MaxFn(initial=initial),
             array,
             output_divisions=1,
             axis=axis,
             keepdims=keepdims,
             mask_identity=mask_identity,
+            behavior=behavior,
+            attrs=attrs,
         )
 
 
 @borrow_docstring(ak.mean)
 def mean(
-    array,
-    weight=None,
-    axis=None,
-    keepdims=False,
-    mask_identity=False,
-):
+    array: Array,
+    weight: Array | int | float | complex | None = None,
+    axis: int | None = None,
+    keepdims: bool = False,
+    mask_identity: bool = False,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
+) -> Array:
+    if weight is not None:
+        raise DaskAwkwardNotImplemented(
+            f"weight={weight} is not supported for this array yet."
+        )
+
     if axis == 0 or axis == -1 * array.ndim:
         raise DaskAwkwardNotImplemented(
             f"axis={axis} is not supported for this array yet."
@@ -288,8 +352,18 @@ def mean(
             axis=axis,
             keepdims=keepdims,
             mask_identity=mask_identity,
+            behavior=behavior,
+            attrs=attrs,
         )
     raise DaskAwkwardNotImplemented("TODO")
+
+
+class _MinFn:
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __call__(self, array, **kwargs):
+        return ak.min(array, **self.kwargs, **kwargs)
 
 
 @borrow_docstring(ak.min)
@@ -299,42 +373,57 @@ def min(
     keepdims: bool = False,
     initial: float | None = None,
     mask_identity: bool = True,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     if axis is None or axis == 0 or axis == -1 * array.ndim:
         return non_trivial_reduction(
             axis=axis,
             label="min",
             array=array,
-            reducer=ak.min,
+            reducer=_MinFn(initial=initial),
             is_positional=False,
             keepdims=keepdims,
             mask_identity=mask_identity,
+            behavior=behavior,
+            attrs=attrs,
         )
     else:
         return map_partitions(
-            ak.min,
+            _MinFn(initial=initial),
             array,
             output_divisions=1,
             axis=axis,
             keepdims=keepdims,
             mask_identity=mask_identity,
+            behavior=behavior,
+            attrs=attrs,
         )
 
 
 @borrow_docstring(ak.moment)
 def moment(
-    x,
-    n,
-    weight=None,
-    axis=None,
-    keepdims=False,
-    mask_identity=False,
-):
+    x: Array,
+    n: int,
+    weight: Array | int | float | complex | None = None,
+    axis: int | None = None,
+    keepdims: bool = False,
+    mask_identity: bool = False,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
+) -> Any:
     raise DaskAwkwardNotImplemented("TODO")
 
 
 @borrow_docstring(ak.prod)
-def prod(array, axis=None, keepdims=False, mask_identity=False):
+def prod(
+    array: Array,
+    axis: int | None = None,
+    keepdims: bool = False,
+    mask_identity: bool = False,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
+) -> Any:
     if axis is None or axis == 0 or axis == -1 * array.ndim:
         return non_trivial_reduction(
             axis=axis,
@@ -344,6 +433,8 @@ def prod(array, axis=None, keepdims=False, mask_identity=False):
             is_positional=False,
             keepdims=keepdims,
             mask_identity=mask_identity,
+            behavior=behavior,
+            attrs=attrs,
         )
     else:
         return map_partitions(
@@ -353,16 +444,32 @@ def prod(array, axis=None, keepdims=False, mask_identity=False):
             axis=axis,
             keepdims=keepdims,
             mask_identity=mask_identity,
+            behavior=behavior,
+            attrs=attrs,
         )
 
 
 @borrow_docstring(ak.ptp)
-def ptp(arr, axis=None, keepdims=False, mask_identity=True):
+def ptp(
+    arr: Array,
+    axis: int | None = None,
+    keepdims: bool = False,
+    mask_identity: bool = True,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
+) -> Any:
     raise DaskAwkwardNotImplemented("TODO")
 
 
 @borrow_docstring(ak.softmax)
-def softmax(x, axis=None, keepdims=False, mask_identity=False):
+def softmax(
+    x: Array,
+    axis: int | None = None,
+    keepdims: bool = False,
+    mask_identity: bool = False,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
+) -> Any:
     raise DaskAwkwardNotImplemented("TODO")
 
 
@@ -376,13 +483,15 @@ class _StdFn:
 
 @borrow_docstring(ak.std)
 def std(
-    x,
-    weight=None,
-    ddof=0,
-    axis=None,
-    keepdims=False,
-    mask_identity=False,
-):
+    x: Array,
+    weight: Array | int | float | complex | None = None,
+    ddof: int = 0,
+    axis: int | None = None,
+    keepdims: bool = False,
+    mask_identity: bool = False,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
+) -> Any:
     if weight is not None:
         raise DaskAwkwardNotImplemented("weight argument is not supported.")
     if axis is None or axis == 0 or axis == -1 * x.ndim:
@@ -396,6 +505,8 @@ def std(
                 axis=axis,
                 keepdims=keepdims,
                 mask_identity=mask_identity,
+                behavior=behavior,
+                attrs=attrs,
             ),
             x,
             output_divisions=1,
@@ -409,6 +520,8 @@ def sum(
     axis: int | None = None,
     keepdims: bool = False,
     mask_identity: bool = False,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
 ) -> Any:
     if axis is None or axis == 0 or axis == -1 * array.ndim:
         return non_trivial_reduction(
@@ -419,6 +532,8 @@ def sum(
             is_positional=False,
             keepdims=keepdims,
             mask_identity=mask_identity,
+            behavior=behavior,
+            attrs=attrs,
         )
     else:
         return map_partitions(
@@ -428,6 +543,8 @@ def sum(
             axis=axis,
             keepdims=keepdims,
             mask_identity=mask_identity,
+            behavior=behavior,
+            attrs=attrs,
         )
 
 
@@ -441,13 +558,15 @@ class _VarFn:
 
 @borrow_docstring(ak.var)
 def var(
-    x,
-    weight=None,
-    ddof=0,
-    axis=None,
-    keepdims=False,
-    mask_identity=False,
-):
+    x: Array,
+    weight: Array | int | float | complex | None = None,
+    ddof: int = 0,
+    axis: int | None = None,
+    keepdims: bool = False,
+    mask_identity: bool = False,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
+) -> Any:
     if weight is not None:
         raise DaskAwkwardNotImplemented("weight argument is not supported.")
     if axis is None or axis == 0 or axis == -1 * x.ndim:
@@ -461,6 +580,8 @@ def var(
                 axis=axis,
                 keepdims=keepdims,
                 mask_identity=mask_identity,
+                behavior=behavior,
+                attrs=attrs,
             ),
             x,
             output_divisions=1,
