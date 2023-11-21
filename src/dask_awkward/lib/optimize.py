@@ -115,9 +115,6 @@ def _prepare_buffer_projection(
     for name in _ak_output_layer_names(dsk):
         projection_layers[name] = _mock_output(projection_layers[name])
 
-    for name in _opt_touch_all_layer_names(dsk):
-        projection_layers[name] = _touch_and_call(projection_layers[name])
-
     hlg = HighLevelGraph(projection_layers, dsk.dependencies)
 
     # this loop builds up what are the possible final leaf nodes by
@@ -235,11 +232,6 @@ def _ak_output_layer_names(dsk: HighLevelGraph) -> list[str]:
     return _layers_with_annotation(dsk, "ak_output")
 
 
-def _opt_touch_all_layer_names(dsk: HighLevelGraph) -> list[str]:
-    return [n for n, v in dsk.layers.items() if hasattr(v, "_opt_touch_all")]
-    # return _layers_with_annotation(dsk, "ak_touch_all")
-
-
 def _has_projectable_awkward_io_layer(dsk: HighLevelGraph) -> bool:
     """Check if a graph at least one AwkwardInputLayer that is project-able."""
     for _, v in dsk.layers.items():
@@ -262,22 +254,6 @@ def _mock_output(layer):
     mp = new_layer.dsk.copy()
     for k in iter(mp.keys()):
         mp[k] = (_touch_all_data,) + mp[k][1:]
-    new_layer.dsk = mp
-    return new_layer
-
-
-def _touch_and_call_fn(fn, *args, **kwargs):
-    _touch_all_data(*args, **kwargs)
-    return fn(*args, **kwargs)
-
-
-def _touch_and_call(layer):
-    assert len(layer.dsk) == 1
-
-    new_layer = copy.deepcopy(layer)
-    mp = new_layer.dsk.copy()
-    for k in iter(mp.keys()):
-        mp[k] = (_touch_and_call_fn,) + mp[k]
     new_layer.dsk = mp
     return new_layer
 

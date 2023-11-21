@@ -88,7 +88,9 @@ def test_zip_tuple_input(caa: ak.Array, daa: dak.Array) -> None:
 def test_zip_bad_input(daa: dak.Array) -> None:
     da1 = daa.points.x
     gd = (x for x in (da1, da1))
-    with pytest.raises(DaskAwkwardNotImplemented, match="only sized iterables"):
+    with pytest.raises(
+        DaskAwkwardNotImplemented, match="only mappings or sequences are supported"
+    ):
         dak.zip(gd)
 
 
@@ -388,11 +390,8 @@ def test_sort(daa, caa, ascending):
 
 
 def test_copy(daa):
-    with pytest.raises(
-        DaskAwkwardNotImplemented,
-        match="This function is not necessary in the context of dask-awkward.",
-    ):
-        dak.copy(daa)
+    result = dak.copy(daa)
+    assert result._meta is not daa._meta
 
 
 @pytest.mark.parametrize(

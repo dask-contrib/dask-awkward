@@ -109,7 +109,7 @@ def test_from_map_with_args_kwargs() -> None:
 
     # concrete version
     y = list(zip(a, b, c))
-    y = dask.core.flatten(list(map(list, y)))  # type: ignore
+    y = dask.core.flatten(list(map(list, y)))
     y = map(lambda x: x * n, y)  # type: ignore
     y = ak.from_iter(y)
 
@@ -120,7 +120,7 @@ def test_from_map_with_args_kwargs() -> None:
 
     # concrete version
     y = list(zip(a, b, c, [0, 0, 0]))  # type: ignore
-    y = dask.core.flatten(list(map(list, y)))  # type: ignore
+    y = dask.core.flatten(list(map(list, y)))
     y = map(lambda x: x * n, y)  # type: ignore
     y = ak.from_iter(y)
 
@@ -281,12 +281,18 @@ def test_from_awkward_empty_array(daa: dak.Array) -> None:
     assert len(c1) == 0
     a1 = dak.from_awkward(c1, npartitions=1)
     assert_eq(a1, c1)
-    assert len(a1) == 0
+    assert not a1.known_divisions
+    a1.eager_compute_divisions()
+    assert a1.known_divisions
+    assert len(a1) == 0  # type: ignore
 
     # with a form
     c2 = ak.typetracer.length_zero_if_typetracer(daa.layout)
     assert len(c2) == 0
     a2 = dak.from_awkward(c2, npartitions=1)
+    assert not a2.known_divisions
+    a2.eager_compute_divisions()
+    assert a2.known_divisions
     assert len(a2) == 0
     daa.layout.form == a2.layout.form
 

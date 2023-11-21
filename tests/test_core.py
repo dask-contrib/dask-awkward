@@ -100,7 +100,20 @@ def test_compute_typetracer(daa: Array) -> None:
 
 def test_len(ndjson_points_file: str) -> None:
     daa = dak.from_json([ndjson_points_file] * 2)
-    assert len(daa) == 10
+    assert not daa.known_divisions
+    with pytest.raises(
+        NotImplementedError,
+        match=(
+            "Cannot determine length of collection with unknown partition sizes without executing the graph.\\n"
+            "Use `dask_awkward.num\\(\\.\\.\\., axis=0\\)` if you want a lazy Scalar of the length.\\n"
+            "If you want to eagerly compute the partition sizes to have the ability to call `len` on the collection"
+            ", use `\\.eager_compute_divisions\\(\\)` on the collection."
+        ),
+    ):
+        assert len(daa) == 10
+    daa.eager_compute_divisions()
+    assert daa.known_divisions
+    assert len(daa) == 10  # type: ignore
 
 
 def test_meta_exists(daa: Array) -> None:
@@ -206,7 +219,9 @@ def test_scalar_collection(daa: Array) -> None:
 def test_scalar_getitem_getattr() -> None:
     d = {"a": 5}
     s = new_known_scalar(d)
-    assert s["a"].compute() == d["a"]
+    with pytest.raises(NotImplementedError, match="should be done after converting"):
+        s["a"].compute() == d["a"]
+    assert s.to_delayed()["a"].compute() == d["a"]  # type: ignore
     Thing = namedtuple("Thing", "a b c")
     t = Thing(c=3, b=2, a=1)
     s = new_known_scalar(t)

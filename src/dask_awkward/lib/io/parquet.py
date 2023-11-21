@@ -5,6 +5,7 @@ import itertools
 import logging
 import math
 import operator
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 import awkward as ak
@@ -41,7 +42,8 @@ class _FromParquetFn(ColumnProjectionMixin):
         listsep: str = "list.item",
         unnamed_root: bool = False,
         original_form: Form | None = None,
-        behavior: dict | None = None,
+        behavior: Mapping | None = None,
+        attrs: Mapping[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
         self.fs = fs
@@ -53,6 +55,7 @@ class _FromParquetFn(ColumnProjectionMixin):
             self.columns = [f".{c}" for c in self.columns]
         self.original_form = original_form
         self.behavior = behavior
+        self.attrs = attrs
         self.kwargs = kwargs
 
     @abc.abstractmethod
@@ -97,7 +100,7 @@ class _FromParquetFileWiseFn(_FromParquetFn):
         listsep: str = "list.item",
         unnamed_root: bool = False,
         original_form: Form | None = None,
-        behavior: dict | None = None,
+        behavior: Mapping | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(
@@ -111,17 +114,22 @@ class _FromParquetFileWiseFn(_FromParquetFn):
         )
 
     def __call__(self, source: Any) -> Any:
-        array = ak_from_parquet._load(
+        layout = ak_from_parquet._load(
             [source],
             parquet_columns=self.columns,
             subrg=[None],
             subform=self.form,
-            highlevel=True,
+            highlevel=False,
+            attrs=None,
+            behavior=None,
             fs=self.fs,
-            behavior=self.behavior,
             **self.kwargs,
         )
-        return ak.Array(unproject_layout(self.original_form, array.layout))
+        return ak.Array(
+            unproject_layout(self.original_form, layout),
+            attrs=self.attrs,
+            behavior=self.behavior,
+        )
 
     def project_columns(self, columns):
         return _FromParquetFileWiseFn(
@@ -130,6 +138,7 @@ class _FromParquetFileWiseFn(_FromParquetFn):
             listsep=self.listsep,
             unnamed_root=self.unnamed_root,
             original_form=self.form,
+            attrs=self.attrs,
             behavior=self.behavior,
             **self.kwargs,
         )
@@ -144,7 +153,8 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
         listsep: str = "list.item",
         unnamed_root: bool = False,
         original_form: Form | None = None,
-        behavior: dict | None = None,
+        behavior: Mapping | None = None,
+        attrs: Mapping[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(
@@ -154,6 +164,7 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
             unnamed_root=unnamed_root,
             original_form=original_form,
             behavior=behavior,
+            attrs=attrs,
             **kwargs,
         )
 
@@ -161,17 +172,22 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
         subrg, source = pair
         if isinstance(subrg, int):
             subrg = [[subrg]]
-        array = ak_from_parquet._load(
+        layout = ak_from_parquet._load(
             [source],
             parquet_columns=self.columns,
             subrg=subrg,
             subform=self.form,
-            highlevel=True,
+            highlevel=False,
+            attrs=None,
+            behavior=None,
             fs=self.fs,
-            behavior=self.behavior,
             **self.kwargs,
         )
-        return ak.Array(unproject_layout(self.original_form, array.layout))
+        return ak.Array(
+            unproject_layout(self.original_form, layout),
+            behavior=self.behavior,
+            attrs=self.attrs,
+        )
 
     def project_columns(self, columns):
         return _FromParquetFragmentWiseFn(
@@ -180,6 +196,7 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
             unnamed_root=self.unnamed_root,
             original_form=self.form,
             behavior=self.behavior,
+            attrs=self.attrs,
             **self.kwargs,
         )
 
@@ -193,7 +210,8 @@ def from_parquet(
     footer_sample_size: int = 1_000_000,
     generate_bitmasks: bool = False,
     highlevel: bool = True,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
     ignore_metadata: bool = True,
     scan_files: bool = False,
     split_row_groups: bool | None = False,
@@ -263,6 +281,8 @@ def from_parquet(
         ignore_metadata,
         scan_files,
         split_row_groups,
+        behavior,
+        attrs,
     )
 
     (
@@ -307,6 +327,7 @@ def from_parquet(
                 footer_sample_size=footer_sample_size,
                 generate_bitmasks=generate_bitmasks,
                 behavior=behavior,
+                attrs=attrs,
             ),
             actual_paths,
             label=label,
@@ -345,6 +366,7 @@ def from_parquet(
                 footer_sample_size=footer_sample_size,
                 generate_bitmasks=generate_bitmasks,
                 behavior=behavior,
+                attrs=attrs,
             ),
             pairs,
             label=label,

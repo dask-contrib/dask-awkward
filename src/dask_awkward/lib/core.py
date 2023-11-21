@@ -6,7 +6,7 @@ import math
 import operator
 import sys
 import warnings
-from collections.abc import Callable, Hashable, Sequence
+from collections.abc import Callable, Hashable, Mapping, Sequence
 from enum import IntEnum
 from functools import cached_property, partial, wraps
 from inspect import getattr_static
@@ -17,13 +17,14 @@ import awkward as ak
 import dask.config
 import numpy as np
 from awkward._do import remove_structure as ak_do_remove_structure
-from awkward._nplikes.typetracer import (
+from awkward.highlevel import NDArrayOperatorsMixin, _dir_pattern
+from awkward.typetracer import (
     MaybeNone,
     OneOf,
     TypeTracerArray,
+    create_unknown_scalar,
     is_unknown_scalar,
 )
-from awkward.highlevel import NDArrayOperatorsMixin, _dir_pattern
 from dask.base import (
     DaskMethodsMixin,
     dont_optimize,
@@ -180,7 +181,9 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
         return (self._name, 0)
 
     def _check_meta(self, m: Any) -> Any | None:
-        if isinstance(m, (MaybeNone, OneOf)) or is_unknown_scalar(m):
+        if m is None:
+            return m
+        elif isinstance(m, (MaybeNone, OneOf)) or is_unknown_scalar(m):
             return m
         elif isinstance(m, ak.Array) and len(m) == 1:
             return m
@@ -233,15 +236,11 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
         return f"dask.awkward<{key_split(self.name)}, type=Scalar, dtype={dt}>"
 
     def __getitem__(self, where: Any) -> Any:
-        token = tokenize(self, operator.getitem, where)
-        label = "getitem"
-        name = f"{label}-{token}"
-        task = AwkwardMaterializedLayer(
-            {(name, 0): (operator.getitem, self.key, where)},
-            previous_layer_names=[self.name],
+        msg = (
+            "__getitem__ access on Scalars should be done after converting "
+            "the Scalar collection to delayed with the to_delayed method."
         )
-        hlg = HighLevelGraph.from_collections(name, task, dependencies=[self])
-        return new_scalar_object(hlg, name, meta=None)
+        raise NotImplementedError(msg)
 
     @property
     def known_value(self) -> Any | None:
@@ -388,12 +387,9 @@ def new_scalar_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Scalar:
         Resulting collection.
 
     """
-    if meta is None:
-        meta = ak.Array(TypeTracerArray._new(dtype=np.dtype(None), shape=()))
-
     if isinstance(meta, MaybeNone):
         meta = ak.Array(meta.content)
-    else:
+    elif meta is not None:
         try:
             if ak.backend(meta) != "typetracer":
                 raise TypeError(
@@ -451,9 +447,7 @@ def new_known_scalar(
         dtype = np.dtype(dtype)
     llg = AwkwardMaterializedLayer({(name, 0): s}, previous_layer_names=[])
     hlg = HighLevelGraph.from_collections(name, llg, dependencies=())
-    return Scalar(
-        hlg, name, meta=TypeTracerArray._new(dtype=dtype, shape=()), known_value=s
-    )
+    return Scalar(hlg, name, meta=create_unknown_scalar(dtype), known_value=s)
 
 
 class Record(Scalar):
@@ -744,7 +738,12 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     def __len__(self) -> int:
         if not self.known_divisions:
-            self.eager_compute_divisions()
+            raise NotImplementedError(
+                "Cannot determine length of collection with unknown partition sizes without executing the graph.\n"
+                "Use `dask_awkward.num(..., axis=0)` if you want a lazy Scalar of the length.\n"
+                "If you want to eagerly compute the partition sizes to have the ability to call `len` on the collection"
+                ", use `.eager_compute_divisions()` on the collection."
+            )
         return self.divisions[-1]  # type: ignore
 
     def _shorttypestr(self, max: int = 10) -> str:
@@ -854,7 +853,14 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         raise ValueError("This collection's meta is None; unknown layout.")
 
     @property
-    def behavior(self) -> dict:
+    def attrs(self) -> dict:
+        """awkward Array attrs dictionary."""
+        if self._meta is not None:
+            return self._meta.attrs
+        raise ValueError("This collection's meta is None; no attrs property available.")
+
+    @property
+    def behavior(self) -> Mapping:
         """awkward Array behavior dictionary."""
         if self._meta is not None:
             return self._meta.behavior
@@ -1454,7 +1460,8 @@ def new_array_object(
     name: str,
     *,
     meta: ak.Array | None = None,
-    behavior: dict | None = None,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
     npartitions: int | None = None,
     divisions: tuple[int, ...] | tuple[None, ...] | None = None,
 ) -> Array:
@@ -1473,6 +1480,10 @@ def new_array_object(
         typetracer for the new Array. If the configuration option
         ``awkward.compute-unknown-meta`` is set to ``False``,
         undefined `meta` will be assigned an empty typetracer.
+    behavior : dict, optional
+        Custom ak.behavior for the output array.
+    attrs : dict, optional
+        Custom attributes for the output array.
     npartitions : int, optional
         Total number of partitions; if used `divisions` will be a
         tuple of length `npartitions` + 1 with all elements``None``.
@@ -1516,6 +1527,8 @@ def new_array_object(
 
     if behavior is not None:
         actual_meta.behavior = behavior
+    if attrs is not None:
+        actual_meta.attrs = attrs
 
     out = Array(dsk, name, actual_meta, divs)
     if actual_meta.__doc__ != actual_meta.__class__.__doc__:
@@ -1528,7 +1541,6 @@ def partitionwise_layer(
     func: Callable,
     name: str,
     *args: Any,
-    opt_touch_all: bool = False,
     **kwargs: Any,
 ) -> AwkwardBlockwiseLayer:
     """Create a partitionwise graph layer.
@@ -1583,8 +1595,6 @@ def partitionwise_layer(
         **kwargs,
     )
     layer = AwkwardBlockwiseLayer.from_blockwise(layer)
-    if opt_touch_all:
-        layer._opt_touch_all = True
     return layer
 
 
@@ -1629,7 +1639,6 @@ def map_partitions(
     token: str | None = None,
     meta: Any | None = None,
     output_divisions: int | None = None,
-    opt_touch_all: bool = False,
     traverse: bool = True,
     **kwargs: Any,
 ) -> Array:
@@ -1667,9 +1676,6 @@ def map_partitions(
         value greater than 1 means the divisions were expanded by some
         operation. This argument is mainly for internal library
         function implementations.
-    opt_touch_all : bool
-        Touch all layers in this graph during typetracer based
-        optimization.
     traverse : bool
         Unpack basic python containers to find dask collections.
     **kwargs : Any
@@ -1707,6 +1713,14 @@ def map_partitions(
     This is effectively the same as `d = c * a`
 
     """
+    opt_touch_all = kwargs.pop("opt_touch_all", None)
+    if opt_touch_all is not None:
+        warnings.warn(
+            "The opt_touch_all argument does nothing.\n"
+            "This warning will be removed in a future version of dask-awkward "
+            "and the function call will likely fail."
+        )
+
     token = token or tokenize(base_fn, *args, meta, **kwargs)
     label = hyphenize(label or funcname(base_fn))
     name = f"{label}-{token}"
@@ -1751,7 +1765,6 @@ def map_partitions(
         name,
         *arg_flat_deps_expanded,
         *kwarg_flat_deps,
-        opt_touch_all=opt_touch_all,
     )
 
     if meta is None:
@@ -1845,6 +1858,8 @@ def non_trivial_reduction(
     keepdims: bool,
     mask_identity: bool,
     reducer: Callable,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
     combiner: Callable | None = None,
     token: str | None = None,
     dtype: Any | None = None,
@@ -2193,7 +2208,11 @@ def typetracer_array(a: ak.Array | Array) -> ak.Array:
     if isinstance(a, Array):
         return a._meta
     elif isinstance(a, ak.Array):
-        return ak.Array(a.layout.to_typetracer(forget_length=True))
+        return ak.Array(
+            a.layout.to_typetracer(forget_length=True),
+            behavior=a._behavior,
+            attrs=a._attrs,
+        )
     else:
         msg = (
             "`a` should be an awkward array or a Dask awkward collection.\n"
