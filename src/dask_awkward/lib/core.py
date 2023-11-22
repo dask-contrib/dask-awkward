@@ -95,15 +95,15 @@ G = TypeVar("G", bound=Callable)
 class dask_property(property):
     _dask_get: Callable | None = None
 
-    def dask(self, func: F) -> F:
+    def dask(self, func: F) -> dask_property:
         self._dask_get = make_dask_descriptor(func)
-        return func
+        return self
 
 
 def dask_method(func: F) -> F:
-    def dask(dask_func_impl: G) -> G:
+    def dask(dask_func_impl: G) -> F:
         func._dask_get = make_dask_method(dask_func_impl)  # type: ignore
-        return dask_func_impl
+        return func
 
     func.dask = dask  # type: ignore
     return func
