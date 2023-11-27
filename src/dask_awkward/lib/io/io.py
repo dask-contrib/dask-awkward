@@ -3,12 +3,16 @@ from __future__ import annotations
 import functools
 import logging
 import math
+import uuid
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, cast, overload
 
 import awkward as ak
 import numpy as np
+from awkward.forms.listoffsetform import ListOffsetForm
+from awkward.forms.numpyform import NumpyForm
+from awkward.forms.recordform import RecordForm
 from awkward.types.numpytype import primitive_to_dtype
 from awkward.typetracer import length_zero_if_typetracer
 from dask.base import flatten, tokenize
@@ -498,24 +502,59 @@ class PackedArgCallable:
 
 
 @dataclass
-class ReadFailure:
-    args: tuple[Any, ...] | None
-    kwargs: dict[str, Any] | None
-    exception: Any | None
-    error: Any | None
+class FromMapException:
+    _args: tuple[Any, ...] | None = ()
+    _kwargs: dict[str, Any] = field(default_factory=dict)
+    _exception: Any | None = None
+    _error: Any | None = None
+    _form = RecordForm(
+        [
+            ListOffsetForm(
+                "i64",
+                ListOffsetForm(
+                    "i64",
+                    NumpyForm("uint8", parameters={"__array__": "char"}),
+                    parameters={"__array__": "string"},
+                ),
+            ),
+            ListOffsetForm(
+                "i64",
+                ListOffsetForm(
+                    "i64",
+                    ListOffsetForm(
+                        "i64",
+                        NumpyForm("uint8", parameters={"__array__": "char"}),
+                        parameters={"__array__": "string"},
+                    ),
+                ),
+            ),
+            ListOffsetForm(
+                "i64",
+                NumpyForm("uint8", parameters={"__array__": "char"}),
+                parameters={"__array__": "string"},
+            ),
+            ListOffsetForm(
+                "i64",
+                NumpyForm("uint8", parameters={"__array__": "char"}),
+                parameters={"__array__": "string"},
+            ),
+        ],
+        ["args", "kwargs", "exception", "message"],
+    )
 
-    def as_array(self):
+    def as_awkward_array(self):
+        if self._exception is None:
+            return ak.Array(self._form.length_zero_array(highlevel=False))
+
         return ak.Array(
             [
                 {
-                    "args": str(self.args),
-                    "kwargs": str(self.kwargs),
-                    "exception": str(self.exception.__name__)
-                    if self.exception is not None
-                    else "None",
-                    "error": str(self.error),
-                }
-            ]
+                    "args": [str(a) for a in str(self._args)],
+                    "kwargs": [[k, str(v)] for k, v in self._kwargs.items()],
+                    "exception": str(self._exception.__name__),
+                    "message": str(self._error),
+                },
+            ],
         )
 
 
@@ -527,9 +566,12 @@ def return_empty_on_raise(
     @functools.wraps(fn)
     def wrapped(*args, **kwargs):
         try:
-            return fn(*args, **kwargs), ReadFailure(None, None, None, None).as_array()
+            return (
+                fn(*args, **kwargs),
+                FromMapException((), {}, None, None).as_awkward_array(),
+            )
         except allowed_exceptions as err:
-            rf = ReadFailure(args, kwargs, type(err), err)
+            rf = FromMapException(args, kwargs, type(err), err)
             logmsg = (
                 "%s call failed with args %s and kwargs %s; empty array returned. %s"
                 % (
@@ -540,7 +582,7 @@ def return_empty_on_raise(
                 )
             )
             logger.info(logmsg)
-            return fn.mock_empty(backend), rf.as_array()
+            return fn.mock_empty(backend), rf.as_awkward_array()
 
     return wrapped
 

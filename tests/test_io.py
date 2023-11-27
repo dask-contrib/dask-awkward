@@ -364,9 +364,14 @@ def test_random_fail_from_lists():
     assert len(array.compute()) < (len(single) * len(many))
 
     computed_report = report.compute()
-    assert len(computed_report[computed_report["args"] == "None"]) < len(
-        computed_report
-    )
+
+    # we expect the 'args' field in the report to be empty if the
+    # from_map node succeded; so we use ak.num(..., axis=1) to filter
+    # those out.
+    succ = ak.num(computed_report["args"], axis=1) == 0
+    fail = np.invert(succ)
+    assert len(computed_report[succ]) < len(computed_report)
+    assert ak.all(computed_report[fail].exception == "OSError")
 
     with pytest.raises(OSError, match="BAD"):
         array, report = from_map(
