@@ -3,7 +3,6 @@ from __future__ import annotations
 import functools
 import logging
 import math
-import uuid
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, cast, overload
