@@ -543,12 +543,12 @@ class FromMapException:
 
     def as_awkward_array(self):
         if self._exception is None:
-            return ak.Array(self._form.length_zero_array(highlevel=False))
+            return ak.Array(self._form.length_one_array(highlevel=False))
 
         return ak.Array(
             [
                 {
-                    "args": [str(a) for a in str(self._args)],
+                    "args": [str(a) for a in self._args],
                     "kwargs": [[k, str(v)] for k, v in self._kwargs.items()],
                     "exception": str(self._exception.__name__),
                     "message": str(self._error),
