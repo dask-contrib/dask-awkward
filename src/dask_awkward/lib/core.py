@@ -92,12 +92,47 @@ F = TypeVar("F", bound=Callable)
 G = TypeVar("G", bound=Callable)
 
 
-class dask_property(property):
+class _DaskProperty(property):
     _dask_get: Callable | None = None
 
-    def dask(self, func: F) -> dask_property:
+    def dask(self, func: F) -> _DaskProperty:
+        assert self._dask_get is None
         self._dask_get = make_dask_descriptor(func)
         return self
+
+
+def _adapt_dask_get(func: Callable) -> Callable:
+    def wrapper(self, dask_array, *args, **kwargs):
+        return func(self, *args, **kwargs)
+
+    return wrapper
+
+
+@overload
+def dask_property(maybe_func: Callable) -> _DaskProperty:
+    ...
+
+
+@overload
+def dask_property(
+    maybe_func: None = None, *, no_dispatch: bool = False
+) -> Callable[[Callable], _DaskProperty]:
+    ...
+
+
+def dask_property(maybe_func=None, *, no_dispatch=False):
+    if maybe_func is None:
+
+        def dask_property_wrapper(func: Callable) -> _DaskProperty:
+            prop = _DaskProperty(func)
+            if no_dispatch:
+                return prop.dask(_adapt_dask_get(func))
+            else:
+                return prop
+
+        return dask_property_wrapper
+    else:
+        return _DaskProperty(maybe_func)
 
 
 def dask_method(func: F) -> F:

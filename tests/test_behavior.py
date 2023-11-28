@@ -33,6 +33,10 @@ class Point:
     def some_property_dask(self, array):
         return f"this is a dask property ({type(array).__name__})"
 
+    @dak.dask_property(no_dispatch=True)
+    def some_property_both(self):
+        return "this is a dask AND non-dask property"
+
     @dak.dask_method
     def some_method(self):
         return None
@@ -77,6 +81,12 @@ def test_property_behavior(daa_p1: dak.Array, caa_p1: ak.Array) -> None:
 
     assert repr(daa.some_method()) == repr(daa)
     assert repr(caa.some_method()) == repr(None)
+
+    assert (
+        daa.some_property_both
+        == caa.some_property_both
+        == "this is a dask AND non-dask property"
+    )
 
 
 @pytest.mark.xfail(
