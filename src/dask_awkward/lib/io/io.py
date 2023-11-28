@@ -500,88 +500,51 @@ class PackedArgCallable:
         )
 
 
-@dataclass
-class FromMapException:
-    _args: tuple[Any, ...] | None = ()
-    _kwargs: dict[str, Any] = field(default_factory=dict)
-    _exception: Any | None = None
-    _error: Any | None = None
-    _form = RecordForm(
+def default_report_success(*args: Any, **kwargs: Any) -> ak.Array:
+    return ak.Array(
         [
-            ListOffsetForm(
-                "i64",
-                ListOffsetForm(
-                    "i64",
-                    NumpyForm("uint8", parameters={"__array__": "char"}),
-                    parameters={"__array__": "string"},
-                ),
-            ),
-            ListOffsetForm(
-                "i64",
-                ListOffsetForm(
-                    "i64",
-                    ListOffsetForm(
-                        "i64",
-                        NumpyForm("uint8", parameters={"__array__": "char"}),
-                        parameters={"__array__": "string"},
-                    ),
-                ),
-            ),
-            ListOffsetForm(
-                "i64",
-                NumpyForm("uint8", parameters={"__array__": "char"}),
-                parameters={"__array__": "string"},
-            ),
-            ListOffsetForm(
-                "i64",
-                NumpyForm("uint8", parameters={"__array__": "char"}),
-                parameters={"__array__": "string"},
-            ),
+            {
+                "args": [],
+                "kwargs": [],
+                "exception": "",
+                "message": "",
+            },
         ],
-        ["args", "kwargs", "exception", "message"],
     )
 
-    def as_awkward_array(self):
-        if self._exception is None:
-            return ak.Array(self._form.length_one_array(highlevel=False))
 
-        return ak.Array(
-            [
-                {
-                    "args": [str(a) for a in self._args],
-                    "kwargs": [[k, str(v)] for k, v in self._kwargs.items()],
-                    "exception": str(self._exception.__name__),
-                    "message": str(self._error),
-                },
-            ],
-        )
+def default_report_failure(
+    exception: type[BaseException],
+    *args: Any,
+    **kwargs: Any,
+) -> ak.Array:
+    return ak.Array(
+        [
+            {
+                "args": [str(a) for a in args],
+                "kwargs": [[k, str(v)] for k, v in kwargs.items()],
+                "exception": str(type(exception).__name__),
+                "message": str(exception),
+            },
+        ],
+    )
 
 
 def return_empty_on_raise(
-    fn: Callable,
+    fn: Callable[..., ak.Array],
     allowed_exceptions: tuple[type[BaseException], ...],
     backend: BackendT,
+    success_callback: Callable[..., ak.Array],
+    failure_callback: Callable[..., ak.Array],
 ) -> Callable:
     @functools.wraps(fn)
     def wrapped(*args, **kwargs):
         try:
-            return (
-                fn(*args, **kwargs),
-                FromMapException((), {}, None, None).as_awkward_array(),
-            )
+            result = fn(*args, **kwargs)
+            return result, success_callback(*args, **kwargs)
         except allowed_exceptions as err:
-            rf = FromMapException(args, kwargs, type(err), err)
-            logmsg = (
-                "%s call failed with args %s and kwargs %s; empty array returned. %s"
-                % (
-                    str(fn),
-                    str(args),
-                    str(kwargs),
-                    str(err),
-                )
-            )
-            logger.info(logmsg)
-            return fn.mock_empty(backend), rf.as_awkward_array()
+            result = fn.mock_empty(backend)
+            return result, failure_callback(err, *args, **kwargs)
 
     return wrapped
 
@@ -597,6 +560,8 @@ def from_map(
     meta: ak.Array | None = None,
     empty_on_raise: None = None,
     empty_backend: None = None,
+    empty_success_callback: Callable[..., ak.Array] = default_report_success,
+    empty_failure_callback: Callable[..., ak.Array] = default_report_failure,
     **kwargs: Any,
 ) -> Array:
     ...
@@ -613,6 +578,8 @@ def from_map(
     token: str | None = None,
     divisions: tuple[int, ...] | tuple[None, ...] | None = None,
     meta: ak.Array | None = None,
+    empty_success_callback: Callable[..., ak.Array] = default_report_success,
+    empty_failure_callback: Callable[..., ak.Array] = default_report_failure,
     **kwargs: Any,
 ) -> tuple[Array, Array]:
     ...
@@ -628,6 +595,8 @@ def from_map(
     meta: ak.Array | None = None,
     empty_on_raise: tuple[type[BaseException], ...] | None = None,
     empty_backend: BackendT | None = None,
+    empty_success_callback: Callable[..., ak.Array] = default_report_success,
+    empty_failure_callback: Callable[..., ak.Array] = default_report_failure,
     **kwargs: Any,
 ) -> Array | tuple[Array, Array]:
     """Create an Array collection from a custom mapping.
@@ -751,6 +720,8 @@ def from_map(
             io_func,
             allowed_exceptions=empty_on_raise,
             backend=empty_backend,
+            success_callback=empty_success_callback,
+            failure_callback=empty_failure_callback,
         )
 
     dsk = AwkwardInputLayer(name=name, inputs=inputs, io_func=io_func)
