@@ -4,14 +4,11 @@ import functools
 import logging
 import math
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast, overload
 
 import awkward as ak
 import numpy as np
-from awkward.forms.listoffsetform import ListOffsetForm
-from awkward.forms.numpyform import NumpyForm
-from awkward.forms.recordform import RecordForm
 from awkward.types.numpytype import primitive_to_dtype
 from awkward.typetracer import length_zero_if_typetracer
 from dask.base import flatten, tokenize
