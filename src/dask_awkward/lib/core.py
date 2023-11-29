@@ -2190,8 +2190,8 @@ def map_meta(fn: ArgsKwargsPackedFunction, *deps: Any) -> ak.Array | None:
             log.debug(
                 f"metadata determination failed: {err}\n"
                 f"The config option `awkward.raise-failed-meta` to "
-                f"allow this failure was recently deprecated, and can be"
-                f"set to False to preserve this behavior before it is removed"
+                f"allow this failure was recently deprecated, and can be "
+                f"set to False to preserve this behavior before it is removed."
             )
             raise
 
