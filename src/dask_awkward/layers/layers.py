@@ -267,8 +267,7 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         fn = maybe_unwrap(self.io_func)
         io_func = cast(ImplementsProjection, fn).project(report=report, state=state)
 
-        is_wrapped = hasattr(self.io_func, "__reor_wrapped__")
-        if is_wrapped:
+        if io_func_reor_wrapped(self.io_func):
             from dask_awkward.lib.io.io import return_empty_on_raise
 
             io_func = return_empty_on_raise(
