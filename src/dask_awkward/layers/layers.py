@@ -113,7 +113,7 @@ def io_func_reor_wrapped(func: ImplementsIOFunction) -> bool:
 
 def maybe_unwrap(func: Callable) -> Callable:
     if io_func_reor_wrapped(func):
-        return func.__reor_wrapped__
+        return func.__reor_wrapped__  # type: ignore
     return func
 
 
@@ -272,10 +272,10 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
 
             io_func = return_empty_on_raise(
                 io_func,
-                allowed_exceptions=self.io_func.allowed_exceptions,
-                backend=self.io_func.backend,
-                success_callback=self.io_func.success_callback,
-                failure_callback=self.io_func.failure_callback,
+                allowed_exceptions=self.io_func.allowed_exceptions,  # type: ignore
+                backend=self.io_func.backend,  # type: ignore
+                success_callback=self.io_func.success_callback,  # type: ignore
+                failure_callback=self.io_func.failure_callback,  # type: ignore
             )
 
         return AwkwardInputLayer(
