@@ -69,7 +69,20 @@ T = TypeVar("T")
 log = logging.getLogger(__name__)
 
 
-def make_dask_descriptor(func: Callable) -> Callable[[T, type[T], Array], Any]:
+def _make_dask_descriptor(func: Callable) -> Callable[[T, type[T], Array], Any]:
+    """Adapt a function accepting a `dask_array` into a dask-awkward descriptor
+    that invokes and returns the user function when invoked.
+
+    Parameters
+    ----------
+    func : Callable dask-awkward descriptor body
+
+    Returns
+    -------
+    Callable
+        The callable dask-awkward descriptor
+    """
+
     def descriptor(instance: T, owner: type[T], dask_array: Array) -> Any:
         impl = func.__get__(instance, owner)
         return impl(dask_array)
@@ -77,7 +90,21 @@ def make_dask_descriptor(func: Callable) -> Callable[[T, type[T], Array], Any]:
     return descriptor
 
 
-def make_dask_method(func: Callable) -> Callable[[T, type[T], Array], Callable]:
+def _make_dask_method(func: Callable) -> Callable[[T, type[T], Array], Callable]:
+    """Adapt a function accepting a `dask_array` and additional arguments into
+    a dask-awkward descriptor that invokes and returns the bound user function.
+
+    Parameters
+    ----------
+    func : Callable
+        The dask-awkward descriptor body.
+
+    Returns
+    -------
+    Callable
+        The callable dask-awkward descriptor.
+    """
+
     def descriptor(instance: T, owner: type[T], dask_array: Array) -> Any:
         def impl(*args, **kwargs):
             impl = func.__get__(instance, owner)
@@ -93,15 +120,33 @@ G = TypeVar("G", bound=Callable)
 
 
 class _DaskProperty(property):
+    """A property descriptor that exposes a `.dask` method for registering
+    dask-awkward descriptor implementations.
+    """
+
     _dask_get: Callable | None = None
 
     def dask(self, func: F) -> _DaskProperty:
         assert self._dask_get is None
-        self._dask_get = make_dask_descriptor(func)
+        self._dask_get = _make_dask_descriptor(func)
         return self
 
 
-def _adapt_dask_get(func: Callable) -> Callable:
+def _adapt_naive_dask_get(func: Callable) -> Callable:
+    """Adapt a non-dask-awkward user-defined descriptor function into
+    a dask-awkward aware descriptor that invokes the original function.
+
+    Parameters
+    ----------
+    func : Callable
+        The non-dask-awkward descriptor body.
+
+    Returns
+    -------
+    Callable
+        The callable dask-awkward aware descriptor body.
+    """
+
     def wrapper(self, dask_array, *args, **kwargs):
         return func(self, *args, **kwargs)
 
@@ -109,35 +154,93 @@ def _adapt_dask_get(func: Callable) -> Callable:
 
 
 @overload
-def dask_property(maybe_func: Callable) -> _DaskProperty:
-    ...
+def dask_property(maybe_func: Callable, *, no_dispatch: bool = False) -> _DaskProperty:
+    """An extension of Python's built-in `property` that supports registration
+    of a dask getter via `.dask`.
+
+    Parameters
+    ----------
+    maybe_func : Callable, optional
+        The property getter function.
+    no_dispatch : bool
+        If True, re-use the main getter function as the Dask implementation.
+
+    Returns
+    -------
+    Callable
+        The callable dask-awkward aware descriptor factory or the descriptor itself
+    """
 
 
 @overload
 def dask_property(
     maybe_func: None = None, *, no_dispatch: bool = False
 ) -> Callable[[Callable], _DaskProperty]:
+    """An extension of Python's built-in `property` that supports registration
+    of a dask getter via `.dask`.
+
+    Parameters
+    ----------
+    maybe_func : Callable, optional
+        The property getter function.
+    no_dispatch : bool
+        If True, re-use the main getter function as the Dask implementation.
+
+    Returns
+    -------
+    Callable
+        The callable dask-awkward aware descriptor factory or the descriptor itself
+    """
     ...
 
 
 def dask_property(maybe_func=None, *, no_dispatch=False):
+    """An extension of Python's built-in `property` that supports registration
+    of a dask getter via `.dask`.
+
+    Parameters
+    ----------
+    maybe_func : Callable, optional
+        The property getter function.
+    no_dispatch : bool
+        If True, re-use the main getter function as the Dask implementation
+
+    Returns
+    -------
+    Callable
+        The callable dask-awkward aware descriptor factory or the descriptor itself
+    """
+
+    def dask_property_wrapper(func: Callable) -> _DaskProperty:
+        prop = _DaskProperty(func)
+        if no_dispatch:
+            return prop.dask(_adapt_naive_dask_get(func))
+        else:
+            return prop
+
     if maybe_func is None:
-
-        def dask_property_wrapper(func: Callable) -> _DaskProperty:
-            prop = _DaskProperty(func)
-            if no_dispatch:
-                return prop.dask(_adapt_dask_get(func))
-            else:
-                return prop
-
         return dask_property_wrapper
     else:
-        return _DaskProperty(maybe_func)
+        return dask_property_wrapper(maybe_func)
 
 
 def dask_method(func: F) -> F:
+    """Decorate an instance method to provide a mechanism for overriding the
+    implementation for dask-awkward arrays.
+
+    Parameters
+    ----------
+    func : Callable
+        The method implementation to decorate.
+
+    Returns
+    -------
+    Callable
+        The callable dask-awkward aware method.
+    """
+
     def dask(dask_func_impl: G) -> F:
-        func._dask_get = make_dask_method(dask_func_impl)  # type: ignore
+        func._dask_get = _make_dask_method(dask_func_impl)  # type: ignore
         return func
 
     func.dask = dask  # type: ignore
