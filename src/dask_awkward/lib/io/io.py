@@ -552,25 +552,6 @@ class return_empty_on_raise:
             return result, self.failure_callback(err, *args, **kwargs)
 
 
-# def return_empty_on_raise(
-#     fn: Callable[..., ak.Array],
-#     allowed_exceptions: tuple[type[BaseException], ...],
-#     backend: BackendT,
-#     success_callback: Callable[..., ak.Array],
-#     failure_callback: Callable[..., ak.Array],
-# ) -> Callable:
-#     @functools.wraps(fn)
-#     def wrapped(*args, **kwargs):
-#         try:
-#             result = fn(*args, **kwargs)
-#             return result, success_callback(*args, **kwargs)
-#         except allowed_exceptions as err:
-#             result = fn.mock_empty(backend)
-#             return result, failure_callback(err, *args, **kwargs)
-
-#     return wrapped
-
-
 @overload
 def from_map(
     func: Callable,
