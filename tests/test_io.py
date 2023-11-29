@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import awkward as ak
+import dask
 import numpy as np
 import pytest
 from dask.array.utils import assert_eq as da_assert_eq
@@ -344,7 +345,7 @@ def test_bytes_with_sample(
         assert len(sample_bytes) == 127
 
 
-def test_random_fail_from_lists():
+def test_from_map_random_fail_from_lists():
     from dask_awkward.lib.testutils import RandomFailFromListsFn
 
     single = [[1, 2, 3], [4, 5], [6], [], [1, 2, 3]]
@@ -435,3 +436,40 @@ def test_random_fail_from_lists():
             empty_on_raise=(RuntimeError,),
             empty_backend="cpu",
         )
+
+
+def test_from_map_fail_with_callbacks():
+    from dask_awkward.lib.testutils import RandomFailFromListsFn
+
+    single = [[1, 2, 3], [4, 5], [6], [], [1, 2, 3]]
+    many = [single] * 30
+    divs = (0, *np.cumsum(list(map(len, many))))
+    form = ak.Array(many[0]).layout.form
+
+    def succ(*args, **kwargs):
+        return ak.Array(["1"])
+
+    def fail(excep, *args, **kwargs):
+        return ak.Array([type(excep).__name__ * 2])
+
+    array, report = from_map(
+        RandomFailFromListsFn(form),
+        many,
+        meta=typetracer_array(ak.Array(many[0])),
+        divisions=divs,
+        label="from-lists",
+        empty_on_raise=(OSError,),
+        empty_backend="cpu",
+        empty_failure_callback=fail,
+        empty_success_callback=succ,
+    )
+
+    _, rep = dask.compute(array, report)
+
+    assert "OSErrorOSError" in rep.tolist()
+
+    nfail = len(rep[rep == "OSErrorOSError"])
+    total = len(many)
+    # total number of successes should be total number of instances of
+    # "1" in the array
+    assert (total - nfail) == len(rep[rep == "1"])
