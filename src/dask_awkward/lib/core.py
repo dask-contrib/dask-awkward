@@ -2202,7 +2202,8 @@ def map_meta(fn: ArgsKwargsPackedFunction, *deps: Any) -> ak.Array | None:
             extras = f"function call: {fn}\n" f"metadata: {deps}\n"
             log.warning(
                 f"metadata could not be determined from operating upon the "
-                f"input array metadata. Falling back to a legacy workaround. \n"
+                f"input array metadata. Falling back to a legacy workaround — "
+                f"please report this at https://github.com/dask-contrib/dask-awkward/issues. \n"
                 f"{extras}"
             )
         pass
