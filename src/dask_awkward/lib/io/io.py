@@ -527,23 +527,48 @@ def default_report_failure(
     )
 
 
-def return_empty_on_raise(
-    fn: Callable[..., ak.Array],
-    allowed_exceptions: tuple[type[BaseException], ...],
-    backend: BackendT,
-    success_callback: Callable[..., ak.Array],
-    failure_callback: Callable[..., ak.Array],
-) -> Callable:
-    @functools.wraps(fn)
-    def wrapped(*args, **kwargs):
-        try:
-            result = fn(*args, **kwargs)
-            return result, success_callback(*args, **kwargs)
-        except allowed_exceptions as err:
-            result = fn.mock_empty(backend)
-            return result, failure_callback(err, *args, **kwargs)
+class return_empty_on_raise:
+    def __init__(
+        self,
+        fn: Callable[..., ak.Array],
+        allowed_exceptions: tuple[type[BaseException], ...],
+        backend: BackendT,
+        success_callback: Callable[..., ak.Array],
+        failure_callback: Callable[..., ak.Array],
+    ):
+        self.__reor_wrapped__ = fn
+        self.fn = fn
+        self.allowed_exceptions = allowed_exceptions
+        self.backend = backend
+        self.success_callback = success_callback
+        self.failure_callback = failure_callback
 
-    return wrapped
+    def __call__(self, *args, **kwargs):
+        try:
+            result = self.fn(*args, **kwargs)
+            return result, self.success_callback(*args, **kwargs)
+        except self.allowed_exceptions as err:
+            result = self.fn.mock_empty(self.backend)
+            return result, self.failure_callback(err, *args, **kwargs)
+
+
+# def return_empty_on_raise(
+#     fn: Callable[..., ak.Array],
+#     allowed_exceptions: tuple[type[BaseException], ...],
+#     backend: BackendT,
+#     success_callback: Callable[..., ak.Array],
+#     failure_callback: Callable[..., ak.Array],
+# ) -> Callable:
+#     @functools.wraps(fn)
+#     def wrapped(*args, **kwargs):
+#         try:
+#             result = fn(*args, **kwargs)
+#             return result, success_callback(*args, **kwargs)
+#         except allowed_exceptions as err:
+#             result = fn.mock_empty(backend)
+#             return result, failure_callback(err, *args, **kwargs)
+
+#     return wrapped
 
 
 @overload

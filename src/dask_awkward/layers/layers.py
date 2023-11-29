@@ -107,20 +107,30 @@ class IOFunctionWithMocking(ImplementsMocking, ImplementsIOFunction):
         )
 
 
+def io_func_reor_wrapped(func: ImplementsIOFunction) -> bool:
+    return hasattr(func, "__reor_wrapped__")
+
+
+def maybe_unwrap(func: Callable) -> Callable:
+    if io_func_reor_wrapped(func):
+        return func.__reor_wrapped__
+    return func
+
+
 def io_func_implements_projection(func: ImplementsIOFunction) -> bool:
-    return hasattr(func, "prepare_for_projection")
+    return hasattr(maybe_unwrap(func), "prepare_for_projection")
 
 
 def io_func_implements_mocking(func: ImplementsIOFunction) -> bool:
-    return hasattr(func, "mock")
+    return hasattr(maybe_unwrap(func), "mock")
 
 
 def io_func_implements_mock_empty(func: ImplementsIOFunction) -> bool:
-    return hasattr(func, "mock_empty")
+    return hasattr(maybe_unwrap(func), "mock_empty")
 
 
 def io_func_implements_columnar(func: ImplementsIOFunction) -> bool:
-    return hasattr(func, "necessary_columns")
+    return hasattr(maybe_unwrap(func), "necessary_columns")
 
 
 class AwkwardInputLayer(AwkwardBlockwiseLayer):
@@ -184,10 +194,12 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
     def mock(self) -> AwkwardInputLayer:
         assert self.is_mockable
 
+        fn = maybe_unwrap(self.io_func)
+
         return AwkwardInputLayer(
             name=self.name,
             inputs=[None][: int(list(self.numblocks.values())[0][0])],
-            io_func=lambda *_, **__: cast(ImplementsMocking, self.io_func).mock(),
+            io_func=lambda *_, **__: cast(ImplementsMocking, fn).mock(),
             label=self.label,
             produces_tasks=self.produces_tasks,
             creation_info=self.creation_info,
@@ -225,14 +237,20 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
             The black-box state object returned by the IO function.
         """
         assert self.is_projectable
+        fn = maybe_unwrap(self.io_func)
         new_meta_array, report, state = cast(
-            ImplementsProjection, self.io_func
+            ImplementsProjection, fn
         ).prepare_for_projection()
+
+        if io_func_reor_wrapped(self.io_func):
+            new_return = (new_meta_array, type(new_meta_array)([]))
+        else:
+            new_return = new_meta_array
 
         new_input_layer = AwkwardInputLayer(
             name=self.name,
             inputs=[None][: int(list(self.numblocks.values())[0][0])],
-            io_func=lambda *_, **__: new_meta_array,
+            io_func=lambda *_, **__: new_return,
             label=self.label,
             produces_tasks=self.produces_tasks,
             creation_info=self.creation_info,
@@ -246,12 +264,25 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         state: T,
     ) -> AwkwardInputLayer:
         assert self.is_projectable
+        fn = maybe_unwrap(self.io_func)
+        io_func = cast(ImplementsProjection, fn).project(report=report, state=state)
+
+        is_wrapped = hasattr(self.io_func, "__reor_wrapped__")
+        if is_wrapped:
+            from dask_awkward.lib.io.io import return_empty_on_raise
+
+            io_func = return_empty_on_raise(
+                io_func,
+                allowed_exceptions=self.io_func.allowed_exceptions,
+                backend=self.io_func.backend,
+                success_callback=self.io_func.success_callback,
+                failure_callback=self.io_func.failure_callback,
+            )
+
         return AwkwardInputLayer(
             name=self.name,
             inputs=self.inputs,
-            io_func=cast(ImplementsProjection, self.io_func).project(
-                report=report, state=state
-            ),
+            io_func=io_func,
             label=self.label,
             produces_tasks=self.produces_tasks,
             creation_info=self.creation_info,
@@ -260,7 +291,8 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
 
     def necessary_columns(self, report: TypeTracerReport, state: T) -> frozenset[str]:
         assert self.is_columnar
-        return cast(ImplementsNecessaryColumns, self.io_func).necessary_columns(
+        fn = maybe_unwrap(self.io_func)
+        return cast(ImplementsNecessaryColumns, fn).necessary_columns(
             report=report, state=state
         )
 
