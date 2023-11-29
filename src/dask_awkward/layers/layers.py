@@ -4,6 +4,7 @@ import copy
 from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeVar, Union, cast
 
+import awkward as ak
 from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
 from dask.highlevelgraph import MaterializedLayer
 from dask.layers import DataFrameTreeReduction
@@ -107,13 +108,13 @@ class IOFunctionWithMocking(ImplementsMocking, ImplementsIOFunction):
         )
 
 
-def io_func_rer_wrapped(func: ImplementsIOFunction) -> bool:
-    return hasattr(func, "__rer_wrapped__")
+def io_func_empty_on_error_wrapped(func: ImplementsIOFunction) -> bool:
+    return hasattr(func, "_empty_on_error_wrapped")
 
 
 def maybe_unwrap(func: Callable) -> Callable:
-    if io_func_rer_wrapped(func):
-        return func.__rer_wrapped__  # type: ignore
+    if io_func_empty_on_error_wrapped(func):
+        return func._empty_on_error_wrapped  # type: ignore
     return func
 
 
@@ -242,8 +243,8 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
             ImplementsProjection, fn
         ).prepare_for_projection()
 
-        if io_func_rer_wrapped(self.io_func):
-            new_return = (new_meta_array, type(new_meta_array)([]))
+        if io_func_empty_on_error_wrapped(self.io_func):
+            new_return = (new_meta_array, ak.from_iter([]))
         else:
             new_return = new_meta_array
 
@@ -267,7 +268,7 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         fn = maybe_unwrap(self.io_func)
         io_func = cast(ImplementsProjection, fn).project(report=report, state=state)
 
-        if io_func_rer_wrapped(self.io_func):
+        if io_func_empty_on_error_wrapped(self.io_func):
             io_func = self.io_func.recreate(io_func)  # type: ignore
 
         return AwkwardInputLayer(

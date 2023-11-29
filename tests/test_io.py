@@ -460,8 +460,8 @@ def test_from_map_fail_with_callbacks():
         label="from-lists",
         empty_on_raise=(OSError,),
         empty_backend="cpu",
-        empty_failure_callback=fail,
-        empty_success_callback=succ,
+        on_failure=fail,
+        on_success=succ,
     )
 
     _, rep = dask.compute(array, report)
