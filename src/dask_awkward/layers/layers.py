@@ -107,13 +107,13 @@ class IOFunctionWithMocking(ImplementsMocking, ImplementsIOFunction):
         )
 
 
-def io_func_reor_wrapped(func: ImplementsIOFunction) -> bool:
-    return hasattr(func, "__reor_wrapped__")
+def io_func_rer_wrapped(func: ImplementsIOFunction) -> bool:
+    return hasattr(func, "__rer_wrapped__")
 
 
 def maybe_unwrap(func: Callable) -> Callable:
-    if io_func_reor_wrapped(func):
-        return func.__reor_wrapped__  # type: ignore
+    if io_func_rer_wrapped(func):
+        return func.__rer_wrapped__  # type: ignore
     return func
 
 
@@ -242,7 +242,7 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
             ImplementsProjection, fn
         ).prepare_for_projection()
 
-        if io_func_reor_wrapped(self.io_func):
+        if io_func_rer_wrapped(self.io_func):
             new_return = (new_meta_array, type(new_meta_array)([]))
         else:
             new_return = new_meta_array
@@ -267,16 +267,8 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         fn = maybe_unwrap(self.io_func)
         io_func = cast(ImplementsProjection, fn).project(report=report, state=state)
 
-        if io_func_reor_wrapped(self.io_func):
-            from dask_awkward.lib.io.io import return_empty_on_raise
-
-            io_func = return_empty_on_raise(
-                io_func,
-                allowed_exceptions=self.io_func.allowed_exceptions,  # type: ignore
-                backend=self.io_func.backend,  # type: ignore
-                success_callback=self.io_func.success_callback,  # type: ignore
-                failure_callback=self.io_func.failure_callback,  # type: ignore
-            )
+        if io_func_rer_wrapped(self.io_func):
+            io_func = self.io_func.recreate(io_func)  # type: ignore
 
         return AwkwardInputLayer(
             name=self.name,

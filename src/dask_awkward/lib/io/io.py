@@ -535,12 +535,21 @@ class return_empty_on_raise:
         success_callback: Callable[..., ak.Array],
         failure_callback: Callable[..., ak.Array],
     ):
-        self.__reor_wrapped__ = fn
+        self.__rer_wrapped__ = fn
         self.fn = fn
         self.allowed_exceptions = allowed_exceptions
         self.backend = backend
         self.success_callback = success_callback
         self.failure_callback = failure_callback
+
+    def recreate(self, fn):
+        return return_empty_on_raise(
+            fn,
+            self.allowed_exceptions,
+            self.backend,
+            self.success_callback,
+            self.failure_callback,
+        )
 
     def __call__(self, *args, **kwargs):
         try:
