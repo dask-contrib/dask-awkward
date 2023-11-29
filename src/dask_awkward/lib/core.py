@@ -226,7 +226,7 @@ def dask_property(maybe_func=None, *, no_dispatch=False):
 
 def dask_method(func: F) -> F:
     """Decorate an instance method to provide a mechanism for overriding the
-    implementation for dask-awkward arrays.
+    implementation for dask-awkward arrays via `.dask`.
 
     Parameters
     ----------
