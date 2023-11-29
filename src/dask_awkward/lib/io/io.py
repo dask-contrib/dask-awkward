@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import functools
 import logging
 import math
 from collections.abc import Callable, Iterable, Mapping
