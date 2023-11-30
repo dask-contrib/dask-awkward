@@ -18,7 +18,6 @@ def test_concatenate_simple(daa, caa, axis):
 
 def test_concatenate_axis_0_logical_same(daa):
     result = dak.concatenate([daa, daa], axis=0)
-    print(daa.form)
     buffers_report = dak.report_necessary_buffers(result.points.x)
     assert len(buffers_report) == 1
 
