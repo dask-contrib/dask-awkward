@@ -48,11 +48,11 @@ awkward:
     # exception is raised, or if nothing is done if a dask-awkward
     # specific optimization fails (right now this is only the column
     # projection optimization for determining necessary columns). The
-    # default value ("warn") will produce a warning if the
-    # optimization fails. If this option is set to "raise" and the
-    # optimization fails, an exception will be raised intead, crashing
-    # a program before an optimized compute. Finally, if the option is
-    # set to "pass" and the optimization fails, it will silently fail
-    # and the task graph continue on to be computed without
-    # dask-awkward specific optimizations.
-    on-fail: warn
+    # default value ("raise") will raise an exception, crashing a 
+    # before an optimized compute. If this option is set to "warn" 
+    # and the program optimization fails, will instead produce a 
+    # warning. Finally, if the option is set to "pass" and the 
+    # optimization fails, it will silently fail and the task graph 
+    # continue on to be computed without dask-awkward specific 
+    # optimizations.
+    on-fail: raise
