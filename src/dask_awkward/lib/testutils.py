@@ -20,7 +20,7 @@ DEFAULT_SCHEDULER: Any = "sync"
 
 NP_GTE_1_25_0 = Version(np.__version__) >= Version("1.25.0")
 AK_LTE_2_2_3 = Version(ak.__version__) <= Version("2.2.3")
-AK_LTE_2_5_0 = Version(ak.__version__) <= Version("2.5.0")
+AK_LT_2_5_0 = Version(ak.__version__) < Version("2.5.0")
 BAD_NP_AK_MIXIN_VERSIONING = NP_GTE_1_25_0 and AK_LTE_2_2_3
 
 
