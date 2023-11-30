@@ -95,7 +95,7 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
         self._name: str = name
         if meta is not None and dtype is None:
             self._meta = self._check_meta(meta)
-            self._dtype = np.dtype(self._meta.type.content.primitive)
+            self._dtype = self._meta.layout.dtype
         elif meta is None and dtype is not None:
             self._meta = ak.Array(create_unknown_scalar(dtype))
             self._dtype = dtype  # type: ignore
