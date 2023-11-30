@@ -120,9 +120,9 @@ class _FromParquetFileWiseFn(_FromParquetFn):
             subrg=[None],
             subform=self.form,
             highlevel=False,
-            attrs=None,
-            behavior=None,
             fs=self.fs,
+            behavior=self.behavior,
+            attrs=self.attrs,
             **self.kwargs,
         )
         return ak.Array(
@@ -178,9 +178,9 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
             subrg=subrg,
             subform=self.form,
             highlevel=False,
-            attrs=None,
-            behavior=None,
             fs=self.fs,
+            behavior=self.behavior,
+            attrs=self.attrs,
             **self.kwargs,
         )
         return ak.Array(
@@ -637,7 +637,7 @@ def to_parquet(
         AwkwardMaterializedLayer(dsk, previous_layer_names=[map_res.name]),
         dependencies=[map_res],
     )
-    out = new_scalar_object(graph, final_name, meta=None)
+    out = new_scalar_object(graph, final_name, dtype="f8")
     if compute:
         out.compute()
         return None

@@ -646,7 +646,11 @@ def num(
             {(name, 0): (_numaxis0, *keys)}, previous_layer_names=[per_axis.name]
         )
         hlg = HighLevelGraph.from_collections(name, matlayer, dependencies=(per_axis,))
-        return new_scalar_object(hlg, name, meta=create_unknown_scalar(np.int64))
+        return new_scalar_object(
+            hlg,
+            name,
+            meta=ak.Array(create_unknown_scalar(np.dtype("int64"))),
+        )
     else:
         return map_partitions(
             ak.num,

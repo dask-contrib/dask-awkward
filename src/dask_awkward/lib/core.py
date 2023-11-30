@@ -263,14 +263,22 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
         self,
         dsk: HighLevelGraph,
         name: str,
-        meta: Any,
+        meta: Any | None = None,
+        dtype: DTypeLike | None = None,
         known_value: Any | None = None,
     ) -> None:
         if not isinstance(dsk, HighLevelGraph):
             dsk = HighLevelGraph.from_collections(name, dsk, dependencies=())  # type: ignore
         self._dask: HighLevelGraph = dsk
         self._name: str = name
-        self._meta: Any = self._check_meta(meta)
+        if meta is not None and dtype is None:
+            self._meta = self._check_meta(meta)
+            self._dtype = self._meta.layout.dtype
+        elif meta is None and dtype is not None:
+            self._meta = ak.Array(create_unknown_scalar(dtype))
+            self._dtype = dtype
+        else:
+            ValueError("One (and only one) of dtype or meta can be defined.")
         self._known_value: Any | None = known_value
 
     def __dask_graph__(self) -> Graph:
@@ -304,7 +312,7 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
         return type(self)(dsk, name, self._meta, self.known_value)
 
     def __reduce__(self):
-        return (Scalar, (self.dask, self.name, self._meta, self.known_value))
+        return (Scalar, (self.dask, self.name, None, self.dtype, self.known_value))
 
     @property
     def dask(self) -> HighLevelGraph:
@@ -318,23 +326,21 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
     def key(self) -> Key:
         return (self._name, 0)
 
-    def _check_meta(self, m: Any) -> Any | None:
-        if m is None:
-            return m
-        elif isinstance(m, (MaybeNone, OneOf)) or is_unknown_scalar(m):
-            return m
+    def _check_meta(self, m):
+        if isinstance(m, MaybeNone):
+            return ak.Array(m.content)
         elif isinstance(m, ak.Array) and len(m) == 1:
             return m
-        raise TypeError(f"meta must be a typetracer object, not a {type(m)}")
+        elif isinstance(m, OneOf) or is_unknown_scalar(m):
+            if isinstance(m, TypeTracerArray):
+                return ak.Array(m)
+            else:
+                return m
+        raise TypeError(f"meta must be a typetracer, not a {type(m)}")
 
     @property
-    def dtype(self) -> np.dtype | None:
-        try:
-            if self._meta is not None:
-                return self._meta.dtype
-        except AttributeError:
-            pass
-        return None
+    def dtype(self) -> np.dtype:
+        return self._dtype
 
     @property
     def npartitions(self) -> int:
@@ -363,15 +369,14 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
         return self.__str__()
 
     def __str__(self) -> str:
-        dt = self.dtype or "Unknown"
         if self.known_value is not None:
             return (
                 f"dask.awkward<{key_split(self.name)}, "
                 "type=Scalar, "
-                f"dtype={dt}, "
+                f"dtype={self.dtype}, "
                 f"known_value={self.known_value}>"
             )
-        return f"dask.awkward<{key_split(self.name)}, type=Scalar, dtype={dt}>"
+        return f"dask.awkward<{key_split(self.name)}, type=Scalar, dtype={self.dtype}>"
 
     def __getitem__(self, where: Any) -> Any:
         msg = (
@@ -437,7 +442,11 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
                 ),
                 dependencies=tuple(deps),
             )
-            return new_scalar_object(graph, name, meta=None)
+            if isinstance(other, Scalar):
+                meta = op(self._meta, other._meta)
+            else:
+                meta = op(self._meta, other)
+            return new_scalar_object(graph, name, meta=meta)
 
         return f
 
@@ -454,7 +463,8 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
                 layer,
                 dependencies=(self,),
             )
-            return new_scalar_object(graph, name, meta=None)
+            meta = op(self._meta)
+            return new_scalar_object(graph, name, meta=meta)
 
         return f
 
@@ -507,7 +517,13 @@ for op in [
     Scalar._bind_operator(op)
 
 
-def new_scalar_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Scalar:
+def new_scalar_object(
+    dsk: HighLevelGraph,
+    name: str,
+    *,
+    meta: Any | None = None,
+    dtype: DTypeLike | None = None,
+) -> Scalar:
     """Instantiate a new scalar collection.
 
     Parameters
@@ -525,6 +541,14 @@ def new_scalar_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Scalar:
         Resulting collection.
 
     """
+
+    if meta is not None and dtype is None:
+        pass
+    elif meta is None and dtype is not None:
+        meta = ak.Array(create_unknown_scalar(dtype))
+    else:
+        ValueError("One (and only one) of dtype or meta can be defined.")
+
     if isinstance(meta, MaybeNone):
         meta = ak.Array(meta.content)
     elif meta is not None:
@@ -585,7 +609,12 @@ def new_known_scalar(
         dtype = np.dtype(dtype)
     llg = AwkwardMaterializedLayer({(name, 0): s}, previous_layer_names=[])
     hlg = HighLevelGraph.from_collections(name, llg, dependencies=())
-    return Scalar(hlg, name, meta=create_unknown_scalar(dtype), known_value=s)
+    return Scalar(
+        hlg,
+        name,
+        dtype=dtype,
+        known_value=s,
+    )
 
 
 class Record(Scalar):
@@ -600,7 +629,9 @@ class Record(Scalar):
     """
 
     def __init__(self, dsk: HighLevelGraph, name: str, meta: Any | None = None) -> None:
-        super().__init__(dsk, name, meta)
+        self._dask: HighLevelGraph = dsk
+        self._name: str = name
+        self._meta: ak.Record = self._check_meta(meta)
 
     def _check_meta(self, m: Any | None) -> Any | None:
         if not isinstance(m, ak.Record):

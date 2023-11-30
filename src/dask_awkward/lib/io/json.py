@@ -753,7 +753,7 @@ def to_json(
         AwkwardMaterializedLayer(dsk, previous_layer_names=[map_res.name]),
         dependencies=(map_res,),
     )
-    res = new_scalar_object(graph, name=name, meta=None)
+    res = new_scalar_object(graph, name=name, dtype="f8")
     if compute:
         res.compute()
         return None
