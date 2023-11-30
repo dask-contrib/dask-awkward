@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 import dask_awkward as dak
-from dask_awkward.lib.testutils import AK_LT_2_5_0, assert_eq
+from dask_awkward.lib.testutils import AK_LTE_2_5_0, assert_eq
 from dask_awkward.utils import DaskAwkwardNotImplemented
 
 
@@ -412,7 +412,7 @@ def test_copy(daa):
         np.complex128,
         pytest.param(
             np.datetime64,
-            marks=pytest.mark.xfail(AK_LT_2_5_0, reason="np dtype problem"),
+            marks=pytest.mark.xfail(AK_LTE_2_5_0, reason="np dtype problem"),
         ),
         np.timedelta64,
         np.float16,
