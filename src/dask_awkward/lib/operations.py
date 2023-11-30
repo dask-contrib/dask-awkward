@@ -43,6 +43,7 @@ def _enforce_concatenated_form(array: AwkwardArray, form: Form) -> AwkwardArray:
 
 
 def _concatenate_axis_0_meta(*arrays: AwkwardArray) -> AwkwardArray:
+    # At this stage, the metas have all been enforced to the same type
     return arrays[0]
 
 
@@ -82,8 +83,11 @@ def concatenate(
 
         # If any forms aren't equal to this form, we must enforce each form to the same type
         if any(
-            m.layout.form != intended_form for m in metas
-        ):  # FIXME: check parameters too
+            not m.layout.form.is_equal_to(
+                intended_form, all_parameters=True, form_key=False
+            )
+            for m in metas
+        ):
             arrays = [
                 map_partitions(
                     _enforce_concatenated_form,
