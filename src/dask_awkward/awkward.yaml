@@ -2,7 +2,7 @@ awkward:
 
   # This option causes graph creation to fail if the metadata of a
   # dask-awkward Array collection cannot be determined.
-  raise-failed-meta: False
+  raise-failed-meta: True
 
   # This option is for cases where new array collections are created
   # with unknown metadata. The default setting is to compute the first

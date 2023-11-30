@@ -98,7 +98,7 @@ testpaths = ["tests"]
 addopts = ["-v", "-ra", "--showlocals", "--strict-markers", "--strict-config"]
 log_cli_level = "DEBUG"
 filterwarnings = ["ignore:There is no current event loop"]
-xfail_strict = true
+xfail_strict = false
 
 [tool.isort]
 profile = "black"

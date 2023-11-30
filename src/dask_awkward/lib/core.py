@@ -2298,15 +2298,24 @@ def map_meta(fn: ArgsKwargsPackedFunction, *deps: Any) -> ak.Array | None:
         # if the metadata function call failed and raise-failed-meta
         # is True, then we want to raise the exception here.
         if dask.config.get("awkward.raise-failed-meta"):
-            log.debug("metadata determination failed: %s" % err)
+            log.debug(
+                f"metadata determination failed: {err}\n"
+                f"The config option `awkward.raise-failed-meta` to "
+                f"allow this failure was recently deprecated, and can be "
+                f"set to False to preserve this behavior before it is removed."
+            )
             raise
 
         # if the metadata function failed and we want to move on to
         # trying the length zero array calculation then we log a
         # warning and pass to the next try-except block.
         else:
+            extras = f"function call: {fn}\n" f"metadata: {deps}\n"
             log.warning(
-                "function call on just metas failed; will try length zero array technique"
+                f"metadata could not be determined from operating upon the "
+                f"input array metadata. Falling back to a legacy workaround — "
+                f"please report this at https://github.com/dask-contrib/dask-awkward/issues. \n"
+                f"{extras}"
             )
         pass
     try:
