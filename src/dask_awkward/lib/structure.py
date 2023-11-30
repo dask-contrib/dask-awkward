@@ -402,7 +402,7 @@ def firsts(
     behavior: Mapping | None = None,
     attrs: Mapping[str, Any] | None = None,
 ) -> Any:
-    if axis == 1:
+    if axis >= 1:
         return map_partitions(
             _FirstsFn(axis=axis, highlevel=highlevel, behavior=behavior, attrs=attrs),
             array,
