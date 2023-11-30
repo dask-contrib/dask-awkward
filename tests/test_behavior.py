@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import no_type_check
+
 import awkward as ak
 import numpy as np
 import pytest
@@ -23,12 +25,26 @@ class Point:
     def point_abs(self):
         return np.sqrt(self.x**2 + self.y**2)
 
-    @property
-    def non_dask_property(self, _dask_array_=None):
+    @dak.dask_property
+    def some_property(self):
         return "this is a non-dask property"
 
-    def non_dask_method(self, _dask_array_=None):
-        return _dask_array_
+    @some_property.dask
+    def some_property_dask(self, array):
+        return f"this is a dask property ({type(array).__name__})"
+
+    @dak.dask_property(no_dispatch=True)
+    def some_property_both(self):
+        return "this is a dask AND non-dask property"
+
+    @dak.dask_method
+    def some_method(self):
+        return None
+
+    @no_type_check
+    @some_method.dask
+    def some_method_dask(self, array):
+        return array
 
 
 @pytest.mark.xfail(
@@ -60,9 +76,17 @@ def test_property_behavior(daa_p1: dak.Array, caa_p1: ak.Array) -> None:
 
     assert daa.behavior == caa.behavior
 
-    assert daa.non_dask_property == caa.non_dask_property
+    assert caa.some_property == "this is a non-dask property"
+    assert daa.some_property == "this is a dask property (Array)"
 
-    assert repr(daa.non_dask_method()) == repr(daa)
+    assert repr(daa.some_method()) == repr(daa)
+    assert repr(caa.some_method()) == repr(None)
+
+    assert (
+        daa.some_property_both
+        == caa.some_property_both
+        == "this is a dask AND non-dask property"
+    )
 
 
 @pytest.mark.xfail(
@@ -72,18 +96,6 @@ def test_property_behavior(daa_p1: dak.Array, caa_p1: ak.Array) -> None:
 def test_nonexistent_behavior(daa_p1: dak.Array, daa_p2: dak.Array) -> None:
     daa1 = dak.with_name(daa_p1["points"], "Point", behavior=behaviors)
     daa2 = daa_p2
-
-    with pytest.raises(
-        AttributeError,
-        match="Method doesnotexist is not available to this collection",
-    ):
-        daa1._call_behavior_method("doesnotexist", daa2)
-
-    with pytest.raises(
-        AttributeError,
-        match="Property doesnotexist is not available to this collection",
-    ):
-        daa1._call_behavior_property("doesnotexist")
 
     # in this case the field check is where we raise
     with pytest.raises(AttributeError, match="distance not in fields"):
