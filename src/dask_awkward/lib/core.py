@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import inspect
 import keyword
 import logging
 import math
@@ -10,6 +9,7 @@ import warnings
 from collections.abc import Callable, Hashable, Mapping, Sequence
 from enum import IntEnum
 from functools import cached_property, partial, wraps
+from inspect import getattr_static
 from numbers import Number
 from typing import TYPE_CHECKING, Any, Literal, TypeVar, Union, overload
 
@@ -67,6 +67,184 @@ T = TypeVar("T")
 
 
 log = logging.getLogger(__name__)
+
+
+def _make_dask_descriptor(func: Callable) -> Callable[[T, type[T], Array], Any]:
+    """Adapt a function accepting a `dask_array` into a dask-awkward descriptor
+    that invokes and returns the user function when invoked.
+
+    Parameters
+    ----------
+    func : Callable dask-awkward descriptor body
+
+    Returns
+    -------
+    Callable
+        The callable dask-awkward descriptor
+    """
+
+    def descriptor(instance: T, owner: type[T], dask_array: Array) -> Any:
+        impl = func.__get__(instance, owner)
+        return impl(dask_array)
+
+    return descriptor
+
+
+def _make_dask_method(func: Callable) -> Callable[[T, type[T], Array], Callable]:
+    """Adapt a function accepting a `dask_array` and additional arguments into
+    a dask-awkward descriptor that invokes and returns the bound user function.
+
+    Parameters
+    ----------
+    func : Callable
+        The dask-awkward descriptor body.
+
+    Returns
+    -------
+    Callable
+        The callable dask-awkward descriptor.
+    """
+
+    def descriptor(instance: T, owner: type[T], dask_array: Array) -> Any:
+        def impl(*args, **kwargs):
+            impl = func.__get__(instance, owner)
+            return impl(dask_array, *args, **kwargs)
+
+        return impl
+
+    return descriptor
+
+
+F = TypeVar("F", bound=Callable)
+G = TypeVar("G", bound=Callable)
+
+
+class _DaskProperty(property):
+    """A property descriptor that exposes a `.dask` method for registering
+    dask-awkward descriptor implementations.
+    """
+
+    _dask_get: Callable | None = None
+
+    def dask(self, func: F) -> _DaskProperty:
+        assert self._dask_get is None
+        self._dask_get = _make_dask_descriptor(func)
+        return self
+
+
+def _adapt_naive_dask_get(func: Callable) -> Callable:
+    """Adapt a non-dask-awkward user-defined descriptor function into
+    a dask-awkward aware descriptor that invokes the original function.
+
+    Parameters
+    ----------
+    func : Callable
+        The non-dask-awkward descriptor body.
+
+    Returns
+    -------
+    Callable
+        The callable dask-awkward aware descriptor body.
+    """
+
+    def wrapper(self, dask_array, *args, **kwargs):
+        return func(self, *args, **kwargs)
+
+    return wrapper
+
+
+@overload
+def dask_property(maybe_func: Callable, *, no_dispatch: bool = False) -> _DaskProperty:
+    """An extension of Python's built-in `property` that supports registration
+    of a dask getter via `.dask`.
+
+    Parameters
+    ----------
+    maybe_func : Callable, optional
+        The property getter function.
+    no_dispatch : bool
+        If True, re-use the main getter function as the Dask implementation.
+
+    Returns
+    -------
+    Callable
+        The callable dask-awkward aware descriptor factory or the descriptor itself
+    """
+
+
+@overload
+def dask_property(
+    maybe_func: None = None, *, no_dispatch: bool = False
+) -> Callable[[Callable], _DaskProperty]:
+    """An extension of Python's built-in `property` that supports registration
+    of a dask getter via `.dask`.
+
+    Parameters
+    ----------
+    maybe_func : Callable, optional
+        The property getter function.
+    no_dispatch : bool
+        If True, re-use the main getter function as the Dask implementation.
+
+    Returns
+    -------
+    Callable
+        The callable dask-awkward aware descriptor factory or the descriptor itself
+    """
+    ...
+
+
+def dask_property(maybe_func=None, *, no_dispatch=False):
+    """An extension of Python's built-in `property` that supports registration
+    of a dask getter via `.dask`.
+
+    Parameters
+    ----------
+    maybe_func : Callable, optional
+        The property getter function.
+    no_dispatch : bool
+        If True, re-use the main getter function as the Dask implementation
+
+    Returns
+    -------
+    Callable
+        The callable dask-awkward aware descriptor factory or the descriptor itself
+    """
+
+    def dask_property_wrapper(func: Callable) -> _DaskProperty:
+        prop = _DaskProperty(func)
+        if no_dispatch:
+            return prop.dask(_adapt_naive_dask_get(func))
+        else:
+            return prop
+
+    if maybe_func is None:
+        return dask_property_wrapper
+    else:
+        return dask_property_wrapper(maybe_func)
+
+
+def dask_method(func: F) -> F:
+    """Decorate an instance method to provide a mechanism for overriding the
+    implementation for dask-awkward arrays via `.dask`.
+
+    Parameters
+    ----------
+    func : Callable
+        The method implementation to decorate.
+
+    Returns
+    -------
+    Callable
+        The callable dask-awkward aware method.
+    """
+
+    def dask(dask_func_impl: G) -> F:
+        func._dask_get = _make_dask_method(dask_func_impl)  # type: ignore
+        return func
+
+    func.dask = dask  # type: ignore
+    return func
 
 
 class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
@@ -1249,101 +1427,34 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         return self._getitem_single(where)
 
-    def _call_behavior_method(self, method_name: str, *args: Any, **kwargs: Any) -> Any:
-        """Call a behavior method for an awkward array.
-        If the function signature has __dunder__ parameters it is assumed that the
-        user wants to do the map_partitions dispatch themselves and the _meta's
-        behavior is called.
-        If there are no __dunder__ parameters in the function call then the function
-        is wrapped in map_partitions automatically.
-        """
-        if hasattr(self._meta, method_name):
-            themethod = getattr(self._meta, method_name)
-            thesig = inspect.signature(themethod)
-            if "_dask_array_" in thesig.parameters:
-                if "_dask_array_" not in kwargs:
-                    kwargs["_dask_array_"] = self
-                return themethod(*args, **kwargs)
-            return self.map_partitions(
-                _BehaviorMethodFn(method_name, **kwargs),
-                *args,
-                label=hyphenize(method_name),
-            )
-
-        raise AttributeError(
-            f"Method {method_name} is not available to this collection."
-        )
-
-    def _call_behavior_property(self, property_name: str) -> Any:
-        """Call a property for an awkward array.
-        This also allows for some internal state to be tracked via behaviors
-        if a user follows the pattern:
-
-        class SomeMixin:
-
-            @property
-            def the_property(self):
-                ...
-
-            @property
-            def a_property(array_context=None) # note: this can be any name
-
-        This pattern is caught if the property has an argument that single
-        argument is assumed to be the array context (i.e. self) so that self-
-        referenced re-indexing operations can be hidden in properties. The
-        user must do the appropriate dispatch of map_partitions.
-
-        If there is no argument the property call is wrapped in map_partitions.
-        """
-        if hasattr(self._meta.__class__, property_name):
-            thegetter = getattr(self._meta.__class__, property_name).fget.__get__(
-                self._meta
-            )
-            thesig = inspect.signature(thegetter)
-
-            if len(thesig.parameters) == 1:
-                binding = thesig.bind(self)
-                return thegetter(*binding.args, **binding.kwargs)
-            elif len(thesig.parameters) > 1:
-                raise RuntimeError(
-                    "Parametrized property cannot have more than one argument, the array context!"
-                )
-            return self.map_partitions(
-                _BehaviorPropertyFn(property_name),
-                label=hyphenize(property_name),
-            )
-        raise AttributeError(
-            f"Property {property_name} is not available to this collection."
-        )
-
-    def _maybe_behavior_method(self, attr: str) -> bool:
-        try:
-            res = getattr(self._meta.__class__, attr)
-            return (not isinstance(res, property)) and callable(res)
-        except AttributeError:
-            return False
-
-    def _maybe_behavior_property(self, attr: str) -> bool:
-        try:
-            res = getattr(self._meta.__class__, attr)
-            return isinstance(res, property)
-        except AttributeError:
-            return False
+    def _is_method_heuristic(self, resolved: Any) -> bool:
+        return callable(resolved)
 
     def __getattr__(self, attr: str) -> Any:
         if attr not in (self.fields or []):
-            # check for possible behavior method
-            if self._maybe_behavior_method(attr):
+            try:
+                cls_method = getattr_static(self._meta, attr)
+            except AttributeError:
+                raise AttributeError(f"{attr} not in fields.")
+            else:
+                if hasattr(cls_method, "_dask_get"):
+                    return cls_method._dask_get(self._meta, type(self._meta), self)
+                elif self._is_method_heuristic(cls_method):
 
-                def wrapper(*args, **kwargs):
-                    return self._call_behavior_method(attr, *args, **kwargs)
+                    @wraps(cls_method)
+                    def wrapper(*args, **kwargs):
+                        return self.map_partitions(
+                            _BehaviorMethodFn(attr, **kwargs),
+                            *args,
+                            label=hyphenize(attr),
+                        )
 
-                return wrapper
-            # check for possible behavior property
-            elif self._maybe_behavior_property(attr):
-                return self._call_behavior_property(attr)
-
-            raise AttributeError(f"{attr} not in fields.")
+                    return wrapper
+                else:
+                    return self.map_partitions(
+                        _BehaviorPropertyFn(attr),
+                        label=hyphenize(attr),
+                    )
         try:
             # at this point attr is either a field or we'll have to
             # raise an exception.
@@ -2218,15 +2329,24 @@ def map_meta(fn: ArgsKwargsPackedFunction, *deps: Any) -> ak.Array | None:
         # if the metadata function call failed and raise-failed-meta
         # is True, then we want to raise the exception here.
         if dask.config.get("awkward.raise-failed-meta"):
-            log.debug("metadata determination failed: %s" % err)
+            log.debug(
+                f"metadata determination failed: {err}\n"
+                f"The config option `awkward.raise-failed-meta` to "
+                f"allow this failure was recently deprecated, and can be "
+                f"set to False to preserve this behavior before it is removed."
+            )
             raise
 
         # if the metadata function failed and we want to move on to
         # trying the length zero array calculation then we log a
         # warning and pass to the next try-except block.
         else:
+            extras = f"function call: {fn}\n" f"metadata: {deps}\n"
             log.warning(
-                "function call on just metas failed; will try length zero array technique"
+                f"metadata could not be determined from operating upon the "
+                f"input array metadata. Falling back to a legacy workaround — "
+                f"please report this at https://github.com/dask-contrib/dask-awkward/issues. \n"
+                f"{extras}"
             )
         pass
     try:
