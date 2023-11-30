@@ -16,14 +16,6 @@ from dask.highlevelgraph import HighLevelGraph
 from dask.utils import funcname, is_integer, parse_bytes
 from fsspec.utils import infer_compression
 
-try:
-    from distributed.queues import Queue
-    from distributed.worker import get_worker
-except ImportError:
-    Queue = None
-    get_worker = None
-
-
 from dask_awkward.layers.layers import (
     AwkwardBlockwiseLayer,
     AwkwardInputLayer,
