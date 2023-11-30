@@ -42,7 +42,7 @@ def _enforce_concatenated_form(array: AwkwardArray, form: Form) -> AwkwardArray:
     return ak.Array(result, behavior=array._behavior, attrs=array._attrs)
 
 
-def _concatenate_axis_0_meta(*arrays):
+def _concatenate_axis_0_meta(*arrays: AwkwardArray) -> AwkwardArray:
     return arrays[0]
 
 
