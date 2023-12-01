@@ -547,9 +547,9 @@ def on_failure_default(
     return ak.Array(
         [
             {
-                "args": [str(a) for a in args],
-                "kwargs": [[k, str(v)] for k, v in kwargs.items()],
-                "exception": str(type(exception).__name__),
+                "args": [repr(a) for a in args],
+                "kwargs": [[k, repr(v)] for k, v in kwargs.items()],
+                "exception": type(exception).__name__,
                 "message": str(exception),
             },
         ],
