@@ -253,6 +253,8 @@ def dask_method(maybe_func: F, *, no_dispatch: bool = False) -> _DaskMethod:
     ----------
     maybe_func : Callable
         The method implementation to decorate.
+    no_dispatch : bool
+        If True, re-use the main getter function as the Dask implementation
 
     Returns
     -------
@@ -272,6 +274,8 @@ def dask_method(
     ----------
     maybe_func : Callable, optional
         The method implementation to decorate.
+    no_dispatch : bool
+        If True, re-use the main getter function as the Dask implementation
 
     Returns
     -------
@@ -288,6 +292,8 @@ def dask_method(maybe_func=None, *, no_dispatch=False):
     ----------
     maybe_func : Callable, optional
         The method implementation to decorate.
+    no_dispatch : bool
+        If True, re-use the main getter function as the Dask implementation
 
     Returns
     -------
