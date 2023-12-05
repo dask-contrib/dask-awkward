@@ -46,6 +46,10 @@ class Point:
     def some_method_dask(self, array):
         return array
 
+    @dak.dask_method(no_dispatch=True)
+    def some_method_both(self):
+        return "NO DISPATCH!"
+
 
 @pytest.mark.xfail(
     BAD_NP_AK_MIXIN_VERSIONING,
@@ -69,7 +73,7 @@ def test_distance_behavior(
     BAD_NP_AK_MIXIN_VERSIONING,
     reason="NumPy 1.25 mixin __slots__ change",
 )
-def test_property_behavior(daa_p1: dak.Array, caa_p1: ak.Array) -> None:
+def test_property_method_behavior(daa_p1: dak.Array, caa_p1: ak.Array) -> None:
     daa = dak.with_name(daa_p1.points, name="Point", behavior=behaviors)
     caa = ak.Array(caa_p1.points, with_name="Point", behavior=behaviors)
     assert_eq(daa.x2, caa.x2)
@@ -87,6 +91,7 @@ def test_property_behavior(daa_p1: dak.Array, caa_p1: ak.Array) -> None:
         == caa.some_property_both
         == "this is a dask AND non-dask property"
     )
+    assert daa.some_method_both() == caa.some_method_both() == "NO DISPATCH!"
 
 
 @pytest.mark.xfail(
