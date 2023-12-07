@@ -9,7 +9,7 @@ import awkward.operations.str as akstr
 from packaging.version import Version
 
 import dask_awkward as dak
-from dask_awkward.lib.testutils import assert_eq
+from dask_awkward.lib.testutils import AK_LTE_2_5_0, assert_eq
 
 PYARROW_GT_13 = Version(pyarrow.__version__) >= Version("13.0")
 
@@ -311,6 +311,7 @@ def test_title() -> None:
     assert_eq(akstr.title(daa), akstr.title(caa))
 
 
+@pytest.mark.xfail(not AK_LTE_2_5_0, reason="cannot concat categoricals")
 def test_to_categorical() -> None:
     a = akstr.to_categorical(daa)
     b = akstr.to_categorical(caa)
