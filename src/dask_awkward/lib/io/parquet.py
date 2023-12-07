@@ -6,7 +6,7 @@ import logging
 import math
 import operator
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Literal, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 
 import awkward as ak
 import awkward.operations.ak_from_parquet as ak_from_parquet
@@ -33,7 +33,35 @@ log = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-class _FromParquetFn(ColumnProjectionMixin):
+def report_failure(exception, *args, **kwargs):
+    return ak.Array(
+        [
+            {
+                "columns": [],
+                "args": [repr(a) for a in args],
+                "kwargs": [[k, repr(v)] for k, v in kwargs.items()],
+                "exception": type(exception).__name__,
+                "message": str(exception),
+            }
+        ]
+    )
+
+
+def report_success(columns, *args, **kwargs):
+    return ak.Array(
+        [
+            {
+                "columns": columns,
+                "args": [repr(a) for a in args],
+                "kwargs": [[k, repr(v)] for k, v in kwargs.items()],
+                "exception": None,
+                "message": None,
+            }
+        ]
+    )
+
+
+class FromParquetFn(ColumnProjectionMixin):
     def __init__(
         self,
         *,
@@ -42,6 +70,8 @@ class _FromParquetFn(ColumnProjectionMixin):
         listsep: str = "list.item",
         unnamed_root: bool = False,
         original_form: Form | None = None,
+        report: bool = False,
+        allowed_exceptions: tuple[type[BaseException], ...] = (OSError,),
         behavior: Mapping | None = None,
         attrs: Mapping[str, Any] | None = None,
         **kwargs: Any,
@@ -54,17 +84,23 @@ class _FromParquetFn(ColumnProjectionMixin):
         if self.unnamed_root:
             self.columns = [f".{c}" for c in self.columns]
         self.original_form = original_form
+        self.report = report
+        self.allowed_exceptions = allowed_exceptions
         self.behavior = behavior
         self.attrs = attrs
         self.kwargs = kwargs
 
     @abc.abstractmethod
-    def __call__(self, source: Any) -> ak.Array:
+    def __call__(self, *args, **kwargs):
         ...
 
     @abc.abstractmethod
     def project_columns(self, columns):
         ...
+
+    @property
+    def return_report(self) -> bool:
+        return self.report
 
     @property
     def use_optimization(self) -> bool:
@@ -91,7 +127,7 @@ class _FromParquetFn(ColumnProjectionMixin):
         return self.__repr__()
 
 
-class _FromParquetFileWiseFn(_FromParquetFn):
+class FromParquetFileWiseFn(FromParquetFn):
     def __init__(
         self,
         *,
@@ -113,7 +149,7 @@ class _FromParquetFileWiseFn(_FromParquetFn):
             **kwargs,
         )
 
-    def __call__(self, source: Any) -> Any:
+    def read_fn(self, source: Any) -> Any:
         layout = ak_from_parquet._load(
             [source],
             parquet_columns=self.columns,
@@ -131,20 +167,32 @@ class _FromParquetFileWiseFn(_FromParquetFn):
             behavior=self.behavior,
         )
 
+    def __call__(self, *args, **kwargs):
+        source = args[0]
+        if self.return_report:
+            try:
+                result = self.read_fn(source)
+                return result, report_success(self.columns, source)
+            except self.allowed_exceptions as err:
+                return self.mock_empty(), report_failure(err, source)
+
+        return self.read_fn(source)
+
     def project_columns(self, columns):
-        return _FromParquetFileWiseFn(
+        return FromParquetFileWiseFn(
             fs=self.fs,
             form=self.form.select_columns(columns),
             listsep=self.listsep,
             unnamed_root=self.unnamed_root,
             original_form=self.form,
+            report=self.report,
             attrs=self.attrs,
             behavior=self.behavior,
             **self.kwargs,
         )
 
 
-class _FromParquetFragmentWiseFn(_FromParquetFn):
+class FromParquetFragmentWiseFn(FromParquetFn):
     def __init__(
         self,
         *,
@@ -190,11 +238,12 @@ class _FromParquetFragmentWiseFn(_FromParquetFn):
         )
 
     def project_columns(self, columns):
-        return _FromParquetFragmentWiseFn(
+        return FromParquetFragmentWiseFn(
             fs=self.fs,
             form=self.form.select_columns(columns),
             unnamed_root=self.unnamed_root,
             original_form=self.form,
+            report=self.report,
             behavior=self.behavior,
             attrs=self.attrs,
             **self.kwargs,
@@ -216,7 +265,8 @@ def from_parquet(
     scan_files: bool = False,
     split_row_groups: bool | None = False,
     storage_options: dict[str, Any] | None = None,
-) -> Array:
+    report: bool = False,
+) -> Array | tuple[Array, Array]:
     """Create an Array collection from a Parquet dataset.
 
     See :func:`ak.from_parquet` for more information.
@@ -317,7 +367,7 @@ def from_parquet(
     if split_row_groups is False or subrg is None:
         # file-wise
         return from_map(
-            _FromParquetFileWiseFn(
+            FromParquetFileWiseFn(
                 fs=fs,
                 form=subform,
                 listsep=listsep,
@@ -328,6 +378,7 @@ def from_parquet(
                 generate_bitmasks=generate_bitmasks,
                 behavior=behavior,
                 attrs=attrs,
+                report=report,
             ),
             actual_paths,
             label=label,
@@ -355,23 +406,26 @@ def from_parquet(
         for isubrg, path in zip(subrg, actual_paths):
             pairs.extend([(irg, path) for irg in isubrg])
 
-        return from_map(
-            _FromParquetFragmentWiseFn(
-                fs=fs,
-                form=subform,
-                listsep=listsep,
-                unnamed_root=unnamed_root,
-                max_gap=max_gap,
-                max_block=max_block,
-                footer_sample_size=footer_sample_size,
-                generate_bitmasks=generate_bitmasks,
-                behavior=behavior,
-                attrs=attrs,
+        return cast(
+            Array,
+            from_map(
+                FromParquetFragmentWiseFn(
+                    fs=fs,
+                    form=subform,
+                    listsep=listsep,
+                    unnamed_root=unnamed_root,
+                    max_gap=max_gap,
+                    max_block=max_block,
+                    footer_sample_size=footer_sample_size,
+                    generate_bitmasks=generate_bitmasks,
+                    behavior=behavior,
+                    attrs=attrs,
+                ),
+                pairs,
+                label=label,
+                token=token,
+                divisions=tuple(divisions),
             ),
-            pairs,
-            label=label,
-            token=token,
-            divisions=tuple(divisions),
         )
 
 

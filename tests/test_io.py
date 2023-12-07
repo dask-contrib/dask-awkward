@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import awkward as ak
+import dask
 import numpy as np
 import pytest
 from dask.array.utils import assert_eq as da_assert_eq
@@ -344,7 +346,7 @@ def test_bytes_with_sample(
         assert len(sample_bytes) == 127
 
 
-def test_random_fail_from_lists():
+def test_from_map_random_fail_from_lists():
     from dask_awkward.lib.testutils import RandomFailFromListsFn
 
     single = [[1, 2, 3], [4, 5], [6], [], [1, 2, 3]]
@@ -352,26 +354,34 @@ def test_random_fail_from_lists():
     divs = (0, *np.cumsum(list(map(len, many))))
     form = ak.Array(many[0]).layout.form
 
-    array = from_map(
-        RandomFailFromListsFn(form),
+    array, report = from_map(
+        RandomFailFromListsFn(form, report=True, allowed_exceptions=(OSError,)),
         many,
         meta=typetracer_array(ak.Array(many[0])),
         divisions=divs,
         label="from-lists",
-        empty_on_raise=(OSError,),
-        empty_backend="cpu",
     )
     assert len(array.compute()) < (len(single) * len(many))
 
+    computed_report = report.compute()
+
+    # we expect the 'args' field in the report to be empty if the
+    # from_map node succeded; so we use ak.num(..., axis=1) to filter
+    # those out.
+    succ = ak.num(computed_report["args"], axis=1) == 0
+    fail = np.invert(succ)
+    assert len(computed_report[succ]) < len(computed_report)
+    assert ak.all(computed_report[fail].exception == "OSError")
+
     with pytest.raises(OSError, match="BAD"):
-        array = from_map(
-            RandomFailFromListsFn(form),
+        array, report = from_map(
+            RandomFailFromListsFn(
+                form, report=True, allowed_exceptions=(RuntimeError,)
+            ),
             many,
             meta=typetracer_array(ak.Array(many[0])),
             divisions=divs,
             label="from-lists",
-            empty_on_raise=(RuntimeError,),
-            empty_backend="cpu",
         )
         array.compute()
 
@@ -383,45 +393,25 @@ def test_random_fail_from_lists():
             divisions=divs,
             label="from-lists",
         )
-        array.compute()
+        cast(dak.Array, array).compute()
 
-    with pytest.raises(ValueError, match="must be used together"):
-        array = from_map(
-            RandomFailFromListsFn(form),
-            many,
-            meta=typetracer_array(ak.Array(many[0])),
-            divisions=divs,
-            label="from-lists",
-            empty_on_raise=(OSError,),
-        )
 
-    with pytest.raises(ValueError, match="must be used together"):
-        array = from_map(
-            RandomFailFromListsFn(form),
-            many,
-            meta=typetracer_array(ak.Array(many[0])),
-            divisions=divs,
-            label="from-lists",
-            empty_backend="cpu",
-        )
+def test_from_map_fail_with_callbacks():
+    from dask_awkward.lib.testutils import RandomFailFromListsFn
 
-    class NoMockEmpty:
-        def __init__(self, x):
-            self.x = x
+    single = [[1, 2, 3], [4, 5], [6], [], [1, 2, 3]]
+    many = [single] * 30
+    divs = (0, *np.cumsum(list(map(len, many))))
+    form = ak.Array(many[0]).layout.form
 
-        def mock(self):
-            return 5
+    array, report = from_map(
+        RandomFailFromListsFn(form, report=True, allowed_exceptions=(OSError,)),
+        many,
+        meta=typetracer_array(ak.Array(many[0])),
+        divisions=divs,
+        label="from-lists",
+    )
 
-        def __call__(self, *args):
-            return self.x * args[0]
+    _, rep = dask.compute(array, report)
 
-    with pytest.raises(ValueError, match="must implement"):
-        array = from_map(
-            NoMockEmpty(5),
-            many,
-            meta=typetracer_array(ak.Array(many[0])),
-            divisions=divs,
-            label="from-lists",
-            empty_on_raise=(RuntimeError,),
-            empty_backend="cpu",
-        )
+    assert "OSError" in rep.exception.tolist()

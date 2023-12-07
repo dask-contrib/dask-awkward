@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Protocol, TypeVar, cast
+from typing import TYPE_CHECKING, Protocol, TypeVar, cast
 
 import awkward as ak
 from awkward import Array as AwkwardArray
 from awkward.forms import Form
+from awkward.typetracer import typetracer_from_form, typetracer_with_report
 
 from dask_awkward.layers.layers import (
     BackendT,
@@ -43,7 +44,7 @@ class ImplementsColumnProjectionMixin(ImplementsNecessaryColumns, Protocol):
     def project_columns(self: T, columns: frozenset[str]) -> T:
         ...
 
-    def __call__(self, *args: Any, **kwargs: Any) -> AwkwardArray:
+    def __call__(self, *args, **kwargs):
         ...
 
 
@@ -60,13 +61,18 @@ class ColumnProjectionMixin(ImplementsNecessaryColumns[FormStructure]):
     """
 
     def mock(self: S) -> AwkwardArray:
-        return ak.typetracer.typetracer_from_form(self.form, behavior=self.behavior)
+        return cast(
+            AwkwardArray, typetracer_from_form(self.form, behavior=self.behavior)
+        )
 
     def mock_empty(self: S, backend: BackendT = "cpu") -> AwkwardArray:
-        return ak.to_backend(
-            self.form.length_zero_array(highlevel=False, behavior=self.behavior),
-            backend,
-            highlevel=True,
+        return cast(
+            AwkwardArray,
+            ak.to_backend(
+                self.form.length_zero_array(highlevel=False, behavior=self.behavior),
+                backend,
+                highlevel=True,
+            ),
         )
 
     def prepare_for_projection(
@@ -75,7 +81,7 @@ class ColumnProjectionMixin(ImplementsNecessaryColumns[FormStructure]):
         form = form_with_unique_keys(self.form, "@")
 
         # Build typetracer and associated report object
-        (meta, report) = ak.typetracer.typetracer_with_report(
+        (meta, report) = typetracer_with_report(
             form,
             highlevel=True,
             behavior=self.behavior,

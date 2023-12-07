@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import functools
 import logging
 import math
 from collections.abc import Callable, Iterable, Mapping
@@ -20,18 +19,20 @@ from dask_awkward.layers.layers import (
     AwkwardBlockwiseLayer,
     AwkwardInputLayer,
     AwkwardMaterializedLayer,
-    BackendT,
     ImplementsMocking,
+    ImplementsReport,
     IOFunctionWithMocking,
-    io_func_implements_mock_empty,
     io_func_implements_mocking,
+    io_func_implements_report,
 )
 from dask_awkward.lib.core import (
+    Array,
     empty_typetracer,
     map_partitions,
     new_array_object,
     typetracer_array,
 )
+from dask_awkward.utils import first, second
 
 if TYPE_CHECKING:
     from dask.array.core import Array as DaskArray
@@ -39,8 +40,6 @@ if TYPE_CHECKING:
     from dask.dataframe.core import DataFrame as DaskDataFrame
     from dask.delayed import Delayed
     from fsspec.spec import AbstractFileSystem
-
-    from dask_awkward.lib.core import Array
 
 
 logger = logging.getLogger(__name__)
@@ -100,16 +99,19 @@ def from_awkward(
     starts = locs[:-1]
     stops = locs[1:]
     meta = typetracer_array(source)
-    return from_map(
-        _FromAwkwardFn(source),
-        starts,
-        stops,
-        label=label or "from-awkward",
-        token=tokenize(source, npartitions),
-        divisions=locs,
-        meta=meta,
-        behavior=behavior,
-        attrs=attrs,
+    return cast(
+        Array,
+        from_map(
+            _FromAwkwardFn(source),
+            starts,
+            stops,
+            label=label or "from-awkward",
+            token=tokenize(source, npartitions),
+            divisions=locs,
+            meta=meta,
+            behavior=behavior,
+            attrs=attrs,
+        ),
     )
 
 
@@ -158,12 +160,15 @@ def from_lists(
     """
     lists = list(source)
     divs = (0, *np.cumsum(list(map(len, lists))))
-    return from_map(
-        _FromListsFn(behavior=behavior, attrs=attrs),
-        lists,
-        meta=typetracer_array(ak.Array(lists[0], attrs=attrs, behavior=behavior)),
-        divisions=divs,
-        label="from-lists",
+    return cast(
+        Array,
+        from_map(
+            _FromListsFn(behavior=behavior, attrs=attrs),
+            lists,
+            meta=typetracer_array(ak.Array(lists[0], attrs=attrs, behavior=behavior)),
+            divisions=divs,
+            label="from-lists",
+        ),
     )
 
 
@@ -496,31 +501,6 @@ class PackedArgCallable:
         )
 
 
-def return_empty_on_raise(
-    fn: Callable,
-    allowed_exceptions: tuple[type[BaseException], ...],
-    backend: BackendT,
-) -> Callable:
-    @functools.wraps(fn)
-    def wrapped(*args, **kwargs):
-        try:
-            return fn(*args, **kwargs)
-        except allowed_exceptions as err:
-            logmsg = (
-                "%s call failed with args %s and kwargs %s; empty array returned. %s"
-                % (
-                    str(fn),
-                    str(args),
-                    str(kwargs),
-                    str(err),
-                )
-            )
-            logger.info(logmsg)
-            return fn.mock_empty(backend)
-
-    return wrapped
-
-
 def from_map(
     func: Callable,
     *iterables: Iterable,
@@ -529,10 +509,8 @@ def from_map(
     token: str | None = None,
     divisions: tuple[int, ...] | tuple[None, ...] | None = None,
     meta: ak.Array | None = None,
-    empty_on_raise: tuple[type[BaseException], ...] | None = None,
-    empty_backend: BackendT | None = None,
     **kwargs: Any,
-) -> Array:
+) -> Array | tuple[Array, Array]:
     """Create an Array collection from a custom mapping.
 
     Parameters
@@ -557,12 +535,6 @@ def from_map(
     meta : Array, optional
         Collection metadata array, if known (the awkward-array type
         tracer)
-    empty_on_raise : tuple[type[BaseException], ...], optional
-        Set of exceptions that can be caught to return an empty array
-        at compute time if file IO raises.
-    empty_backend : str,
-        The backend for the empty array resulting from a failed read
-        when `empty_on_raise` is defined.
     **kwargs : Any
         Keyword arguments passed to `func`.
 
@@ -644,18 +616,6 @@ def from_map(
         io_func = func
         array_meta = None
 
-    if (empty_on_raise and not empty_backend) or (empty_backend and not empty_on_raise):
-        raise ValueError("empty_on_raise and empty_backend must be used together.")
-
-    if empty_on_raise and empty_backend:
-        if not io_func_implements_mock_empty(io_func):
-            raise ValueError("io_func must implement mock_empty method.")
-        io_func = return_empty_on_raise(
-            io_func,
-            allowed_exceptions=empty_on_raise,
-            backend=empty_backend,
-        )
-
     dsk = AwkwardInputLayer(name=name, inputs=inputs, io_func=io_func)
 
     hlg = HighLevelGraph.from_collections(name, dsk)
@@ -663,6 +623,12 @@ def from_map(
         result = new_array_object(hlg, name, meta=array_meta, divisions=divisions)
     else:
         result = new_array_object(hlg, name, meta=array_meta, npartitions=len(inputs))
+
+    if io_func_implements_report(io_func):
+        if cast(ImplementsReport, io_func).return_report:
+            res = result.map_partitions(first, meta=array_meta, output_divisions=1)
+            rep = result.map_partitions(second, meta=empty_typetracer())
+            return res, rep
 
     return result
 
