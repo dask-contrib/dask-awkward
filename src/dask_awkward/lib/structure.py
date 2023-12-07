@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 import awkward as ak
 import numpy as np
+from awkward.types.type import Type
 from awkward.typetracer import create_unknown_scalar, is_unknown_scalar
 from dask.base import is_dask_collection, tokenize
 from dask.highlevelgraph import HighLevelGraph
@@ -1336,3 +1337,25 @@ def repartition_layer(arr: Array, key: str, divisions: tuple[int, ...]) -> dict:
             (_repartition_func,) + tuple((arr.name, part) for part in pp) + (ss,)
         )
     return layer
+
+
+@borrow_docstring(ak.enforce_type)
+def enforce_type(
+    array: Array,
+    type: str | dict | Type,
+    highlevel: bool = True,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
+) -> Array:
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
+    return map_partitions(
+        ak.enforce_type,
+        array,
+        label="enforce-type",
+        type=type,
+        behavior=behavior,
+        attrs=attrs,
+        output_divisions=1,
+    )
