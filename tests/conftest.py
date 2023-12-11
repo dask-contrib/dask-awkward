@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import cast
 
 import awkward as ak
 import fsspec
@@ -73,7 +74,7 @@ def pq_points_dir(daa: dak.Array, tmp_path_factory: pytest.TempPathFactory) -> s
 
 @pytest.fixture(scope="session")
 def daa_parquet(pq_points_dir: str) -> dak.Array:
-    return dak.from_parquet(pq_points_dir)
+    return cast(dak.Array, dak.from_parquet(pq_points_dir))
 
 
 @pytest.fixture(scope="session")

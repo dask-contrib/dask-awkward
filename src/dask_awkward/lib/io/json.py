@@ -4,7 +4,7 @@ import abc
 import logging
 import math
 from collections.abc import Callable, Mapping
-from typing import TYPE_CHECKING, Any, Literal, overload
+from typing import TYPE_CHECKING, Any, Literal, cast, overload
 
 import awkward as ak
 import dask
@@ -18,7 +18,13 @@ from fsspec.core import get_fs_token_paths, url_to_fs
 from fsspec.utils import infer_compression, read_block
 
 from dask_awkward.layers.layers import AwkwardMaterializedLayer
-from dask_awkward.lib.core import map_partitions, new_scalar_object, typetracer_array
+from dask_awkward.lib.core import (
+    Array,
+    Scalar,
+    map_partitions,
+    new_scalar_object,
+    typetracer_array,
+)
 from dask_awkward.lib.io.columnar import ColumnProjectionMixin
 from dask_awkward.lib.io.io import (
     _bytes_with_sample,
@@ -30,7 +36,6 @@ if TYPE_CHECKING:
     from awkward.contents.content import Content
     from fsspec.spec import AbstractFileSystem
 
-    from dask_awkward.lib.core import Array, Scalar
 
 log = logging.getLogger(__name__)
 
@@ -297,12 +302,15 @@ def _from_json_files(
         **kwargs,
     )
 
-    return from_map(
-        f,
-        paths,
-        label="from-json-files",
-        token=token,
-        meta=meta,
+    return cast(
+        Array,
+        from_map(
+            f,
+            paths,
+            label="from-json-files",
+            token=token,
+            meta=meta,
+        ),
     )
 
 
@@ -334,12 +342,15 @@ def _from_json_sopf(
         **kwargs,
     )
 
-    return from_map(
-        f,
-        paths,
-        label="from-json-sopf",
-        token=token,
-        meta=meta,
+    return cast(
+        Array,
+        from_map(
+            f,
+            paths,
+            label="from-json-sopf",
+            token=token,
+            meta=meta,
+        ),
     )
 
 
@@ -394,12 +405,15 @@ def _from_json_bytes(
         **kwargs,
     )
 
-    return from_map(
-        fn,
-        list(flatten(bytes_ingredients)),
-        label="from-json-bytes",
-        token=token,
-        meta=meta,
+    return cast(
+        Array,
+        from_map(
+            fn,
+            list(flatten(bytes_ingredients)),
+            label="from-json-bytes",
+            token=token,
+            meta=meta,
+        ),
     )
 
 

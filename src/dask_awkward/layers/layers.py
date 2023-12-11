@@ -48,18 +48,26 @@ class AwkwardBlockwiseLayer(Blockwise):
 
 
 class ImplementsIOFunction(Protocol):
-    def __call__(self, *args: Any, **kwargs: Any) -> AwkwardArray:
+    def __call__(self, *args, **kwargs):
         ...
 
 
 T = TypeVar("T")
 
 
-class ImplementsMocking(Protocol):
+class ImplementsMocking(ImplementsIOFunction, Protocol):
     def mock(self) -> AwkwardArray:
         ...
 
+
+class ImplementsMockEmpty(ImplementsIOFunction, Protocol):
     def mock_empty(self, backend: BackendT) -> AwkwardArray:
+        ...
+
+
+class ImplementsReport(ImplementsIOFunction, Protocol):
+    @property
+    def return_report(self) -> bool:
         ...
 
 
@@ -93,19 +101,6 @@ class IOFunctionWithMocking(ImplementsMocking, ImplementsIOFunction):
         assert self._meta is not None
         return self._meta
 
-    def mock_empty(self, backend: BackendT = "cpu") -> AwkwardArray:
-        import awkward as ak
-
-        if backend not in ("cpu", "jax", "cuda"):
-            raise ValueError(
-                f"backend must be one of 'cpu', 'jax', or 'cuda', received {backend}"
-            )
-        return ak.to_backend(
-            self.mock().layout.form.length_zero_array(highlevel=False),
-            backend=backend,
-            highlevel=True,
-        )
-
 
 def io_func_implements_projection(func: ImplementsIOFunction) -> bool:
     return hasattr(func, "prepare_for_projection")
@@ -121,6 +116,10 @@ def io_func_implements_mock_empty(func: ImplementsIOFunction) -> bool:
 
 def io_func_implements_columnar(func: ImplementsIOFunction) -> bool:
     return hasattr(func, "necessary_columns")
+
+
+def io_func_implements_report(func: ImplementsIOFunction) -> bool:
+    return hasattr(func, "return_report")
 
 
 class AwkwardInputLayer(AwkwardBlockwiseLayer):
@@ -183,7 +182,6 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
 
     def mock(self) -> AwkwardInputLayer:
         assert self.is_mockable
-
         return AwkwardInputLayer(
             name=self.name,
             inputs=[None][: int(list(self.numblocks.values())[0][0])],
@@ -229,10 +227,15 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
             ImplementsProjection, self.io_func
         ).prepare_for_projection()
 
+        new_return = new_meta_array
+        if io_func_implements_report(self.io_func):
+            if cast(ImplementsReport, self.io_func).return_report:
+                new_return = (new_meta_array, type(new_meta_array)([]))
+
         new_input_layer = AwkwardInputLayer(
             name=self.name,
             inputs=[None][: int(list(self.numblocks.values())[0][0])],
-            io_func=lambda *_, **__: new_meta_array,
+            io_func=lambda *_, **__: new_return,
             label=self.label,
             produces_tasks=self.produces_tasks,
             creation_info=self.creation_info,
@@ -246,12 +249,13 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         state: T,
     ) -> AwkwardInputLayer:
         assert self.is_projectable
+        io_func = cast(ImplementsProjection, self.io_func).project(
+            report=report, state=state
+        )
         return AwkwardInputLayer(
             name=self.name,
             inputs=self.inputs,
-            io_func=cast(ImplementsProjection, self.io_func).project(
-                report=report, state=state
-            ),
+            io_func=io_func,
             label=self.label,
             produces_tasks=self.produces_tasks,
             creation_info=self.creation_info,

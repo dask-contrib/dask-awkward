@@ -9,6 +9,7 @@ pytest.importorskip("requests")
 pytest.importorskip("aiohttp")
 
 import awkward as ak
+import dask
 import fsspec
 import pyarrow as pa
 import pyarrow.dataset as pad
@@ -201,3 +202,15 @@ def test_to_parquet_with_prefix(
             assert fname.startswith(f"{prefix}")
         else:
             assert fname.startswith("part")
+
+
+def test_from_parquet_with_report(
+    daa: dak.Array,
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    p = str(tmp_path_factory.mktemp("from_pq_with_report"))
+    dak.to_parquet(daa, p)
+    ds, report = dak.from_parquet(p, report=True)
+    c_ds, c_report = dask.compute(dak.max(ds.points.x, axis=1), report)
+    assert len(c_ds)
+    assert c_report.columns.tolist()[0] == ["points.list.item.x"]

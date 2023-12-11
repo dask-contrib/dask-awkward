@@ -143,3 +143,9 @@ def first(seq: Iterable[T]) -> T:
 
     """
     return next(iter(seq))
+
+
+def second(seq: Iterable[T]) -> T:
+    the_iter = iter(seq)
+    next(the_iter)
+    return next(the_iter)

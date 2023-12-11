@@ -883,6 +883,6 @@ def test_shape_only_ops(fn: Callable, tmp_path_factory: pytest.TempPathFactory) 
     p = tmp_path_factory.mktemp("zeros-like-flat")
     ak.to_parquet(a, str(p / "file.parquet"))
     lazy = dak.from_parquet(str(p))
-    result = fn(lazy.b)
+    result = fn(lazy.b)  # type: ignore
     with dask.config.set({"awkward.optimization.enabled": True}):
         result.compute()

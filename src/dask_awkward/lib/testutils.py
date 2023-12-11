@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import functools
 import random
+import time
 from typing import Any
 
 import awkward as ak
@@ -182,7 +184,7 @@ def lists() -> Array:
     return from_lists([list1(), list2(), list3()])  # pragma: no cover
 
 
-def unnamed_root_ds() -> Array:
+def unnamed_root_ds() -> ak.Array:
     ds = [
         [
             {
@@ -227,16 +229,70 @@ def unnamed_root_ds() -> Array:
     return ak.Array(ds * 3)
 
 
-class RandomFailFromListsFn:
-    def __init__(self, form):
-        self.form = form
+def time_it(f):
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        result = f(*args, **kwargs)
+        end = time.time()
+        return result, (end - start)
 
-    def __call__(self, x: list) -> ak.Array:
+    return wrapper
+
+
+class RandomFailFromListsFn:
+    def __init__(self, form, report=False, allowed_exceptions=(OSError,)):
+        self.form = form
+        self.allowed_exceptions = allowed_exceptions
+        self.report = report
+
+    @property
+    def return_report(self) -> bool:
+        return self.report
+
+    @staticmethod
+    def make_fail_report(exception, *args, **kwargs):
+        return ak.Array(
+            [
+                {
+                    "duration": None,
+                    "args": [repr(a) for a in args],
+                    "kwargs": [[k, repr(v)] for k, v in kwargs.items()],
+                    "exception": type(exception).__name__,
+                    "message": str(exception),
+                }
+            ]
+        )
+
+    @staticmethod
+    def make_success_report(duration, *args, **kwargs):
+        return ak.Array(
+            [
+                {
+                    "duration": duration,
+                    "args": [repr(a) for a in args],
+                    "kwargs": [[k, repr(v)] for k, v in kwargs.items()],
+                    "exception": None,
+                    "message": None,
+                }
+            ]
+        )
+
+    def read_fn(self, x: list) -> ak.Array:
         n = random.randint(0, 9)
         if n < 5:
             raise OSError("BAD!")
-
         return ak.Array(x)
+
+    def __call__(self, *args, **kwargs):
+        if self.return_report:
+            try:
+                result, time = time_it(self.read_fn)(*args, **kwargs)
+                return result, self.make_success_report(time, *args, **kwargs)
+            except self.allowed_exceptions as err:
+                return self.mock_empty(), self.make_fail_report(err, *args, **kwargs)
+
+        return self.read_fn(*args, **kwargs)
 
     def mock(self):
         return typetracer_from_form(self.form)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import cast
 
 import awkward as ak
 import numpy as np
@@ -12,14 +12,12 @@ from dask.core import flatten
 from fsspec.core import get_fs_token_paths
 from fsspec.utils import infer_compression, read_block
 
+from dask_awkward.lib.core import Array
 from dask_awkward.lib.io.io import (
     _bytes_with_sample,
     _BytesReadingInstructions,
     from_map,
 )
-
-if TYPE_CHECKING:
-    from dask_awkward.lib.core import Array
 
 
 def _string_array_from_bytestring(bytestring: bytes, delimiter: bytes) -> ak.Array:
@@ -117,10 +115,13 @@ def from_text(
         )
     )
 
-    return from_map(
-        _from_text_on_block,
-        list(flatten(bytes_ingredients)),
-        label="from-text",
-        token=token,
-        meta=meta,
+    return cast(
+        Array,
+        from_map(
+            _from_text_on_block,
+            list(flatten(bytes_ingredients)),
+            label="from-text",
+            token=token,
+            meta=meta,
+        ),
     )
