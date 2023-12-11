@@ -1685,10 +1685,10 @@ class AwkwardMask:
     def __init__(self, array: Array) -> None:
         self.array = array
 
-    def __getitem__(self, boolean_array: Array) -> Array:
+    def __getitem__(self, where: Array) -> Array:
         from dask_awkward.lib.structure import mask
 
-        return mask(self.array, boolean_array)
+        return mask(self.array, where, valid_when=True)
 
 
 def _zero_getitem(arr: ak.Array, zeroth: slice, rest: tuple[slice, ...]) -> ak.Array:
