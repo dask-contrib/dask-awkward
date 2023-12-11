@@ -1106,6 +1106,10 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         )
 
     @property
+    def mask(self) -> AwkwardMask:
+        return AwkwardMask(self)
+
+    @property
     def fields(self) -> list[str]:
         """Record field names (if any)."""
         return ak.fields(self._meta)
@@ -1675,6 +1679,16 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if self.known_divisions:
             out._divisions = (0, min(nrow, self.defined_divisions[1]))
         return out
+
+
+class AwkwardMask:
+    def __init__(self, array: Array) -> None:
+        self.array = array
+
+    def __getitem__(self, where: Array) -> Array:
+        from dask_awkward.lib.structure import mask
+
+        return mask(self.array, where, valid_when=True)
 
 
 def _zero_getitem(arr: ak.Array, zeroth: slice, rest: tuple[slice, ...]) -> ak.Array:
