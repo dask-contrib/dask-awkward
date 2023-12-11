@@ -170,6 +170,7 @@ def test_mask(daa, caa):
     mask = ak.any(caa.points.x > 3, axis=1)
     dmask = dak.any(daa.points.x > 3, axis=1)
 
+    assert_eq(daa.mask[dmask], caa.mask[mask])
     assert_eq(dak.mask(daa, dmask), ak.mask(caa, mask))
 
 
