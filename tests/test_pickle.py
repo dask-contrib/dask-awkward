@@ -8,7 +8,11 @@ import numpy as np
 
 def test_pickle_ak_array():
     buffers = []
-    array = ak.Array([[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]])[[0, 2]]
+    attrs = {"foo": "keep", "@foo": "drop"}
+    behavior = {("some", "behavior"): "key"}
+    array = ak.Array(
+        [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]], attrs=attrs, behavior=behavior
+    )[[0, 2]]
     next_array = pickle.loads(
         pickle.dumps(array, protocol=5, buffer_callback=buffers.append), buffers=buffers
     )
@@ -27,18 +31,27 @@ def test_pickle_ak_array():
         array.layout.stops.data,
         next_array.layout.stops.data,
     )
+    assert next_array.behavior == behavior
+    assert next_array.attrs == {"foo": "keep"}
 
 
 def test_pickle_ak_record():
     buffers = []
+    attrs = {"foo": "keep", "@foo": "drop"}
+    behavior = {("some", "behavior"): "key"}
     record = ak.zip(
-        {"x": [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]]}, depth_limit=1
+        {"x": [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]]},
+        depth_limit=1,
+        behavior=behavior,
+        attrs=attrs,
     )[2]
     next_record = pickle.loads(
         pickle.dumps(record, protocol=5, buffer_callback=buffers.append),
         buffers=buffers,
     )
     assert record.layout.at == next_record.layout.at
+    assert next_record.behavior == behavior
+    assert next_record.attrs == {"foo": "keep"}
 
     array = ak.Array(record.layout.array)
     next_array = ak.Array(next_record.layout.array)
