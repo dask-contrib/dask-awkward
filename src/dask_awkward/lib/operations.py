@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from awkward.highlevel import Array as AwkwardArray
 
 
-class _ConcatenateFnAxisGT0:
+class ConcatenateFnAxisGT0:
     def __init__(self, **kwargs):
         self.kwargs = kwargs
 
@@ -133,7 +133,7 @@ def concatenate(
         if partition_compatibility(*arrays) == PartitionCompatibility.NO:
             raise IncompatiblePartitions("concatenate", *arrays)
 
-        fn = _ConcatenateFnAxisGT0(axis=axis, behavior=behavior, attrs=attrs)
-        return map_partitions(fn, *arrays)
+        fn = ConcatenateFnAxisGT0(axis=axis, behavior=behavior, attrs=attrs)
+        return map_partitions(fn, label="concatenate-axisgt0", *arrays)
 
     raise DaskAwkwardNotImplemented("TODO")
