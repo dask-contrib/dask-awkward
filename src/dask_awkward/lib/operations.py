@@ -134,6 +134,6 @@ def concatenate(
             raise IncompatiblePartitions("concatenate", *arrays)
 
         fn = ConcatenateFnAxisGT0(axis=axis, behavior=behavior, attrs=attrs)
-        return map_partitions(fn, label="concatenate-axisgt0", *arrays)
+        return map_partitions(fn, *arrays, label="concatenate-axisgt0")
 
     raise DaskAwkwardNotImplemented("TODO")
