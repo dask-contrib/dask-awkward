@@ -113,7 +113,7 @@ def argcartesian(
             attrs=attrs,
         )
         return map_partitions(
-            fn, *arrays_packed, label="argcartesian", output_divisions=1
+            fn, *arrays_unpacked, label="argcartesian", output_divisions=1
         )
     raise DaskAwkwardNotImplemented("TODO")
 
