@@ -261,7 +261,7 @@ def cartesian(
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
     if axis == 1:
-        arrays_packed, repacker = unpack_collections(arrays, traverse=True)
+        arrays_unpacked, repacker = unpack_collections(arrays, traverse=True)
         fn = _CartesianFn(
             repacker,
             axis=axis,
