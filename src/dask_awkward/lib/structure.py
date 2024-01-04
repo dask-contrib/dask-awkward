@@ -272,7 +272,7 @@ def cartesian(
             behavior=behavior,
             attrs=attrs,
         )
-        return map_partitions(fn, *arrays_packed, label="cartesian", output_divisions=1)
+        return map_partitions(fn, *arrays_unpacked, label="cartesian", output_divisions=1)
     raise DaskAwkwardNotImplemented("TODO")
 
 
