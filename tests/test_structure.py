@@ -104,6 +104,10 @@ def test_cartesian(caa: ak.Array, daa: dak.Array) -> None:
     cz = ak.cartesian([ca1, ca2], axis=1)
     assert_eq(dz, cz)
 
+    dz = dak.cartesian({"xx": da1, "yy": da2}, axis=1)
+    cz = ak.cartesian({"xx": ca1, "yy": ca2}, axis=1)
+    assert_eq(dz, cz)
+
 
 def test_argcartesian(caa: ak.Array, daa: dak.Array) -> None:
     da1 = daa["points", "x"]
@@ -113,6 +117,10 @@ def test_argcartesian(caa: ak.Array, daa: dak.Array) -> None:
 
     dz = dak.argcartesian([da1, da2], axis=1)
     cz = ak.argcartesian([ca1, ca2], axis=1)
+    assert_eq(dz, cz)
+
+    dz = dak.argcartesian({"xx": da1, "yy": da2}, axis=1)
+    cz = ak.argcartesian({"xx": ca1, "yy": ca2}, axis=1)
     assert_eq(dz, cz)
 
 

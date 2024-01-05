@@ -11,7 +11,7 @@ import awkward as ak
 import numpy as np
 from awkward.types.type import Type
 from awkward.typetracer import create_unknown_scalar, is_unknown_scalar
-from dask.base import is_dask_collection, tokenize
+from dask.base import is_dask_collection, tokenize, unpack_collections
 from dask.highlevelgraph import HighLevelGraph
 
 from dask_awkward.layers import AwkwardMaterializedLayer
@@ -77,15 +77,12 @@ __all__ = (
 
 
 class _ArgCartesianFn:
-    def __init__(self, **kwargs):
+    def __init__(self, repacker, **kwargs):
+        self.repacker = repacker
         self.kwargs = kwargs
 
     def __call__(self, *arrays):
-        # FIXME: with proper typetracer/form rehydration support we
-        # should not need to manually touch this when it's a
-        # typetracer
-        arrays = [ak.typetracer.touch_data(a) for a in arrays]
-        return ak.argcartesian(arrays, **self.kwargs)
+        return ak.argcartesian(self.repacker(arrays)[0], **self.kwargs)
 
 
 @borrow_docstring(ak.argcartesian)
@@ -104,7 +101,9 @@ def argcartesian(
 
     # FIXME: resolve negative axis
     if axis >= 1:
+        arrays_unpacked, repacker = unpack_collections(arrays, traverse=True)
         fn = _ArgCartesianFn(
+            repacker,
             axis=axis,
             nested=nested,
             parameters=parameters,
@@ -113,7 +112,9 @@ def argcartesian(
             behavior=behavior,
             attrs=attrs,
         )
-        return map_partitions(fn, *arrays, label="argcartesian", output_divisions=1)
+        return map_partitions(
+            fn, *arrays_unpacked, label="argcartesian", output_divisions=1
+        )
     raise DaskAwkwardNotImplemented("TODO")
 
 
@@ -238,11 +239,12 @@ def broadcast_arrays(
 
 
 class _CartesianFn:
-    def __init__(self, **kwargs):
+    def __init__(self, repacker, **kwargs):
+        self.repacker = repacker
         self.kwargs = kwargs
 
     def __call__(self, *arrays):
-        return ak.cartesian(list(arrays), **self.kwargs)
+        return ak.cartesian(self.repacker(arrays)[0], **self.kwargs)
 
 
 @borrow_docstring(ak.cartesian)
@@ -259,7 +261,9 @@ def cartesian(
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
     if axis == 1:
+        arrays_unpacked, repacker = unpack_collections(arrays, traverse=True)
         fn = _CartesianFn(
+            repacker,
             axis=axis,
             nested=nested,
             parameters=parameters,
@@ -268,7 +272,9 @@ def cartesian(
             behavior=behavior,
             attrs=attrs,
         )
-        return map_partitions(fn, *arrays, label="cartesian", output_divisions=1)
+        return map_partitions(
+            fn, *arrays_unpacked, label="cartesian", output_divisions=1
+        )
     raise DaskAwkwardNotImplemented("TODO")
 
 
