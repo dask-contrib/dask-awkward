@@ -930,17 +930,6 @@ def multiply(a, b, c):
 def test_map_partitions_bad_arguments():
     array1 = ak.Array([[1, 2, 3], [4], [5, 6, 7], [8]])
     array2 = ak.Array([4, 5, 6, 7])
-    dak_array1 = dak.from_awkward(array1, npartitions=2)
-    dak_array2 = dak.from_awkward(array2, npartitions=1)
-    with pytest.raises(IncompatiblePartitions):
-        result = map_partitions(
-            multiply,
-            dak_array1,
-            dak_array2,
-            a_delayed_array(),
-            meta=dak_array1._meta,
-        )
-
     with pytest.raises(TypeError, match="at least one"):
         result = map_partitions(
             multiply,

@@ -2037,8 +2037,6 @@ def map_partitions(
         )
     in_npartitions = dak_arrays[0].npartitions
     in_divisions = dak_arrays[0].divisions
-    if partition_compatibility(*dak_arrays) == PartitionCompatibility.NO:
-        raise IncompatiblePartitions("map_partitions", *dak_arrays)
 
     if output_divisions is not None:
         if output_divisions == 1:
