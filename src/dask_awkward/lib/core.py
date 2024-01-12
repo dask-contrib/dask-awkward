@@ -1830,6 +1830,8 @@ def partitionwise_layer(
         elif isinstance(arg, Scalar):
             pairs.extend([arg.name, "i"])
             numblocks[arg.name] = (1,)
+        elif isinstance(arg, Delayed):
+            pairs.extend([arg.key, None])
         elif is_dask_collection(arg):
             raise DaskAwkwardNotImplemented(
                 "Use of Array with other Dask collections is currently unsupported."

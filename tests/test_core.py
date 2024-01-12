@@ -13,6 +13,7 @@ import dask.config
 import fsspec
 import numpy as np
 import pytest
+from dask.delayed import delayed
 
 import dask_awkward as dak
 from dask_awkward.lib.core import (
@@ -886,3 +887,25 @@ def test_shape_only_ops(fn: Callable, tmp_path_factory: pytest.TempPathFactory) 
     result = fn(lazy.b)  # type: ignore
     with dask.config.set({"awkward.optimization.enabled": True}):
         result.compute()
+
+
+@delayed
+def a_delayed_array():
+    return ak.Array([1, 2])
+
+
+def test_partitionwise_op_with_delayed():
+    array = ak.Array([[1, 2, 3], [4], [5, 6, 7], [8]])
+    dak_array = dak.from_awkward(array, npartitions=2)
+    result = dak_array.map_partitions(
+        operator.mul,
+        a_delayed_array(),
+        meta=dak_array._meta,
+        output_divisions=1,
+    )
+    concrete_result = ak.concatenate(
+        [
+            array[:2] * a_delayed_array().compute(),
+            array[2:] * a_delayed_array().compute(),
+        ],
+    )
