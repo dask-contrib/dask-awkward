@@ -931,7 +931,7 @@ def test_map_partitions_bad_arguments():
     array1 = ak.Array([[1, 2, 3], [4], [5, 6, 7], [8]])
     array2 = ak.Array([4, 5, 6, 7])
     with pytest.raises(TypeError, match="at least one"):
-        result = map_partitions(
+        map_partitions(
             multiply,
             a_delayed_array(),
             array1,
