@@ -2029,13 +2029,22 @@ def map_partitions(
         dependencies=flat_deps,
     )
 
+    dak_arrays = tuple(filter(lambda x: isinstance(x, Array), flat_deps))
+    if len(dak_arrays) == 0:
+        raise TypeError(
+            "at least one argument passed to map_partitions "
+            "should be a dask_awkward.Array collection."
+        )
+    in_npartitions = dak_arrays[0].npartitions
+    in_divisions = dak_arrays[0].divisions
+    if partition_compatibility(*dak_arrays) == PartitionCompatibility.NO:
+        raise IncompatiblePartitions("map_partitions", *dak_arrays)
+
     if output_divisions is not None:
         if output_divisions == 1:
             new_divisions = flat_deps[0].divisions
         else:
-            new_divisions = tuple(
-                map(lambda x: x * output_divisions, flat_deps[0].divisions)
-            )
+            new_divisions = tuple(map(lambda x: x * output_divisions, in_divisions))
         return new_array_object(
             hlg,
             name=name,
@@ -2047,7 +2056,7 @@ def map_partitions(
             hlg,
             name=name,
             meta=meta,
-            npartitions=flat_deps[0].npartitions,
+            npartitions=in_npartitions,
         )
 
 

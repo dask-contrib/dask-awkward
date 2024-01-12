@@ -21,6 +21,7 @@ from dask_awkward.lib.core import (
     Scalar,
     calculate_known_divisions,
     compute_typetracer,
+    empty_typetracer,
     is_typetracer,
     map_partitions,
     meta_or_identity,
@@ -912,3 +913,39 @@ def test_partitionwise_op_with_delayed():
         ],
     )
     assert_eq(result, concrete_result)
+
+    result = map_partitions(
+        operator.mul,
+        a_delayed_array(),
+        dak_array,
+        meta=dak_array._meta,
+    )
+    assert_eq(result, concrete_result)
+
+
+def multiply(a, b, c):
+    return a * b * c
+
+
+def test_map_partitions_bad_arguments():
+    array1 = ak.Array([[1, 2, 3], [4], [5, 6, 7], [8]])
+    array2 = ak.Array([4, 5, 6, 7])
+    dak_array1 = dak.from_awkward(array1, npartitions=2)
+    dak_array2 = dak.from_awkward(array2, npartitions=1)
+    with pytest.raises(IncompatiblePartitions):
+        result = map_partitions(
+            multiply,
+            dak_array1,
+            dak_array2,
+            a_delayed_array(),
+            meta=dak_array1._meta,
+        )
+
+    with pytest.raises(TypeError, match="at least one"):
+        result = map_partitions(
+            multiply,
+            a_delayed_array(),
+            array1,
+            array2,
+            meta=empty_typetracer(),
+        )
