@@ -22,6 +22,7 @@ from dask_awkward.lib.core import (
     calculate_known_divisions,
     compute_typetracer,
     is_typetracer,
+    map_partitions,
     meta_or_identity,
     new_array_object,
     new_known_scalar,
@@ -891,14 +892,15 @@ def test_shape_only_ops(fn: Callable, tmp_path_factory: pytest.TempPathFactory) 
 
 @delayed
 def a_delayed_array():
-    return ak.Array([1, 2])
+    return ak.Array([2, 4])
 
 
 def test_partitionwise_op_with_delayed():
     array = ak.Array([[1, 2, 3], [4], [5, 6, 7], [8]])
     dak_array = dak.from_awkward(array, npartitions=2)
-    result = dak_array.map_partitions(
+    result = map_partitions(
         operator.mul,
+        dak_array,
         a_delayed_array(),
         meta=dak_array._meta,
         output_divisions=1,
