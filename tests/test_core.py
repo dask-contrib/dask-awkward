@@ -909,3 +909,4 @@ def test_partitionwise_op_with_delayed():
             array[2:] * a_delayed_array().compute(),
         ],
     )
+    assert_eq(result, concrete_result)
