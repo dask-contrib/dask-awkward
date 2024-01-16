@@ -59,6 +59,8 @@ docs = [
   "sphinx-book-theme",
   "sphinx-design",
   "sphinx-codeautolink",
+  # broken see PR 451
+  # "dask-sphinx-theme",
 ]
 test = [
   "aiohttp;python_version<\"3.12\"",
