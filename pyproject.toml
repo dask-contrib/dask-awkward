@@ -56,7 +56,7 @@ complete = [
 # `docs` and `test` are separate from user installs
 docs = [
   "dask-awkward[complete]",
-  "dask-sphinx-theme >=3.0.2",
+  "sphinx-book-theme",
   "sphinx-design",
   "sphinx-codeautolink",
 ]
