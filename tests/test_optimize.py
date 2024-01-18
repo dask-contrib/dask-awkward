@@ -78,7 +78,7 @@ def test_multiple_computes_multiple_incapsulated(daa, caa):
     assert_eq(opt4_alone, opt4)
 
 
-def test_optimization_runs_on_multiple_collections(tmp_path_factory):
+def test_optimization_runs_on_multiple_collections_gh430(tmp_path_factory):
     d = tmp_path_factory.mktemp("opt")
     array1 = ak.Array(
         [
