@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 import logging
 import warnings
-from collections.abc import Hashable, Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 import dask.config
@@ -14,9 +14,11 @@ from dask.highlevelgraph import HighLevelGraph
 from dask.local import get_sync
 
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardInputLayer
+from dask_awkward.utils import first
 
 if TYPE_CHECKING:
     from awkward._nplikes.typetracer import TypeTracerReport
+    from dask.typing import Key
 
 log = logging.getLogger(__name__)
 
@@ -30,19 +32,13 @@ https://dask-awkward.readthedocs.io/en/stable/more/faq.html
 """
 
 
-def all_optimizations(
-    dsk: Mapping,
-    keys: Hashable | list[Hashable] | set[Hashable],
-    **_: Any,
-) -> Mapping:
+def all_optimizations(dsk: Mapping, keys: Sequence[Key], **_: Any) -> Mapping:
     """Run all optimizations that benefit dask-awkward computations.
 
     This function will run both dask-awkward specific and upstream
     general optimizations from core dask.
 
     """
-    if not isinstance(keys, (list, set)):
-        keys = (keys,)  # pragma: no cover
     keys = tuple(flatten(keys))
 
     if not isinstance(dsk, HighLevelGraph):
@@ -63,11 +59,7 @@ def all_optimizations(
     return dsk
 
 
-def optimize(
-    dsk: HighLevelGraph,
-    keys: Hashable | list[Hashable] | set[Hashable],
-    **_: Any,
-) -> Mapping:
+def optimize(dsk: HighLevelGraph, keys: Sequence[Key], **_: Any) -> Mapping:
     """Run optimizations specific to dask-awkward.
 
     This is currently limited to determining the necessary columns for
@@ -77,7 +69,7 @@ def optimize(
     if dask.config.get("awkward.optimization.enabled"):
         which = dask.config.get("awkward.optimization.which")
         if "columns" in which:
-            dsk = optimize_columns(dsk)
+            dsk = optimize_columns(dsk, keys)
         if "layer-chains" in which:
             dsk = rewrite_layer_chains(dsk, keys)
 
@@ -85,7 +77,7 @@ def optimize(
 
 
 def _prepare_buffer_projection(
-    dsk: HighLevelGraph,
+    dsk: HighLevelGraph, keys: Sequence[Key]
 ) -> tuple[dict[str, TypeTracerReport], dict[str, Any]] | None:
     """Pair layer names with lists of necessary columns."""
     import awkward as ak
@@ -117,17 +109,12 @@ def _prepare_buffer_projection(
 
     hlg = HighLevelGraph(projection_layers, dsk.dependencies)
 
-    # this loop builds up what are the possible final leaf nodes by
-    # inspecting the dependents dictionary. If something does not have
-    # a dependent, it must be the end of a graph. These are the things
-    # we need to compute for; we only use a single partition (the
-    # first). for a single collection `.compute()` this list will just
-    # be length 1; but if we are using `dask.compute` to pass in
-    # multiple collections to be computed simultaneously, this list
-    # will increase in length.
-    leaf_layers_keys = [
-        (k, 0) for k, v in dsk.dependents.items() if isinstance(v, set) and len(v) == 0
-    ]
+    minimal_keys: set[Key] = set()
+    for k in keys:
+        if isinstance(k, tuple) and len(k) == 2:
+            minimal_keys.add((k[0], 0))
+        else:
+            minimal_keys.add(k)
 
     # now we try to compute for each possible output layer key (leaf
     # node on partition 0); this will cause the typetacer reports to
@@ -136,7 +123,7 @@ def _prepare_buffer_projection(
     try:
         for layer in hlg.layers.values():
             layer.__dict__.pop("_cached_dict", None)
-        results = get_sync(hlg, leaf_layers_keys)
+        results = get_sync(hlg, list(minimal_keys))
         for out in results:
             if isinstance(out, (ak.Array, ak.Record)):
                 touch_data(out)
@@ -163,7 +150,7 @@ def _prepare_buffer_projection(
         return layer_to_reports, layer_to_projection_state
 
 
-def optimize_columns(dsk: HighLevelGraph) -> HighLevelGraph:
+def optimize_columns(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelGraph:
     """Run column projection optimization.
 
     This optimization determines which columns from an
@@ -192,7 +179,7 @@ def optimize_columns(dsk: HighLevelGraph) -> HighLevelGraph:
         New, optimized task graph with column-projected ``AwkwardInputLayer``.
 
     """
-    projection_data = _prepare_buffer_projection(dsk)
+    projection_data = _prepare_buffer_projection(dsk, keys)
     if projection_data is None:
         return dsk
 
@@ -258,7 +245,7 @@ def _mock_output(layer):
     return new_layer
 
 
-def rewrite_layer_chains(dsk: HighLevelGraph, keys: Any) -> HighLevelGraph:
+def rewrite_layer_chains(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelGraph:
     """Smush chains of blockwise layers into a single layer.
 
     The logic here identifies chains by popping layers (in arbitrary
@@ -292,54 +279,54 @@ def rewrite_layer_chains(dsk: HighLevelGraph, keys: Any) -> HighLevelGraph:
     chains = []
     deps = copy.copy(dsk.dependencies)
 
-    required_layers = {k[0] for k in keys}
+    required_layers = {k[0] for k in keys if isinstance(k, tuple)}
     layers = {}
     # find chains; each chain list is at least two keys long
     dependents = dsk.dependents
     all_layers = set(dsk.layers)
     while all_layers:
-        lay = all_layers.pop()
-        val = dsk.layers[lay]
-        if not isinstance(val, AwkwardBlockwiseLayer):
+        layer_key = all_layers.pop()
+        layer = dsk.layers[layer_key]
+        if not isinstance(layer, AwkwardBlockwiseLayer):
             # shortcut to avoid making comparisons
-            layers[lay] = val  # passthrough unchanged
+            layers[layer_key] = layer  # passthrough unchanged
             continue
-        children = dependents[lay]
-        chain = [lay]
-        lay0 = lay
+        children = dependents[layer_key]
+        chain = [layer_key]
+        current_layer_key = layer_key
         while (
             len(children) == 1
-            and dsk.dependencies[list(children)[0]] == {lay}
-            and isinstance(dsk.layers[list(children)[0]], AwkwardBlockwiseLayer)
-            and len(dsk.layers[lay]) == len(dsk.layers[list(children)[0]])
-            and lay not in required_layers
+            and dsk.dependencies[first(children)] == {current_layer_key}
+            and isinstance(dsk.layers[first(children)], AwkwardBlockwiseLayer)
+            and len(dsk.layers[current_layer_key]) == len(dsk.layers[first(children)])
+            and current_layer_key not in required_layers
         ):
             # walk forwards
-            lay = list(children)[0]
-            chain.append(lay)
-            all_layers.remove(lay)
-            children = dependents[lay]
-        lay = lay0
-        parents = dsk.dependencies[lay]
+            current_layer_key = first(children)
+            chain.append(current_layer_key)
+            all_layers.remove(current_layer_key)
+            children = dependents[current_layer_key]
+
+        parents = dsk.dependencies[layer_key]
         while (
             len(parents) == 1
-            and dependents[list(parents)[0]] == {lay}
-            and isinstance(dsk.layers[list(parents)[0]], AwkwardBlockwiseLayer)
-            and len(dsk.layers[lay]) == len(dsk.layers[list(parents)[0]])
-            and list(parents)[0] not in required_layers
+            and dependents[first(parents)] == {layer_key}
+            and isinstance(dsk.layers[first(parents)], AwkwardBlockwiseLayer)
+            and len(dsk.layers[layer_key]) == len(dsk.layers[first(parents)])
+            and next(iter(parents)) not in required_layers
         ):
             # walk backwards
-            lay = list(parents)[0]
-            chain.insert(0, lay)
-            all_layers.remove(lay)
-            parents = dsk.dependencies[lay]
+            layer_key = first(parents)
+            chain.insert(0, layer_key)
+            all_layers.remove(layer_key)
+            parents = dsk.dependencies[layer_key]
         if len(chain) > 1:
             chains.append(chain)
             layers[chain[-1]] = copy.copy(
                 dsk.layers[chain[-1]]
             )  # shallow copy to be mutated
         else:
-            layers[lay] = val  # passthrough unchanged
+            layers[layer_key] = layer  # passthrough unchanged
 
     # do rewrite
     for chain in chains:
