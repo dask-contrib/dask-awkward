@@ -76,3 +76,78 @@ def test_multiple_computes_multiple_incapsulated(daa, caa):
     (opt4_alone,) = dask.optimize(dstep4)
     assert len(opt4_alone.dask.layers) == 1
     assert_eq(opt4_alone, opt4)
+
+
+def test_optimization_runs_on_multiple_collections(tmp_path_factory):
+    d = tmp_path_factory.mktemp("opt")
+    array1 = ak.Array(
+        [
+            {
+                "points": [
+                    {"x": 3.0, "y": 4.0, "z": 1.0},
+                    {"x": 2.0, "y": 5.0, "z": 2.0},
+                ],
+            },
+            {
+                "points": [
+                    {"x": 2.0, "y": 5.0, "z": 2.0},
+                    {"x": 3.0, "y": 4.0, "z": 1.0},
+                ],
+            },
+            {
+                "points": [],
+            },
+            {
+                "points": [
+                    {"x": 2.0, "y": 6.0, "z": 2.0},
+                ],
+            },
+        ]
+    )
+    ak.to_parquet(array1, d / "p0.parquet", extensionarray=False)
+
+    array2 = ak.Array(
+        [
+            {
+                "points": [
+                    {"x": 1.0, "y": 4.0, "z": 1.0},
+                ],
+            },
+            {
+                "points": [
+                    {"x": 7.0, "y": 5.0, "z": 2.0},
+                    {"x": 3.0, "y": 4.0, "z": 1.0},
+                    {"x": 5.0, "y": 5.0, "z": 2.0},
+                ],
+            },
+            {
+                "points": [
+                    {"x": 2.0, "y": 6.0, "z": 2.0},
+                ],
+            },
+            {
+                "points": [],
+            },
+        ]
+    )
+    ak.to_parquet(array2, d / "p1.parquet", extensionarray=False)
+
+    ds = dak.from_parquet(d)
+    a1 = ds.partitions[0].points
+    a2 = ds.partitions[1].points
+    a, b = ak.unzip(ak.cartesian([a1, a2], axis=1, nested=True))
+
+    def something(j, k):
+        return j.x + k.x
+
+    a_compute = something(a, b)
+    nc1 = dak.necessary_columns(a_compute)
+    assert sorted(list(nc1.items())[0][1]) == ["points.x"]
+
+    nc2 = dak.necessary_columns(a_compute, (a, b))
+    assert sorted(list(nc2.items())[0][1]) == ["points.x", "points.y", "points.z"]
+
+    x, (y, z) = dask.compute(a_compute, (a, b))
+    assert str(x)
+    assert str(y)
+    assert str(z)
