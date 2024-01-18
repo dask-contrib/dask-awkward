@@ -31,11 +31,7 @@ https://dask-awkward.readthedocs.io/en/stable/more/faq.html
 """
 
 
-def all_optimizations(
-    dsk: Mapping,
-    keys: Hashable | list[Hashable] | set[Hashable],
-    **_: Any,
-) -> Mapping:
+def all_optimizations(dsk: Mapping, keys: Sequence[Key], **_: Any) -> Mapping:
     """Run all optimizations that benefit dask-awkward computations.
 
     This function will run both dask-awkward specific and upstream
@@ -64,11 +60,7 @@ def all_optimizations(
     return dsk
 
 
-def optimize(
-    dsk: HighLevelGraph,
-    keys: Sequence[Key],
-    **_: Any,
-) -> Mapping:
+def optimize(dsk: HighLevelGraph, keys: Sequence[Key], **_: Any) -> Mapping:
     """Run optimizations specific to dask-awkward.
 
     This is currently limited to determining the necessary columns for
@@ -118,6 +110,13 @@ def _prepare_buffer_projection(
 
     hlg = HighLevelGraph(projection_layers, dsk.dependencies)
 
+    minimal_keys = set()
+    for k in keys:
+        if isinstance(k, tuple) and len(k) == 2:
+            minimal_keys.add((k[0], 0))
+        else:
+            minimal_keys.add(k)
+
     # now we try to compute for each possible output layer key (leaf
     # node on partition 0); this will cause the typetacer reports to
     # get correct fields/columns touched. If the result is a record or
@@ -125,7 +124,7 @@ def _prepare_buffer_projection(
     try:
         for layer in hlg.layers.values():
             layer.__dict__.pop("_cached_dict", None)
-        results = get_sync(hlg, list(keys))
+        results = get_sync(hlg, list(minimal_keys))
         for out in results:
             if isinstance(out, (ak.Array, ak.Record)):
                 touch_data(out)
