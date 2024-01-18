@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import awkward as ak
 import dask
+import pytest
 
 import dask_awkward as dak
 from dask_awkward.lib.testutils import assert_eq
@@ -79,6 +80,7 @@ def test_multiple_computes_multiple_incapsulated(daa, caa):
 
 
 def test_optimization_runs_on_multiple_collections_gh430(tmp_path_factory):
+    pytest.importorskip("pyarrow")
     d = tmp_path_factory.mktemp("opt")
     array1 = ak.Array(
         [
