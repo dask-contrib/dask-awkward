@@ -38,8 +38,6 @@ def all_optimizations(dsk: Mapping, keys: Sequence[Key], **_: Any) -> Mapping:
     general optimizations from core dask.
 
     """
-    if not isinstance(keys, (list, set)):
-        keys = (keys,)  # pragma: no cover
     keys = tuple(flatten(keys))
 
     if not isinstance(dsk, HighLevelGraph):
@@ -110,7 +108,7 @@ def _prepare_buffer_projection(
 
     hlg = HighLevelGraph(projection_layers, dsk.dependencies)
 
-    minimal_keys = set()
+    minimal_keys: set[Key] = set()
     for k in keys:
         if isinstance(k, tuple) and len(k) == 2:
             minimal_keys.add((k[0], 0))
