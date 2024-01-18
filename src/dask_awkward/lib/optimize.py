@@ -14,6 +14,7 @@ from dask.highlevelgraph import HighLevelGraph
 from dask.local import get_sync
 
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardInputLayer
+from dask_awkward.utils import first
 
 if TYPE_CHECKING:
     from awkward._nplikes.typetracer import TypeTracerReport
@@ -295,14 +296,13 @@ def rewrite_layer_chains(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelG
         current_layer_key = layer_key
         while (
             len(children) == 1
-            and dsk.dependencies[first_child := next(iter(children))]
-            == {current_layer_key}
-            and isinstance(dsk.layers[first_child], AwkwardBlockwiseLayer)
-            and len(dsk.layers[current_layer_key]) == len(dsk.layers[first_child])
+            and dsk.dependencies[first(children)] == {current_layer_key}
+            and isinstance(dsk.layers[first(children)], AwkwardBlockwiseLayer)
+            and len(dsk.layers[current_layer_key]) == len(dsk.layers[first(children)])
             and current_layer_key not in required_layers
         ):
             # walk forwards
-            current_layer_key = first_child
+            current_layer_key = first(children)
             chain.append(current_layer_key)
             all_layers.remove(current_layer_key)
             children = dependents[current_layer_key]
@@ -310,13 +310,13 @@ def rewrite_layer_chains(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelG
         parents = dsk.dependencies[layer_key]
         while (
             len(parents) == 1
-            and dependents[first_parent := next(iter(parents))] == {layer_key}
-            and isinstance(dsk.layers[first_parent], AwkwardBlockwiseLayer)
-            and len(dsk.layers[layer_key]) == len(dsk.layers[first_parent])
+            and dependents[first(parents)] == {layer_key}
+            and isinstance(dsk.layers[first(parents)], AwkwardBlockwiseLayer)
+            and len(dsk.layers[layer_key]) == len(dsk.layers[first(parents)])
             and next(iter(parents)) not in required_layers
         ):
             # walk backwards
-            layer_key = first_parent
+            layer_key = first(parents)
             chain.insert(0, layer_key)
             all_layers.remove(layer_key)
             parents = dsk.dependencies[layer_key]
