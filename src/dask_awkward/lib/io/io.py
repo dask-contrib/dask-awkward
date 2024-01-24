@@ -63,7 +63,6 @@ class FromAwkwardFn(ColumnProjectionMixin):
         return True
 
     def __call__(self, *args, **kwargs):
-        print(args)
         start, stop = args[0]
         arr = cast(ak.Array, self.arr[start:stop])
         return ak.Array(arr, behavior=self.behavior, attrs=self.attrs)
