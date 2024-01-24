@@ -1400,7 +1400,10 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             return self._getitem_outer_int(where)
 
         elif isinstance(where[0], str):
-            return self._getitem_outer_str_or_list(where)
+            first, rest = where[0], where[1:]
+            if rest:
+                return self[first][rest]
+            return self[first]
 
         elif isinstance(where[0], list):
             return self._getitem_outer_str_or_list(where)
