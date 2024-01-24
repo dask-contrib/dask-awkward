@@ -159,3 +159,30 @@ def test_firstarg_ellipsis_bad() -> None:
         match="sliced axes is greater than",
     ):
         daa[..., 0]
+
+
+def test_multiarg_starting_with_string_gh454():
+    caa = ak.Array(
+        [
+            [
+                {"a": 1, "b": 5},
+                {"a": 2, "b": 6},
+                {"a": 1, "b": 5},
+                {"a": 2, "b": 6},
+            ],
+            [
+                {"a": 1, "b": 5},
+                {"a": 2, "b": 6},
+            ],
+            [],
+            [
+                {"a": 1, "b": 5},
+                {"a": 2, "b": 6},
+            ],
+        ]
+    )
+    daa = dak.from_awkward(caa, npartitions=2)
+    assert_eq(daa["a", 0], caa["a", 0])
+    assert daa.defined_divisions
+    with pytest.raises(ValueError, match="only works when divisions are known"):
+        daa["a", 0].defined_divisions
