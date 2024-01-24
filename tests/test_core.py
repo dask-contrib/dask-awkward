@@ -104,7 +104,7 @@ def test_len(ndjson_points_file: str) -> None:
     daa = dak.from_json([ndjson_points_file] * 2)
     assert not daa.known_divisions
     with pytest.raises(
-        NotImplementedError,
+        TypeError,
         match=(
             "Cannot determine length of collection with unknown partition sizes without executing the graph.\\n"
             "Use `dask_awkward.num\\(\\.\\.\\., axis=0\\)` if you want a lazy Scalar of the length.\\n"
