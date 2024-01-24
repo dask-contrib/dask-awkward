@@ -183,6 +183,9 @@ def test_multiarg_starting_with_string_gh454():
     )
     daa = dak.from_awkward(caa, npartitions=2)
     assert_eq(daa["a", 0], caa["a", 0])
+    assert_eq(daa["a", 1], caa["a", 1])
+    assert_eq(daa["a", 2], caa["a", 2])
+    assert_eq(daa["a", 3], caa["a", 3])
     assert daa.defined_divisions
     with pytest.raises(ValueError, match="only works when divisions are known"):
         daa["a", 0].defined_divisions
