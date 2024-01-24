@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, cast
 import awkward as ak
 import numpy as np
 from awkward.types.numpytype import primitive_to_dtype
-from awkward.typetracer import length_zero_if_typetracer, typetracer_from_form
+from awkward.typetracer import length_zero_if_typetracer
 from dask.base import flatten, tokenize
 from dask.highlevelgraph import HighLevelGraph
 from dask.utils import funcname, is_integer, parse_bytes
