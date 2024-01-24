@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, cast
 import awkward as ak
 import numpy as np
 from awkward.types.numpytype import primitive_to_dtype
-from awkward.typetracer import length_zero_if_typetracer
+from awkward.typetracer import length_zero_if_typetracer, typetracer_from_form
 from dask.base import flatten, tokenize
 from dask.highlevelgraph import HighLevelGraph
 from dask.utils import funcname, is_integer, parse_bytes
@@ -32,6 +32,7 @@ from dask_awkward.lib.core import (
     new_array_object,
     typetracer_array,
 )
+from dask_awkward.lib.io.columnar import ColumnProjectionMixin
 from dask_awkward.utils import first, second
 
 if TYPE_CHECKING:
@@ -45,12 +46,30 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class _FromAwkwardFn:
-    def __init__(self, arr: ak.Array) -> None:
+class FromAwkwardFn(ColumnProjectionMixin):
+    def __init__(
+        self,
+        arr: ak.Array,
+        behavior: Mapping | None = None,
+        attrs: Mapping[str, Any] | None = None,
+    ) -> None:
         self.arr = arr
+        self.form = arr.layout.form
+        self.behavior = behavior
+        self.attrs = attrs
 
-    def __call__(self, start: int, stop: int, **kwargs: Any) -> ak.Array:
-        return cast(ak.Array, self.arr[start:stop])
+    @property
+    def use_optimization(self):
+        return True
+
+    def __call__(self, *args, **kwargs):
+        print(args)
+        start, stop = args[0]
+        arr = cast(ak.Array, self.arr[start:stop])
+        return ak.Array(arr, behavior=self.behavior, attrs=self.attrs)
+
+    def project_columns(self, columns):
+        return type(self)(self.arr, self.behavior, self.attrs)
 
 
 def from_awkward(
@@ -96,21 +115,17 @@ def from_awkward(
     else:
         chunksize = int(math.ceil(nrows / npartitions))
         locs = tuple(list(range(0, nrows, chunksize)) + [nrows])
-    starts = locs[:-1]
-    stops = locs[1:]
+    starts_stops = list(zip(locs[:-1], locs[1:]))
     meta = typetracer_array(source)
     return cast(
         Array,
         from_map(
-            _FromAwkwardFn(source),
-            starts,
-            stops,
+            FromAwkwardFn(source, behavior=behavior),
+            starts_stops,
             label=label or "from-awkward",
             token=tokenize(source, npartitions),
             divisions=locs,
             meta=meta,
-            behavior=behavior,
-            attrs=attrs,
         ),
     )
 
