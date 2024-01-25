@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
-from typing import TYPE_CHECKING, Any, Sequence, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
+from collections.abc import Sequence
 
 from typing_extensions import ParamSpec
 

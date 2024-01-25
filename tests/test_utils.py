@@ -4,9 +4,9 @@ import pytest
 
 from dask_awkward.utils import (
     LazyInputsDict,
+    field_access_to_front,
     hyphenize,
     is_empty_slice,
-    field_access_to_front,
 )
 
 
