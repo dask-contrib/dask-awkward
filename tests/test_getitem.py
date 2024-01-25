@@ -161,31 +161,31 @@ def test_firstarg_ellipsis_bad() -> None:
         daa[..., 0]
 
 
-def test_multiarg_starting_with_string_gh454():
+@pytest.mark.parametrize("i", [0, 1, 2, 3])
+def test_multiarg_starting_with_string_gh454(i):
     caa = ak.Array(
         [
             [
                 {"a": 1, "b": 5},
-                {"a": 2, "b": 6},
+                {"a": -2, "b": -6},
                 {"a": 1, "b": 5},
-                {"a": 2, "b": 6},
+                {"a": -2, "b": -6},
             ],
             [
-                {"a": 1, "b": 5},
-                {"a": 2, "b": 6},
+                {"a": 1, "b": -5},
+                {"a": -2, "b": 6},
             ],
             [],
             [
-                {"a": 1, "b": 5},
-                {"a": 2, "b": 6},
+                {"a": -1, "b": 5},
+                {"a": -2, "b": 6},
             ],
         ]
     )
     daa = dak.from_awkward(caa, npartitions=2)
-    assert_eq(daa["a", 0], caa["a", 0])
-    assert_eq(daa["a", 1], caa["a", 1])
-    assert_eq(daa["a", 2], caa["a", 2])
-    assert_eq(daa["a", 3], caa["a", 3])
-    assert daa.defined_divisions
+    assert_eq(daa["a", i], caa["a", i])
+
     with pytest.raises(ValueError, match="only works when divisions are known"):
         daa["a", 0].defined_divisions
+
+    assert_eq(daa[["a", "b"], i], caa[["a", "b"], i])

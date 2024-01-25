@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Sequence, TypeVar
 
 from typing_extensions import ParamSpec
 
@@ -149,3 +149,23 @@ def second(seq: Iterable[T]) -> T:
     the_iter = iter(seq)
     next(the_iter)
     return next(the_iter)
+
+
+def field_access_like(entry: Any) -> bool:
+    if isinstance(entry, str):
+        return True
+    if isinstance(entry, (list, tuple)) and all(isinstance(x, str) for x in entry):
+        return True
+    return False
+
+
+def field_access_to_front(seq: Sequence[Any]) -> tuple[Any, ...]:
+    new_seq = []
+    n_front = 0
+    for entry in seq:
+        if field_access_like(entry):
+            new_seq.insert(n_front, entry)
+            n_front += 1
+        else:
+            new_seq.append(entry)
+    return tuple(new_seq)

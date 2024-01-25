@@ -47,6 +47,7 @@ from dask_awkward.lib.optimize import all_optimizations
 from dask_awkward.utils import (
     DaskAwkwardNotImplemented,
     IncompatiblePartitions,
+    field_access_to_front,
     first,
     hyphenize,
     is_empty_slice,
@@ -1396,17 +1397,15 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         )
 
     def _getitem_tuple(self, where):
+        where = field_access_to_front(where)
         if isinstance(where[0], int):
             return self._getitem_outer_int(where)
 
-        elif isinstance(where[0], str):
+        elif isinstance(where[0], (str, list)):
             first, rest = where[0], where[1:]
             if rest:
                 return self[first][rest]
             return self[first]
-
-        elif isinstance(where[0], list):
-            return self._getitem_outer_str_or_list(where)
 
         elif isinstance(where[0], slice) and is_empty_slice(where[0]):
             return self._getitem_trivial_map_partitions(where)
