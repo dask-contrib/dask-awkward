@@ -21,15 +21,22 @@ will be partitioned on a per-file basis
 
 Support for the ROOT file format is provided by the Uproot_ project.
 
+The dask-awkward repository contains a Jupyter notebook tutorial going
+into more details about IO. You can find that notebook at
+`docs/examples/io-tutorial
+<https://github.com/dask-contrib/dask-awkward/tree/main/docs/examples/io-tutorial>`_.
+
 It's also possible to instantiate dask-awkward
 :class:`dask_awkward.Array` instances from other Dask collections
 (like :class:`dask.array.Array`), or concrete objects like existing
 awkward Array instances or Python lists.
 
-.. _Uproot: https://github.com/scikit-hep/uproot5
 
 See the :ref:`IO API docs<api/io:IO>` page for more information on the
 possible ways to instantiate a new dask-awkward Array.
+
+
+.. _Uproot: https://github.com/scikit-hep/uproot5
 
 .. raw:: html
 
