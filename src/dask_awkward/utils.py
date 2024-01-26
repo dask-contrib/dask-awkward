@@ -152,6 +152,35 @@ def second(seq: Iterable[T]) -> T:
 
 
 def not_field_access_like(entry: Any) -> bool:
+    """Test field-access-likeness of a getitem argument.
+
+    Field accesses are strings or lists-of-strings, for example:
+
+    - ``"foo"``
+    - ``["foo", "bar"]``
+
+    Parameters
+    ----------
+    entry : Any
+        Thing to test.
+
+    Returns
+    -------
+    bool
+        True if ENTRY is _not_ field access like, otherwise False.
+
+    Examples
+    --------
+    >>> not_field_access_like(0)
+    True
+    >>> not_field_access_like("foo")
+    False
+    >>> not_field_access_like(["foo", "bar"])
+    False
+    >>> not_field_access_like(["foo", 0])
+    True
+
+    """
     if isinstance(entry, str):
         return False
     if isinstance(entry, (list, tuple)) and all(isinstance(x, str) for x in entry):
