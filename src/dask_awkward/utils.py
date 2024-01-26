@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, TypeVar
-from collections.abc import Sequence
 
 from typing_extensions import ParamSpec
 
@@ -160,7 +159,7 @@ def field_access_like(entry: Any) -> bool:
     return False
 
 
-def field_access_to_front(seq: Sequence[Any]) -> tuple[Any, ...]:
+def field_access_to_front(seq: Sequence[Any]) -> tuple[tuple[Any, ...], int]:
     new_seq = []
     n_front = 0
     for entry in seq:
@@ -169,4 +168,4 @@ def field_access_to_front(seq: Sequence[Any]) -> tuple[Any, ...]:
             n_front += 1
         else:
             new_seq.append(entry)
-    return tuple(new_seq)
+    return tuple(new_seq), n_front

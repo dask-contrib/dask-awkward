@@ -45,28 +45,36 @@ def test_hyphenize() -> None:
         (
             (1, 3, 2, "z", "a"),
             ("z", "a", 1, 3, 2),
+            2,
         ),
         (
             ("a", 1, 2, ["1", "2"]),
             ("a", ["1", "2"], 1, 2),
+            2,
         ),
         (
             (0, ["a", "b", "c"]),
             (["a", "b", "c"], 0),
+            1,
         ),
         (
             ("hello", "abc"),
             ("hello", "abc"),
+            2,
         ),
         (
             (1, 2, slice(None, None, 2), 3),
             (1, 2, slice(None, None, 2), 3),
+            0,
         ),
         (
             (0, ["a", 0], ["a", "b"]),
             (["a", "b"], 0, ["a", 0]),
+            1,
         ),
     ],
 )
 def test_field_access_to_front(pairs):
-    assert field_access_to_front(pairs[0]) == pairs[1]
+    res = field_access_to_front(pairs[0])
+    assert res[0] == pairs[1]
+    assert res[1] == pairs[2]

@@ -1397,15 +1397,16 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         )
 
     def _getitem_tuple(self, where):
-        where = field_access_to_front(where)
+        where, n_field_accesses = field_access_to_front(where)
+
         if isinstance(where[0], int):
             return self._getitem_outer_int(where)
 
         elif isinstance(where[0], (str, list)):
-            first, rest = where[0], where[1:]
+            first, rest = where[:n_field_accesses], where[n_field_accesses:]
             if rest:
-                return self[first][rest]
-            return self[first]
+                return self._getitem_trivial_map_partitions(first)[rest]
+            return self._getitem_trivial_map_partitions(first)
 
         elif isinstance(where[0], slice) and is_empty_slice(where[0]):
             return self._getitem_trivial_map_partitions(where)
