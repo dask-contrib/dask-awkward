@@ -151,12 +151,12 @@ def second(seq: Iterable[T]) -> T:
     return next(the_iter)
 
 
-def field_access_like(entry: Any) -> bool:
+def not_field_access_like(entry: Any) -> bool:
     if isinstance(entry, str):
-        return True
+        return False
     if isinstance(entry, (list, tuple)) and all(isinstance(x, str) for x in entry):
-        return True
-    return False
+        return False
+    return True
 
 
 def field_access_to_front(seq: Sequence[Any]) -> tuple[tuple[Any, ...], int]:
@@ -197,12 +197,6 @@ def field_access_to_front(seq: Sequence[Any]) -> tuple[tuple[Any, ...], int]:
     2
 
     """
-    new_seq: list[Any] = []
-    n_front = 0
-    for entry in seq:
-        if field_access_like(entry):
-            new_seq.insert(n_front, entry)
-            n_front += 1
-        else:
-            new_seq.append(entry)
-    return tuple(new_seq), n_front
+    new_args = tuple(sorted(seq, key=not_field_access_like))
+    n_field_accesses = sum(map(lambda x: not not_field_access_like(x), new_args))
+    return new_args, n_field_accesses
