@@ -197,7 +197,7 @@ def field_access_to_front(seq: Sequence[Any]) -> tuple[tuple[Any, ...], int]:
     2
 
     """
-    new_seq = []
+    new_seq: list[Any] = []
     n_front = 0
     for entry in seq:
         if field_access_like(entry):
