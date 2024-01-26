@@ -16,6 +16,7 @@ import dask_awkward as dak
 from dask_awkward.lib.core import typetracer_array
 from dask_awkward.lib.io.io import _bytes_with_sample, from_map
 from dask_awkward.lib.testutils import assert_eq
+from dask_awkward.utils import first
 
 
 def test_to_and_from_dask_array(daa: dak.Array) -> None:
@@ -415,3 +416,25 @@ def test_from_map_fail_with_callbacks():
     _, rep = dask.compute(array, report)
 
     assert "OSError" in rep.exception.tolist()
+
+
+def test_from_awkward_necessary_columns(caa):
+    behavior = {}
+
+    @ak.mixin_class(behavior)
+    class Point:
+        @property
+        def xsq(self):
+            return self.x * self.x
+
+        @ak.mixin_class_method(np.abs)
+        def point_abs(self):
+            return np.sqrt(self.x**2 + self.y**2)
+
+    caa = ak.with_name(caa.points, name="Point", behavior=behavior)
+    daa = dak.from_awkward(caa, npartitions=2, behavior=behavior)
+    assert_eq(caa.xsq, daa.xsq)
+    assert set(first(dak.necessary_columns(daa.xsq).items())[1]) == {"x"}
+    assert set(first(dak.necessary_columns(daa).items())[1]) == {"x", "y"}
+    assert set(first(dak.necessary_columns(np.abs(daa)).items())[1]) == {"x", "y"}
+    assert_eq(np.abs(caa), np.abs(daa))

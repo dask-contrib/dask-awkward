@@ -13,6 +13,7 @@ import dask.config
 import fsspec
 import numpy as np
 import pytest
+from dask.delayed import delayed
 
 import dask_awkward as dak
 from dask_awkward.lib.core import (
@@ -20,7 +21,9 @@ from dask_awkward.lib.core import (
     Scalar,
     calculate_known_divisions,
     compute_typetracer,
+    empty_typetracer,
     is_typetracer,
+    map_partitions,
     meta_or_identity,
     new_array_object,
     new_known_scalar,
@@ -896,3 +899,52 @@ def test_assign_behavior(daa_p1: dak.Array) -> None:
 def test_assign_attrs(daa_p1: dak.Array) -> None:
     with pytest.raises(TypeError, match="'mappingproxy' object does not support item assignment"):
         daa_p1.attrs["should_fail"] = None
+
+
+@delayed
+def a_delayed_array():
+    return ak.Array([2, 4])
+
+
+def test_partitionwise_op_with_delayed():
+    array = ak.Array([[1, 2, 3], [4], [5, 6, 7], [8]])
+    dak_array = dak.from_awkward(array, npartitions=2)
+    result = map_partitions(
+        operator.mul,
+        dak_array,
+        a_delayed_array(),
+        meta=dak_array._meta,
+        output_divisions=1,
+    )
+    concrete_result = ak.concatenate(
+        [
+            array[:2] * a_delayed_array().compute(),
+            array[2:] * a_delayed_array().compute(),
+        ],
+    )
+    assert_eq(result, concrete_result)
+
+    result = map_partitions(
+        operator.mul,
+        a_delayed_array(),
+        dak_array,
+        meta=dak_array._meta,
+    )
+    assert_eq(result, concrete_result)
+
+
+def multiply(a, b, c):
+    return a * b * c
+
+
+def test_map_partitions_bad_arguments():
+    array1 = ak.Array([[1, 2, 3], [4], [5, 6, 7], [8]])
+    array2 = ak.Array([4, 5, 6, 7])
+    with pytest.raises(TypeError, match="at least one"):
+        map_partitions(
+            multiply,
+            a_delayed_array(),
+            array1,
+            array2,
+            meta=empty_typetracer(),
+        )

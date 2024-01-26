@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 
 import numpy as np
 from dask.base import unpack_collections
-from dask.highlevelgraph import HighLevelGraph
 
 from dask_awkward.layers import AwkwardInputLayer
 
@@ -81,8 +80,9 @@ def report_necessary_buffers(
 
     name_to_necessary_buffers: dict[str, NecessaryBuffers | None] = {}
     for obj in collections:
-        dsk = obj if isinstance(obj, HighLevelGraph) else obj.dask
-        projection_data = o._prepare_buffer_projection(dsk)
+        dsk = obj.__dask_graph__()
+        keys = obj.__dask_keys__()
+        projection_data = o._prepare_buffer_projection(dsk, keys)
 
         # If the projection failed, or there are no input layers
         if projection_data is None:
@@ -178,8 +178,9 @@ def report_necessary_columns(
 
     name_to_necessary_columns: dict[str, frozenset | None] = {}
     for obj in collections:
-        dsk = obj if isinstance(obj, HighLevelGraph) else obj.dask
-        projection_data = o._prepare_buffer_projection(dsk)
+        dsk = obj.__dask_graph__()
+        keys = obj.__dask_keys__()
+        projection_data = o._prepare_buffer_projection(dsk, keys)
 
         # If the projection failed, or there are no input layers
         if projection_data is None:

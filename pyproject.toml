@@ -56,9 +56,11 @@ complete = [
 # `docs` and `test` are separate from user installs
 docs = [
   "dask-awkward[complete]",
-  "dask-sphinx-theme >=3.0.2",
+  "sphinx-book-theme",
   "sphinx-design",
   "sphinx-codeautolink",
+  # broken see PR 451
+  # "dask-sphinx-theme",
 ]
 test = [
   "aiohttp;python_version<\"3.12\"",

@@ -91,7 +91,7 @@ def input_layer_array_partition0(collection: Array) -> ak.Array:
 
     """
     with dask.config.set({"awkward.optimization.which": ["columns"]}):
-        optimized_hlg = dak_optimize(collection.dask, [])
+        optimized_hlg = dak_optimize(collection.dask, collection.keys)  # type: ignore
         layers = list(optimized_hlg.layers)  # type: ignore
         layer_name = [name for name in layers if name.startswith("from-json")][0]
         sgc, arg = optimized_hlg[(layer_name, 0)]

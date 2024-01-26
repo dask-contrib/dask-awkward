@@ -57,7 +57,7 @@ def test_concatenate_axis_0_logical_different(daa):
         result = dak.concatenate([daa, empty_dak_array], axis=0)
 
         buffers_report = dak.report_necessary_buffers(result.points.x)
-        assert len(buffers_report) == 1
+        assert len(buffers_report) == 2
 
         buffers = next(iter(buffers_report.values()))
         assert buffers.data_and_shape == frozenset(
