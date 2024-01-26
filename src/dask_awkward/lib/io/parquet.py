@@ -504,7 +504,7 @@ class _ToParquetFn:
         filename = f"part{str(block_index[0]).zfill(self.zfill)}.parquet"
         if self.prefix is not None:
             filename = f"{self.prefix}-{filename}"
-        filename = f"{self.protocol}://{self.path}/{filename}"
+        filename = self.fs.unstrip_protocol(f"{self.path}{self.fs.sep}{filename}")
         return ak.to_parquet(
             data, filename, **self.kwargs, storage_options=self.storage_options
         )

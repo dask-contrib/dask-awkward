@@ -664,7 +664,7 @@ class ToJsonFn:
                 ext = "zst"
             filename = f"{filename}.{ext}"
 
-        thispath = self.fs.sep.join([self.path, filename])
+        thispath = self.fs.unstrip_protocol(f"{self.path}{self.fs.sep}{filename}")
         with self.fs.open(thispath, mode="wt", compression=self.compression) as f:
             ak.to_json(array, f, **self.kwargs)
 
