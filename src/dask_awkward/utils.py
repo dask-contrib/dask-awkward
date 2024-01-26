@@ -160,6 +160,43 @@ def field_access_like(entry: Any) -> bool:
 
 
 def field_access_to_front(seq: Sequence[Any]) -> tuple[tuple[Any, ...], int]:
+    """Move field access to the front of a sequence.
+
+    We have multiargument getitem calls we want to bring the field
+    access calls to the front. For example
+
+    >>> a[0, "foo"]
+
+    Is the same as
+
+    >>> a["foo", 0]
+
+    But the latter starts with something that is trivially
+    map-partitionable. This function helps us write out the logic for
+    getitem calls.
+
+    Parameters
+    ----------
+    seq : Sequence[Any]
+        Sequence to reorder.
+
+    Returns
+    -------
+    tuple[Any, ...]
+        Reordered sequence with field accesses brought to the front.
+    int
+        Total number of field accesses.
+
+    Examples
+    --------
+    >>> where = [0, ["foo", "bar"], "x"]
+    >>> new, n = field_access_to_front(where)
+    >>> new
+    [["foo", "bar"], "x", 0]
+    >>> n
+    2
+
+    """
     new_seq = []
     n_front = 0
     for entry in seq:
