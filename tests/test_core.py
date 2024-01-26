@@ -892,12 +892,16 @@ def test_shape_only_ops(fn: Callable, tmp_path_factory: pytest.TempPathFactory) 
 
 
 def test_assign_behavior(daa_p1: dak.Array) -> None:
-    with pytest.raises(TypeError, match="'mappingproxy' object does not support item assignment"):
+    with pytest.raises(
+        TypeError, match="'mappingproxy' object does not support item assignment"
+    ):
         daa_p1.behavior["should_fail"] = None
 
 
 def test_assign_attrs(daa_p1: dak.Array) -> None:
-    with pytest.raises(TypeError, match="'mappingproxy' object does not support item assignment"):
+    with pytest.raises(
+        TypeError, match="'mappingproxy' object does not support item assignment"
+    ):
         daa_p1.attrs["should_fail"] = None
 
 
