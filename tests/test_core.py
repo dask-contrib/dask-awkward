@@ -897,7 +897,7 @@ def test_assign_behavior() -> None:
     with pytest.raises(
         TypeError, match="'mappingproxy' object does not support item assignment"
     ):
-        dx.behavior["should_fail"] = None
+        dx.behavior["should_fail"] = None  # type: ignore
 
 
 def test_assign_attrs() -> None:
@@ -906,7 +906,7 @@ def test_assign_attrs() -> None:
     with pytest.raises(
         TypeError, match="'mappingproxy' object does not support item assignment"
     ):
-        dx.attrs["should_fail"] = None
+        dx.attrs["should_fail"] = None  # type: ignore
 
 
 @delayed
