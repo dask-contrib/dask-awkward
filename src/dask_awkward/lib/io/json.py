@@ -49,6 +49,7 @@ class FromJsonFn(ColumnProjectionMixin):
         compression: str | None = None,
         schema: str | dict | list | None = None,
         behavior: Mapping | None = None,
+        attrs: Mapping[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
         self.compression = compression
@@ -57,6 +58,7 @@ class FromJsonFn(ColumnProjectionMixin):
         self.kwargs = kwargs
         self.form = form
         self.behavior = behavior
+        self.attrs = attrs
 
     @abc.abstractmethod
     def __call__(self, source: Any) -> ak.Array:
@@ -97,6 +99,7 @@ class FromJsonLineDelimitedFn(FromJsonFn):
         compression: str | None = None,
         schema: str | dict | list | None = None,
         behavior: Mapping | None = None,
+        attrs: Mapping[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(
@@ -105,6 +108,7 @@ class FromJsonLineDelimitedFn(FromJsonFn):
             schema=schema,
             form=form,
             behavior=behavior,
+            attrs=attrs,
             **kwargs,
         )
 
@@ -131,6 +135,7 @@ class FromJsonSingleObjPerFile(FromJsonFn):
         compression: str | None = None,
         schema: str | dict | list | None = None,
         behavior: Mapping | None = None,
+        attrs: Mapping[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(
@@ -139,6 +144,7 @@ class FromJsonSingleObjPerFile(FromJsonFn):
             schema=schema,
             form=form,
             behavior=behavior,
+            attrs=attrs,
             **kwargs,
         )
 
@@ -169,6 +175,7 @@ class FromJsonBytesFn(FromJsonFn):
         compression: str | None = None,
         schema: str | dict | list | None = None,
         behavior: Mapping | None = None,
+        attrs: Mapping[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(
@@ -176,6 +183,7 @@ class FromJsonBytesFn(FromJsonFn):
             compression=compression,
             schema=schema,
             behavior=behavior,
+            attrs=attrs,
             form=form,
             **kwargs,
         )

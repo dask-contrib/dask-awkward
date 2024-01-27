@@ -41,6 +41,10 @@ class ImplementsColumnProjectionMixin(ImplementsNecessaryColumns, Protocol):
     def behavior(self) -> dict | None:
         ...
 
+    @property
+    def attrs(self) -> dict | None:
+        ...
+
     def project_columns(self: T, columns: frozenset[str]) -> T:
         ...
 
@@ -62,7 +66,8 @@ class ColumnProjectionMixin(ImplementsNecessaryColumns[FormStructure]):
 
     def mock(self: S) -> AwkwardArray:
         return cast(
-            AwkwardArray, typetracer_from_form(self.form, behavior=self.behavior)
+            AwkwardArray,
+            typetracer_from_form(self.form, behavior=self.behavior, attrs=self.attrs),
         )
 
     def mock_empty(self: S, backend: BackendT = "cpu") -> AwkwardArray:
