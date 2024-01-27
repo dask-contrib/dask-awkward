@@ -912,6 +912,7 @@ def test_assign_attrs() -> None:
         dx.attrs["should_fail"] = None  # type: ignore
     assert dx.attrs == attrs
 
+
 @delayed
 def a_delayed_array():
     return ak.Array([2, 4])
