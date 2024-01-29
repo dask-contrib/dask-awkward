@@ -11,6 +11,7 @@ from enum import IntEnum
 from functools import cached_property, partial, wraps
 from inspect import getattr_static
 from numbers import Number
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal, TypeVar, Union, overload
 
 import awkward as ak
@@ -1091,17 +1092,18 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         raise ValueError("This collection's meta is None; unknown layout.")
 
     @property
-    def attrs(self) -> dict:
+    def attrs(self) -> Mapping[str, Any]:
         """awkward Array attrs dictionary."""
         if self._meta is not None:
-            return self._meta.attrs
+            return MappingProxyType(self._meta.attrs)
         raise ValueError("This collection's meta is None; no attrs property available.")
 
     @property
-    def behavior(self) -> Mapping:
+    def behavior(self) -> Mapping | None:
         """awkward Array behavior dictionary."""
         if self._meta is not None:
-            return self._meta.behavior
+            behavior = self._meta.behavior
+            return None if behavior is None else MappingProxyType(behavior)
         raise ValueError(
             "This collection's meta is None; no behavior property available."
         )
