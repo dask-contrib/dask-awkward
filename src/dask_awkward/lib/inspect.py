@@ -201,10 +201,11 @@ def report_necessary_columns(
 
             assert existing_columns is not None
             # Update set of touched keys
-            name_to_necessary_columns[
-                name
-            ] = existing_columns | layer.necessary_columns(
-                report=report, state=layer_to_projection_state[name]
+            name_to_necessary_columns[name] = (
+                existing_columns
+                | layer.necessary_columns(
+                    report=report, state=layer_to_projection_state[name]
+                )
             )
 
     # Populate result with names of seen layers

@@ -91,12 +91,10 @@ class FromParquetFn(ColumnProjectionMixin):
         self.kwargs = kwargs
 
     @abc.abstractmethod
-    def __call__(self, *args, **kwargs):
-        ...
+    def __call__(self, *args, **kwargs): ...
 
     @abc.abstractmethod
-    def project_columns(self, columns):
-        ...
+    def project_columns(self, columns): ...
 
     @property
     def return_report(self) -> bool:

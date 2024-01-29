@@ -48,40 +48,35 @@ class AwkwardBlockwiseLayer(Blockwise):
 
 
 class ImplementsIOFunction(Protocol):
-    def __call__(self, *args, **kwargs):
-        ...
+    def __call__(self, *args, **kwargs): ...
 
 
 T = TypeVar("T")
 
 
 class ImplementsMocking(ImplementsIOFunction, Protocol):
-    def mock(self) -> AwkwardArray:
-        ...
+    def mock(self) -> AwkwardArray: ...
 
 
 class ImplementsMockEmpty(ImplementsIOFunction, Protocol):
-    def mock_empty(self, backend: BackendT) -> AwkwardArray:
-        ...
+    def mock_empty(self, backend: BackendT) -> AwkwardArray: ...
 
 
 class ImplementsReport(ImplementsIOFunction, Protocol):
     @property
-    def return_report(self) -> bool:
-        ...
+    def return_report(self) -> bool: ...
 
 
 class ImplementsProjection(ImplementsMocking, Protocol[T]):
-    def prepare_for_projection(self) -> tuple[AwkwardArray, TypeTracerReport, T]:
-        ...
+    def prepare_for_projection(self) -> tuple[AwkwardArray, TypeTracerReport, T]: ...
 
-    def project(self, report: TypeTracerReport, state: T) -> ImplementsIOFunction:
-        ...
+    def project(self, report: TypeTracerReport, state: T) -> ImplementsIOFunction: ...
 
 
 class ImplementsNecessaryColumns(ImplementsProjection[T], Protocol):
-    def necessary_columns(self, report: TypeTracerReport, state: T) -> frozenset[str]:
-        ...
+    def necessary_columns(
+        self, report: TypeTracerReport, state: T
+    ) -> frozenset[str]: ...
 
 
 class IOFunctionWithMocking(ImplementsMocking, ImplementsIOFunction):
@@ -300,9 +295,11 @@ class AwkwardMaterializedLayer(MaterializedLayer):
             if (name, 0) in mapping:
                 task = mapping[(name, 0)]
                 task = tuple(
-                    (prev_name, 0)
-                    if isinstance(v, tuple) and len(v) == 2 and v[0] == prev_name
-                    else v
+                    (
+                        (prev_name, 0)
+                        if isinstance(v, tuple) and len(v) == 2 and v[0] == prev_name
+                        else v
+                    )
                     for v in task
                 )
 

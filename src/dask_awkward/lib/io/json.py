@@ -61,8 +61,7 @@ class FromJsonFn(ColumnProjectionMixin):
         self.attrs = attrs
 
     @abc.abstractmethod
-    def __call__(self, source: Any) -> ak.Array:
-        ...
+    def __call__(self, source: Any) -> ak.Array: ...
 
     @property
     def use_optimization(self) -> bool:
@@ -783,23 +782,19 @@ def to_json(
 
 
 @overload
-def json_type(original: str, add_null: Literal[False] = False) -> str:
-    ...
+def json_type(original: str, add_null: Literal[False] = False) -> str: ...
 
 
 @overload
-def json_type(original: str, add_null: Literal[True]) -> list[str]:
-    ...
+def json_type(original: str, add_null: Literal[True]) -> list[str]: ...
 
 
 @overload
-def json_type(original: str, add_null: bool) -> str | list[str]:
-    ...
+def json_type(original: str, add_null: bool) -> str | list[str]: ...
 
 
 @overload
-def json_type(original: list[str], add_null: bool) -> list[str]:
-    ...
+def json_type(original: list[str], add_null: bool) -> list[str]: ...
 
 
 def json_type(original: str | list[str], add_null: bool = False) -> str | list[str]:
