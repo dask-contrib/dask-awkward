@@ -55,8 +55,8 @@ class FromAwkwardFn(ColumnProjectionMixin):
     ) -> None:
         self.arr = arr
         self.form = arr.layout.form
-        self.behavior = behavior
-        self.attrs = attrs
+        self.behavior = behavior if behavior else arr.behavior
+        self.attrs = attrs if attrs else arr.attrs
 
     @property
     def use_optimization(self):
@@ -119,7 +119,7 @@ def from_awkward(
     return cast(
         Array,
         from_map(
-            FromAwkwardFn(source, behavior=behavior),
+            FromAwkwardFn(source, behavior=behavior, attrs=attrs),
             starts_stops,
             label=label or "from-awkward",
             token=tokenize(source, npartitions),
