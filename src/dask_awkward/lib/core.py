@@ -48,6 +48,7 @@ from dask_awkward.lib.optimize import all_optimizations
 from dask_awkward.utils import (
     DaskAwkwardNotImplemented,
     IncompatiblePartitions,
+    field_access_to_front,
     first,
     hyphenize,
     is_empty_slice,
@@ -976,7 +977,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     def __len__(self) -> int:
         if not self.known_divisions:
-            raise NotImplementedError(
+            raise TypeError(
                 "Cannot determine length of collection with unknown partition sizes without executing the graph.\n"
                 "Use `dask_awkward.num(..., axis=0)` if you want a lazy Scalar of the length.\n"
                 "If you want to eagerly compute the partition sizes to have the ability to call `len` on the collection"
@@ -1398,14 +1399,16 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         )
 
     def _getitem_tuple(self, where):
+        where, n_field_accesses = field_access_to_front(where)
+
         if isinstance(where[0], int):
             return self._getitem_outer_int(where)
 
-        elif isinstance(where[0], str):
-            return self._getitem_outer_str_or_list(where)
-
-        elif isinstance(where[0], list):
-            return self._getitem_outer_str_or_list(where)
+        elif isinstance(where[0], (str, list)):
+            first, rest = where[:n_field_accesses], where[n_field_accesses:]
+            if rest:
+                return self._getitem_trivial_map_partitions(first)[rest]
+            return self._getitem_trivial_map_partitions(first)
 
         elif isinstance(where[0], slice) and is_empty_slice(where[0]):
             return self._getitem_trivial_map_partitions(where)

@@ -159,3 +159,40 @@ def test_firstarg_ellipsis_bad() -> None:
         match="sliced axes is greater than",
     ):
         daa[..., 0]
+
+
+@pytest.mark.parametrize("i", [0, 1, 2, 3])
+def test_multiarg_starting_with_string_gh454(i):
+    caa = ak.Array(
+        [
+            [
+                {"a": {"c": 1}, "b": 5},
+                {"a": {"c": -2}, "b": -6},
+                {"a": {"c": 1}, "b": 5},
+                {"a": {"c": -2}, "b": -6},
+            ],
+            [
+                {"a": {"c": 1}, "b": -5},
+                {"a": {"c": -2}, "b": 6},
+            ],
+            [],
+            [
+                {"a": {"c": -1}, "b": 5},
+                {"a": {"c": -2}, "b": 6},
+            ],
+        ]
+    )
+    daa = dak.from_awkward(caa, npartitions=2)
+    assert_eq(daa["a", i], caa["a", i])
+    assert_eq(daa[["a"], i], caa[["a"], i])
+    assert_eq(daa[["a"], "c", i], caa[["a"], "c", i])
+    assert_eq(daa[["a"], i, "c"], caa[["a"], "c", i])
+    assert_eq(daa[i, "a"], caa["a", i])
+    assert_eq(daa[i, ["a"]], caa[["a"], i])
+    assert_eq(daa[i, ["a"], "c"], caa[["a"], "c", i])
+
+    with pytest.raises(ValueError, match="only works when divisions are known"):
+        daa["a", 0].defined_divisions
+
+    assert_eq(daa[["a", "b"], i], caa[["a", "b"], i])
+    assert_eq(daa[i, ["a", "b"]], caa[["a", "b"], i])

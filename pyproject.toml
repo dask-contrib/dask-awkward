@@ -69,7 +69,7 @@ test = [
   "distributed",
   "hist",
   "pandas",
-  "pytest >=6.0",
+  "pytest >=6.0,<8",
   "pytest-cov >=3.0.0",
   "requests",
   "uproot >=5.1.0",

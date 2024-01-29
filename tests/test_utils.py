@@ -1,6 +1,13 @@
 from __future__ import annotations
 
-from dask_awkward.utils import LazyInputsDict, hyphenize, is_empty_slice
+import pytest
+
+from dask_awkward.utils import (
+    LazyInputsDict,
+    field_access_to_front,
+    hyphenize,
+    is_empty_slice,
+)
 
 
 def test_is_empty_slice() -> None:
@@ -30,3 +37,44 @@ def test_hyphenize() -> None:
     assert hyphenize("with_name") == "with-name"
     assert hyphenize("with_a_name") == "with-a-name"
     assert hyphenize("ok") == "ok"
+
+
+@pytest.mark.parametrize(
+    "pairs",
+    [
+        (
+            (1, 3, 2, "z", "a"),
+            ("z", "a", 1, 3, 2),
+            2,
+        ),
+        (
+            ("a", 1, 2, ["1", "2"]),
+            ("a", ["1", "2"], 1, 2),
+            2,
+        ),
+        (
+            (0, ["a", "b", "c"]),
+            (["a", "b", "c"], 0),
+            1,
+        ),
+        (
+            ("hello", "abc"),
+            ("hello", "abc"),
+            2,
+        ),
+        (
+            (1, 2, slice(None, None, 2), 3),
+            (1, 2, slice(None, None, 2), 3),
+            0,
+        ),
+        (
+            (0, ["a", 0], ["a", "b"]),
+            (["a", "b"], 0, ["a", 0]),
+            1,
+        ),
+    ],
+)
+def test_field_access_to_front(pairs):
+    res = field_access_to_front(pairs[0])
+    assert res[0] == pairs[1]
+    assert res[1] == pairs[2]
