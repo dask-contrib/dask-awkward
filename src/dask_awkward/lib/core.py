@@ -2371,13 +2371,11 @@ def meta_or_identity(obj: Any) -> Any:
 
 
 @overload
-def to_meta(objects: Sequence[Any]) -> tuple[Any, ...]:
-    ...
+def to_meta(objects: Sequence[Any]) -> tuple[Any, ...]: ...
 
 
 @overload
-def to_meta(objects: dict[str, Any]) -> dict[str, Any]:
-    ...
+def to_meta(objects: dict[str, Any]) -> dict[str, Any]: ...
 
 
 def to_meta(objects):

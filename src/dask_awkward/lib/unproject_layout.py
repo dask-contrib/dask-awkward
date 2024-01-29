@@ -144,9 +144,11 @@ def _unproject_layout(form, layout, length, backend):
             return BitMaskedArray(
                 dummy_index_of(
                     form.mask,
-                    unknown_length
-                    if length is unknown_length
-                    else math.ceil(length / 8.0),
+                    (
+                        unknown_length
+                        if length is unknown_length
+                        else math.ceil(length / 8.0)
+                    ),
                     backend.index_nplike,
                 ),
                 _unproject_layout(form.content, None, length, backend),
