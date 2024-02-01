@@ -44,15 +44,12 @@ def all_optimizations(dsk: Mapping, keys: Sequence[Key], **_: Any) -> Mapping:
     if not isinstance(dsk, HighLevelGraph):
         dsk = HighLevelGraph.from_collections(str(id(dsk)), dsk, dependencies=())
 
-    else:
-        # Perform dask-awkward specific optimizations.
-        dsk = optimize(dsk, keys=keys)
-
-        # Perform Blockwise optimizations for HLG input
-        dsk = optimize_blockwise(dsk, keys=keys)
-        # fuse nearby layers
-        dsk = fuse_roots(dsk, keys=keys)  # type: ignore
-
+    # Perform dask-awkward specific optimizations.
+    dsk = optimize(dsk, keys=keys)
+    # Perform Blockwise optimizations for HLG input
+    dsk = optimize_blockwise(dsk, keys=keys)
+    # fuse nearby layers
+    dsk = fuse_roots(dsk, keys=keys)  # type: ignore
     # cull unncessary tasks
     dsk = dsk.cull(set(keys))  # type: ignore
 
