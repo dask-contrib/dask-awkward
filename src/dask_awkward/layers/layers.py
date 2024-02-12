@@ -117,6 +117,19 @@ def io_func_implements_report(func: ImplementsIOFunction) -> bool:
     return hasattr(func, "return_report")
 
 
+class AwkwardTokenizable:
+
+    def __init__(self, ret_func, parent_name):
+        self.parent_name = parent_name
+        self.ret_func = ret_func
+
+    def __dask_tokenize__(self):
+        return (AwkwardTokenizable, self.parent_name)
+
+    def __call__(self, *_, **__):
+        return self.ret_func
+
+
 class AwkwardInputLayer(AwkwardBlockwiseLayer):
     """A layer known to perform IO and produce Awkward arrays
 
@@ -230,7 +243,7 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         new_input_layer = AwkwardInputLayer(
             name=self.name,
             inputs=[None][: int(list(self.numblocks.values())[0][0])],
-            io_func=lambda *_, **__: new_return,
+            io_func=AwkwardTokenizable(new_return, self.name),
             label=self.label,
             produces_tasks=self.produces_tasks,
             creation_info=self.creation_info,
