@@ -97,7 +97,10 @@ def test_basic_root_works():
         .fill(events.MET_pt)
     )
 
+    columns = list(dak.necessary_columns(q1_hist).values())[0]
+    assert columns == frozenset({"MET_pt"})
     dask.compute(q1_hist)
+    
 
 
 def test_sample(daa):
