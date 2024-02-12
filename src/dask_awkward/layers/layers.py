@@ -119,15 +119,15 @@ def io_func_implements_report(func: ImplementsIOFunction) -> bool:
 
 class AwkwardTokenizable:
 
-    def __init__(self, ret_func, parent_name):
+    def __init__(self, ret_val, parent_name):
         self.parent_name = parent_name
-        self.ret_func = ret_func
+        self.ret_val = ret_val
 
     def __dask_tokenize__(self):
         return ("AwkwardTokenizable", self.parent_name)
 
     def __call__(self, *_, **__):
-        return self.ret_func
+        return self.ret_val
 
 
 class AwkwardInputLayer(AwkwardBlockwiseLayer):
