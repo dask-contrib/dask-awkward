@@ -124,7 +124,7 @@ class AwkwardTokenizable:
         self.ret_func = ret_func
 
     def __dask_tokenize__(self):
-        return (AwkwardTokenizable, self.parent_name)
+        return ("AwkwardTokenizable", self.parent_name)
 
     def __call__(self, *_, **__):
         return self.ret_func
