@@ -316,8 +316,15 @@ def _unproject_layout(form, layout, length, backend):
     # UnmaskedArray, non-UnmaskedArray form
     elif isinstance(layout, UnmaskedArray) and form.is_option:
         if isinstance(form, BitMaskedForm):
+            byte_length = (
+                unknown_length if length is unknown_length else math.ceil(length / 8.0)
+            )
             return BitMaskedArray(
-                ak.index.IndexU8.zeros(length, backend.index_nplike),
+                ak.index.Index(
+                    backend.index_nplike.full(byte_length, 255, dtype=np.uint8)
+                    if form.valid_when
+                    else backend.index_nplike.zeros(byte_length, dtype=np.uint8)
+                ),
                 _unproject_layout(
                     form.content, layout.content, layout.content.length, backend
                 ),
@@ -328,7 +335,11 @@ def _unproject_layout(form, layout, length, backend):
             )
         elif isinstance(form, ByteMaskedForm):
             return ByteMaskedArray(
-                ak.index.Index8.zeros(length, backend.index_nplike),
+                ak.index.Index(
+                    backend.index_nplike.full(length, 1, dtype=np.uint8)
+                    if form.valid_when
+                    else backend.index_nplike.zeros(length, dtype=np.uint8)
+                ),
                 _unproject_layout(
                     form.content, layout.content, layout.content.length, backend
                 ),
