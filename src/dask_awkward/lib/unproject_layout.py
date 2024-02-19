@@ -336,9 +336,9 @@ def _unproject_layout(form, layout, length, backend):
         elif isinstance(form, ByteMaskedForm):
             return ByteMaskedArray(
                 ak.index.Index(
-                    backend.index_nplike.full(length, 1, dtype=np.uint8)
+                    backend.index_nplike.full(length, 1, dtype=np.int8)
                     if form.valid_when
-                    else backend.index_nplike.zeros(length, dtype=np.uint8)
+                    else backend.index_nplike.zeros(length, dtype=np.int8)
                 ),
                 _unproject_layout(
                     form.content, layout.content, layout.content.length, backend
