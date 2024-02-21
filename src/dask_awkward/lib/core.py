@@ -875,8 +875,27 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     ) -> None:
         self._dask: HighLevelGraph = dsk
         self._name: str = name
+        self._queued = None
         self._divisions: tuple[int, ...] | tuple[None, ...] = divisions
-        self._meta: ak.Array = meta
+        self._base_meta: ak.Array = meta
+        self._getitem_staged = ()
+
+    @property
+    def _meta(self):
+        if self._getitem_staged:
+            newobj = self._getitem_trivial_map_partitions(
+                self._getitem_staged, execute=True
+            )
+            self._getitem_staged = ()
+            self._meta = newobj._meta
+            self._dask = newobj.dask
+        return self._base_meta
+
+    @_meta.setter
+    def _meta(self, meta):
+        if self._getitem_staged:
+            raise ValueError("Cannot set _meta with staged getitems (internal)")
+        self._base_meta = meta
 
     def __dask_graph__(self) -> HighLevelGraph:
         return self.dask
@@ -1045,6 +1064,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     @property
     def dask(self) -> HighLevelGraph:
         """High level task graph associated with the collection."""
+        if self._getitem_staged is not None:
+            self._meta
         return self._dask
 
     @property
@@ -1204,14 +1225,21 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         where: Any,
         meta: Any | None = None,
         label: str | None = None,
+        execute: bool = False,
     ) -> Any:
-        if meta is None and self._meta is not None:
+        import copy
+
+        if not execute:
+            newobj = copy.copy(self)  # shallow/fast
+            newobj._getitem_staged = where
+            return newobj
+        if meta is None and self._base_meta is not None:
             if isinstance(where, tuple):
                 metad = to_meta(where)
-                meta = self._meta[metad]
+                meta = self._base_meta[metad]
             else:
                 m = to_meta([where])[0]
-                meta = self._meta[m]
+                meta = self._base_meta[m]
         return map_partitions(
             operator.getitem,
             self,
