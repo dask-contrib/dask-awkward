@@ -1230,7 +1230,8 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         if not execute:
             newobj = copy.copy(self)  # shallow/fast
-            newobj._getitem_staged = where
+            where = where if isinstance(where, tuple) else (where,)
+            newobj._getitem_staged = self._getitem_staged + where
             return newobj
         if meta is None and self._base_meta is not None:
             if isinstance(where, tuple):
