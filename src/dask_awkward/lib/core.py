@@ -875,7 +875,6 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     ) -> None:
         self._dask: HighLevelGraph = dsk
         self._name: str = name
-        self._queued = None
         self._divisions: tuple[int, ...] | tuple[None, ...] = divisions
         self._base_meta: ak.Array = meta
         self._getitem_staged = ()
