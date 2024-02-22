@@ -1909,7 +1909,13 @@ def _map_partitions(
     **kwargs: Any,
 ) -> Array:
     """Map a callable across all partitions of any number of collections.
-    No wrapper is used to flatten the function arguments.
+    No wrapper is used to flatten the function arguments. This is meant for
+    dask-awkward internal use or in situations where input data are sanitized.
+
+    The parameters of this function are otherwise the same as map_partitions,
+    but the limitation that args, kwargs must be non-nested and flat. They
+    will not be traversed to extract all dask collections, except those in
+    the first dimension of args or kwargs.
     """
     token = token or tokenize(fn, *args, meta, **kwargs)
     label = hyphenize(label or funcname(fn))
