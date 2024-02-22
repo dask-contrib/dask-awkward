@@ -1539,6 +1539,15 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         except (IndexError, KeyError):
             raise AttributeError(f"{attr} not in fields.")
 
+    def _map_partitions(
+        self,
+        func: Callable,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Array:
+        """Maps a function to partitions without flattening the function inputs."""
+        return _map_partitions(func, self, *args, **kwargs)
+
     def map_partitions(
         self,
         func: Callable,
@@ -1890,6 +1899,72 @@ class ArgsKwargsPackedFunction:
         return self.fn(*args, **kwargs)
 
 
+def _map_partitions(
+    fn: Callable,
+    *args: Any,
+    label: str | None = None,
+    token: str | None = None,
+    meta: Any | None = None,
+    output_divisions: int | None = None,
+    **kwargs: Any,
+) -> Array:
+    """Map a callable across all partitions of any number of collections.
+    No wrapper is used to flatten the function arguments.
+    """
+    token = token or tokenize(fn, *args, meta, **kwargs)
+    label = hyphenize(label or funcname(fn))
+    name = f"{label}-{token}"
+
+    deps = [a for a in args if is_dask_collection(a)] + [
+        v for v in kwargs.values() if is_dask_collection(v)
+    ]
+
+    dak_arrays = tuple(filter(lambda x: isinstance(x, Array), deps))
+
+    lay = partitionwise_layer(
+        fn,
+        name,
+        *args,
+        **kwargs,
+    )
+
+    if meta is None:
+        meta = map_meta(fn, *args, **kwargs)
+
+    hlg = HighLevelGraph.from_collections(
+        name,
+        lay,
+        dependencies=deps,
+    )
+
+    if len(dak_arrays) == 0:
+        raise TypeError(
+            "at least one argument passed to map_partitions "
+            "should be a dask_awkward.Array collection."
+        )
+    in_npartitions = dak_arrays[0].npartitions
+    in_divisions = dak_arrays[0].divisions
+
+    if output_divisions is not None:
+        if output_divisions == 1:
+            new_divisions = dak_arrays[0].divisions
+        else:
+            new_divisions = tuple(map(lambda x: x * output_divisions, in_divisions))
+        return new_array_object(
+            hlg,
+            name=name,
+            meta=meta,
+            divisions=new_divisions,
+        )
+    else:
+        return new_array_object(
+            hlg,
+            name=name,
+            meta=meta,
+            npartitions=in_npartitions,
+        )
+
+
 def map_partitions(
     base_fn: Callable,
     *args: Any,
@@ -1971,6 +2046,9 @@ def map_partitions(
     This is effectively the same as `d = c * a`
 
     """
+    token = token or tokenize(base_fn, *args, meta, **kwargs)
+    label = hyphenize(label or funcname(base_fn))
+
     opt_touch_all = kwargs.pop("opt_touch_all", None)
     if opt_touch_all is not None:
         warnings.warn(
@@ -1979,9 +2057,6 @@ def map_partitions(
             "and the function call will likely fail."
         )
 
-    token = token or tokenize(base_fn, *args, meta, **kwargs)
-    label = hyphenize(label or funcname(base_fn))
-    name = f"{label}-{token}"
     kwarg_flat_deps, kwarg_repacker = unpack_collections(kwargs, traverse=traverse)
     flat_deps, _ = unpack_collections(*args, *kwargs.values(), traverse=traverse)
 
@@ -2017,50 +2092,15 @@ def map_partitions(
         kwarg_repacker,
         arg_lens_for_repackers,
     )
-
-    lay = partitionwise_layer(
+    return _map_partitions(
         fn,
-        name,
         *arg_flat_deps_expanded,
         *kwarg_flat_deps,
+        label=label,
+        token=token,
+        meta=meta,
+        output_divisions=output_divisions,
     )
-
-    if meta is None:
-        meta = map_meta(fn, *arg_flat_deps_expanded, *kwarg_flat_deps)
-
-    hlg = HighLevelGraph.from_collections(
-        name,
-        lay,
-        dependencies=flat_deps,
-    )
-
-    dak_arrays = tuple(filter(lambda x: isinstance(x, Array), flat_deps))
-    if len(dak_arrays) == 0:
-        raise TypeError(
-            "at least one argument passed to map_partitions "
-            "should be a dask_awkward.Array collection."
-        )
-    in_npartitions = dak_arrays[0].npartitions
-    in_divisions = dak_arrays[0].divisions
-
-    if output_divisions is not None:
-        if output_divisions == 1:
-            new_divisions = flat_deps[0].divisions
-        else:
-            new_divisions = tuple(map(lambda x: x * output_divisions, in_divisions))
-        return new_array_object(
-            hlg,
-            name=name,
-            meta=meta,
-            divisions=new_divisions,
-        )
-    else:
-        return new_array_object(
-            hlg,
-            name=name,
-            meta=meta,
-            npartitions=in_npartitions,
-        )
 
 
 def _chunk_reducer_non_positional(
@@ -2408,7 +2448,7 @@ def to_length_zero_arrays(objects: Sequence[Any]) -> tuple[Any, ...]:
     return tuple(map(length_zero_array_or_identity, objects))
 
 
-def map_meta(fn: ArgsKwargsPackedFunction, *deps: Any) -> ak.Array | None:
+def map_meta(fn: Callable | ArgsKwargsPackedFunction, *deps: Any) -> ak.Array | None:
     # NOTE: fn is assumed to be a *packed* function
     #       as defined up in map_partitions. be careful!
     try:
