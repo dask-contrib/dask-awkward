@@ -1212,7 +1212,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             else:
                 m = to_meta([where])[0]
                 meta = self._meta[m]
-        return map_partitions(
+        return _map_partitions(
             operator.getitem,
             self,
             where,
@@ -1232,7 +1232,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             )
 
         new_meta = self._meta[where._meta]
-        return self.map_partitions(
+        return self._map_partitions(
             operator.getitem,
             where,
             meta=new_meta,
