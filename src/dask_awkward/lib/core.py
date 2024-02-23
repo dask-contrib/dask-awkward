@@ -440,7 +440,6 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
         return self.__str__()
 
     def __str__(self) -> str:
-        self._meta  # force updating from any staged ops
         if self.known_value is not None:
             return (
                 f"dask.awkward<{key_split(self.name)}, "
