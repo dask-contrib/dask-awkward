@@ -755,7 +755,7 @@ class Record(Scalar):
     def fields(self) -> list[str]:
         if self._meta is None:
             raise TypeError("metadata is missing; cannot determine fields.")
-        return ak.fields(self._meta)
+        return getattr(self._meta, "fields", None) or []
 
     @property
     def layout(self) -> Any:
