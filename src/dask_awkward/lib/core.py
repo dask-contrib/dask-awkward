@@ -15,6 +15,7 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal, TypeVar, Union, overload
 
 import awkward as ak
+import cachetools
 import dask.config
 import numpy as np
 from awkward._do import remove_structure as ak_do_remove_structure
@@ -439,6 +440,7 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
         return self.__str__()
 
     def __str__(self) -> str:
+        self._meta  # force updating from any staged ops
         if self.known_value is not None:
             return (
                 f"dask.awkward<{key_split(self.name)}, "
@@ -854,6 +856,9 @@ def _finalize_array(results: Sequence[Any]) -> Any:
         raise RuntimeError(msg)
 
 
+dak_cache = cachetools.LRUCache(maxsize=1000)
+
+
 class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     """Partitioned, lazy, and parallel Awkward Array Dask collection.
 
@@ -876,25 +881,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         self._dask: HighLevelGraph = dsk
         self._name: str = name
         self._divisions: tuple[int, ...] | tuple[None, ...] = divisions
-        self._base_meta: ak.Array = meta
-        self._getitem_staged = ()
-
-    @property
-    def _meta(self):
-        if self._getitem_staged:
-            newobj = self._getitem_trivial_map_partitions(
-                self._getitem_staged, execute=True
-            )
-            self._getitem_staged = ()
-            self._meta = newobj._meta
-            self._dask = newobj.dask
-        return self._base_meta
-
-    @_meta.setter
-    def _meta(self, meta):
-        if self._getitem_staged:
-            raise ValueError("Cannot set _meta with staged getitems (internal)")
-        self._base_meta = meta
+        self._meta: ak.Array = meta
 
     def __dask_graph__(self) -> HighLevelGraph:
         return self.dask
@@ -1063,8 +1050,6 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     @property
     def dask(self) -> HighLevelGraph:
         """High level task graph associated with the collection."""
-        if self._getitem_staged is not None:
-            self._meta
         return self._dask
 
     @property
@@ -1135,7 +1120,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     @property
     def fields(self) -> list[str]:
         """Record field names (if any)."""
-        return ak.fields(self._meta)
+        return getattr(self._meta, "fields", None) or []
 
     @property
     def form(self) -> Form:
@@ -1224,22 +1209,14 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         where: Any,
         meta: Any | None = None,
         label: str | None = None,
-        execute: bool = False,
     ) -> Any:
-        import copy
-
-        if not execute:
-            newobj = copy.copy(self)  # shallow/fast
-            where = where if isinstance(where, tuple) else (where,)
-            newobj._getitem_staged = self._getitem_staged + where
-            return newobj
-        if meta is None and self._base_meta is not None:
+        if meta is None and self._meta is not None:
             if isinstance(where, tuple):
                 metad = to_meta(where)
-                meta = self._base_meta[metad]
+                meta = self._meta[metad]
             else:
                 m = to_meta([where])[0]
-                meta = self._base_meta[m]
+                meta = self._meta[m]
         return map_partitions(
             operator.getitem,
             self,
@@ -1999,96 +1976,99 @@ def map_partitions(
     This is effectively the same as `d = c * a`
 
     """
-    opt_touch_all = kwargs.pop("opt_touch_all", None)
-    if opt_touch_all is not None:
-        warnings.warn(
-            "The opt_touch_all argument does nothing.\n"
-            "This warning will be removed in a future version of dask-awkward "
-            "and the function call will likely fail."
-        )
-
-    token = token or tokenize(base_fn, *args, meta, **kwargs)
+    token = token or tokenize(
+        base_fn, *args, meta is not None and meta.typestr, **kwargs
+    )
     label = hyphenize(label or funcname(base_fn))
     name = f"{label}-{token}"
-    kwarg_flat_deps, kwarg_repacker = unpack_collections(kwargs, traverse=traverse)
-    flat_deps, _ = unpack_collections(*args, *kwargs.values(), traverse=traverse)
+    if name in dak_cache:
+        (hlg, meta, in_divisions, in_npartitions) = dak_cache[name]
+    else:
+        opt_touch_all = kwargs.pop("opt_touch_all", None)
+        if opt_touch_all is not None:
+            warnings.warn(
+                "The opt_touch_all argument does nothing.\n"
+                "This warning will be removed in a future version of dask-awkward "
+                "and the function call will likely fail."
+            )
 
-    if len(flat_deps) == 0:
-        message = (
-            "map_partitions expects at least one Dask collection instance, "
-            "you are passing non-Dask collections to dask-awkward code.\n"
-            "observed argument types:\n"
-        )
+        kwarg_flat_deps, kwarg_repacker = unpack_collections(kwargs, traverse=traverse)
+        flat_deps, _ = unpack_collections(*args, *kwargs.values(), traverse=traverse)
+
+        if len(flat_deps) == 0:
+            message = (
+                "map_partitions expects at least one Dask collection instance, "
+                "you are passing non-Dask collections to dask-awkward code.\n"
+                "observed argument types:\n"
+            )
+            for arg in args:
+                message += f"- {type(arg)}"
+            raise TypeError(message)
+
+        arg_flat_deps_expanded = []
+        arg_repackers = []
+        arg_lens_for_repackers = []
         for arg in args:
-            message += f"- {type(arg)}"
-        raise TypeError(message)
+            this_arg_flat_deps, repacker = unpack_collections(arg, traverse=traverse)
+            if (
+                len(this_arg_flat_deps) > 0
+            ):  # if the deps list is empty this arg does not contain any dask collection, no need to repack!
+                arg_flat_deps_expanded.extend(this_arg_flat_deps)
+                arg_repackers.append(repacker)
+                arg_lens_for_repackers.append(len(this_arg_flat_deps))
+            else:
+                arg_flat_deps_expanded.append(arg)
+                arg_repackers.append(None)
+                arg_lens_for_repackers.append(1)
 
-    arg_flat_deps_expanded = []
-    arg_repackers = []
-    arg_lens_for_repackers = []
-    for arg in args:
-        this_arg_flat_deps, repacker = unpack_collections(arg, traverse=traverse)
-        if (
-            len(this_arg_flat_deps) > 0
-        ):  # if the deps list is empty this arg does not contain any dask collection, no need to repack!
-            arg_flat_deps_expanded.extend(this_arg_flat_deps)
-            arg_repackers.append(repacker)
-            arg_lens_for_repackers.append(len(this_arg_flat_deps))
-        else:
-            arg_flat_deps_expanded.append(arg)
-            arg_repackers.append(None)
-            arg_lens_for_repackers.append(1)
-
-    fn = ArgsKwargsPackedFunction(
-        base_fn,
-        arg_repackers,
-        kwarg_repacker,
-        arg_lens_for_repackers,
-    )
-
-    lay = partitionwise_layer(
-        fn,
-        name,
-        *arg_flat_deps_expanded,
-        *kwarg_flat_deps,
-    )
-
-    if meta is None:
-        meta = map_meta(fn, *arg_flat_deps_expanded, *kwarg_flat_deps)
-
-    hlg = HighLevelGraph.from_collections(
-        name,
-        lay,
-        dependencies=flat_deps,
-    )
-
-    dak_arrays = tuple(filter(lambda x: isinstance(x, Array), flat_deps))
-    if len(dak_arrays) == 0:
-        raise TypeError(
-            "at least one argument passed to map_partitions "
-            "should be a dask_awkward.Array collection."
+        fn = ArgsKwargsPackedFunction(
+            base_fn,
+            arg_repackers,
+            kwarg_repacker,
+            arg_lens_for_repackers,
         )
-    in_npartitions = dak_arrays[0].npartitions
-    in_divisions = dak_arrays[0].divisions
+
+        lay = partitionwise_layer(
+            fn,
+            name,
+            *arg_flat_deps_expanded,
+            *kwarg_flat_deps,
+        )
+
+        if meta is None:
+            meta = map_meta(fn, *arg_flat_deps_expanded, *kwarg_flat_deps)
+
+        hlg = HighLevelGraph.from_collections(
+            name,
+            lay,
+            dependencies=flat_deps,
+        )
+
+        dak_arrays = tuple(filter(lambda x: isinstance(x, Array), flat_deps))
+        if len(dak_arrays) == 0:
+            raise TypeError(
+                "at least one argument passed to map_partitions "
+                "should be a dask_awkward.Array collection."
+            )
+        in_npartitions = dak_arrays[0].npartitions
+        in_divisions = dak_arrays[0].divisions
+
+        if output_divisions is not None:
+            if output_divisions == 1:
+                in_divisions = flat_deps[0].divisions
+            else:
+                in_divisions = tuple(map(lambda x: x * output_divisions, in_divisions))
+        dak_cache[name] = (hlg, meta, in_divisions, in_npartitions)
 
     if output_divisions is not None:
-        if output_divisions == 1:
-            new_divisions = flat_deps[0].divisions
-        else:
-            new_divisions = tuple(map(lambda x: x * output_divisions, in_divisions))
         return new_array_object(
             hlg,
             name=name,
             meta=meta,
-            divisions=new_divisions,
+            divisions=in_divisions,
         )
     else:
-        return new_array_object(
-            hlg,
-            name=name,
-            meta=meta,
-            npartitions=in_npartitions,
-        )
+        return new_array_object(hlg, name=name, meta=meta, npartitions=in_npartitions)
 
 
 def _chunk_reducer_non_positional(

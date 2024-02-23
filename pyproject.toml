@@ -128,7 +128,8 @@ warn_unreachable = true
     "pyarrow.*",
     "tlz.*",
     "uproot.*",
-    "cloudpickle.*"
+    "cloudpickle.*",
+    "cachetools.*"
   ]
   ignore_missing_imports = true
 
