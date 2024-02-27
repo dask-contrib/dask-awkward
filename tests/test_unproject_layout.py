@@ -87,3 +87,29 @@ def test_UnionArray():
     projected = ak.from_iter([{"x": 1}, {"x": 2}, {"x": 3}], highlevel=False)
     unprojected = unproject_layout(form, projected)
     compare_values(projected, unprojected)
+
+
+def test_BitMaskedArray():
+    form = ak.forms.BitMaskedForm(
+        "u8", ak.forms.NumpyForm("int64"), valid_when=False, lsb_order=True
+    )
+    projected = ak.contents.UnmaskedArray(ak.from_iter([1, 2, 3, 4], highlevel=False))
+    unprojected = unproject_layout(form, projected)
+    compare_values(projected, unprojected)
+
+    form = ak.forms.BitMaskedForm(
+        "u8", ak.forms.NumpyForm("int64"), valid_when=True, lsb_order=True
+    )
+    unprojected = unproject_layout(form, projected)
+    compare_values(projected, unprojected)
+
+
+def test_ByteMaskedArray():
+    form = ak.forms.ByteMaskedForm("u8", ak.forms.NumpyForm("int64"), valid_when=False)
+    projected = ak.contents.UnmaskedArray(ak.from_iter([1, 2, 3, 4], highlevel=False))
+    unprojected = unproject_layout(form, projected)
+    compare_values(projected, unprojected)
+
+    form = ak.forms.ByteMaskedForm("u8", ak.forms.NumpyForm("int64"), valid_when=True)
+    unprojected = unproject_layout(form, projected)
+    compare_values(projected, unprojected)

@@ -1216,7 +1216,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             else:
                 m = to_meta([where])[0]
                 meta = self._meta[m]
-        return map_partitions(
+        return _map_partitions(
             operator.getitem,
             self,
             where,
@@ -1236,7 +1236,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             )
 
         new_meta = self._meta[where._meta]
-        return self.map_partitions(
+        return self._map_partitions(
             operator.getitem,
             where,
             meta=new_meta,
@@ -1542,6 +1542,15 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             return self.__getitem__(attr)
         except (IndexError, KeyError):
             raise AttributeError(f"{attr} not in fields.")
+
+    def _map_partitions(
+        self,
+        func: Callable,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Array:
+        """Maps a function to partitions without flattening the function inputs."""
+        return _map_partitions(func, self, *args, **kwargs)
 
     def map_partitions(
         self,
@@ -1894,6 +1903,86 @@ class ArgsKwargsPackedFunction:
         return self.fn(*args, **kwargs)
 
 
+def _map_partitions(
+    fn: Callable,
+    *args: Any,
+    label: str | None = None,
+    token: str | None = None,
+    meta: Any | None = None,
+    output_divisions: int | None = None,
+    **kwargs: Any,
+) -> Array:
+    """Map a callable across all partitions of any number of collections.
+    No wrapper is used to flatten the function arguments. This is meant for
+    dask-awkward internal use or in situations where input data are sanitized.
+
+    The parameters of this function are otherwise the same as map_partitions,
+    but the limitation that args, kwargs must be non-nested and flat. They
+    will not be traversed to extract all dask collections, except those in
+    the first dimension of args or kwargs.
+    """
+    token = token or tokenize(fn, *args, meta is not None and meta.typestr, **kwargs)
+    label = hyphenize(label or funcname(fn))
+    name = f"{label}-{token}"
+
+    if name in dak_cache:
+        (hlg, meta, new_divisions, in_npartitions) = dak_cache[name]
+    else:
+
+        deps = [a for a in args if is_dask_collection(a)] + [
+            v for v in kwargs.values() if is_dask_collection(v)
+        ]
+
+        dak_arrays = tuple(filter(lambda x: isinstance(x, Array), deps))
+
+        lay = partitionwise_layer(
+            fn,
+            name,
+            *args,
+            **kwargs,
+        )
+
+        if meta is None:
+            meta = map_meta(fn, *args, **kwargs)
+
+        hlg = HighLevelGraph.from_collections(
+            name,
+            lay,
+            dependencies=deps,
+        )
+
+        if len(dak_arrays) == 0:
+            raise TypeError(
+                "at least one argument passed to map_partitions "
+                "should be a dask_awkward.Array collection."
+            )
+        in_npartitions = dak_arrays[0].npartitions
+        in_divisions = dak_arrays[0].divisions
+        if output_divisions is not None:
+            if output_divisions == 1:
+                new_divisions = dak_arrays[0].divisions
+            else:
+                new_divisions = tuple(map(lambda x: x * output_divisions, in_divisions))
+        else:
+            new_divisions = in_divisions
+        dak_cache[name] = (hlg, meta, new_divisions, in_npartitions)
+
+    if output_divisions is not None:
+        return new_array_object(
+            hlg,
+            name=name,
+            meta=meta,
+            divisions=new_divisions,
+        )
+    else:
+        return new_array_object(
+            hlg,
+            name=name,
+            meta=meta,
+            npartitions=in_npartitions,
+        )
+
+
 def map_partitions(
     base_fn: Callable,
     *args: Any,
@@ -1973,101 +2062,60 @@ def map_partitions(
     <Array [[1, 4, 9], [16], [5, 12, 21], [32]] type='4 * var * int64'>
 
     This is effectively the same as `d = c * a`
-
     """
-    token = token or tokenize(
-        base_fn, *args, meta is not None and meta.typestr, **kwargs
-    )
-    label = hyphenize(label or funcname(base_fn))
-    name = f"{label}-{token}"
-    if name in dak_cache:
-        (hlg, meta, in_divisions, in_npartitions) = dak_cache[name]
-    else:
-        opt_touch_all = kwargs.pop("opt_touch_all", None)
-        if opt_touch_all is not None:
-            warnings.warn(
-                "The opt_touch_all argument does nothing.\n"
-                "This warning will be removed in a future version of dask-awkward "
-                "and the function call will likely fail."
-            )
 
-        kwarg_flat_deps, kwarg_repacker = unpack_collections(kwargs, traverse=traverse)
-        flat_deps, _ = unpack_collections(*args, *kwargs.values(), traverse=traverse)
+    opt_touch_all = kwargs.pop("opt_touch_all", None)
+    if opt_touch_all is not None:
+        warnings.warn(
+            "The opt_touch_all argument does nothing.\n"
+            "This warning will be removed in a future version of dask-awkward "
+            "and the function call will likely fail."
+        )
 
-        if len(flat_deps) == 0:
-            message = (
-                "map_partitions expects at least one Dask collection instance, "
-                "you are passing non-Dask collections to dask-awkward code.\n"
-                "observed argument types:\n"
-            )
-            for arg in args:
-                message += f"- {type(arg)}"
-            raise TypeError(message)
+    kwarg_flat_deps, kwarg_repacker = unpack_collections(kwargs, traverse=traverse)
+    flat_deps, _ = unpack_collections(*args, *kwargs.values(), traverse=traverse)
 
-        arg_flat_deps_expanded = []
-        arg_repackers = []
-        arg_lens_for_repackers = []
+    if len(flat_deps) == 0:
+        message = (
+            "map_partitions expects at least one Dask collection instance, "
+            "you are passing non-Dask collections to dask-awkward code.\n"
+            "observed argument types:\n"
+        )
         for arg in args:
-            this_arg_flat_deps, repacker = unpack_collections(arg, traverse=traverse)
-            if (
-                len(this_arg_flat_deps) > 0
-            ):  # if the deps list is empty this arg does not contain any dask collection, no need to repack!
-                arg_flat_deps_expanded.extend(this_arg_flat_deps)
-                arg_repackers.append(repacker)
-                arg_lens_for_repackers.append(len(this_arg_flat_deps))
-            else:
-                arg_flat_deps_expanded.append(arg)
-                arg_repackers.append(None)
-                arg_lens_for_repackers.append(1)
+            message += f"- {type(arg)}"
+        raise TypeError(message)
 
-        fn = ArgsKwargsPackedFunction(
-            base_fn,
-            arg_repackers,
-            kwarg_repacker,
-            arg_lens_for_repackers,
-        )
+    arg_flat_deps_expanded = []
+    arg_repackers = []
+    arg_lens_for_repackers = []
+    for arg in args:
+        this_arg_flat_deps, repacker = unpack_collections(arg, traverse=traverse)
+        if (
+            len(this_arg_flat_deps) > 0
+        ):  # if the deps list is empty this arg does not contain any dask collection, no need to repack!
+            arg_flat_deps_expanded.extend(this_arg_flat_deps)
+            arg_repackers.append(repacker)
+            arg_lens_for_repackers.append(len(this_arg_flat_deps))
+        else:
+            arg_flat_deps_expanded.append(arg)
+            arg_repackers.append(None)
+            arg_lens_for_repackers.append(1)
 
-        lay = partitionwise_layer(
-            fn,
-            name,
-            *arg_flat_deps_expanded,
-            *kwarg_flat_deps,
-        )
-
-        if meta is None:
-            meta = map_meta(fn, *arg_flat_deps_expanded, *kwarg_flat_deps)
-
-        hlg = HighLevelGraph.from_collections(
-            name,
-            lay,
-            dependencies=flat_deps,
-        )
-
-        dak_arrays = tuple(filter(lambda x: isinstance(x, Array), flat_deps))
-        if len(dak_arrays) == 0:
-            raise TypeError(
-                "at least one argument passed to map_partitions "
-                "should be a dask_awkward.Array collection."
-            )
-        in_npartitions = dak_arrays[0].npartitions
-        in_divisions = dak_arrays[0].divisions
-
-        if output_divisions is not None:
-            if output_divisions == 1:
-                in_divisions = flat_deps[0].divisions
-            else:
-                in_divisions = tuple(map(lambda x: x * output_divisions, in_divisions))
-        dak_cache[name] = (hlg, meta, in_divisions, in_npartitions)
-
-    if output_divisions is not None:
-        return new_array_object(
-            hlg,
-            name=name,
-            meta=meta,
-            divisions=in_divisions,
-        )
-    else:
-        return new_array_object(hlg, name=name, meta=meta, npartitions=in_npartitions)
+    fn = ArgsKwargsPackedFunction(
+        base_fn,
+        arg_repackers,
+        kwarg_repacker,
+        arg_lens_for_repackers,
+    )
+    return _map_partitions(
+        fn,
+        *arg_flat_deps_expanded,
+        *kwarg_flat_deps,
+        label=label,
+        token=token,
+        meta=meta,
+        output_divisions=output_divisions,
+    )
 
 
 def _chunk_reducer_non_positional(
@@ -2415,7 +2463,7 @@ def to_length_zero_arrays(objects: Sequence[Any]) -> tuple[Any, ...]:
     return tuple(map(length_zero_array_or_identity, objects))
 
 
-def map_meta(fn: ArgsKwargsPackedFunction, *deps: Any) -> ak.Array | None:
+def map_meta(fn: Callable | ArgsKwargsPackedFunction, *deps: Any) -> ak.Array | None:
     # NOTE: fn is assumed to be a *packed* function
     #       as defined up in map_partitions. be careful!
     try:
