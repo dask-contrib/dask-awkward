@@ -4,6 +4,7 @@ import logging
 import math
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
+from functools import partial
 from typing import TYPE_CHECKING, Any, cast
 
 import awkward as ak
@@ -19,6 +20,7 @@ from dask_awkward.layers.layers import (
     AwkwardBlockwiseLayer,
     AwkwardInputLayer,
     AwkwardMaterializedLayer,
+    AwkwardTreeReductionLayer,
     ImplementsMocking,
     ImplementsReport,
     IOFunctionWithMocking,
@@ -643,9 +645,45 @@ def from_map(
             res = result.map_partitions(
                 first, meta=array_meta, label=label, output_divisions=1
             )
-            rep = result.map_partitions(
-                second, meta=empty_typetracer(), label=f"{label}-report"
+
+            concat_fn = partial(
+                ak.concatenate,
+                axis=0,
             )
+
+            split_every = 8
+
+            rep_trl_label = f"{label}-report"
+            rep_trl_token = tokenize(result, second, concat_fn, split_every)
+            rep_trl_name = f"{rep_trl_label}-{rep_trl_token}"
+            rep_trl_tree_node_name = f"{rep_trl_label}-tree-node-{rep_trl_token}"
+
+            rep_part = result.map_partitions(
+                second, meta=empty_typetracer(), label=f"{label}-partitioned-report"
+            )
+
+            rep_trl = AwkwardTreeReductionLayer(
+                name=rep_trl_name,
+                name_input=rep_part.name,
+                npartitions_input=rep_part.npartitions,
+                concat_func=concat_fn,
+                tree_node_func=lambda x: x,
+                finalize_func=lambda x: x,
+                split_every=split_every,
+                tree_node_name=rep_trl_tree_node_name,
+            )
+
+            rep_graph = HighLevelGraph.from_collections(
+                rep_trl_name, rep_trl, dependencies=[rep_part]
+            )
+
+            rep = new_array_object(
+                rep_graph,
+                rep_trl_name,
+                meta=empty_typetracer(),
+                npartitions=len(rep_trl.output_partitions),
+            )
+
             return res, rep
 
     return result
