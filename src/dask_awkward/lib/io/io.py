@@ -643,7 +643,9 @@ def from_map(
             res = result.map_partitions(
                 first, meta=array_meta, label=label, output_divisions=1
             )
-            rep = result.map_partitions(second, meta=empty_typetracer(), label=f"{label}-report")
+            rep = result.map_partitions(
+                second, meta=empty_typetracer(), label=f"{label}-report"
+            )
             return res, rep
 
     return result
