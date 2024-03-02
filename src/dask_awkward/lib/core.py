@@ -2246,7 +2246,7 @@ def non_trivial_reduction(
     finalize_fn = partial(finalize_fn, **finalize_kwargs)
 
     if split_every is None:
-        split_every = 8
+        split_every = dask.config.get("awkward.aggregation.split-every", 8)
     elif split_every is False:
         split_every = sys.maxsize
     else:

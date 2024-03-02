@@ -8,6 +8,7 @@ from functools import partial
 from typing import TYPE_CHECKING, Any, cast
 
 import awkward as ak
+import dask.config
 import numpy as np
 from awkward.types.numpytype import primitive_to_dtype
 from awkward.typetracer import length_zero_if_typetracer
@@ -652,7 +653,7 @@ def from_map(
                 axis=0,
             )
 
-            split_every = 8
+            split_every = dask.config.get("awkward.aggregation.split-every", 8)
 
             rep_trl_label = f"{label}-report"
             rep_trl_token = tokenize(result, second, concat_fn, split_every)
