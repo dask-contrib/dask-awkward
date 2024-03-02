@@ -640,8 +640,12 @@ def from_map(
 
     if io_func_implements_report(io_func):
         if cast(ImplementsReport, io_func).return_report:
-            res = result.map_partitions(first, meta=array_meta, output_divisions=1)
-            rep = result.map_partitions(second, meta=empty_typetracer())
+            res = result.map_partitions(
+                first, meta=array_meta, label=label, output_divisions=1
+            )
+            rep = result.map_partitions(
+                second, meta=empty_typetracer(), label=f"{label}-report"
+            )
             return res, rep
 
     return result
