@@ -1617,7 +1617,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         if partition_compatibility(*dak_arrays) == PartitionCompatibility.NO:
             raise IncompatiblePartitions(*dak_arrays)
 
-        return map_partitions(
+        return _map_partitions(
             ufunc,
             *inputs,
             output_divisions=1,

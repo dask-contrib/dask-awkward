@@ -18,6 +18,7 @@ from dask_awkward.layers import AwkwardMaterializedLayer
 from dask_awkward.lib.core import (
     Array,
     PartitionCompatibility,
+    _map_partitions,
     map_partitions,
     new_known_scalar,
     new_scalar_object,
@@ -1069,7 +1070,7 @@ def with_field(
 
     if partition_compatibility(*dask_args) == PartitionCompatibility.NO:
         raise IncompatiblePartitions("with_field", *dask_args)
-    return map_partitions(
+    return _map_partitions(
         _WithFieldFn(where=where, highlevel=highlevel, behavior=behavior, attrs=attrs),
         base,
         what,
