@@ -56,3 +56,8 @@ awkward:
     # continue on to be computed without dask-awkward specific
     # optimizations.
     on-fail: raise
+
+  aggregation:
+    # For tree reductions in dask-awkward, control how many partitions
+    # are aggregated per non-leaf tree node.
+    split-every: 8

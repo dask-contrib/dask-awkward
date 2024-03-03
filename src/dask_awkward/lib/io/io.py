@@ -8,11 +8,13 @@ from functools import partial
 from typing import TYPE_CHECKING, Any, cast
 
 import awkward as ak
+import dask.config
 import numpy as np
 from awkward.types.numpytype import primitive_to_dtype
 from awkward.typetracer import length_zero_if_typetracer
 from dask.base import flatten, tokenize
 from dask.highlevelgraph import HighLevelGraph
+from dask.local import identity
 from dask.utils import funcname, is_integer, parse_bytes
 from fsspec.utils import infer_compression
 
@@ -651,7 +653,7 @@ def from_map(
                 axis=0,
             )
 
-            split_every = 8
+            split_every = dask.config.get("awkward.aggregation.split-every", 8)
 
             rep_trl_label = f"{label}-report"
             rep_trl_token = tokenize(result, second, concat_fn, split_every)
@@ -667,8 +669,8 @@ def from_map(
                 name_input=rep_part.name,
                 npartitions_input=rep_part.npartitions,
                 concat_func=concat_fn,
-                tree_node_func=lambda x: x,
-                finalize_func=lambda x: x,
+                tree_node_func=identity,
+                finalize_func=identity,
                 split_every=split_every,
                 tree_node_name=rep_trl_tree_node_name,
             )
