@@ -1924,17 +1924,14 @@ def _map_partitions(
     token = token or tokenize(fn, *args, meta is not None and meta.typestr, **kwargs)
     label = hyphenize(label or funcname(fn))
     name = f"{label}-{token}"
+    deps = [a for a in args if is_dask_collection(a)] + [
+        v for v in kwargs.values() if is_dask_collection(v)
+    ]
+    dak_arrays = tuple(filter(lambda x: isinstance(x, Array), deps))
 
     if name in dak_cache:
-        (hlg, meta, new_divisions, in_npartitions) = dak_cache[name]
+        hlg, meta = dak_cache[name]
     else:
-
-        deps = [a for a in args if is_dask_collection(a)] + [
-            v for v in kwargs.values() if is_dask_collection(v)
-        ]
-
-        dak_arrays = tuple(filter(lambda x: isinstance(x, Array), deps))
-
         lay = partitionwise_layer(
             fn,
             name,
@@ -1956,16 +1953,16 @@ def _map_partitions(
                 "at least one argument passed to map_partitions "
                 "should be a dask_awkward.Array collection."
             )
-        in_npartitions = dak_arrays[0].npartitions
-        in_divisions = dak_arrays[0].divisions
-        if output_divisions is not None:
-            if output_divisions == 1:
-                new_divisions = dak_arrays[0].divisions
-            else:
-                new_divisions = tuple(map(lambda x: x * output_divisions, in_divisions))
+        dak_cache[name] = hlg, meta
+    in_npartitions = dak_arrays[0].npartitions
+    in_divisions = dak_arrays[0].divisions
+    if output_divisions is not None:
+        if output_divisions == 1:
+            new_divisions = dak_arrays[0].divisions
         else:
-            new_divisions = in_divisions
-        dak_cache[name] = (hlg, meta, new_divisions, in_npartitions)
+            new_divisions = tuple(map(lambda x: x * output_divisions, in_divisions))
+    else:
+        new_divisions = in_divisions
 
     if output_divisions is not None:
         return new_array_object(
