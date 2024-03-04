@@ -1921,7 +1921,7 @@ def _map_partitions(
     will not be traversed to extract all dask collections, except those in
     the first dimension of args or kwargs.
     """
-    token = token or tokenize(fn, *args, meta is not None and meta.typestr, **kwargs)
+    token = token or tokenize(fn, *args, output_divisions, **kwargs)
     label = hyphenize(label or funcname(fn))
     name = f"{label}-{token}"
     deps = [a for a in args if is_dask_collection(a)] + [
