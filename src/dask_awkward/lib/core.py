@@ -15,6 +15,7 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal, TypeVar, Union, overload
 
 import awkward as ak
+import cachetools
 import dask.config
 import numpy as np
 from awkward._do import remove_structure as ak_do_remove_structure
@@ -753,7 +754,7 @@ class Record(Scalar):
     def fields(self) -> list[str]:
         if self._meta is None:
             raise TypeError("metadata is missing; cannot determine fields.")
-        return ak.fields(self._meta)
+        return getattr(self._meta, "fields", None) or []
 
     @property
     def layout(self) -> Any:
@@ -852,6 +853,9 @@ def _finalize_array(results: Sequence[Any]) -> Any:
             f"type of first result: {type(results[0])}"
         )
         raise RuntimeError(msg)
+
+
+dak_cache = cachetools.LRUCache(maxsize=1000)
 
 
 class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
@@ -1115,7 +1119,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     @property
     def fields(self) -> list[str]:
         """Record field names (if any)."""
-        return ak.fields(self._meta)
+        return getattr(self._meta, "fields", None) or []
 
     @property
     def form(self) -> Form:
@@ -1917,45 +1921,50 @@ def _map_partitions(
     will not be traversed to extract all dask collections, except those in
     the first dimension of args or kwargs.
     """
-    token = token or tokenize(fn, *args, meta, **kwargs)
+    token = token or tokenize(fn, *args, output_divisions, **kwargs)
     label = hyphenize(label or funcname(fn))
     name = f"{label}-{token}"
-
     deps = [a for a in args if is_dask_collection(a)] + [
         v for v in kwargs.values() if is_dask_collection(v)
     ]
-
     dak_arrays = tuple(filter(lambda x: isinstance(x, Array), deps))
 
-    lay = partitionwise_layer(
-        fn,
-        name,
-        *args,
-        **kwargs,
-    )
-
-    if meta is None:
-        meta = map_meta(fn, *args, **kwargs)
-
-    hlg = HighLevelGraph.from_collections(
-        name,
-        lay,
-        dependencies=deps,
-    )
-
-    if len(dak_arrays) == 0:
-        raise TypeError(
-            "at least one argument passed to map_partitions "
-            "should be a dask_awkward.Array collection."
+    if name in dak_cache:
+        hlg, meta = dak_cache[name]
+    else:
+        lay = partitionwise_layer(
+            fn,
+            name,
+            *args,
+            **kwargs,
         )
+
+        if meta is None:
+            meta = map_meta(fn, *args, **kwargs)
+
+        hlg = HighLevelGraph.from_collections(
+            name,
+            lay,
+            dependencies=deps,
+        )
+
+        if len(dak_arrays) == 0:
+            raise TypeError(
+                "at least one argument passed to map_partitions "
+                "should be a dask_awkward.Array collection."
+            )
+        dak_cache[name] = hlg, meta
     in_npartitions = dak_arrays[0].npartitions
     in_divisions = dak_arrays[0].divisions
-
     if output_divisions is not None:
         if output_divisions == 1:
             new_divisions = dak_arrays[0].divisions
         else:
             new_divisions = tuple(map(lambda x: x * output_divisions, in_divisions))
+    else:
+        new_divisions = in_divisions
+
+    if output_divisions is not None:
         return new_array_object(
             hlg,
             name=name,
@@ -2050,10 +2059,7 @@ def map_partitions(
     <Array [[1, 4, 9], [16], [5, 12, 21], [32]] type='4 * var * int64'>
 
     This is effectively the same as `d = c * a`
-
     """
-    token = token or tokenize(base_fn, *args, meta, **kwargs)
-    label = hyphenize(label or funcname(base_fn))
 
     opt_touch_all = kwargs.pop("opt_touch_all", None)
     if opt_touch_all is not None:
