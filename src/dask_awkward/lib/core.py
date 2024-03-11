@@ -1425,7 +1425,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 dtype = where[0].layout.dtype.type
             except AttributeError:
                 dtype = where[0].layout.content.dtype.type
-            if issubclass(dtype, (np.bool_, bool, np.int64, np.int32, np.int16, int)):
+            if issubclass(dtype, (np.bool_, bool, np.int64, np.int32, np.int16, np.int8, int)):
                 return self._getitem_outer_bool_or_int_lazy_array(where)
 
         elif where[0] is Ellipsis:
@@ -1467,7 +1467,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             while not hasattr(layout, "dtype"):
                 layout = layout.content
             dtype = layout.dtype.type
-            if issubclass(dtype, (np.bool_, bool, np.int64, np.int32, np.int16, int)):
+            if issubclass(dtype, (np.bool_, bool, np.int64, np.int32, np.int16, np.int8, int)):
                 return self._getitem_outer_bool_or_int_lazy_array(where)
 
         # a single ellipsis
