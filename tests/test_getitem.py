@@ -66,6 +66,18 @@ def test_single_int(daa: dak.Array, caa: ak.Array) -> None:
         assert caa["points"][i].tolist() == daa["points"][i].compute().tolist()
 
 
+@pytest.mark.parametrize("dtype", [np.int8, np.uint8, np.int16, np.uint16, np.int32, np.uint32, np.int64, np.uint64])
+def test_multi_int(daa: dak.Array, caa: ak.Array, dtype: np.dtype) -> None:
+    a = daa["points"]["x"]
+    aix = ak.zeros_like(a, dtype=dtype) # take first elements
+    c = caa["points"]["x"]
+    cix = ak.zeros_like(c, dtype=dtype) # take first elements
+    assert_eq(
+        a[aix],
+        c[cix],
+    )
+
+
 def test_single_ellipsis(daa: dak.Array, caa: ak.Array) -> None:
     assert_eq(daa[...], caa[...])
 
