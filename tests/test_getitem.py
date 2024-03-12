@@ -67,7 +67,7 @@ def test_single_int(daa: dak.Array, caa: ak.Array) -> None:
 
 
 @pytest.mark.parametrize("dtype", [np.int8, np.uint8, np.int16, np.uint16, np.int32, np.uint32, np.int64, np.uint64])
-def test_multi_int(daa: dak.Array, caa: ak.Array, dtype: np.dtype) -> None:
+def test_multi_int(daa: dak.Array, caa: ak.Array, dtype: type) -> None:
     a = daa["points"]["x"]
     aix = ak.zeros_like(a, dtype=dtype) # take first elements
     c = caa["points"]["x"]
