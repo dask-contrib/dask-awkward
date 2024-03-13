@@ -65,6 +65,7 @@ docs = [
 ]
 test = [
   "aiohttp;python_version<\"3.12\"",
+  "dask[dataframe]",
   "dask-awkward[complete]",
   "dask-histogram",
   "distributed",
