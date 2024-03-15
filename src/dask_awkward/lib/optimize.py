@@ -14,6 +14,7 @@ from dask.highlevelgraph import HighLevelGraph
 from dask.local import get_sync
 
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardInputLayer
+from dask_awkward.lib.utils import typetracer_nochecks
 from dask_awkward.utils import first
 
 if TYPE_CHECKING:
@@ -45,7 +46,8 @@ def all_optimizations(dsk: Mapping, keys: Sequence[Key], **_: Any) -> Mapping:
         dsk = HighLevelGraph.from_collections(str(id(dsk)), dsk, dependencies=())
 
     # Perform dask-awkward specific optimizations.
-    dsk = optimize(dsk, keys=keys)
+    with typetracer_nochecks():
+        dsk = optimize(dsk, keys=keys)
     # Perform Blockwise optimizations for HLG input
     dsk = optimize_blockwise(dsk, keys=keys)
     # fuse nearby layers

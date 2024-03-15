@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from dask_awkward.lib.utils import typetracer_nochecks
 from dask_awkward.utils import (
     LazyInputsDict,
     field_access_to_front,
@@ -78,3 +79,12 @@ def test_field_access_to_front(pairs):
     res = field_access_to_front(pairs[0])
     assert res[0] == pairs[1]
     assert res[1] == pairs[2]
+
+
+def test_nocheck_context():
+    from awkward._nplikes.typetracer import TypeTracerArray
+
+    assert getattr(TypeTracerArray, "runtime_typechecks", True)
+    with typetracer_nochecks():
+        assert not TypeTracerArray.runtime_typechecks
+    assert getattr(TypeTracerArray, "runtime_typechecks", True)
