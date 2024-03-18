@@ -177,36 +177,39 @@ def report_necessary_columns(
     seen_names = set()
 
     name_to_necessary_columns: dict[str, frozenset | None] = {}
-    for obj in collections:
-        dsk = obj.__dask_graph__()
-        keys = obj.__dask_keys__()
-        projection_data = o._prepare_buffer_projection(dsk, keys)
+    with o.typetracer_nochecks():
+        for obj in collections:
+            dsk = obj.__dask_graph__()
+            keys = obj.__dask_keys__()
+            projection_data = o._prepare_buffer_projection(dsk, keys)
 
-        # If the projection failed, or there are no input layers
-        if projection_data is None:
-            # Ensure that we have a record of the seen layers, if they're inputs
-            for name, layer in dsk.items():
-                if isinstance(layer, AwkwardInputLayer):
-                    seen_names.add(name)
-            continue
-
-        # Unpack projection information
-        layer_to_reports, layer_to_projection_state = projection_data
-        for name, report in layer_to_reports.items():
-            layer = dsk.layers[name]
-            if not (isinstance(layer, AwkwardInputLayer) and layer.is_columnar):
+            # If the projection failed, or there are no input layers
+            if projection_data is None:
+                # Ensure that we have a record of the seen layers, if they're inputs
+                for name, layer in dsk.items():
+                    if isinstance(layer, AwkwardInputLayer):
+                        seen_names.add(name)
                 continue
 
-            existing_columns = name_to_necessary_columns.setdefault(name, frozenset())
+            # Unpack projection information
+            layer_to_reports, layer_to_projection_state = projection_data
+            for name, report in layer_to_reports.items():
+                layer = dsk.layers[name]
+                if not (isinstance(layer, AwkwardInputLayer) and layer.is_columnar):
+                    continue
 
-            assert existing_columns is not None
-            # Update set of touched keys
-            name_to_necessary_columns[name] = (
-                existing_columns
-                | layer.necessary_columns(
-                    report=report, state=layer_to_projection_state[name]
+                existing_columns = name_to_necessary_columns.setdefault(
+                    name, frozenset()
                 )
-            )
+
+                assert existing_columns is not None
+                # Update set of touched keys
+                name_to_necessary_columns[name] = (
+                    existing_columns
+                    | layer.necessary_columns(
+                        report=report, state=layer_to_projection_state[name]
+                    )
+                )
 
     # Populate result with names of seen layers
     for k in seen_names:
