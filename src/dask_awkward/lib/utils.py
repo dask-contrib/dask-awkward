@@ -3,6 +3,7 @@ from __future__ import annotations
 __all__ = ("trace_form_structure", "buffer_keys_required_to_compute_shapes")
 
 from collections.abc import Callable, Iterable, Iterator, Mapping, MutableMapping
+from contextlib import contextmanager
 from typing import TYPE_CHECKING, TypedDict, TypeVar
 
 import awkward as ak
@@ -164,3 +165,16 @@ def form_with_unique_keys(form: Form, key: str) -> Form:
     form = ak.forms.from_dict(form.to_dict())
     impl(form, key)
     return form
+
+
+@contextmanager
+def typetracer_nochecks():
+    from awkward._nplikes.typetracer import TypeTracerArray
+
+    oldval = getattr(TypeTracerArray, "runtime_typechecks", None)
+    TypeTracerArray.runtime_typechecks = False
+    yield
+    if oldval is not None:
+        TypeTracerArray.runtime_typechecks = oldval
+    else:
+        del TypeTracerArray.runtime_typechecks
