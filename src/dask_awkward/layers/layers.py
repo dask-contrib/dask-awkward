@@ -177,12 +177,6 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
             annotations=self.annotations,
         )
 
-    def necessary_columns(self, report: TypeTracerReport, state: T) -> frozenset[str]:
-        assert self.is_columnar
-        return cast(ImplementsNecessaryColumns, self.io_func).necessary_columns(
-            report=report, state=state
-        )
-
 
 class AwkwardMaterializedLayer(MaterializedLayer):
     def __init__(

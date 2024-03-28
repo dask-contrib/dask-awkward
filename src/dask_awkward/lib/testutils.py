@@ -7,7 +7,6 @@ from typing import Any
 
 import awkward as ak
 import numpy as np
-from awkward.typetracer import typetracer_from_form
 from dask.base import is_dask_collection
 from packaging.version import Version
 
