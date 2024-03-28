@@ -11,7 +11,7 @@ import awkward as ak
 import dask.config
 import numpy as np
 from awkward.types.numpytype import primitive_to_dtype
-from awkward.typetracer import length_zero_if_typetracer
+from awkward.typetracer import length_zero_if_typetracer, typetracer_with_report
 from dask.base import flatten, tokenize
 from dask.highlevelgraph import HighLevelGraph
 from dask.local import identity
@@ -23,10 +23,9 @@ from dask_awkward.layers.layers import (
     AwkwardInputLayer,
     AwkwardMaterializedLayer,
     AwkwardTreeReductionLayer,
-    ImplementsMocking,
     ImplementsReport,
     IOFunctionWithMocking,
-    io_func_implements_mocking,
+    io_func_implements_projection,
     io_func_implements_report,
 )
 from dask_awkward.lib.core import (
@@ -37,6 +36,7 @@ from dask_awkward.lib.core import (
     typetracer_array,
 )
 from dask_awkward.lib.io.columnar import ColumnProjectionMixin
+from dask_awkward.lib.utils import render_buffer_key
 from dask_awkward.utils import first, second
 
 if TYPE_CHECKING:
@@ -620,11 +620,18 @@ def from_map(
             packed=packed,
         )
 
-    # Special `io_func` implementations can implement mocking and optionally
-    # support buffer projection.
-    if io_func_implements_mocking(func):
+    kw = {}
+    if io_func_implements_projection(func):
+        # Special `io_func` implementations can do buffer projection - choosing columns
+        # so here we start with a blank report
         io_func = func
-        array_meta = cast(ImplementsMocking, func).mock()
+        array_meta, report = typetracer_with_report(
+            io_func.form,
+            highlevel=True,
+            behavior=io_func.behavior,
+            buffer_key=render_buffer_key,
+        )
+        kw["report"] = {report}  # column tracking report, not failure report, below
     # If we know the meta, we can spoof mocking
     elif meta is not None:
         io_func = IOFunctionWithMocking(meta, func)
@@ -638,9 +645,11 @@ def from_map(
 
     hlg = HighLevelGraph.from_collections(name, dsk)
     if divisions is not None:
-        result = new_array_object(hlg, name, meta=array_meta, divisions=divisions)
+        result = new_array_object(hlg, name, meta=array_meta, divisions=divisions, **kw)
     else:
-        result = new_array_object(hlg, name, meta=array_meta, npartitions=len(inputs))
+        result = new_array_object(
+            hlg, name, meta=array_meta, npartitions=len(inputs), **kw
+        )
 
     if io_func_implements_report(io_func):
         if cast(ImplementsReport, io_func).return_report:
