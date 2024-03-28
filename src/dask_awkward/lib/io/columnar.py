@@ -59,12 +59,6 @@ class ColumnProjectionMixin(ImplementsNecessaryColumns[FormStructure]):
     when only metadata buffers are required.
     """
 
-    def mock(self: S) -> AwkwardArray:
-        return cast(
-            AwkwardArray,
-            typetracer_from_form(self.form, behavior=self.behavior, attrs=self.attrs),
-        )
-
     def mock_empty(self: S, backend: BackendT = "cpu") -> AwkwardArray:
         return cast(
             AwkwardArray,
@@ -73,25 +67,6 @@ class ColumnProjectionMixin(ImplementsNecessaryColumns[FormStructure]):
                 backend,
                 highlevel=True,
             ),
-        )
-
-    def prepare_for_projection(
-        self: S,
-    ) -> tuple[AwkwardArray, TypeTracerReport, FormStructure]:
-        form = form_with_unique_keys(self.form, "@")
-
-        # Build typetracer and associated report object
-        (meta, report) = typetracer_with_report(
-            form,
-            highlevel=True,
-            behavior=self.behavior,
-            buffer_key=render_buffer_key,
-        )
-
-        return (
-            cast(AwkwardArray, meta),
-            report,
-            trace_form_structure(form, buffer_key=render_buffer_key),
         )
 
     def necessary_columns(

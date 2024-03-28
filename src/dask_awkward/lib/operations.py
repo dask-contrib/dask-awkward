@@ -60,6 +60,7 @@ def concatenate(
     name = f"{label}-{token}"
 
     metas = [c._meta for c in arrays]
+    report = set.union(getattr(m, "_report", set()) for m in metas)
 
     if len(metas) == 0:
         raise ValueError("Need at least one array to concatenate")
@@ -127,6 +128,7 @@ def concatenate(
             name,
             meta=meta_no_report,
             npartitions=sum(a.npartitions for a in arrays),
+            report=report,
         )
 
     if axis > 0:

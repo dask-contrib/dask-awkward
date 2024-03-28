@@ -387,6 +387,10 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
         return (Scalar, (self.dask, self.name, None, self.dtype, self.known_value))
 
     @property
+    def report(self):
+        return getattr(self.meta, "report", set())
+
+    @property
     def dask(self) -> HighLevelGraph:
         return self._dask
 
@@ -936,6 +940,10 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     def reset_meta(self) -> None:
         """Assign an empty typetracer array as the collection metadata."""
         self._meta = empty_typetracer()
+
+    @property
+    def report(self):
+        return getattr(self.meta, "report", set())
 
     def repartition(
         self,
@@ -1734,6 +1742,7 @@ def new_array_object(
     attrs: Mapping[str, Any] | None = None,
     npartitions: int | None = None,
     divisions: tuple[int, ...] | tuple[None, ...] | None = None,
+    report=set(),
 ) -> Array:
     """Instantiate a new Array collection object.
 
@@ -1801,6 +1810,9 @@ def new_array_object(
         actual_meta.attrs = attrs
 
     out = Array(dsk, name, actual_meta, divs)
+    if report:
+        [r.commit(out.name) for r in report]
+        actual_meta._report = report
     if actual_meta.__doc__ != actual_meta.__class__.__doc__:
         out.__doc__ = actual_meta.__doc__
 
@@ -2194,10 +2206,6 @@ def non_trivial_reduction(
 
     if combiner is None:
         combiner = reducer
-
-    # is_positional == True is not implemented
-    # if is_positional:
-    #     assert combiner is reducer
 
     # For `axis=None`, we prepare each array to have the following structure:
     #   [[[ ... [x1 x2 x3 ... xN] ... ]]] (length-1 outer lists)

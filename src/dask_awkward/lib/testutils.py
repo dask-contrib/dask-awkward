@@ -294,9 +294,6 @@ class RandomFailFromListsFn:
 
         return self.read_fn(*args, **kwargs)
 
-    def mock(self):
-        return typetracer_from_form(self.form)
-
     def mock_empty(self, backend="cpu"):
         return ak.to_backend(
             self.form.length_zero_array(highlevel=False),
