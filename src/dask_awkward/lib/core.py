@@ -388,7 +388,7 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
 
     @property
     def report(self):
-        return getattr(self.meta, "report", set())
+        return getattr(self._meta, "_report", set())
 
     @property
     def dask(self) -> HighLevelGraph:
@@ -401,6 +401,10 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
     @property
     def key(self) -> Key:
         return (self._name, 0)
+
+    @property
+    def report(self):
+        return getattr(self._meta, "_report", set())
 
     def _check_meta(self, m):
         if isinstance(m, MaybeNone):
@@ -717,6 +721,8 @@ class Record(Scalar):
     def __getitem__(self, where):
         token = tokenize(self, where)
         new_name = f"{where}-{token}"
+        report = self.report
+        [_.commit(new_name) for _ in report]
         new_meta = self._meta[where]
 
         # first check for array type return
@@ -727,6 +733,7 @@ class Record(Scalar):
                 graphlayer,
                 dependencies=[self],
             )
+            new_meta._report = report
             return new_array_object(hlg, new_name, meta=new_meta, npartitions=1)
 
         # then check for scalar (or record) type
@@ -737,6 +744,7 @@ class Record(Scalar):
             dependencies=[self],
         )
         if isinstance(new_meta, ak.Record):
+            new_meta._report = report
             return new_record_object(hlg, new_name, meta=new_meta)
         else:
             return new_scalar_object(hlg, new_name, meta=new_meta)
@@ -810,7 +818,7 @@ def new_record_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Record:
         raise TypeError(
             f"meta Record must have a typetracer backend, not {ak.backend(meta)}"
         )
-    return Record(dsk, name, meta)
+    return out
 
 
 def _is_numpy_or_cupy_like(arr: Any) -> bool:
@@ -943,7 +951,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     @property
     def report(self):
-        return getattr(self.meta, "report", set())
+        return getattr(self._meta, "_report", set())
 
     def repartition(
         self,
@@ -980,6 +988,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         new_graph = HighLevelGraph.from_collections(
             key, new_layer, dependencies=(self,)
         )
+        [_.commit(key) for _ in self.report]
         return new_array_object(
             new_graph,
             key,
@@ -1181,7 +1190,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         # otherwise nullify the known divisions
         else:
             new_divisions = (None,) * (len(new_keys) + 1)  # type: ignore
-
+        [_.commit(name) for _ in self.report]
         return new_array_object(
             graph, name, meta=self._meta, divisions=tuple(new_divisions)
         )
@@ -1403,6 +1412,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             AwkwardMaterializedLayer(dask, previous_layer_names=[self.name]),
             dependencies=[self],
         )
+        [_.commit(name) for _ in self.report]
         return new_array_object(
             hlg,
             name,
@@ -1742,7 +1752,6 @@ def new_array_object(
     attrs: Mapping[str, Any] | None = None,
     npartitions: int | None = None,
     divisions: tuple[int, ...] | tuple[None, ...] | None = None,
-    report=set(),
 ) -> Array:
     """Instantiate a new Array collection object.
 
@@ -1810,9 +1819,6 @@ def new_array_object(
         actual_meta.attrs = attrs
 
     out = Array(dsk, name, actual_meta, divs)
-    if report:
-        [r.commit(out.name) for r in report]
-        actual_meta._report = report
     if actual_meta.__doc__ != actual_meta.__class__.__doc__:
         out.__doc__ = actual_meta.__doc__
 
@@ -1955,6 +1961,15 @@ def _map_partitions(
         if meta is None:
             meta = map_meta(fn, *args, **kwargs)
 
+        reps = set()
+        for dep in to_meta(deps):
+            rep = getattr(dep, "_report", None)
+            if rep:
+                [_.commit(name) for _ in rep]
+                [reps.add(_) for _ in rep]
+
+        meta._report = reps
+
         hlg = HighLevelGraph.from_collections(
             name,
             lay,
@@ -1976,7 +1991,6 @@ def _map_partitions(
             new_divisions = tuple(map(lambda x: x * output_divisions, in_divisions))
     else:
         new_divisions = in_divisions
-
     if output_divisions is not None:
         return new_array_object(
             hlg,
@@ -2281,7 +2295,7 @@ def non_trivial_reduction(
     )
 
     graph = HighLevelGraph.from_collections(name_finalize, trl, dependencies=(chunked,))
-
+    [_.commit(name_finalize) for _ in array.report]
     meta = reducer(
         array._meta,
         axis=axis,
@@ -2289,6 +2303,7 @@ def non_trivial_reduction(
         mask_identity=mask_identity,
     )
     if isinstance(meta, ak.highlevel.Array):
+        meta._report = array.report
         return new_array_object(graph, name_finalize, meta=meta, npartitions=1)
     else:
         return new_scalar_object(graph, name_finalize, meta=meta)

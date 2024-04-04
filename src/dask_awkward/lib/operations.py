@@ -60,7 +60,7 @@ def concatenate(
     name = f"{label}-{token}"
 
     metas = [c._meta for c in arrays]
-    report = set.union(getattr(m, "_report", set()) for m in metas)
+    report = set.union(*(getattr(m, "_report", set()) for m in metas))
 
     if len(metas) == 0:
         raise ValueError("Need at least one array to concatenate")
@@ -123,12 +123,12 @@ def concatenate(
             aml = AwkwardMaterializedLayer(g, previous_layer_names=[arrays[0].name])
 
         hlg = HighLevelGraph.from_collections(name, aml, dependencies=arrays)
+        meta_no_report._report = report
         return new_array_object(
             hlg,
             name,
             meta=meta_no_report,
             npartitions=sum(a.npartitions for a in arrays),
-            report=report,
         )
 
     if axis > 0:

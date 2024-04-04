@@ -7,12 +7,8 @@ import awkward as ak
 from awkward import Array as AwkwardArray
 from awkward.forms import Form
 
-from dask_awkward.layers.layers import (
-    BackendT,
-    ImplementsIOFunction,
-    ImplementsNecessaryColumns,
-)
-from dask_awkward.lib.utils import METADATA_ATTRIBUTES, FormStructure
+from dask_awkward.layers.layers import BackendT, ImplementsNecessaryColumns
+from dask_awkward.lib.utils import FormStructure
 
 if TYPE_CHECKING:
     from awkward._nplikes.typetracer import TypeTracerReport

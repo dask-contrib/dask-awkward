@@ -25,7 +25,7 @@ from dask_awkward.layers.layers import (
     AwkwardTreeReductionLayer,
     ImplementsReport,
     IOFunctionWithMocking,
-    io_func_implements_projection,
+    io_func_implements_columnar,
     io_func_implements_report,
 )
 from dask_awkward.lib.core import (
@@ -621,7 +621,7 @@ def from_map(
         )
 
     kw = {}
-    if io_func_implements_projection(func):
+    if io_func_implements_columnar(func):
         # Special `io_func` implementations can do buffer projection - choosing columns
         # so here we start with a blank report
         io_func = func
@@ -631,7 +631,9 @@ def from_map(
             behavior=io_func.behavior,
             buffer_key=render_buffer_key,
         )
-        kw["report"] = {report}  # column tracking report, not failure report, below
+        array_meta._report = {
+            report
+        }  # column tracking report, not failure report, below
     # If we know the meta, we can spoof mocking
     elif meta is not None:
         io_func = IOFunctionWithMocking(meta, func)
