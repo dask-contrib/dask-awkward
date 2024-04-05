@@ -36,7 +36,7 @@ from dask_awkward.lib.core import (
     typetracer_array,
 )
 from dask_awkward.lib.io.columnar import ColumnProjectionMixin
-from dask_awkward.lib.utils import render_buffer_key
+from dask_awkward.lib.utils import form_with_unique_keys, render_buffer_key
 from dask_awkward.utils import first, second
 
 if TYPE_CHECKING:
@@ -626,11 +626,12 @@ def from_map(
         # so here we start with a blank report
         io_func = func
         array_meta, report = typetracer_with_report(
-            io_func.form,
+            form_with_unique_keys(io_func.form, "@"),
             highlevel=True,
             behavior=io_func.behavior,
             buffer_key=render_buffer_key,
         )
+        report.commit(name)
         array_meta._report = {
             report
         }  # column tracking report, not failure report, below
