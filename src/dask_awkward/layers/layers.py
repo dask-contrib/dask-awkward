@@ -57,7 +57,7 @@ class ImplementsReport(ImplementsIOFunction, Protocol):
 
 
 class ImplementsProjection(Protocol[T]):
-    def project(self, report: TypeTracerReport, state: T) -> ImplementsIOFunction: ...
+    def project(self, columns: list[str]) -> ImplementsIOFunction: ...
 
 
 class ImplementsNecessaryColumns(ImplementsProjection[T], Protocol):
@@ -81,7 +81,7 @@ class IOFunctionWithMocking(ImplementsIOFunction):
 
 
 def io_func_implements_projection(func: ImplementsIOFunction) -> bool:
-    return hasattr(func, "prepare_for_projection")
+    return hasattr(func, "project")
 
 
 def io_func_implements_columnar(func: ImplementsIOFunction) -> bool:
@@ -158,15 +158,9 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
     def is_columnar(self) -> bool:
         return io_func_implements_columnar(self.io_func)
 
-    def project(
-        self,
-        report: TypeTracerReport,
-        state: T,
-    ) -> AwkwardInputLayer:
+    def project(self, columns: list[str]) -> AwkwardInputLayer:
         assert self.is_projectable
-        io_func = cast(ImplementsProjection, self.io_func).project(
-            report=report, state=state
-        )
+        io_func = self.io_func.project(columns)
         return AwkwardInputLayer(
             name=self.name,
             inputs=self.inputs,

@@ -631,6 +631,7 @@ def from_map(
             behavior=io_func.behavior,
             buffer_key=render_buffer_key,
         )
+        io_func._column_report = report
         report.commit(name)
         array_meta._report = {
             report

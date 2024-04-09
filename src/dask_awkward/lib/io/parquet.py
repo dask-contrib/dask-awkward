@@ -94,7 +94,7 @@ class FromParquetFn(ColumnProjectionMixin):
     def __call__(self, *args, **kwargs): ...
 
     @abc.abstractmethod
-    def project_columns(self, columns): ...
+    def project(self, columns): ...
 
     @property
     def return_report(self) -> bool:
@@ -176,7 +176,7 @@ class FromParquetFileWiseFn(FromParquetFn):
 
         return self.read_fn(source)
 
-    def project_columns(self, columns):
+    def project(self, columns):
         return FromParquetFileWiseFn(
             fs=self.fs,
             form=self.form.select_columns(columns),
@@ -235,7 +235,7 @@ class FromParquetFragmentWiseFn(FromParquetFn):
             attrs=self.attrs,
         )
 
-    def project_columns(self, columns):
+    def project(self, columns):
         return FromParquetFragmentWiseFn(
             fs=self.fs,
             form=self.form.select_columns(columns),

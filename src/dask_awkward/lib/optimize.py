@@ -61,8 +61,8 @@ def all_optimizations(dsk: Mapping, keys: Sequence[Key], **_: Any) -> Mapping:
 def optimize(dsk: HighLevelGraph, keys: Sequence[Key], **_: Any) -> Mapping:
     """Run optimizations specific to dask-awkward.
 
-    This is currently limited to determining the necessary columns for
-    input layers.
+    - determine the necessary columns for input layers
+    - fuse linear chains of blockwise operations in linear time
 
     """
     if dask.config.get("awkward.optimization.enabled"):
@@ -104,9 +104,27 @@ def optimize_columns(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelGraph
         New, optimized task graph with column-projected ``AwkwardInputLayer``.
 
     """
-    # TBD
+    dsk2 = dsk.layers.copy()
+    for k, lay in dsk.layers.items():
+        if not isinstance(lay, AwkwardInputLayer):
+            continue
+        rep = lay.io_func._column_report
+        cols = rep.data_touched_in(dsk.layers)
+        new_lay = lay.project([c.replace("@.", "") for c in cols])
+        dsk2[k] = new_lay
 
-    return dsk  # HighLevelGraph(layers, dsk.dependencies)
+    return HighLevelGraph(dsk2, dsk.dependencies)
+
+
+def necessary_columns(dsk, keys):
+    out = {}
+    for k, lay in dsk.layers.items():
+        if not isinstance(lay, AwkwardInputLayer):
+            continue
+        rep = lay.io_func._column_report
+        cols = rep.data_touched_in(dsk.layers)
+        out[k] = lay.project([c.replace("@.", "") for c in cols])
+    return out
 
 
 def rewrite_layer_chains(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelGraph:
