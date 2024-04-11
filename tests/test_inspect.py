@@ -80,7 +80,6 @@ def test_visualize_works(daa):
         dask.compute(query, optimize_graph=True)
 
 
-@pytest.mark.xfail()
 def test_basic_root_works():
     pytest.importorskip("hist")
     pytest.importorskip("uproot")
