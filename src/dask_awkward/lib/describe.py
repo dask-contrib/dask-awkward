@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from dask_awkward.lib.core import Array, Record
+import awkward as ak
+
+from dask_awkward.lib.core import Array, Record, Scalar
 
 
 def fields(collection: Array | Record) -> list[str] | None:
@@ -19,3 +21,22 @@ def fields(collection: Array | Record) -> list[str] | None:
 
     """
     return collection.fields
+
+
+def backend(*arrays: Array | Record) -> str:
+    """Get the name of the backend used by `arrays`.
+
+    Parameters
+    ----------
+        arrays : dask_awkward.Array or dask_awkward.Record
+            Array or Record collection
+
+    Returns
+    -------
+    str
+        The backend name, which is always `"typetracer"` for
+        dask-awkward arrays.
+    """
+    return ak.backend(
+        *[x._meta if isinstance(x, (Array, Record, Scalar)) else x for x in arrays]
+    )

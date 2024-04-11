@@ -18,7 +18,7 @@ from dask_awkward.lib.core import (
     map_partitions,
     partition_compatibility,
 )
-from dask_awkward.lib.describe import fields
+from dask_awkward.lib.describe import backend, fields
 from dask_awkward.lib.inspect import (
     report_necessary_buffers,
     report_necessary_columns,
