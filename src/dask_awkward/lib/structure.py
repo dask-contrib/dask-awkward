@@ -62,6 +62,7 @@ __all__ = (
     "singletons",
     "sort",
     "strings_astype",
+    "to_list",
     "to_packed",
     "to_regular",
     "unflatten",
@@ -689,6 +690,15 @@ def ones_like(
         output_divisions=1,
         attrs=attrs,
     )
+
+
+@borrow_docstring(ak.to_list)
+def to_list(array: Array) -> list:
+    """Return list/dict version of the data
+
+    Unlike most functions, this one requires a compute() of the data.
+    """
+    return array.compute().to_list()
 
 
 @borrow_docstring(ak.to_packed)

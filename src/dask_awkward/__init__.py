@@ -90,6 +90,7 @@ from dask_awkward.lib.structure import (
     singletons,
     sort,
     strings_astype,
+    to_list,
     to_packed,
     to_regular,
     unflatten,

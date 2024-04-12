@@ -458,6 +458,10 @@ def test_to_packed(daa, caa):
     )
 
 
+def test_to_list(daa):
+    assert dak.to_list(daa) == daa.compute().to_list()
+
+
 def test_ravel(daa, caa):
     assert_eq(
         dak.ravel(daa.points.x),
