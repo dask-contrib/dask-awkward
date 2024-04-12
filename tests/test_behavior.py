@@ -65,6 +65,7 @@ def test_distance_behavior(
     daa2 = dak.with_name(daa_p2.points, name="Point", behavior=behaviors)
     caa1 = ak.Array(caa_p1.points, with_name="Point", behavior=behaviors)
     caa2 = ak.Array(caa_p2.points)
+
     assert_eq(daa1.distance(daa2), caa1.distance(caa2))
     assert_eq(np.abs(daa1), np.abs(caa1))
 
