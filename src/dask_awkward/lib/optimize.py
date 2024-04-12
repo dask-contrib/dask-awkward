@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import copy
 import logging
-import warnings
 from collections.abc import Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
@@ -11,14 +9,12 @@ from awkward.typetracer import touch_data
 from dask.blockwise import fuse_roots, optimize_blockwise
 from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
-from dask.local import get_sync
 
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardInputLayer
 from dask_awkward.lib.utils import typetracer_nochecks
 from dask_awkward.utils import first
 
 if TYPE_CHECKING:
-    from awkward._nplikes.typetracer import TypeTracerReport
     from dask.typing import Key
 
 log = logging.getLogger(__name__)
@@ -105,8 +101,14 @@ def optimize_columns(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelGraph
 
     """
     dsk2 = dsk.layers.copy()
+
+    lays = {_[0] for _ in keys if isinstance(_, tuple)}
+    for l in lays:
+        1
     for k, lay in dsk.layers.items():
-        if not isinstance(lay, AwkwardInputLayer):
+        if not isinstance(lay, AwkwardInputLayer) or not hasattr(
+            lay.io_func, "_column_report"
+        ):
             continue
         rep = lay.io_func._column_report
         cols = rep.data_touched_in(dsk.layers)
@@ -214,7 +216,7 @@ def rewrite_layer_chains(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelG
     for chain in chains:
         # inputs are the inputs of chain[0]
         # outputs are the outputs of chain[-1]
-        # .dsk is composed from the .dsk of each layer
+        # .dsk is composed of the .dsk of each layer
         outkey = chain[-1]
         layer0 = dsk.layers[chain[0]]
         outlayer = layers[outkey]

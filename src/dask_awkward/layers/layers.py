@@ -160,6 +160,7 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
 
     def project(self, columns: list[str]) -> AwkwardInputLayer:
         assert self.is_projectable
+        breakpoint()
         io_func = self.io_func.project(columns)
         return AwkwardInputLayer(
             name=self.name,

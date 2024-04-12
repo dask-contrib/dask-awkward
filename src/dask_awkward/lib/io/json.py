@@ -74,7 +74,15 @@ class FromJsonFn(ColumnProjectionMixin):
             and self.schema is None
         )
 
-    def project_columns(self, columns):
+    def project(self, columns: list[str]):
+        # transform buffer names to JSON columns
+        columns = {
+            c.replace(".content", "")
+            .replace("-offsets", "")
+            .replace("-data", "")
+            .replace("-index", "")
+            for c in columns
+        }
         form = self.form.select_columns(columns)
         assert form is not None
         schema = layout_to_jsonschema(form.length_zero_array(highlevel=False))
