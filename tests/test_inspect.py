@@ -10,68 +10,6 @@ import dask_awkward as dak
 test_uproot_path = Path(__file__).parent / "test-uproot"
 
 
-def test_report_necessary_buffers(
-    daa: dak.Array, tmpdir_factory: pytest.TempdirFactory
-) -> None:
-    z = daa.points.x + daa.points.y
-    for k, v in dak.report_necessary_buffers(z).items():
-        assert v == (
-            frozenset(
-                {
-                    "@.points-offsets",
-                    "@.points.content.y-data",
-                    "@.points.content.x-data",
-                }
-            ),
-            frozenset(),
-        )
-
-    w = dak.to_parquet(
-        daa.points.x, str(Path(tmpdir_factory.mktemp("pq")) / "out"), compute=False
-    )
-    for k, v in dak.report_necessary_buffers(w).items():
-        assert v == (
-            frozenset({"@.points-offsets", "@.points.content.x-data"}),
-            frozenset(),
-        )
-
-    q = {"z": z, "w": w}
-    for k, v in dak.report_necessary_buffers(q).items():
-        assert v == (
-            frozenset(
-                {
-                    "@.points-offsets",
-                    "@.points.content.x-data",
-                    "@.points.content.y-data",
-                }
-            ),
-            frozenset(),
-        )
-
-    z = dak.zeros_like(daa.points.x)
-    for k, v in dak.report_necessary_buffers(z).items():
-        assert v == (
-            frozenset({"@.points-offsets"}),
-            frozenset({"@.points.content.x-data"}),
-        )
-
-
-def test_report_necessary_columns(daa: dak.Array) -> None:
-    result = dak.min(daa.points.x, axis=1)
-    rep = dak.report_necessary_columns(result)
-    for k, v in rep.items():
-        assert v is not None
-        assert sorted(["points.x"]) == sorted(v)
-
-    result = dak.zeros_like(daa.points.y)
-    rep = dak.report_necessary_columns(result)
-    for k, v in rep.items():
-        assert v is not None
-        points, coord = list(v)[0].split(".")
-        assert points == "points"
-        assert coord in ["x", "y"]
-
-
 def test_visualize_works(daa):
     query = daa.points.x
 

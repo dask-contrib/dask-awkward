@@ -425,6 +425,8 @@ def from_dask_array(
         concatenate=True,
     )
     layer = AwkwardBlockwiseLayer.from_blockwise(layer)
+    layer.meta = meta
+    meta._report = set()
     hlg = HighLevelGraph.from_collections(name, layer, dependencies=[array])
     if np.any(np.isnan(array.chunks)):
         return new_array_object(
@@ -636,7 +638,7 @@ def from_map(
         array_meta._report = {
             report
         }  # column tracking report, not failure report, below
-    # If we know the meta, we can spoof mocking
+        # If we know the meta, we can spoof mocking
     elif meta is not None:
         io_func = IOFunctionWithMocking(meta, func)
         array_meta = meta
@@ -646,6 +648,7 @@ def from_map(
         array_meta = None
 
     dsk = AwkwardInputLayer(name=name, inputs=inputs, io_func=io_func)
+    dsk.meta = array_meta
 
     hlg = HighLevelGraph.from_collections(name, dsk)
     if divisions is not None:

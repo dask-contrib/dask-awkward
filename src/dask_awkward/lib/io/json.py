@@ -81,6 +81,7 @@ class FromJsonFn(ColumnProjectionMixin):
             .replace("-offsets", "")
             .replace("-data", "")
             .replace("-index", "")
+            .replace("-mask", "")
             for c in columns
         }
         form = self.form.select_columns(columns)

@@ -7,7 +7,7 @@ import awkward as ak
 from awkward import Array as AwkwardArray
 from awkward.forms import Form
 
-from dask_awkward.layers.layers import BackendT, ImplementsNecessaryColumns
+from dask_awkward.layers.layers import BackendT
 from dask_awkward.lib.utils import FormStructure
 
 if TYPE_CHECKING:
@@ -15,28 +15,8 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-T = TypeVar("T")
 
-
-class ImplementsColumnProjectionMixin(ImplementsNecessaryColumns, Protocol):
-    @property
-    def form(self) -> Form: ...
-
-    @property
-    def behavior(self) -> dict | None: ...
-
-    @property
-    def attrs(self) -> dict | None: ...
-
-    def project_columns(self: T, columns: frozenset[str]) -> T: ...
-
-    def __call__(self, *args, **kwargs): ...
-
-
-S = TypeVar("S", bound=ImplementsColumnProjectionMixin)
-
-
-class ColumnProjectionMixin(ImplementsNecessaryColumns[FormStructure]):
+class ColumnProjectionMixin:
     """A mixin to add column-centric buffer projection to an IO function.
 
     Classes that inherit from this mixin are assumed to be able to read at the

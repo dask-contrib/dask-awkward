@@ -104,29 +104,46 @@ def optimize_columns(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelGraph
 
     lays = {_[0] for _ in keys if isinstance(_, tuple)}
     for l in lays:
-        1
+        if hasattr(dsk.layers[l], "meta"):
+            touch_data(dsk.layers[l].meta)
+            [_.commit("output") for _ in getattr(dsk.layers[l].meta, "_report", ())]
+
+    # this loop is necessary_columns
+    all_layers = tuple(dsk.layers) + ("output",)
     for k, lay in dsk.layers.items():
         if not isinstance(lay, AwkwardInputLayer) or not hasattr(
             lay.io_func, "_column_report"
         ):
             continue
+        all_cols = lay.meta.layout.form.columns()
         rep = lay.io_func._column_report
-        cols = rep.data_touched_in(dsk.layers)
+        cols = set()
+        for l in all_layers:
+            # this loop not required after next ak release
+            try:
+                cols |= set(rep.data_touched_in((l,)))
+                for col in rep.shape_touched_in((l,)):
+                    if col in cols or any(_.startswith(col) for _ in cols):
+                        # loopy loop?
+                        continue
+                    col2 = (
+                        col[2:]
+                        .replace(".content", "")
+                        .replace("-offsets", "")
+                        .replace("-data", "")
+                        .replace("-index", "")
+                        .replace("-mask", "")
+                    )
+                    ll = list(_ for _ in all_cols if _.startswith(col2))
+                    if ll:
+                        cols.add("@." + ll[0])
+
+            except KeyError:
+                pass
         new_lay = lay.project([c.replace("@.", "") for c in cols])
         dsk2[k] = new_lay
 
     return HighLevelGraph(dsk2, dsk.dependencies)
-
-
-def necessary_columns(dsk, keys):
-    out = {}
-    for k, lay in dsk.layers.items():
-        if not isinstance(lay, AwkwardInputLayer):
-            continue
-        rep = lay.io_func._column_report
-        cols = rep.data_touched_in(dsk.layers)
-        out[k] = lay.project([c.replace("@.", "") for c in cols])
-    return out
 
 
 def rewrite_layer_chains(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelGraph:

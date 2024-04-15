@@ -34,6 +34,7 @@ class AwkwardBlockwiseLayer(Blockwise):
         # Indicator that this layer has been serialised
         state = self.__dict__.copy()
         state["has_been_unpickled"] = True
+        state.pop("meta")  # this is a typetracer
         return state
 
     def __repr__(self) -> str:
@@ -58,12 +59,6 @@ class ImplementsReport(ImplementsIOFunction, Protocol):
 
 class ImplementsProjection(Protocol[T]):
     def project(self, columns: list[str]) -> ImplementsIOFunction: ...
-
-
-class ImplementsNecessaryColumns(ImplementsProjection[T], Protocol):
-    def necessary_columns(
-        self, report: TypeTracerReport, state: T
-    ) -> frozenset[str]: ...
 
 
 class IOFunctionWithMocking(ImplementsIOFunction):
@@ -148,19 +143,10 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         return f"AwkwardInputLayer<{self.output}>"
 
     @property
-    def is_projectable(self) -> bool:
-        # isinstance(self.io_func, ImplementsProjection)
-        return (
-            io_func_implements_projection(self.io_func) and not self.has_been_unpickled
-        )
-
-    @property
     def is_columnar(self) -> bool:
         return io_func_implements_columnar(self.io_func)
 
     def project(self, columns: list[str]) -> AwkwardInputLayer:
-        assert self.is_projectable
-        breakpoint()
         io_func = self.io_func.project(columns)
         return AwkwardInputLayer(
             name=self.name,

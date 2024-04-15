@@ -19,13 +19,9 @@ from dask_awkward.lib.core import (
     partition_compatibility,
 )
 from dask_awkward.lib.describe import fields
-from dask_awkward.lib.inspect import (
-    report_necessary_buffers,
-    report_necessary_columns,
-    sample,
-)
+from dask_awkward.lib.inspect import sample
 
-necessary_columns = report_necessary_columns  # Export for backwards compatibility.
+necessary_columns = None  # TODO
 
 from dask_awkward.lib.io.io import (
     from_awkward,

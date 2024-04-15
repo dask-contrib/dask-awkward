@@ -734,6 +734,7 @@ class Record(Scalar):
                 dependencies=[self],
             )
             new_meta._report = report
+            hlg.layers[new_name].meta = new_meta
             return new_array_object(hlg, new_name, meta=new_meta, npartitions=1)
 
         # then check for scalar (or record) type
@@ -745,6 +746,7 @@ class Record(Scalar):
         )
         if isinstance(new_meta, ak.Record):
             new_meta._report = report
+            hlg.layers[new_name].meta = new_meta
             return new_record_object(hlg, new_name, meta=new_meta)
         else:
             return new_scalar_object(hlg, new_name, meta=new_meta)
@@ -1523,9 +1525,14 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 raise RuntimeError("Lists containing integers are not supported.")
 
         if isinstance(where, tuple):
-            return self._getitem_tuple(where)
-
-        return self._getitem_single(where)
+            out = self._getitem_tuple(where)
+        else:
+            out = self._getitem_single(where)
+        if self.report:
+            [_.commit(out.name) for _ in self.report]
+            out._meta._report = self._meta._report
+        out.dask.layers[out.name].meta = out._meta
+        return out
 
     def _is_method_heuristic(self, resolved: Any) -> bool:
         return callable(resolved)
@@ -1960,16 +1967,20 @@ def _map_partitions(
 
         if meta is None:
             meta = map_meta(fn, *args, **kwargs)
+        else:
+            # To do any touching??
+            map_meta(fn, *args, **kwargs)
 
         reps = set()
-        for dep in to_meta(deps):
-            rep = getattr(dep, "_report", None)
-            if rep:
-                [_.commit(name) for _ in rep]
-                [reps.add(_) for _ in rep]
+        for dep in deps:
+            rep = getattr(dep, "report", None)
+            if isinstance(rep, set):
+                for _ in rep:
+                    _.commit(name)
+                    reps.add(_)
 
         meta._report = reps
-
+        lay.meta = meta
         hlg = HighLevelGraph.from_collections(
             name,
             lay,
@@ -2295,13 +2306,13 @@ def non_trivial_reduction(
     )
 
     graph = HighLevelGraph.from_collections(name_finalize, trl, dependencies=(chunked,))
-    [_.commit(name_finalize) for _ in array.report]
     meta = reducer(
         array._meta,
         axis=axis,
         keepdims=keepdims,
         mask_identity=mask_identity,
     )
+    [_.commit(name_finalize) for _ in array.report]
     if isinstance(meta, ak.highlevel.Array):
         meta._report = array.report
         return new_array_object(graph, name_finalize, meta=meta, npartitions=1)

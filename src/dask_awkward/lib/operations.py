@@ -124,6 +124,7 @@ def concatenate(
 
         hlg = HighLevelGraph.from_collections(name, aml, dependencies=arrays)
         meta_no_report._report = report
+        aml.meta = meta_no_report
         return new_array_object(
             hlg,
             name,
