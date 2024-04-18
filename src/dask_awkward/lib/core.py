@@ -27,6 +27,7 @@ from awkward.typetracer import (
     TypeTracerArray,
     create_unknown_scalar,
     is_unknown_scalar,
+    touch_data,
 )
 from dask.base import (
     DaskMethodsMixin,
@@ -1965,11 +1966,18 @@ def _map_partitions(
             **kwargs,
         )
 
-        if meta is None:
-            meta = map_meta(fn, *args, **kwargs)
-        else:
-            # To do any touching??
-            map_meta(fn, *args, **kwargs)
+        try:
+            if meta is None:
+                meta = map_meta(fn, *args, **kwargs)
+            else:
+                # To do any touching??
+                map_meta(fn, *args, **kwargs)
+        except (AssertionError, TypeError, NotImplementedError):
+            [
+                touch_data(_)
+                for _ in args
+                if isinstance(_, ak.Array) and ak.backend(_) == "typetracer"
+            ]
 
         reps = set()
         for dep in deps:

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast, overload
 import awkward as ak
 import dask
 from awkward.forms.form import Form
+from awkward.typetracer import touch_data
 from dask.base import tokenize
 from dask.blockwise import BlockIndex
 from dask.core import flatten
@@ -778,6 +779,8 @@ def to_json(
     map_res.dask.layers[map_res.name].annotations = {"ak_output": True}
     name = f"to-json-{tokenize(array, path)}"
     dsk = {(name, 0): (lambda *_: None, map_res.__dask_keys__())}
+    touch_data(array._meta)
+    [_.commit(name) for _ in array.report]
     graph = HighLevelGraph.from_collections(
         name,
         AwkwardMaterializedLayer(dsk, previous_layer_names=[map_res.name]),

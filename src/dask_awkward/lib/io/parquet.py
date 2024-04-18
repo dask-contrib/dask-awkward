@@ -12,6 +12,7 @@ import awkward as ak
 import awkward.operations.ak_from_parquet as ak_from_parquet
 import dask
 from awkward.forms.form import Form
+from awkward.typetracer import touch_data
 from dask.base import tokenize
 from dask.blockwise import BlockIndex
 from dask.highlevelgraph import HighLevelGraph
@@ -689,6 +690,8 @@ def to_parquet(
         AwkwardMaterializedLayer(dsk, previous_layer_names=[map_res.name]),
         dependencies=[map_res],
     )
+    touch_data(array._meta)
+    [_.commit(name) for _ in array.report]
     out = new_scalar_object(graph, final_name, dtype="f8")
     if compute:
         out.compute()

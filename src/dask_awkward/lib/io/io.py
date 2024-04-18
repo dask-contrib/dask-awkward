@@ -648,7 +648,6 @@ def from_map(
         array_meta = None
 
     dsk = AwkwardInputLayer(name=name, inputs=inputs, io_func=io_func)
-    dsk.meta = array_meta
 
     hlg = HighLevelGraph.from_collections(name, dsk)
     if divisions is not None:
@@ -657,6 +656,7 @@ def from_map(
         result = new_array_object(
             hlg, name, meta=array_meta, npartitions=len(inputs), **kw
         )
+    dsk.meta = result._meta
 
     if io_func_implements_report(io_func):
         if cast(ImplementsReport, io_func).return_report:
