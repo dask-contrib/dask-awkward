@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable, Mapping, Sequence
-from typing import TYPE_CHECKING, Any, cast
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, Any
 
 import dask.config
 from awkward.typetracer import touch_data
+from dask.base import tokenize
 from dask.blockwise import fuse_roots, optimize_blockwise
 from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
@@ -103,13 +104,16 @@ def optimize_columns(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelGraph
     dsk2 = dsk.layers.copy()
 
     lays = {_[0] for _ in keys if isinstance(_, tuple)}
-    for l in lays:
-        if hasattr(dsk.layers[l], "meta"):
-            touch_data(dsk.layers[l].meta)
-            [_.commit("output") for _ in getattr(dsk.layers[l].meta, "_report", ())]
+    all_reps = set()
+    for ln in lays:
+        if hasattr(dsk.layers[ln], "meta"):
+            touch_data(dsk.layers[ln].meta)
+            all_reps.update(getattr(dsk.layers[ln].meta, "_report", ()))
+    name = tokenize("output", lays)
+    [_.commit(name) for _ in all_reps]
 
     # this loop is necessary_columns
-    all_layers = tuple(dsk.layers) + ("output",)
+    all_layers = tuple(dsk.layers) + (name,)
     for k, lay in dsk.layers.items():
         if not isinstance(lay, AwkwardInputLayer) or not hasattr(
             lay.io_func, "_column_report"
@@ -118,11 +122,11 @@ def optimize_columns(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelGraph
         all_cols = lay.meta.layout.form.columns()
         rep = lay.io_func._column_report
         cols = set()
-        for l in all_layers:
+        for ln in all_layers:
             # this loop not required after next ak release
             try:
-                cols |= set(rep.data_touched_in((l,)))
-                for col in rep.shape_touched_in((l,)):
+                cols |= set(rep.data_touched_in((ln,)))
+                for col in rep.shape_touched_in((ln,)):
                     if col in cols or any(_.startswith(col) for _ in cols):
                         # loopy loop?
                         continue

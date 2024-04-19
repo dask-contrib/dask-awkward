@@ -388,10 +388,6 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
         return (Scalar, (self.dask, self.name, None, self.dtype, self.known_value))
 
     @property
-    def report(self):
-        return getattr(self._meta, "_report", set())
-
-    @property
     def dask(self) -> HighLevelGraph:
         return self._dask
 
@@ -1973,19 +1969,14 @@ def _map_partitions(
                 # To do any touching??
                 map_meta(fn, *args, **kwargs)
         except (AssertionError, TypeError, NotImplementedError):
-            [
-                touch_data(_)
-                for _ in args
-                if isinstance(_, ak.Array) and ak.backend(_) == "typetracer"
-            ]
+            [touch_data(_._meta) for _ in dak_arrays]
 
         reps = set()
-        for dep in deps:
-            rep = getattr(dep, "report", None)
-            if isinstance(rep, set):
-                for _ in rep:
-                    _.commit(name)
-                    reps.add(_)
+        for dep in dak_arrays:
+            for rep in dep.report:
+                if rep not in reps:
+                    rep.commit(name)
+                    reps.add(rep)
 
         meta._report = reps
         lay.meta = meta

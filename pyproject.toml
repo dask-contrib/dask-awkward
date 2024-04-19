@@ -164,5 +164,5 @@ omit = [
 source = ["src/"]
 
 [tool.ruff]
-ignore = ["E501", "E402"]
-per-file-ignores = {"__init__.py" = ["E402", "F401"]}
+lint.ignore = ["E501", "E402"]
+lint.per-file-ignores = {"__init__.py" = ["E402", "F401"]}

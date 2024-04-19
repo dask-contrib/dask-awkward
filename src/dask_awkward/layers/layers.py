@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import copy
 from collections.abc import Callable, Mapping
-from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeVar, Union
 
 from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
 from dask.highlevelgraph import MaterializedLayer
@@ -13,7 +12,6 @@ from dask_awkward.utils import LazyInputsDict
 
 if TYPE_CHECKING:
     from awkward import Array as AwkwardArray
-    from awkward._nplikes.typetracer import TypeTracerReport
 
 
 BackendT: TypeAlias = Union[Literal["cpu"], Literal["jax"], Literal["cuda"]]
@@ -34,7 +32,7 @@ class AwkwardBlockwiseLayer(Blockwise):
         # Indicator that this layer has been serialised
         state = self.__dict__.copy()
         state["has_been_unpickled"] = True
-        state.pop("meta")  # this is a typetracer
+        state.pop("meta", None)  # this is a typetracer
         return state
 
     def __repr__(self) -> str:

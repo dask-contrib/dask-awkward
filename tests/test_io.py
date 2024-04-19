@@ -360,14 +360,14 @@ def test_from_map_random_fail_from_lists():
         many,
         meta=typetracer_array(ak.Array(many[0])),
         divisions=divs,
-        label="from-lists",
+        label="from-lists01",
     )
     assert len(array.compute()) < (len(single) * len(many))
 
     computed_report = report.compute()
 
     # we expect the 'args' field in the report to be empty if the
-    # from_map node succeded; so we use ak.num(..., axis=1) to filter
+    # from_map node succeeded; so we use ak.num(..., axis=1) to filter
     # those out.
     succ = ak.num(computed_report["args"], axis=1) == 0
     fail = np.invert(succ)
@@ -382,7 +382,7 @@ def test_from_map_random_fail_from_lists():
             many,
             meta=typetracer_array(ak.Array(many[0])),
             divisions=divs,
-            label="from-lists",
+            label="from-lists02",
         )
         array.compute()
 
@@ -392,7 +392,7 @@ def test_from_map_random_fail_from_lists():
             many,
             meta=typetracer_array(ak.Array(many[0])),
             divisions=divs,
-            label="from-lists",
+            label="from-lists03",
         )
         cast(dak.Array, array).compute()
 
