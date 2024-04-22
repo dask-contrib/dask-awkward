@@ -18,7 +18,7 @@ from dask_awkward.lib.core import (
     map_partitions,
     partition_compatibility,
 )
-from dask_awkward.lib.describe import fields
+from dask_awkward.lib.describe import backend, fields
 from dask_awkward.lib.inspect import sample
 from dask_awkward.lib.io.io import (
     from_awkward,
@@ -84,6 +84,7 @@ from dask_awkward.lib.structure import (
     singletons,
     sort,
     strings_astype,
+    to_list,
     to_packed,
     to_regular,
     unflatten,
