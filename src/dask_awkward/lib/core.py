@@ -719,8 +719,8 @@ class Record(Scalar):
         token = tokenize(self, where)
         new_name = f"{where}-{token}"
         report = self.report
-        [_.commit(new_name) for _ in report]
         new_meta = self._meta[where]
+        [_.commit(new_name) for _ in report]
 
         # first check for array type return
         if isinstance(new_meta, ak.Array):

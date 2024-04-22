@@ -111,10 +111,30 @@ def optimize_columns(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelGraph
             all_reps.update(getattr(dsk.layers[ln].meta, "_report", ()))
     name = tokenize("output", lays)
     [_.commit(name) for _ in all_reps]
+    all_layers = tuple(dsk.layers) + (name,)
+
+    for k, lay, cols in _optimize_columns(dsk.layers, all_layers):
+        new_lay = lay.project(cols)
+        dsk2[k] = new_lay
+
+    return HighLevelGraph(dsk2, dsk.dependencies)
+
+
+def _buf_to_col(s):
+    return (
+        s[2:]
+        .replace(".content", "")
+        .replace("-offsets", "")
+        .replace("-data", "")
+        .replace("-index", "")
+        .replace("-mask", "")
+    )
+
+
+def _optimize_columns(dsk, all_layers):
 
     # this loop is necessary_columns
-    all_layers = tuple(dsk.layers) + (name,)
-    for k, lay in dsk.layers.items():
+    for k, lay in dsk.copy().items():
         if not isinstance(lay, AwkwardInputLayer) or not hasattr(
             lay.io_func, "_column_report"
         ):
@@ -125,29 +145,38 @@ def optimize_columns(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelGraph
         for ln in all_layers:
             # this loop not required after next ak release
             try:
-                cols |= set(rep.data_touched_in((ln,)))
-                for col in rep.shape_touched_in((ln,)):
-                    if col in cols or any(_.startswith(col) for _ in cols):
-                        # loopy loop?
+                cols |= {_buf_to_col(s) for s in rep.data_touched_in((ln,))}
+                for col in (_buf_to_col(s) for s in rep.shape_touched_in((ln,))):
+                    if col in cols:
                         continue
-                    col2 = (
-                        col[2:]
-                        .replace(".content", "")
-                        .replace("-offsets", "")
-                        .replace("-data", "")
-                        .replace("-index", "")
-                        .replace("-mask", "")
-                    )
-                    ll = list(_ for _ in all_cols if _.startswith(col2))
+                    if any(_.startswith(col) for _ in cols):
+                        continue
+                    ll = list(_ for _ in all_cols if _.startswith(col))
                     if ll:
-                        cols.add("@." + ll[0])
+                        cols.add(ll[0])
 
             except KeyError:
                 pass
-        new_lay = lay.project([c.replace("@.", "") for c in cols])
-        dsk2[k] = new_lay
+        yield k, lay, cols
 
-    return HighLevelGraph(dsk2, dsk.dependencies)
+
+def necessary_columns(*args):
+    dsk = {}
+    all_reps = set()
+    all_layers = set()
+    for arg in args:
+        dsk.update(arg.dask.layers)
+        all_layers.add(arg.name)
+        touch_data(arg._meta)
+        all_reps.update(getattr(arg.dask.layers[arg.name].meta, "_report", ()))
+    name = tokenize("output", args)
+    [_.commit(name) for _ in all_reps]
+    all_layers = tuple(all_layers) + (name,)
+
+    out = {}
+    for k, _, cols in _optimize_columns(dsk, all_layers):
+        out[k] = cols
+    return out
 
 
 def rewrite_layer_chains(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelGraph:
