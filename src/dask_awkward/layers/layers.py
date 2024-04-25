@@ -29,8 +29,8 @@ class AwkwardBlockwiseLayer(Blockwise):
         return ob
 
     def __getstate__(self) -> dict:
-        # Indicator that this layer has been serialised
         state = self.__dict__.copy()
+        # Indicator that this layer has been serialised
         state["has_been_unpickled"] = True
         state.pop("meta", None)  # this is a typetracer
         return state

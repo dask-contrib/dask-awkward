@@ -523,6 +523,7 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
                 meta = op(self._meta, other._meta)
             else:
                 meta = op(self._meta, other)
+            [_.commit(name) for _ in self.report]
             return new_scalar_object(graph, name, meta=meta)
 
         return f
@@ -1173,11 +1174,13 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         name = f"partitions-{token}"
         new_keys = self.keys_array[index].tolist()
         dsk = {(name, i): tuple(key) for i, key in enumerate(new_keys)}
+        layer = AwkwardMaterializedLayer(dsk, previous_layer_names=[self.name])
         graph = HighLevelGraph.from_collections(
             name,
-            AwkwardMaterializedLayer(dsk, previous_layer_names=[self.name]),
+            layer,
             dependencies=(self,),
         )
+        layer.meta = self._meta
 
         # if a single partition was requested we trivially know the new divisions.
         if len(raw) == 1 and isinstance(raw[0], int) and self.known_divisions:

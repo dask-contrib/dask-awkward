@@ -178,3 +178,15 @@ def typetracer_nochecks():
         TypeTracerArray.runtime_typechecks = oldval
     else:
         del TypeTracerArray.runtime_typechecks
+
+
+def _buf_to_col(s):
+    return (
+        s[2:]
+        .replace("content.", "")
+        .replace("-offsets", "")
+        .replace("-data", "")
+        .replace("-index", "")
+        .replace("-mask", "")
+        .replace("-tags", "")
+    )

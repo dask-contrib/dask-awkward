@@ -336,6 +336,7 @@ def copy(array: Array) -> Array:
     # dask-awkward's copy is metadata-only
     old_meta = array._meta
     new_meta = ak.Array(old_meta.layout, behavior=deepcopy(old_meta._behavior))
+    new_meta._report = old_meta._report
 
     return Array(
         array._dask,

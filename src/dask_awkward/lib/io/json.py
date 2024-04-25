@@ -32,6 +32,7 @@ from dask_awkward.lib.io.io import (
     _BytesReadingInstructions,
     from_map,
 )
+from dask_awkward.lib.utils import _buf_to_col
 
 if TYPE_CHECKING:
     from awkward.contents.content import Content
@@ -76,16 +77,8 @@ class FromJsonFn(ColumnProjectionMixin):
         )
 
     def project(self, columns: list[str]):
-        # transform buffer names to JSON columns
-        columns = {
-            c.replace(".content", "")
-            .replace("-offsets", "")
-            .replace("-data", "")
-            .replace("-index", "")
-            .replace("-mask", "")
-            for c in columns
-        }
-        form = self.form.select_columns(columns)
+        cols = [_buf_to_col(s) for s in columns]
+        form = self.form.select_columns(cols)
         assert form is not None
         schema = layout_to_jsonschema(form.length_zero_array(highlevel=False))
 

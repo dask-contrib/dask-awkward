@@ -1,17 +1,10 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Protocol, TypeVar, cast
 
 import awkward as ak
-from awkward import Array as AwkwardArray
-from awkward.forms import Form
 
 from dask_awkward.layers.layers import BackendT
-from dask_awkward.lib.utils import FormStructure
-
-if TYPE_CHECKING:
-    from awkward._nplikes.typetracer import TypeTracerReport
 
 log = logging.getLogger(__name__)
 
@@ -25,10 +18,13 @@ class ColumnProjectionMixin:
     when only metadata buffers are required.
     """
 
-    def mock_empty(self: S, backend: BackendT = "cpu") -> AwkwardArray:
+    def project(self, *args, **kwargs):
+        # default implementation does nothing
+        return self
+
+    def mock_empty(self, backend: BackendT = "cpu"):
         # used by failure report generation
-        return cast(
-            AwkwardArray,
+        return (
             ak.to_backend(
                 self.form.length_zero_array(highlevel=False, behavior=self.behavior),
                 backend,

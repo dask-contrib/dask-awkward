@@ -434,7 +434,7 @@ def test_from_awkward_necessary_columns(caa):
     caa = ak.with_name(caa.points, name="Point", behavior=behavior)
     daa = dak.from_awkward(caa, npartitions=2, behavior=behavior)
     assert_eq(caa.xsq, daa.xsq)
-    assert set(first(dak.necessary_columns(daa.xsq).items())[1]) == {"x"}
-    assert set(first(dak.necessary_columns(daa).items())[1]) == {"x", "y"}
-    assert set(first(dak.necessary_columns(np.abs(daa)).items())[1]) == {"x", "y"}
+    assert set(first(dak.necessary_columns(daa.xsq).values())) == {"x"}
+    assert set(first(dak.necessary_columns(daa).values())) == {"x", "y"}
+    assert set(first(dak.necessary_columns(np.abs(daa)).values())) == {"x", "y"}
     assert_eq(np.abs(caa), np.abs(daa))

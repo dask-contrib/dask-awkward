@@ -12,7 +12,7 @@ from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
 
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardInputLayer
-from dask_awkward.lib.utils import typetracer_nochecks
+from dask_awkward.lib.utils import _buf_to_col, typetracer_nochecks
 from dask_awkward.utils import first
 
 if TYPE_CHECKING:
@@ -106,9 +106,12 @@ def optimize_columns(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelGraph
     lays = {_[0] for _ in keys if isinstance(_, tuple)}
     all_reps = set()
     for ln in lays:
-        if hasattr(dsk.layers[ln], "meta"):
+        if ln in dsk.layers and hasattr(dsk.layers[ln], "meta"):
             touch_data(dsk.layers[ln].meta)
             all_reps.update(getattr(dsk.layers[ln].meta, "_report", ()))
+            print()
+            print(ln)
+            print(getattr(dsk.layers[ln].meta, "_report", ()), all_reps)
     name = tokenize("output", lays)
     [_.commit(name) for _ in all_reps]
     all_layers = tuple(dsk.layers) + (name,)
@@ -120,17 +123,6 @@ def optimize_columns(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelGraph
     return HighLevelGraph(dsk2, dsk.dependencies)
 
 
-def _buf_to_col(s):
-    return (
-        s[2:]
-        .replace(".content", "")
-        .replace("-offsets", "")
-        .replace("-data", "")
-        .replace("-index", "")
-        .replace("-mask", "")
-    )
-
-
 def _optimize_columns(dsk, all_layers):
 
     # this loop is necessary_columns
@@ -139,21 +131,21 @@ def _optimize_columns(dsk, all_layers):
             lay.io_func, "_column_report"
         ):
             continue
-        all_cols = lay.meta.layout.form.columns()
         rep = lay.io_func._column_report
         cols = set()
+        # this loop not required after next ak release
         for ln in all_layers:
-            # this loop not required after next ak release
             try:
-                cols |= {_buf_to_col(s) for s in rep.data_touched_in((ln,))}
-                for col in (_buf_to_col(s) for s in rep.shape_touched_in((ln,))):
+                cols.update(rep.data_touched_in((ln,)))
+            except KeyError:
+                pass
+            try:
+                for col in rep.shape_touched_in((ln,)):
                     if col in cols:
                         continue
                     if any(_.startswith(col) for _ in cols):
                         continue
-                    ll = list(_ for _ in all_cols if _.startswith(col))
-                    if ll:
-                        cols.add(ll[0])
+                    cols.add(col)
 
             except KeyError:
                 pass
@@ -175,7 +167,9 @@ def necessary_columns(*args):
 
     out = {}
     for k, _, cols in _optimize_columns(dsk, all_layers):
-        out[k] = cols
+        first = (_buf_to_col(s) for s in cols)
+        # remove root "offsets", which appears when computing divisions
+        out[k] = sorted(s for s in first if s and s != "offsets")
     return out
 
 
