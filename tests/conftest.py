@@ -11,6 +11,11 @@ import dask_awkward as dak
 import dask_awkward.lib.testutils as daktu
 
 
+@pytest.fixture(autouse=True)
+def clear_cache():
+    dak.lib.core.dak_cache.clear()
+
+
 @pytest.fixture(scope="session")
 def single_record_file(tmp_path_factory: pytest.TempPathFactory) -> str:
     fname = tmp_path_factory.mktemp("data") / "single_record.json"
