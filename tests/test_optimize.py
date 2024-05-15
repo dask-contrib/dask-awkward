@@ -28,7 +28,7 @@ def test_multiple_computes(ndjson_points_file: str) -> None:
     assert len(things3[1]) < len(things3[0])
 
     things = dask.compute(ds1.points, ds2.points.x, ds2.points.y, ds1.points.y, ds3)
-    assert things[-1].tolist() == ak.Array(lists[0] + lists[1]).tolist()  # type: ignore
+    assert things[-1].tolist() == ak.Array(lists[0] + lists[1]).tolist()
 
 
 def identity(x):
