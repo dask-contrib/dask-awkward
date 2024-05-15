@@ -600,26 +600,20 @@ def mask(
 @borrow_docstring(ak.nan_to_num)
 def nan_to_num(
     array: Array,
-    copy: bool = True,
     nan: float = 0.0,
     posinf: Any | None = None,
     neginf: Any | None = None,
-    highlevel: bool = True,
     behavior: Any | None = None,
-    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
-    # return map_partitions(
-    #     ak.nan_to_num,
-    #     array,
-    #     output_partitions=1,
-    #     copy=copy,
-    #     nan=nan,
-    #     posinf=posinf,
-    #     neginf=neginf,
-    #     highlevel=highlevel,
-    #     behavior=behavior,
-    # )
-    raise DaskAwkwardNotImplemented("TODO")
+    return map_partitions(
+        ak.nan_to_num,
+        array,
+        nan=nan,
+        posinf=posinf,
+        neginf=neginf,
+        highlevel=True,
+        behavior=behavior,
+    )
 
 
 def _numaxis0(*integers):
