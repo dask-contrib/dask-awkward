@@ -157,6 +157,15 @@ def test_drop_none(axis: int) -> None:
     assert_eq(d, e)
 
 
+def test_nan_to_num():
+    a = [[1, 2, np.nan], [], [np.nan], [5, 6, 7, np.nan], [1, 2], np.nan]
+    b = [[np.nan, 2, 1], [np.nan], [], np.nan, [7, 6, np.nan, 5], [np.nan, np.nan]]
+    c = dak.from_lists([a, b])
+    d = dak.nan_to_num(c, nan=5)
+    e = ak.nan_to_num(ak.from_iter(a + b), nan=5)
+    assert_eq(d, e)
+
+
 @pytest.mark.parametrize("axis", [0, 1, -1])
 def test_is_none(axis: int) -> None:
     a: list[Any] = [[1, 2, None], None, None, [], [None], [5, 6, 7, None], [1, 2], None]
