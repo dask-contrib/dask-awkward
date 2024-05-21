@@ -143,11 +143,12 @@ def test_optimization_runs_on_multiple_collections_gh430(tmp_path_factory):
         return j.x + k.x
 
     a_compute = something(a, b)
+    print()
     nc1 = dak.necessary_columns(a_compute)
-    assert sorted(list(nc1.items())[0][1]) == ["points.x"]
+    assert list(nc1.values())[0] == ["points.x"]
 
-    nc2 = dak.necessary_columns(a_compute, (a, b))
-    assert sorted(list(nc2.items())[0][1]) == ["points.x", "points.y", "points.z"]
+    nc2 = dak.necessary_columns(a_compute, a, b)
+    assert list(nc2.items())[0][1] == ["points.x", "points.y", "points.z"]
 
     x, (y, z) = dask.compute(a_compute, (a, b))
     assert str(x)

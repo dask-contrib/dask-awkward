@@ -2314,6 +2314,7 @@ def non_trivial_reduction(
         keepdims=keepdims,
         mask_identity=mask_identity,
     )
+    trl.meta = meta
     [_.commit(name_finalize) for _ in array.report]
     if isinstance(meta, ak.highlevel.Array):
         meta._report = array.report

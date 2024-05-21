@@ -704,11 +704,12 @@ def from_map(
             rep_graph = HighLevelGraph.from_collections(
                 rep_trl_name, rep_trl, dependencies=[rep_part]
             )
+            rep_trl.meta = empty_typetracer()
 
             rep = new_array_object(
                 rep_graph,
                 rep_trl_name,
-                meta=empty_typetracer(),
+                meta=rep_trl.meta,
                 npartitions=len(rep_trl.output_partitions),
             )
 

@@ -937,8 +937,11 @@ def _array_with_rebuilt_meta(
         behavior = array._meta.behavior
 
     new_meta = ak.Array(array._meta, behavior=behavior, attrs=attrs)
+    new_meta._report = array.report
+    out = Array(array.dask, array.name, new_meta, array.divisions)
+    [_.commit(out.name) for _ in array.report]
 
-    return Array(array.dask, array.name, new_meta, array.divisions)
+    return out
 
 
 @borrow_docstring(ak.unzip)

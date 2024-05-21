@@ -109,9 +109,6 @@ def optimize_columns(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelGraph
         if ln in dsk.layers and hasattr(dsk.layers[ln], "meta"):
             touch_data(dsk.layers[ln].meta)
             all_reps.update(getattr(dsk.layers[ln].meta, "_report", ()))
-            print()
-            print(ln)
-            print(getattr(dsk.layers[ln].meta, "_report", ()), all_reps)
     name = tokenize("output", lays)
     [_.commit(name) for _ in all_reps]
     all_layers = tuple(dsk.layers) + (name,)
@@ -141,10 +138,6 @@ def _optimize_columns(dsk, all_layers):
                 pass
             try:
                 for col in rep.shape_touched_in((ln,)):
-                    if col in cols:
-                        continue
-                    if any(_.startswith(col) for _ in cols):
-                        continue
                     cols.add(col)
 
             except KeyError:
@@ -158,7 +151,7 @@ def necessary_columns(*args):
     all_layers = set()
     for arg in args:
         dsk.update(arg.dask.layers)
-        all_layers.add(arg.name)
+        all_layers.update(arg.dask.layers)
         touch_data(arg._meta)
         all_reps.update(getattr(arg.dask.layers[arg.name].meta, "_report", ()))
     name = tokenize("output", args)
@@ -169,7 +162,13 @@ def necessary_columns(*args):
     for k, _, cols in _optimize_columns(dsk, all_layers):
         first = (_buf_to_col(s) for s in cols)
         # remove root "offsets", which appears when computing divisions
-        out[k] = sorted(s for s in first if s and s != "offsets")
+        second = {s for s in first if s and s != "offsets"}
+        # remove columns that have sub-columns also in the set
+        for c in second.copy():
+            if "." in c:
+                parent = c.rsplit(".", 1)[0]
+                second.discard(parent)
+        out[k] = sorted(second)
     return out
 
 
