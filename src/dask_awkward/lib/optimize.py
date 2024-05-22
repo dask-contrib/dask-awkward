@@ -4,6 +4,7 @@ import logging
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
+import awkward as ak
 import dask.config
 from awkward.typetracer import touch_data
 from dask.base import tokenize
@@ -107,8 +108,14 @@ def optimize_columns(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelGraph
     all_reps = set()
     for ln in lays:
         if ln in dsk.layers and hasattr(dsk.layers[ln], "meta"):
-            touch_data(dsk.layers[ln].meta)
-            all_reps.update(getattr(dsk.layers[ln].meta, "_report", ()))
+            m = dsk.layers[ln].meta
+            if not isinstance(m, ak._nplikes.typetracer.MaybeNone):
+                # maybenone cases should already have been all touched
+                # but we could extract the .content here
+                touch_data(m)
+            rep = getattr(dsk.layers[ln].meta, "_report", ())
+            if rep:
+                all_reps.update(rep)
     name = tokenize("output", lays)
     [_.commit(name) for _ in all_reps]
     all_layers = tuple(dsk.layers) + (name,)
@@ -153,7 +160,9 @@ def necessary_columns(*args):
         dsk.update(arg.dask.layers)
         all_layers.update(arg.dask.layers)
         touch_data(arg._meta)
-        all_reps.update(getattr(arg.dask.layers[arg.name].meta, "_report", ()))
+        rep = getattr(arg.dask.layers[arg.name].meta, "_report", ())
+        if rep:
+            all_reps.update(rep)
     name = tokenize("output", args)
     [_.commit(name) for _ in all_reps]
     all_layers = tuple(all_layers) + (name,)
