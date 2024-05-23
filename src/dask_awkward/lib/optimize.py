@@ -128,8 +128,6 @@ def optimize_columns(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelGraph
 
 
 def _optimize_columns(dsk, all_layers):
-
-    # this loop is necessary_columns
     for k, lay in dsk.copy().items():
         if not isinstance(lay, AwkwardInputLayer) or not hasattr(
             lay.io_func, "_column_report"
@@ -144,9 +142,7 @@ def _optimize_columns(dsk, all_layers):
             except KeyError:
                 pass
             try:
-                for col in rep.shape_touched_in((ln,)):
-                    cols.add(col)
-
+                cols.update(rep.shape_touched_in((ln,)))
             except KeyError:
                 pass
         yield k, lay, cols
@@ -159,10 +155,11 @@ def necessary_columns(*args):
     for arg in args:
         dsk.update(arg.dask.layers)
         all_layers.update(arg.dask.layers)
-        touch_data(arg._meta)
-        rep = getattr(arg.dask.layers[arg.name].meta, "_report", ())
-        if rep:
-            all_reps.update(rep)
+        if hasattr(arg, "_meta"):  # isinstance(, (dak.Scalar, dak.Array)?
+            touch_data(arg._meta)
+            rep = getattr(arg.dask.layers[arg.name].meta, "_report", ())
+            if rep:
+                all_reps.update(rep)
     name = tokenize("output", args)
     [_.commit(name) for _ in all_reps]
     all_layers = tuple(all_layers) + (name,)

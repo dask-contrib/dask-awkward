@@ -1859,10 +1859,12 @@ def partitionwise_layer(
     """
     pairs: list[Any] = []
     numblocks: dict[str, tuple[int, ...]] = {}
+    reps = set()
     for arg in args:
         if isinstance(arg, Array):
             pairs.extend([arg.name, "i"])
             numblocks[arg.name] = (arg.npartitions,)
+            reps.update(arg.report)
         elif isinstance(arg, BlockwiseDep):
             if len(arg.numblocks) == 1:
                 pairs.extend([arg, "i"])
@@ -1882,6 +1884,8 @@ def partitionwise_layer(
             )
         else:
             pairs.extend([arg, None])
+    [_.commit(name) for _ in reps]
+
     layer = dask_blockwise(
         func,
         name,
