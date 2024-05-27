@@ -13,7 +13,7 @@ from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
 
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardInputLayer
-from dask_awkward.lib.utils import _buf_to_col, typetracer_nochecks
+from dask_awkward.lib.utils import _buf_to_col, commit_to_reports, typetracer_nochecks
 from dask_awkward.utils import first
 
 if TYPE_CHECKING:
@@ -117,7 +117,7 @@ def optimize_columns(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelGraph
             if rep:
                 all_reps.update(rep)
     name = tokenize("output", lays)
-    [_.commit(name) for _ in all_reps]
+    commit_to_reports(name, all_reps)
     all_layers = tuple(dsk.layers) + (name,)
 
     for k, lay, cols in _optimize_columns(dsk.layers, all_layers):

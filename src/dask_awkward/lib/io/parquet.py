@@ -24,7 +24,7 @@ from dask_awkward.lib.core import Array, Scalar, map_partitions, new_scalar_obje
 from dask_awkward.lib.io.columnar import ColumnProjectionMixin
 from dask_awkward.lib.io.io import from_map
 from dask_awkward.lib.unproject_layout import unproject_layout
-from dask_awkward.lib.utils import _buf_to_col
+from dask_awkward.lib.utils import _buf_to_col, commit_to_reports
 
 if TYPE_CHECKING:
     pass
@@ -694,7 +694,7 @@ def to_parquet(
         dependencies=[map_res],
     )
     touch_data(array._meta)
-    [_.commit(name) for _ in array.report]
+    commit_to_reports(name, array.report)
     out = new_scalar_object(graph, final_name, dtype="f8")
     if compute:
         out.compute()

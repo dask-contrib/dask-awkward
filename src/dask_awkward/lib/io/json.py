@@ -32,7 +32,7 @@ from dask_awkward.lib.io.io import (
     _BytesReadingInstructions,
     from_map,
 )
-from dask_awkward.lib.utils import _buf_to_col
+from dask_awkward.lib.utils import _buf_to_col, commit_to_reports
 
 if TYPE_CHECKING:
     from awkward.contents.content import Content
@@ -773,7 +773,7 @@ def to_json(
     name = f"to-json-{tokenize(array, path)}"
     dsk = {(name, 0): (lambda *_: None, map_res.__dask_keys__())}
     touch_data(array._meta)
-    [_.commit(name) for _ in array.report]
+    commit_to_reports(name, array.report)
     graph = HighLevelGraph.from_collections(
         name,
         AwkwardMaterializedLayer(dsk, previous_layer_names=[map_res.name]),

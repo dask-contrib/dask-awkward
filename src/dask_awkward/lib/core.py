@@ -48,6 +48,7 @@ from dask.utils import funcname, is_arraylike, key_split
 
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardMaterializedLayer
 from dask_awkward.lib.optimize import all_optimizations
+from dask_awkward.lib.utils import commit_to_reports
 from dask_awkward.utils import (
     DaskAwkwardNotImplemented,
     IncompatiblePartitions,
@@ -523,7 +524,7 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
                 meta = op(self._meta, other._meta)
             else:
                 meta = op(self._meta, other)
-            [_.commit(name) for _ in self.report]
+            commit_to_reports(name, self.report)
             return new_scalar_object(graph, name, meta=meta)
 
         return f
@@ -721,7 +722,7 @@ class Record(Scalar):
         new_name = f"{where}-{token}"
         report = self.report
         new_meta = self._meta[where]
-        [_.commit(new_name) for _ in report]
+        commit_to_reports(new_name, report)
 
         # first check for array type return
         if isinstance(new_meta, ak.Array):
@@ -988,7 +989,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         new_graph = HighLevelGraph.from_collections(
             key, new_layer, dependencies=(self,)
         )
-        [_.commit(key) for _ in self.report]
+        commit_to_reports(key, self.report)
         return new_array_object(
             new_graph,
             key,
@@ -1192,7 +1193,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         # otherwise nullify the known divisions
         else:
             new_divisions = (None,) * (len(new_keys) + 1)  # type: ignore
-        [_.commit(name) for _ in self.report]
+        commit_to_reports(name, self.report)
         return new_array_object(
             graph, name, meta=self._meta, divisions=tuple(new_divisions)
         )
@@ -1414,7 +1415,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             AwkwardMaterializedLayer(dask, previous_layer_names=[self.name]),
             dependencies=[self],
         )
-        [_.commit(name) for _ in self.report]
+        commit_to_reports(name, self.report)
         return new_array_object(
             hlg,
             name,
@@ -1529,7 +1530,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         else:
             out = self._getitem_single(where)
         if self.report:
-            [_.commit(out.name) for _ in self.report]
+            commit_to_reports(out.name, self.report)
             out._meta._report = self._meta._report
         out.dask.layers[out.name].meta = out._meta
         return out
@@ -1884,7 +1885,7 @@ def partitionwise_layer(
             )
         else:
             pairs.extend([arg, None])
-    [_.commit(name) for _ in reps]
+    commit_to_reports(name, reps)
 
     layer = dask_blockwise(
         func,
@@ -2319,7 +2320,7 @@ def non_trivial_reduction(
         mask_identity=mask_identity,
     )
     trl.meta = meta
-    [_.commit(name_finalize) for _ in array.report]
+    commit_to_reports(name_finalize, array.report)
     if isinstance(meta, ak.highlevel.Array):
         meta._report = array.report
         return new_array_object(graph, name_finalize, meta=meta, npartitions=1)

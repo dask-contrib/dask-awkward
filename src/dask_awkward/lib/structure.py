@@ -24,6 +24,7 @@ from dask_awkward.lib.core import (
     new_scalar_object,
     partition_compatibility,
 )
+from dask_awkward.lib.utils import commit_to_reports
 from dask_awkward.utils import (
     DaskAwkwardNotImplemented,
     IncompatiblePartitions,
@@ -939,8 +940,7 @@ def _array_with_rebuilt_meta(
     new_meta = ak.Array(array._meta, behavior=behavior, attrs=attrs)
     new_meta._report = array.report
     out = Array(array.dask, array.name, new_meta, array.divisions)
-    [_.commit(out.name) for _ in array.report]
-
+    commit_to_reports(out.name, array.report)
     return out
 
 
