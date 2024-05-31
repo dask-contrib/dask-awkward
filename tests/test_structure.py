@@ -212,26 +212,35 @@ def test_pad_none(axis: int, target: int) -> None:
 
 
 def test_with_field(caa: ak.Array, daa: dak.Array) -> None:
-    assert_eq(
-        ak.with_field(caa["points"], caa["points"]["x"], where="xx"),
-        dak.with_field(daa["points"], daa["points"]["x"], where="xx"),
-    )
+    new_caa = ak.with_field(caa["points"], caa["points"]["x"], where="xx")
+    new_daa = dak.with_field(daa["points"], daa["points"]["x"], where="xx")
+    assert_eq(new_caa, new_daa)
+    assert_eq(ak.without_field(new_caa, "xx"), ak.without_field(new_daa, "xx"))
 
-    assert_eq(
-        ak.with_field(caa["points"], 1, where="xx"),
-        dak.with_field(daa["points"], 1, where="xx"),
-    )
+    new_caa = ak.with_field(caa["points"], 1, where="xx")
+    new_daa = dak.with_field(daa["points"], 1, where="xx")
+    assert_eq(new_caa, new_daa)
+    assert_eq(ak.without_field(new_caa, "xx"), ak.without_field(new_daa, "xx"))
 
-    assert_eq(
-        ak.with_field(caa["points"], 1.0, where="xx"),
-        dak.with_field(daa["points"], 1.0, where="xx"),
-    )
+    new_caa = ak.with_field(caa["points"], 1.0, where="xx")
+    new_daa = dak.with_field(daa["points"], 1.0, where="xx")
+    assert_eq(new_caa, new_daa)
+    assert_eq(ak.without_field(new_caa, "xx"), ak.without_field(new_daa, "xx"))
 
     with pytest.raises(
         ValueError,
         match="Base argument in with_field must be a dask_awkward.Array",
     ):
         _ = dak.with_field([{"foo": 1.0}, {"foo": 2.0}], daa.points.x, where="x")
+
+    with pytest.raises(
+        ValueError,
+        match="Base argument in without_field must be a dask_awkward.Array",
+    ):
+        _ = dak.without_field(
+            [{"foo": [1.0, 2.0], "bar": [3.0, 4.0]}],
+            "bar",
+        )
 
     with pytest.raises(
         ValueError,
