@@ -86,6 +86,7 @@ from dask_awkward.lib.structure import (
     with_field,
     with_name,
     with_parameter,
+    without_field,
     without_parameters,
     zeros_like,
     zip,

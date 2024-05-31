@@ -70,6 +70,7 @@ __all__ = (
     "values_astype",
     "where",
     "with_field",
+    "without_field",
     "with_name",
     "with_parameter",
     "without_parameters",
@@ -1079,6 +1080,46 @@ def with_field(
         base,
         what,
         label="with-field",
+        output_divisions=1,
+    )
+
+
+class _WithoutFieldFn:
+    def __init__(
+        self,
+        highlevel: bool,
+        behavior: Mapping | None = None,
+        attrs: Mapping[str, Any] | None = None,
+    ) -> None:
+        self.highlevel = highlevel
+        self.behavior = behavior
+        self.attrs = attrs
+
+    def __call__(self, array: ak.Array, where: str) -> ak.Array:
+        return ak.without_field(
+            array, where=where, behavior=self.behavior, attrs=self.attrs
+        )
+
+
+@borrow_docstring(ak.without_field)
+def without_field(
+    base: Array,
+    where: str,
+    highlevel: bool = True,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
+) -> Array:
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
+    if not isinstance(base, Array):
+        raise ValueError("Base argument in without_field must be a dask_awkward.Array")
+
+    return map_partitions(
+        _WithoutFieldFn(highlevel=highlevel, behavior=behavior, attrs=attrs),
+        base,
+        where,
+        label="without-field",
         output_divisions=1,
     )
 
