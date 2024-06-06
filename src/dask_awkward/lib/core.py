@@ -1970,24 +1970,24 @@ def _map_partitions(
             **kwargs,
         )
 
+        reps = set()
         try:
             if meta is None:
                 meta = map_meta(fn, *args, **kwargs)
             else:
                 # To do any touching??
                 map_meta(fn, *args, **kwargs)
+            meta._report = reps
+            lay.meta = meta
         except (AssertionError, TypeError, NotImplementedError):
             [touch_data(_._meta) for _ in dak_arrays]
 
-        reps = set()
         for dep in dak_arrays:
             for rep in dep.report:
                 if rep not in reps:
                     rep.commit(name)
                     reps.add(rep)
 
-        meta._report = reps
-        lay.meta = meta
         hlg = HighLevelGraph.from_collections(
             name,
             lay,
