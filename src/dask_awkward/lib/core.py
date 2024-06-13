@@ -942,29 +942,75 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         npartitions: int | None = None,
         divisions: tuple[int, ...] | None = None,
         rows_per_partition: int | None = None,
+        one_to_n: int | None = None,
+        n_to_one: int | None = None,
     ) -> Array:
+        """Restructure the partitioning of the whole array
+
+        Various schemes are possible, with one of the mutually exclusive
+        optional arguments for each. Of these, the first three require
+        knowledge of the number of rows in each existing partition, which
+        will be eagerly computed if not already known, and some shuffling of
+        data between partitions.
+
+        - npartitions: split all the rows as evenly as possible into this
+          many output partitions.
+        - divisions: exact row count offsets of each output partition
+        - rows_per_partition: each partition will have this many rows,
+          except the last, which will have this number or fewer
+        - one_to_n: each input partition becomes n output partitions
+        - n_to_one: every n adjacent input partitions becomes one
+          output partition. Note that exactly one output partition
+          (npartitions=1) is a special case of this.
+        """
         from dask_awkward.layers import AwkwardMaterializedLayer
-        from dask_awkward.lib.structure import repartition_layer
+        from dask_awkward.lib.structure import (
+            repartition_layer,
+            simple_repartition_layer,
+        )
 
-        if sum(bool(_) for _ in [npartitions, divisions, rows_per_partition]) != 1:
+        if (
+            sum(
+                bool(_)
+                for _ in (
+                    npartitions,
+                    divisions,
+                    rows_per_partition,
+                    one_to_n,
+                    n_to_one,
+                )
+            )
+            != 1
+        ):
             raise ValueError("Please specify exactly one of the inputs")
-        if not self.known_divisions:
-            self.eager_compute_divisions()
-        nrows = self.defined_divisions[-1]
-        new_divisions: tuple[int, ...] = tuple()
-        if divisions:
-            new_divisions = divisions
-        elif npartitions:
-            rows_per_partition = math.ceil(nrows / npartitions)
-        if rows_per_partition:
-            new_divs = list(range(0, nrows, rows_per_partition))
-            new_divs.append(nrows)
-            new_divisions = tuple(new_divs)
+        new_divisions: tuple[int, ...] = ()
+        if npartitions and npartitions == 1:
+            npartitions, n_to_one = None, self.npartitions
+        if n_to_one or one_to_n:
+            token = tokenize(self, n_to_one, one_to_n)
+            key = f"repartition-{token}"
+            new_layer_raw, new_divisions = simple_repartition_layer(
+                self, n_to_one, one_to_n, key
+            )
+        else:
+            if not self.known_divisions:
+                self.eager_compute_divisions()
+            nrows = self.defined_divisions[-1]
+            if divisions:
+                if divisions == self.divisions:
+                    # noop
+                    return self
+                new_divisions = divisions
+            elif npartitions:
+                rows_per_partition = math.ceil(nrows / npartitions)
+            if rows_per_partition:
+                new_divs = list(range(0, nrows, rows_per_partition))
+                new_divs.append(nrows)
+                new_divisions = tuple(new_divs)
+            token = tokenize(self, divisions)
+            key = f"repartition-{token}"
+            new_layer_raw = repartition_layer(self, key, new_divisions)
 
-        token = tokenize(self, divisions)
-        key = f"repartition-{token}"
-
-        new_layer_raw = repartition_layer(self, key, new_divisions)
         new_layer = AwkwardMaterializedLayer(
             new_layer_raw,
             previous_layer_names=[self.name],

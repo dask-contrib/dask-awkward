@@ -1350,6 +1350,49 @@ def repartition_layer(arr: Array, key: str, divisions: tuple[int, ...]) -> dict:
     return layer
 
 
+def _subpart(data: ak.Array, parts: int, part: int) -> ak.Array:
+    from dask_awkward.lib.core import is_typetracer
+
+    if is_typetracer(data):
+        return data
+    rows_per = len(data) // parts
+    return data[
+        part * rows_per : None if part == (parts - 1) else (part + 1) * rows_per
+    ]
+
+
+def _subcat(*arrs: tuple[ak.Array, ...]) -> ak.Array:
+    return ak.concatenate(arrs)
+
+
+def simple_repartition_layer(
+    arr: Array, n_to_one: int | None, one_to_n: int | None, key: str
+) -> tuple[dict, tuple[Any, ...]]:
+    layer: dict[tuple[str, int], tuple[Any, ...]] = {}
+    new_divisions: tuple[Any, ...]
+    if n_to_one:
+        for i in range(0, arr.npartitions, n_to_one):
+            layer[(key, i)] = (_subcat,) + tuple(
+                (arr.name, part)
+                for part in range(i, min(i + n_to_one, arr.npartitions))
+            )
+        new_divisions = arr.divisions[::n_to_one]
+    elif one_to_n:
+        for i in range(arr.npartitions):
+            for part in range(one_to_n):
+                layer[(key, (i * one_to_n + part))] = (
+                    _subpart,
+                    (arr.name, i),
+                    one_to_n,
+                    part,
+                )
+        # TODO: if arr.known_divisions:
+        new_divisions = (None,) * (arr.npartitions * one_to_n + 1)
+    else:
+        raise ValueError
+    return layer, new_divisions
+
+
 @borrow_docstring(ak.enforce_type)
 def enforce_type(
     array: Array,
