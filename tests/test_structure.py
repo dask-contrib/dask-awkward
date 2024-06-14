@@ -548,6 +548,12 @@ def test_repartition_whole(daa):
     assert_eq(daa, daa1, check_divisions=False)
 
 
+def test_repartition_one_to_n(daa):
+    daa1 = daa.repartition(one_to_n=2)
+    assert daa1.npartitions == daa.npartitions * 2
+    assert_eq(daa, daa1, check_divisions=False)
+
+
 def test_repartition_no_change(daa):
     daa1 = daa.repartition(divisions=(0, 5, 10, 15))
     assert daa1.npartitions == 3
