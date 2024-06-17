@@ -91,24 +91,12 @@ def input_layer_array_partition0(collection: Array) -> ak.Array:
 
     """
     with dask.config.set({"awkward.optimization.which": ["columns"]}):
-        optimized_hlg = dak_optimize(collection.dask, collection.keys)  # type: ignore
-        layers = list(optimized_hlg.layers)  # type: ignore
+        optimized_hlg = dak_optimize(collection.dask, collection.keys)
+        layers = list(optimized_hlg.layers)
         layer_name = [name for name in layers if name.startswith("from-json")][0]
         sgc, arg = optimized_hlg[(layer_name, 0)]
         array = sgc.dsk[layer_name][0](arg)
     return array
-
-
-def test_json_column_projection_off(json_data_dir: Path) -> None:
-    source = os.path.join(str(json_data_dir), "*.json")
-    ds = dak.from_json(source)
-    fields_to_keep = ["name", "goals"]
-
-    ds2 = ds[fields_to_keep]
-    with dask.config.set({"awkward.optimization.columns-opt-formats": []}):
-        array = input_layer_array_partition0(ds2)
-
-    assert array.fields == ["name", "team", "goals"]
 
 
 def test_json_column_projection1(json_data_dir: Path) -> None:

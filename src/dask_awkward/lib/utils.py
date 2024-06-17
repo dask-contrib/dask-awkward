@@ -10,6 +10,7 @@ import awkward as ak
 
 if TYPE_CHECKING:
     from awkward.forms import Form
+    from awkward.typetracer import TypeTracerReport
 
 KNOWN_LENGTH_ATTRIBUTES = frozenset(("mask",))
 UNKNOWN_LENGTH_ATTRIBUTES = frozenset(("offsets", "starts", "stops", "index", "tags"))
@@ -178,3 +179,20 @@ def typetracer_nochecks():
         TypeTracerArray.runtime_typechecks = oldval
     else:
         del TypeTracerArray.runtime_typechecks
+
+
+def commit_to_reports(name: str, reports: Iterable[TypeTracerReport]):
+    for report in reports:
+        report.commit(name)
+
+
+def _buf_to_col(s):
+    return (
+        s[2:]
+        .replace("content.", "")
+        .replace("-offsets", "")
+        .replace("-data", "")
+        .replace("-index", "")
+        .replace("-mask", "")
+        .replace("-tags", "")
+    )

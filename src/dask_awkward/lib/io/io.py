@@ -11,7 +11,7 @@ import awkward as ak
 import dask.config
 import numpy as np
 from awkward.types.numpytype import primitive_to_dtype
-from awkward.typetracer import length_zero_if_typetracer
+from awkward.typetracer import length_zero_if_typetracer, typetracer_with_report
 from dask.base import flatten, tokenize
 from dask.highlevelgraph import HighLevelGraph
 from dask.local import identity
@@ -23,10 +23,8 @@ from dask_awkward.layers.layers import (
     AwkwardInputLayer,
     AwkwardMaterializedLayer,
     AwkwardTreeReductionLayer,
-    ImplementsMocking,
     ImplementsReport,
-    IOFunctionWithMocking,
-    io_func_implements_mocking,
+    io_func_implements_projection,
     io_func_implements_report,
 )
 from dask_awkward.lib.core import (
@@ -37,6 +35,7 @@ from dask_awkward.lib.core import (
     typetracer_array,
 )
 from dask_awkward.lib.io.columnar import ColumnProjectionMixin
+from dask_awkward.lib.utils import form_with_unique_keys, render_buffer_key
 from dask_awkward.utils import first, second
 
 if TYPE_CHECKING:
@@ -133,10 +132,13 @@ def from_awkward(
     )
 
 
-class _FromListsFn:
-    def __init__(self, behavior: Mapping | None, attrs: Mapping[str, Any] | None):
+class _FromListsFn(ColumnProjectionMixin):
+    def __init__(
+        self, behavior: Mapping | None, attrs: Mapping[str, Any] | None, form=None
+    ):
         self.behavior = behavior
         self.attrs = attrs
+        self.form = form
 
     def __call__(self, x: list) -> ak.Array:
         return ak.Array(x, behavior=self.behavior, attrs=self.attrs)
@@ -178,12 +180,13 @@ def from_lists(
     """
     lists = list(source)
     divs = (0, *np.cumsum(list(map(len, lists))))
+    meta = typetracer_array(ak.Array(lists[0], attrs=attrs, behavior=behavior))
     return cast(
         Array,
         from_map(
-            _FromListsFn(behavior=behavior, attrs=attrs),
+            _FromListsFn(behavior=behavior, attrs=attrs, form=meta.layout.form),
             lists,
-            meta=typetracer_array(ak.Array(lists[0], attrs=attrs, behavior=behavior)),
+            meta=meta,
             divisions=divs,
             label="from-lists",
         ),
@@ -425,6 +428,8 @@ def from_dask_array(
         concatenate=True,
     )
     layer = AwkwardBlockwiseLayer.from_blockwise(layer)
+    layer.meta = meta
+    meta._report = set()  # just because we can't project, we shouldn't track?
     hlg = HighLevelGraph.from_collections(name, layer, dependencies=[array])
     if np.any(np.isnan(array.chunks)):
         return new_array_object(
@@ -620,16 +625,34 @@ def from_map(
             packed=packed,
         )
 
-    # Special `io_func` implementations can implement mocking and optionally
-    # support buffer projection.
-    if io_func_implements_mocking(func):
+    kw = {}
+    if io_func_implements_projection(func):
+        # Special `io_func` implementations can do buffer projection - choosing columns
+        # so here we start with a blank report
         io_func = func
-        array_meta = cast(ImplementsMocking, func).mock()
-    # If we know the meta, we can spoof mocking
-    elif meta is not None:
-        io_func = IOFunctionWithMocking(meta, func)
-        array_meta = meta
+        array_meta, report = typetracer_with_report(
+            form_with_unique_keys(io_func.form, "@"),
+            highlevel=True,
+            behavior=io_func.behavior,
+            buffer_key=render_buffer_key,
+        )
+        io_func._column_report = report
+        report.commit(name)
+        # column tracking report, not failure report, below
+        array_meta._report = {report}
     # Without `meta`, the meta will be computed by executing the graph
+    elif meta is not None:
+        # we can still track necessary columns even if we can't project
+        io_func = func
+        array_meta, report = typetracer_with_report(
+            form_with_unique_keys(meta.layout.form, "@"),
+            highlevel=True,
+            behavior=None,
+            buffer_key=render_buffer_key,
+        )
+        report.commit(name)
+        # column tracking report, not failure report, below
+        array_meta._report = {report}
     else:
         io_func = func
         array_meta = None
@@ -638,9 +661,12 @@ def from_map(
 
     hlg = HighLevelGraph.from_collections(name, dsk)
     if divisions is not None:
-        result = new_array_object(hlg, name, meta=array_meta, divisions=divisions)
+        result = new_array_object(hlg, name, meta=array_meta, divisions=divisions, **kw)
     else:
-        result = new_array_object(hlg, name, meta=array_meta, npartitions=len(inputs))
+        result = new_array_object(
+            hlg, name, meta=array_meta, npartitions=len(inputs), **kw
+        )
+    dsk.meta = result._meta
 
     if io_func_implements_report(io_func):
         if cast(ImplementsReport, io_func).return_report:
@@ -678,11 +704,12 @@ def from_map(
             rep_graph = HighLevelGraph.from_collections(
                 rep_trl_name, rep_trl, dependencies=[rep_part]
             )
+            rep_trl.meta = empty_typetracer()
 
             rep = new_array_object(
                 rep_graph,
                 rep_trl_name,
-                meta=empty_typetracer(),
+                meta=rep_trl.meta,
                 npartitions=len(rep_trl.output_partitions),
             )
 

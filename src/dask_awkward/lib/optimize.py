@@ -1,24 +1,22 @@
 from __future__ import annotations
 
-import copy
 import logging
-import warnings
-from collections.abc import Iterable, Mapping, Sequence
-from typing import TYPE_CHECKING, Any, cast
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, Any
 
+import awkward as ak
 import dask.config
 from awkward.typetracer import touch_data
+from dask.base import tokenize
 from dask.blockwise import fuse_roots, optimize_blockwise
 from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
-from dask.local import get_sync
 
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardInputLayer
-from dask_awkward.lib.utils import typetracer_nochecks
+from dask_awkward.lib.utils import _buf_to_col, commit_to_reports, typetracer_nochecks
 from dask_awkward.utils import first
 
 if TYPE_CHECKING:
-    from awkward._nplikes.typetracer import TypeTracerReport
     from dask.typing import Key
 
 log = logging.getLogger(__name__)
@@ -61,8 +59,8 @@ def all_optimizations(dsk: Mapping, keys: Sequence[Key], **_: Any) -> Mapping:
 def optimize(dsk: HighLevelGraph, keys: Sequence[Key], **_: Any) -> Mapping:
     """Run optimizations specific to dask-awkward.
 
-    This is currently limited to determining the necessary columns for
-    input layers.
+    - determine the necessary columns for input layers
+    - fuse linear chains of blockwise operations in linear time
 
     """
     if dask.config.get("awkward.optimization.enabled"):
@@ -73,80 +71,6 @@ def optimize(dsk: HighLevelGraph, keys: Sequence[Key], **_: Any) -> Mapping:
             dsk = rewrite_layer_chains(dsk, keys)
 
     return dsk
-
-
-def _prepare_buffer_projection(
-    dsk: HighLevelGraph, keys: Sequence[Key]
-) -> tuple[dict[str, TypeTracerReport], dict[str, Any]] | None:
-    """Pair layer names with lists of necessary columns."""
-    import awkward as ak
-
-    if not _has_projectable_awkward_io_layer(dsk):
-        return None
-
-    layer_to_projection_state: dict[str, Any] = {}
-    layer_to_reports: dict[str, TypeTracerReport] = {}
-    projection_layers = dict(dsk.layers)
-
-    for name, lay in dsk.layers.items():
-        if isinstance(lay, AwkwardInputLayer):
-            if lay.is_projectable:
-                # Insert mocked array into layers, replacing generation func
-                # Keep track of mocked state
-                (
-                    projection_layers[name],
-                    layer_to_reports[name],
-                    layer_to_projection_state[name],
-                ) = lay.prepare_for_projection()
-            elif lay.is_mockable:
-                projection_layers[name] = lay.mock()
-        elif hasattr(lay, "mock"):
-            projection_layers[name] = lay.mock()
-
-    for name in _ak_output_layer_names(dsk):
-        projection_layers[name] = _mock_output(projection_layers[name])
-
-    hlg = HighLevelGraph(projection_layers, dsk.dependencies)
-
-    minimal_keys: set[Key] = set()
-    for k in keys:
-        if isinstance(k, tuple) and len(k) == 2:
-            minimal_keys.add((k[0], 0))
-        else:
-            minimal_keys.add(k)
-
-    # now we try to compute for each possible output layer key (leaf
-    # node on partition 0); this will cause the typetacer reports to
-    # get correct fields/columns touched. If the result is a record or
-    # an array we of course want to touch all of the data/fields.
-    try:
-        for layer in hlg.layers.values():
-            layer.__dict__.pop("_cached_dict", None)
-        results = get_sync(hlg, list(minimal_keys))
-        for out in results:
-            if isinstance(out, (ak.Array, ak.Record)):
-                touch_data(out)
-    except Exception as err:
-        on_fail = dask.config.get("awkward.optimization.on-fail")
-        # this is the default, throw a warning but skip the optimization.
-        if on_fail == "warn":
-            warnings.warn(
-                COLUMN_OPT_FAILED_WARNING_MSG.format(exception=type(err), message=err)
-            )
-        # option "pass" means do not throw warning but skip the optimization.
-        elif on_fail == "pass":
-            log.debug("Column projection optimization failed; optimization skipped.")
-        # option "raise" to raise the exception here
-        elif on_fail == "raise":
-            raise
-        else:
-            raise ValueError(
-                f"Invalid awkward.optimization.on-fail option: {on_fail}.\n"
-                "Valid options are 'warn', 'pass', or 'raise'."
-            )
-        return None
-    else:
-        return layer_to_reports, layer_to_projection_state
 
 
 def optimize_columns(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelGraph:
@@ -178,70 +102,80 @@ def optimize_columns(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelGraph
         New, optimized task graph with column-projected ``AwkwardInputLayer``.
 
     """
-    projection_data = _prepare_buffer_projection(dsk, keys)
-    if projection_data is None:
-        return dsk
+    dsk2 = dsk.layers.copy()
 
-    # Unpack result
-    layer_to_reports, layer_to_projection_state = projection_data
+    lays = {_[0] for _ in keys if isinstance(_, tuple)}
+    all_reps = set()
+    for ln in lays:
+        if ln in dsk.layers and hasattr(dsk.layers[ln], "meta"):
+            m = dsk.layers[ln].meta
+            if not isinstance(m, ak._nplikes.typetracer.MaybeNone):
+                # maybenone cases should already have been all touched
+                # but we could extract the .content here
+                touch_data(m)
+            rep = getattr(dsk.layers[ln].meta, "_report", ())
+            if rep:
+                all_reps.update(rep)
+    name = tokenize("output", lays)
+    commit_to_reports(name, all_reps)
+    all_layers = tuple(dsk.layers) + (name,)
 
-    # Project layers using projection state
-    layers = dict(dsk.layers)
-    for name, state in layer_to_projection_state.items():
-        layers[name] = cast(AwkwardInputLayer, layers[name]).project(
-            report=layer_to_reports[name], state=state
-        )
+    for k, lay, cols in _optimize_columns(dsk.layers, all_layers):
+        new_lay = lay.project(cols)
+        dsk2[k] = new_lay
 
-    return HighLevelGraph(layers, dsk.dependencies)
-
-
-def _layers_with_annotation(dsk: HighLevelGraph, key: str) -> list[str]:
-    return [n for n, v in dsk.layers.items() if (v.annotations or {}).get(key)]
-
-
-def _ak_output_layer_names(dsk: HighLevelGraph) -> list[str]:
-    """Get a list output layer names.
-
-    Output layer names are annotated with 'ak_output'.
-
-    Parameters
-    ----------
-    dsk : HighLevelGraph
-        Graph of interest.
-
-    Returns
-    -------
-    list[str]
-        Names of the output layers.
-
-    """
-    return _layers_with_annotation(dsk, "ak_output")
+    return HighLevelGraph(dsk2, dsk.dependencies)
 
 
-def _has_projectable_awkward_io_layer(dsk: HighLevelGraph) -> bool:
-    """Check if a graph at least one AwkwardInputLayer that is project-able."""
-    for _, v in dsk.layers.items():
-        if isinstance(v, AwkwardInputLayer) and v.is_projectable:
-            return True
-    return False
+def _optimize_columns(dsk, all_layers):
+    for k, lay in dsk.copy().items():
+        if not isinstance(lay, AwkwardInputLayer) or not hasattr(
+            lay.io_func, "_column_report"
+        ):
+            continue
+        rep = lay.io_func._column_report
+        cols = set()
+        # this loop not required after next ak release
+        for ln in all_layers:
+            try:
+                cols.update(rep.data_touched_in((ln,)))
+            except KeyError:
+                pass
+            try:
+                cols.update(rep.shape_touched_in((ln,)))
+            except KeyError:
+                pass
+        yield k, lay, cols
 
 
-def _touch_all_data(*args, **kwargs):
-    """Mock writing an ak.Array to disk by touching data buffers."""
-    for arg in args + tuple(kwargs.values()):
-        touch_data(arg)
+def necessary_columns(*args):
+    dsk = {}
+    all_reps = set()
+    all_layers = set()
+    for arg in args:
+        dsk.update(arg.dask.layers)
+        all_layers.update(arg.dask.layers)
+        if hasattr(arg, "_meta"):  # isinstance(, (dak.Scalar, dak.Array)?
+            touch_data(arg._meta)
+            rep = getattr(arg.dask.layers[arg.name].meta, "_report", ())
+            if rep:
+                all_reps.update(rep)
+    name = tokenize("output", args)
+    [_.commit(name) for _ in all_reps]
+    all_layers = tuple(all_layers) + (name,)
 
-
-def _mock_output(layer):
-    """Update a layer to run the _touch_all_data."""
-    assert len(layer.dsk) == 1
-
-    new_layer = copy.deepcopy(layer)
-    mp = new_layer.dsk.copy()
-    for k in iter(mp.keys()):
-        mp[k] = (_touch_all_data,) + mp[k][1:]
-    new_layer.dsk = mp
-    return new_layer
+    out = {}
+    for k, _, cols in _optimize_columns(dsk, all_layers):
+        first = (_buf_to_col(s) for s in cols)
+        # remove root "offsets", which appears when computing divisions
+        second = {s for s in first if s and s != "offsets"}
+        # remove columns that have sub-columns also in the set
+        for c in second.copy():
+            if "." in c:
+                parent = c.rsplit(".", 1)[0]
+                second.discard(parent)
+        out[k] = sorted(second)
+    return out
 
 
 def rewrite_layer_chains(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelGraph:
@@ -331,7 +265,7 @@ def rewrite_layer_chains(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelG
     for chain in chains:
         # inputs are the inputs of chain[0]
         # outputs are the outputs of chain[-1]
-        # .dsk is composed from the .dsk of each layer
+        # .dsk is composed of the .dsk of each layer
         outkey = chain[-1]
         layer0 = dsk.layers[chain[0]]
         outlayer = layers[outkey]
@@ -389,9 +323,3 @@ def _recursive_replace(args, layer, parent, indices):
         else:
             args2.append(arg)
     return args2
-
-
-def _buffer_keys_for_layer(
-    buffer_keys: Iterable[str], known_buffer_keys: frozenset[str]
-) -> set[str]:
-    return {k for k in buffer_keys if k in known_buffer_keys}

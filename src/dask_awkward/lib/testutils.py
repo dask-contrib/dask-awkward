@@ -7,7 +7,6 @@ from typing import Any
 
 import awkward as ak
 import numpy as np
-from awkward.typetracer import typetracer_from_form
 from dask.base import is_dask_collection
 from packaging.version import Version
 
@@ -293,9 +292,6 @@ class RandomFailFromListsFn:
                 return self.mock_empty(), self.make_fail_report(err, *args, **kwargs)
 
         return self.read_fn(*args, **kwargs)
-
-    def mock(self):
-        return typetracer_from_form(self.form)
 
     def mock_empty(self, backend="cpu"):
         return ak.to_backend(

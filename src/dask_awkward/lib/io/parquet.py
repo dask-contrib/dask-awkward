@@ -12,6 +12,7 @@ import awkward as ak
 import awkward.operations.ak_from_parquet as ak_from_parquet
 import dask
 from awkward.forms.form import Form
+from awkward.typetracer import touch_data
 from dask.base import tokenize
 from dask.blockwise import BlockIndex
 from dask.highlevelgraph import HighLevelGraph
@@ -23,6 +24,7 @@ from dask_awkward.lib.core import Array, Scalar, map_partitions, new_scalar_obje
 from dask_awkward.lib.io.columnar import ColumnProjectionMixin
 from dask_awkward.lib.io.io import from_map
 from dask_awkward.lib.unproject_layout import unproject_layout
+from dask_awkward.lib.utils import _buf_to_col, commit_to_reports
 
 if TYPE_CHECKING:
     pass
@@ -94,7 +96,7 @@ class FromParquetFn(ColumnProjectionMixin):
     def __call__(self, *args, **kwargs): ...
 
     @abc.abstractmethod
-    def project_columns(self, columns): ...
+    def project(self, columns): ...
 
     @property
     def return_report(self) -> bool:
@@ -176,10 +178,11 @@ class FromParquetFileWiseFn(FromParquetFn):
 
         return self.read_fn(source)
 
-    def project_columns(self, columns):
+    def project(self, columns):
+        cols = [_buf_to_col(s) for s in columns]
         return FromParquetFileWiseFn(
             fs=self.fs,
-            form=self.form.select_columns(columns),
+            form=self.form.select_columns(cols),
             listsep=self.listsep,
             unnamed_root=self.unnamed_root,
             original_form=self.form,
@@ -235,10 +238,11 @@ class FromParquetFragmentWiseFn(FromParquetFn):
             attrs=self.attrs,
         )
 
-    def project_columns(self, columns):
+    def project(self, columns):
+        cols = [_buf_to_col(s) for s in columns]
         return FromParquetFragmentWiseFn(
             fs=self.fs,
-            form=self.form.select_columns(columns),
+            form=self.form.select_columns(cols),
             unnamed_root=self.unnamed_root,
             original_form=self.form,
             report=self.report,
@@ -689,6 +693,8 @@ def to_parquet(
         AwkwardMaterializedLayer(dsk, previous_layer_names=[map_res.name]),
         dependencies=[map_res],
     )
+    touch_data(array._meta)
+    commit_to_reports(name, array.report)
     out = new_scalar_object(graph, final_name, dtype="f8")
     if compute:
         out.compute()
