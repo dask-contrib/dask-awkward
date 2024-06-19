@@ -1421,7 +1421,7 @@ def simple_repartition_layer(
         if arr.npartitions % n_to_one:
             new_divisions = new_divisions + (arr.divisions[-1],)
             layer[(key, i0 + 1)] = (_subcat,) + tuple(
-                (arr.name, part) for part in range(new_divisions[-2], new_divisions[-1])
+                (arr.name, part0) for part0 in range(len(layer), arr.npartitions)
             )
     elif one_to_n:
         for i in range(arr.npartitions):
