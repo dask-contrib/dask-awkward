@@ -554,6 +554,22 @@ def test_repartition_one_to_n(daa):
     assert_eq(daa, daa1, check_divisions=False)
 
 
+def test_repartition_n_to_one():
+    daa = dak.from_lists([[[1, 2, 3], [], [4, 5]]] * 52)
+    daa2 = daa.repartition(n_to_one=52)
+    assert daa2.npartitions == 1
+    assert daa.compute().to_list() == daa2.compute().to_list()
+    daa2 = daa.repartition(n_to_one=53)
+    assert daa2.npartitions == 1
+    assert daa.compute().to_list() == daa2.compute().to_list()
+    daa2 = daa.repartition(n_to_one=2)
+    assert daa2.npartitions == 26
+    assert daa.compute().to_list() == daa2.compute().to_list()
+    daa2 = daa.repartition(n_to_one=10)
+    assert daa2.npartitions == 6
+    assert daa.compute().to_list() == daa2.compute().to_list()
+
+
 def test_repartition_no_change(daa):
     daa1 = daa.repartition(divisions=(0, 5, 10, 15))
     assert daa1.npartitions == 3
