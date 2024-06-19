@@ -1412,12 +1412,17 @@ def simple_repartition_layer(
     layer: dict[tuple[str, int], tuple[Any, ...]] = {}
     new_divisions: tuple[Any, ...]
     if n_to_one:
-        for i in range(0, arr.npartitions, n_to_one):
-            layer[(key, i)] = (_subcat,) + tuple(
+        for i0, i in enumerate(range(0, arr.npartitions, n_to_one)):
+            layer[(key, i0)] = (_subcat,) + tuple(
                 (arr.name, part)
                 for part in range(i, min(i + n_to_one, arr.npartitions))
             )
         new_divisions = arr.divisions[::n_to_one]
+        if arr.npartitions % n_to_one:
+            new_divisions = new_divisions + (arr.divisions[-1],)
+            layer[(key, i0 + 1)] = (_subcat,) + tuple(
+                (arr.name, part) for part in range(new_divisions[-2], new_divisions[-1])
+            )
     elif one_to_n:
         for i in range(arr.npartitions):
             for part in range(one_to_n):
