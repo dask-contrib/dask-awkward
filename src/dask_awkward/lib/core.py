@@ -502,9 +502,17 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
             if is_dask_collection(other):
                 task = (op, self.key, *other.__dask_keys__())
                 deps.append(other)
-                plns.append(other.name)
+                if inv:
+                    plns.insert(0, other.name)
+                else:
+                    plns.append(other.name)
             else:
-                task = (op, self.key, other)
+                if inv:
+                    task = (op, other, self.key)
+                else:
+                    task = (op, self.key, other)
+            if inv:
+                plns.reverse()
             graph = HighLevelGraph.from_collections(
                 name,
                 layer=AwkwardMaterializedLayer(
@@ -514,10 +522,16 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
                 ),
                 dependencies=tuple(deps),
             )
-            if isinstance(other, Scalar):
-                meta = op(self._meta, other._meta)
+            if isinstance(other, (Scalar, Array)):
+                if inv:
+                    meta = op(other._meta, self._meta)
+                else:
+                    meta = op(self._meta, other._meta)
             else:
-                meta = op(self._meta, other)
+                if inv:
+                    meta = op(other, self._meta)
+                else:
+                    meta = op(self._meta, other)
             return new_scalar_object(graph, name, meta=meta)
 
         return f
