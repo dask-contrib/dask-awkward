@@ -565,6 +565,9 @@ def test_repartition_n_to_one():
     daa2 = daa.repartition(n_to_one=2)
     assert daa2.npartitions == 26
     assert daa.compute().to_list() == daa2.compute().to_list()
+    daa2 = daa.repartition(n_to_one=10)
+    assert daa2.npartitions == 6
+    assert daa.compute().to_list() == daa2.compute().to_list()
 
 
 def test_repartition_no_change(daa):
