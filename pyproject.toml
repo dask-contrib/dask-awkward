@@ -112,6 +112,7 @@ src_paths = ["src", "tests"]
 [tool.mypy]
 python_version = "3.9"
 files = ["src"]
+exclude = ["tests/"]
 strict = false
 warn_unused_configs = true
 show_error_codes = true
