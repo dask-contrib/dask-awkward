@@ -555,7 +555,7 @@ def test_repartition_one_to_n(daa):
 
 
 def test_repartition_n_to_one():
-    daa = dak.from_lists([[[1, 2, 3], [], [4, 5]]] * 52)
+    daa = dak.from_lists([[[1, 2, 3], [], [4, 5]] * 2] * 52)
     daa2 = daa.repartition(n_to_one=52)
     assert daa2.npartitions == 1
     assert daa.compute().to_list() == daa2.compute().to_list()
@@ -566,6 +566,9 @@ def test_repartition_n_to_one():
     assert daa2.npartitions == 26
     assert daa.compute().to_list() == daa2.compute().to_list()
     daa2 = daa.repartition(n_to_one=10)
+    assert daa2.npartitions == 6
+    assert daa.compute().to_list() == daa2.compute().to_list()
+    daa._divisions = (None,) * len(daa.divisions)
     assert daa2.npartitions == 6
     assert daa.compute().to_list() == daa2.compute().to_list()
 
