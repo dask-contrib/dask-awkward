@@ -11,7 +11,7 @@ from awkward.typetracer import touch_data
 from dask.blockwise import fuse_roots, optimize_blockwise
 from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
-from dask.local import get_sync
+from dask.threaded import get
 
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardInputLayer
 from dask_awkward.lib.utils import typetracer_nochecks
@@ -122,7 +122,7 @@ def _prepare_buffer_projection(
     try:
         for layer in hlg.layers.values():
             layer.__dict__.pop("_cached_dict", None)
-        results = get_sync(hlg, list(minimal_keys))
+        results = get(hlg, list(minimal_keys))
         for out in results:
             if isinstance(out, (ak.Array, ak.Record)):
                 touch_data(out)
