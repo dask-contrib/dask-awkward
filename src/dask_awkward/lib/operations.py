@@ -87,7 +87,7 @@ def concatenate(
             not m.layout.form.is_equal_to(
                 intended_form, all_parameters=True, form_key=False
             )
-            for m in metas
+            for m in metas_no_report[1:]
         ):
             arrays = [
                 map_partitions(
