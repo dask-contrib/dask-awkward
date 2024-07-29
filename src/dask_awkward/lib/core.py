@@ -895,6 +895,9 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         self._name: str = name
         self._divisions: tuple[int, ...] | tuple[None, ...] = divisions
         self._meta: ak.Array = meta
+        if any(_.shape_touched for _ in self.report):
+            # DIAGNOSTIC - this should never happen
+            breakpoint()
 
     def __dask_graph__(self) -> HighLevelGraph:
         return self.dask
@@ -1960,7 +1963,7 @@ def _map_partitions(
     ]
     dak_arrays = tuple(filter(lambda x: isinstance(x, Array), deps))
 
-    if name in dak_cache:
+    if False:  # name in dak_cache:
         hlg, meta = dak_cache[name]
     else:
         lay = partitionwise_layer(
@@ -2000,6 +2003,12 @@ def _map_partitions(
                 "should be a dask_awkward.Array collection."
             )
         dak_cache[name] = hlg, meta
+    if name in dak_cache:
+        hlg0, meta0 = dak_cache[name]
+        if meta0.layout.form != meta.layout.form:
+            breakpoint()
+        if hlg0 != hlg:
+            breakpoint()
     in_npartitions = dak_arrays[0].npartitions
     in_divisions = dak_arrays[0].divisions
     if output_divisions is not None:
