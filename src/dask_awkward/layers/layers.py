@@ -145,7 +145,10 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         return io_func_implements_columnar(self.io_func)
 
     def project(self, columns: list[str]) -> AwkwardInputLayer:
-        io_func = self.io_func.project(columns)
+        if hasattr(self.io_func, "project"):
+            io_func = self.io_func.project(columns)
+        else:
+            return self
         return AwkwardInputLayer(
             name=self.name,
             inputs=self.inputs,

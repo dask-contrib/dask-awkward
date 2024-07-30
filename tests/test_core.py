@@ -856,6 +856,7 @@ def test_map_partitions_args_and_kwargs_have_collection():
 
 
 def test_dask_array_in_map_partitions(daa, caa):
+    daa.eager_compute_divisions()
     x1 = dak.zeros_like(daa.points.x)
     y1 = da.ones(len(x1), chunks=x1.divisions[1])
     z1 = x1 + y1

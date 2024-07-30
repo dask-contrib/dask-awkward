@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 
 import awkward as ak
 import awkward.operations.ak_from_parquet as ak_from_parquet
-import dask
 from awkward.forms.form import Form
 from awkward.typetracer import touch_data
 from dask.base import tokenize
@@ -101,13 +100,6 @@ class FromParquetFn(ColumnProjectionMixin):
     @property
     def return_report(self) -> bool:
         return self.report
-
-    @property
-    def use_optimization(self) -> bool:
-        return "parquet" in dask.config.get(
-            "awkward.optimization.columns-opt-formats",
-            default=[],
-        )
 
     def __repr__(self) -> str:
         s = (

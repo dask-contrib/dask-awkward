@@ -73,7 +73,9 @@ def optimize(dsk: HighLevelGraph, keys: Sequence[Key], **_: Any) -> Mapping:
     return dsk
 
 
-def optimize_columns(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelGraph:
+def optimize_columns(
+    dsk: HighLevelGraph, keys: Sequence[Key], dryrun=False
+) -> HighLevelGraph:
     """Run column projection optimization.
 
     This optimization determines which columns from an
@@ -120,20 +122,28 @@ def optimize_columns(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelGraph
     commit_to_reports(name, all_reps)
     all_layers = tuple(dsk.layers) + (name,)
 
+    if dryrun:
+        out = {}
     for k, lay, cols in _optimize_columns(dsk.layers, all_layers):
-        new_lay = lay.project(cols)
-        dsk2[k] = new_lay
+        if dryrun:
+            out[k] = cols
+        else:
+            new_lay = lay.project(cols)
+            dsk2[k] = new_lay
+    if dryrun:
+        return out
 
     return HighLevelGraph(dsk2, dsk.dependencies)
 
 
 def _optimize_columns(dsk, all_layers):
     for k, lay in dsk.copy().items():
-        if not isinstance(lay, AwkwardInputLayer) or not hasattr(
-            lay.io_func, "_column_report"
-        ):
+        if not isinstance(lay, AwkwardInputLayer) or not hasattr(lay, "meta"):
             continue
-        rep = lay.io_func._column_report
+        rep = getattr(lay.meta, "_report", None)
+        if not rep:
+            continue
+        rep = first(rep)  # each meta of an IL layer should have just one report
         cols = set()
         # this loop not required after next ak release
         for ln in all_layers:
@@ -145,36 +155,45 @@ def _optimize_columns(dsk, all_layers):
                 cols.update(rep.shape_touched_in((ln,)))
             except KeyError:
                 pass
-        yield k, lay, cols
+        if cols:
+            yield k, lay, cols
 
 
-def necessary_columns(*args):
+def necessary_columns(*args, normalize: bool = True, trim: bool = True):
+    """Find the columns in each input layer that are needed by given collections
+
+    Parameters
+    ----------
+    args: dask-awkward colections or other dask objects baseed on them
+    normalize: if True, will transform the internal buffer-oriented representation
+        to column names similar to the convention used for instance by parquet. The
+        raw representation is the one actually passed to the IO backends during
+        optimization, and includes information about which component of a field
+        is needed (data, offsets, index, etc.)
+    trim: if normalize is True, setting this True will remove parent columns
+
+    Returns
+    -------
+    dict: the keys are the dask names of IO layers contained in the combined graph,
+        and for each there is a set of required columns
+    """
     dsk = {}
-    all_reps = set()
-    all_layers = set()
+    keys = []
     for arg in args:
         dsk.update(arg.dask.layers)
-        all_layers.update(arg.dask.layers)
-        if hasattr(arg, "_meta"):  # isinstance(, (dak.Scalar, dak.Array)?
-            touch_data(arg._meta)
-            rep = getattr(arg.dask.layers[arg.name].meta, "_report", ())
-            if rep:
-                all_reps.update(rep)
-    name = tokenize("output", args)
-    [_.commit(name) for _ in all_reps]
-    all_layers = tuple(all_layers) + (name,)
-
-    out = {}
-    for k, _, cols in _optimize_columns(dsk, all_layers):
-        first = (_buf_to_col(s) for s in cols)
-        # remove root "offsets", which appears when computing divisions
-        second = {s for s in first if s and s != "offsets"}
-        # remove columns that have sub-columns also in the set
-        for c in second.copy():
-            if "." in c:
-                parent = c.rsplit(".", 1)[0]
-                second.discard(parent)
-        out[k] = sorted(second)
+        keys.append((arg.name, 0))
+    hlg = HighLevelGraph(dsk, {})
+    out = optimize_columns(hlg, keys, dryrun=True)
+    if normalize:
+        for k in list(out):
+            # `startswith` to clobber attributes of unnamed root field
+            col1 = {_buf_to_col(_) for _ in out[k] if _.startswith("@.")}
+            if trim:
+                parents = {_.rsplit(".", 1)[0] for _ in col1 if "." in _}
+                out[k] = {_ for _ in col1 if _ not in parents}
+            else:
+                out[k] = col1
+        # TODO: remove columns included in children?
     return out
 
 

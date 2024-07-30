@@ -636,7 +636,6 @@ def from_map(
             behavior=io_func.behavior,
             buffer_key=render_buffer_key,
         )
-        io_func._column_report = report
         report.commit(name)
         # column tracking report, not failure report, below
         array_meta._report = {report}
@@ -670,9 +669,11 @@ def from_map(
 
     if io_func_implements_report(io_func):
         if cast(ImplementsReport, io_func).return_report:
+            # first element of each output tuple is the actual data
             res = result.map_partitions(
-                first, meta=array_meta, label=label, output_divisions=1
+                first, meta=empty_typetracer(), label=label, output_divisions=1
             )
+            res._meta = array_meta
 
             concat_fn = partial(
                 ak.concatenate,
@@ -686,6 +687,8 @@ def from_map(
             rep_trl_name = f"{rep_trl_label}-{rep_trl_token}"
             rep_trl_tree_node_name = f"{rep_trl_label}-tree-node-{rep_trl_token}"
 
+            # second element of each output tuple is the result, which does not
+            # depend on any of the actual data
             rep_part = result.map_partitions(
                 second, meta=empty_typetracer(), label=f"{label}-partitioned-report"
             )

@@ -37,7 +37,7 @@ def test_basic_root_works():
 
     dask.compute(q1_hist)
     columns = list(dak.necessary_columns(q1_hist).values())[0]
-    assert columns == ["MET_pt"]
+    assert columns == {"MET_pt"}
 
 
 def test_sample(daa):
