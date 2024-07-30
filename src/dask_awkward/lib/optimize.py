@@ -250,7 +250,8 @@ def rewrite_layer_chains(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelG
             len(children) == 1
             and dsk.dependencies[first(children)] == {current_layer_key}
             and isinstance(dsk.layers[first(children)], AwkwardBlockwiseLayer)
-            and len(dsk.layers[current_layer_key]) == len(dsk.layers[first(children)])
+            and len(dsk.layers[current_layer_key])
+            == len(dsk.layers[first(children)])  # SLOW?!
             and current_layer_key not in required_layers
         ):
             # walk forwards
