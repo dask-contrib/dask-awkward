@@ -115,7 +115,7 @@ def test_len(ndjson_points_file: str) -> None:
         assert len(daa) == 10
     daa.eager_compute_divisions()
     assert daa.known_divisions
-    assert len(daa) == 10  # type: ignore
+    assert len(daa) == 10
 
 
 def test_meta_exists(daa: Array) -> None:
@@ -157,7 +157,7 @@ def test_partitions_divisions(ndjson_points_file: str) -> None:
     assert not t1.known_divisions
     t2 = daa.partitions[1]
     assert t2.known_divisions
-    assert t2.divisions == (0, divs[2] - divs[1])  # type: ignore
+    assert t2.divisions == (0, divs[2] - divs[1])
 
 
 def test_array_rebuild(ndjson_points_file: str) -> None:
@@ -384,13 +384,13 @@ def test_to_meta(daa: Array) -> None:
 
 def test_record_str(daa: Array) -> None:
     r = daa[0]
-    assert type(r) == dak.Record
+    assert isinstance(r, dak.Record)
     assert str(r) == "dask.awkward<getitem, type=Record>"
 
 
 def test_record_to_delayed(daa: Array) -> None:
     r = daa[0]
-    assert type(r) == dak.Record
+    assert isinstance(r, dak.Record)
     d = r.to_delayed()
     x = r.compute().tolist()
     y = d.compute().tolist()
@@ -399,7 +399,7 @@ def test_record_to_delayed(daa: Array) -> None:
 
 def test_record_fields(daa: Array) -> None:
     r = daa[0]
-    assert type(r) == dak.Record
+    assert isinstance(r, dak.Record)
     r._meta = None
     with pytest.raises(TypeError, match="metadata is missing"):
         assert not r.fields
@@ -407,7 +407,7 @@ def test_record_fields(daa: Array) -> None:
 
 def test_record_dir(daa: Array) -> None:
     r = daa["points"][0][0]
-    assert type(r) == dak.Record
+    assert isinstance(r, dak.Record)
     d = dir(r)
     for f in r.fields:
         assert f in d
@@ -418,7 +418,7 @@ def test_record_dir(daa: Array) -> None:
 #     import pickle
 
 #     r = daa[0]
-#     assert type(r) == dak.Record
+#     assert isinstance(r, dak.Record)
 #     assert isinstance(r._meta, ak.Record)
 
 #     dumped = pickle.dumps(r)
@@ -537,7 +537,7 @@ def test_compatible_partitions_after_slice() -> None:
     assert_eq(lazy, ccrt)
 
     # sanity
-    assert dak.compatible_partitions(lazy, lazy + 2)  # type: ignore
+    assert dak.compatible_partitions(lazy, lazy + 2)
     assert dak.compatible_partitions(lazy, dak.num(lazy, axis=1) > 2)
 
     assert not dak.compatible_partitions(lazy[:-2], lazy)
@@ -644,6 +644,14 @@ def test_scalar_repr(daa: Array) -> None:
 def test_scalar_divisions(daa: Array) -> None:
     s = dak.max(daa.points.x, axis=None)
     assert s.divisions == (None, None)
+
+
+def test_scalar_binop_inv() -> None:
+    # GH #515
+    x = dak.from_lists([[1]])
+    y = x[0]  # scalar
+    assert (0 - y) == -1
+    assert (y - 0) == 1
 
 
 def test_array_persist(daa: Array) -> None:
@@ -887,7 +895,7 @@ def test_shape_only_ops(fn: Callable, tmp_path_factory: pytest.TempPathFactory) 
     p = tmp_path_factory.mktemp("zeros-like-flat")
     ak.to_parquet(a, str(p / "file.parquet"))
     lazy = dak.from_parquet(str(p))
-    result = fn(lazy.b)  # type: ignore
+    result = fn(lazy.b)
     with dask.config.set({"awkward.optimization.enabled": True}):
         result.compute()
 
@@ -899,7 +907,7 @@ def test_assign_behavior() -> None:
     with pytest.raises(
         TypeError, match="'mappingproxy' object does not support item assignment"
     ):
-        dx.behavior["should_fail"] = None  # type: ignore
+        dx.behavior["should_fail"] = None
     assert dx.behavior == behavior
 
 
@@ -910,7 +918,7 @@ def test_assign_attrs() -> None:
     with pytest.raises(
         TypeError, match="'mappingproxy' object does not support item assignment"
     ):
-        dx.attrs["should_fail"] = None  # type: ignore
+        dx.attrs["should_fail"] = None
     assert dx.attrs == attrs
 
 

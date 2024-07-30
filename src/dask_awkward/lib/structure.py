@@ -71,6 +71,7 @@ __all__ = (
     "values_astype",
     "where",
     "with_field",
+    "without_field",
     "with_name",
     "with_parameter",
     "without_parameters",
@@ -602,26 +603,20 @@ def mask(
 @borrow_docstring(ak.nan_to_num)
 def nan_to_num(
     array: Array,
-    copy: bool = True,
     nan: float = 0.0,
     posinf: Any | None = None,
     neginf: Any | None = None,
-    highlevel: bool = True,
     behavior: Any | None = None,
-    attrs: Mapping[str, Any] | None = None,
 ) -> Array:
-    # return map_partitions(
-    #     ak.nan_to_num,
-    #     array,
-    #     output_partitions=1,
-    #     copy=copy,
-    #     nan=nan,
-    #     posinf=posinf,
-    #     neginf=neginf,
-    #     highlevel=highlevel,
-    #     behavior=behavior,
-    # )
-    raise DaskAwkwardNotImplemented("TODO")
+    return map_partitions(
+        ak.nan_to_num,
+        array,
+        nan=nan,
+        posinf=posinf,
+        neginf=neginf,
+        highlevel=True,
+        behavior=behavior,
+    )
 
 
 def _numaxis0(*integers):
@@ -1093,6 +1088,46 @@ def with_field(
     )
 
 
+class _WithoutFieldFn:
+    def __init__(
+        self,
+        highlevel: bool,
+        behavior: Mapping | None = None,
+        attrs: Mapping[str, Any] | None = None,
+    ) -> None:
+        self.highlevel = highlevel
+        self.behavior = behavior
+        self.attrs = attrs
+
+    def __call__(self, array: ak.Array, where: str) -> ak.Array:
+        return ak.without_field(
+            array, where=where, behavior=self.behavior, attrs=self.attrs
+        )
+
+
+@borrow_docstring(ak.without_field)
+def without_field(
+    base: Array,
+    where: str,
+    highlevel: bool = True,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
+) -> Array:
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
+    if not isinstance(base, Array):
+        raise ValueError("Base argument in without_field must be a dask_awkward.Array")
+
+    return map_partitions(
+        _WithoutFieldFn(highlevel=highlevel, behavior=behavior, attrs=attrs),
+        base,
+        where,
+        label="without-field",
+        output_divisions=1,
+    )
+
+
 class _WithNameFn:
     def __init__(
         self,
@@ -1358,6 +1393,54 @@ def repartition_layer(arr: Array, key: str, divisions: tuple[int, ...]) -> dict:
             (_repartition_func,) + tuple((arr.name, part) for part in pp) + (ss,)
         )
     return layer
+
+
+def _subpart(data: ak.Array, parts: int, part: int) -> ak.Array:
+    from dask_awkward.lib.core import is_typetracer
+
+    if is_typetracer(data):
+        return data
+    rows_per = len(data) // parts
+    return data[
+        part * rows_per : None if part == (parts - 1) else (part + 1) * rows_per
+    ]
+
+
+def _subcat(*arrs: tuple[ak.Array, ...]) -> ak.Array:
+    return ak.concatenate(arrs)
+
+
+def simple_repartition_layer(
+    arr: Array, n_to_one: int | None, one_to_n: int | None, key: str
+) -> tuple[dict, tuple[Any, ...]]:
+    layer: dict[tuple[str, int], tuple[Any, ...]] = {}
+    new_divisions: tuple[Any, ...]
+    if n_to_one:
+        for i0, i in enumerate(range(0, arr.npartitions, n_to_one)):
+            layer[(key, i0)] = (_subcat,) + tuple(
+                (arr.name, part)
+                for part in range(i, min(i + n_to_one, arr.npartitions))
+            )
+        new_divisions = arr.divisions[::n_to_one]
+        if arr.npartitions % n_to_one:
+            new_divisions = new_divisions + (arr.divisions[-1],)
+            layer[(key, i0 + 1)] = (_subcat,) + tuple(
+                (arr.name, part0) for part0 in range(len(layer), arr.npartitions)
+            )
+    elif one_to_n:
+        for i in range(arr.npartitions):
+            for part in range(one_to_n):
+                layer[(key, (i * one_to_n + part))] = (
+                    _subpart,
+                    (arr.name, i),
+                    one_to_n,
+                    part,
+                )
+        # TODO: if arr.known_divisions:
+        new_divisions = (None,) * (arr.npartitions * one_to_n + 1)
+    else:
+        raise ValueError
+    return layer, new_divisions
 
 
 @borrow_docstring(ak.enforce_type)

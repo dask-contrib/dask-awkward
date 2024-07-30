@@ -508,9 +508,17 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
             if is_dask_collection(other):
                 task = (op, self.key, *other.__dask_keys__())
                 deps.append(other)
-                plns.append(other.name)
+                if inv:
+                    plns.insert(0, other.name)
+                else:
+                    plns.append(other.name)
             else:
-                task = (op, self.key, other)
+                if inv:
+                    task = (op, other, self.key)
+                else:
+                    task = (op, self.key, other)
+            if inv:
+                plns.reverse()
             graph = HighLevelGraph.from_collections(
                 name,
                 layer=AwkwardMaterializedLayer(
@@ -520,10 +528,16 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
                 ),
                 dependencies=tuple(deps),
             )
-            if isinstance(other, Scalar):
-                meta = op(self._meta, other._meta)
+            if isinstance(other, (Scalar, Array)):
+                if inv:
+                    meta = op(other._meta, self._meta)
+                else:
+                    meta = op(self._meta, other._meta)
             else:
-                meta = op(self._meta, other)
+                if inv:
+                    meta = op(other, self._meta)
+                else:
+                    meta = op(self._meta, other)
             commit_to_reports(name, self.report)
             return new_scalar_object(graph, name, meta=meta)
 
@@ -667,7 +681,7 @@ def new_known_scalar(
 
     Examples
     --------
-    >>> from dask_awkward.core import new_known_scalar
+    >>> from dask_awkward.lib.core import new_known_scalar
     >>> a = new_known_scalar(5, label="five")
     >>> a
     dask.awkward<five, type=Scalar, dtype=int64, known_value=5>
@@ -959,29 +973,75 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         npartitions: int | None = None,
         divisions: tuple[int, ...] | None = None,
         rows_per_partition: int | None = None,
+        one_to_n: int | None = None,
+        n_to_one: int | None = None,
     ) -> Array:
+        """Restructure the partitioning of the whole array
+
+        Various schemes are possible, with one of the mutually exclusive
+        optional arguments for each. Of these, the first three require
+        knowledge of the number of rows in each existing partition, which
+        will be eagerly computed if not already known, and some shuffling of
+        data between partitions.
+
+        - npartitions: split all the rows as evenly as possible into this
+          many output partitions.
+        - divisions: exact row count offsets of each output partition
+        - rows_per_partition: each partition will have this many rows,
+          except the last, which will have this number or fewer
+        - one_to_n: each input partition becomes n output partitions
+        - n_to_one: every n adjacent input partitions becomes one
+          output partition. Note that exactly one output partition
+          (npartitions=1) is a special case of this.
+        """
         from dask_awkward.layers import AwkwardMaterializedLayer
-        from dask_awkward.lib.structure import repartition_layer
+        from dask_awkward.lib.structure import (
+            repartition_layer,
+            simple_repartition_layer,
+        )
 
-        if sum(bool(_) for _ in [npartitions, divisions, rows_per_partition]) != 1:
+        if (
+            sum(
+                bool(_)
+                for _ in (
+                    npartitions,
+                    divisions,
+                    rows_per_partition,
+                    one_to_n,
+                    n_to_one,
+                )
+            )
+            != 1
+        ):
             raise ValueError("Please specify exactly one of the inputs")
-        if not self.known_divisions:
-            self.eager_compute_divisions()
-        nrows = self.defined_divisions[-1]
-        new_divisions: tuple[int, ...] = tuple()
-        if divisions:
-            new_divisions = divisions
-        elif npartitions:
-            rows_per_partition = math.ceil(nrows / npartitions)
-        if rows_per_partition:
-            new_divs = list(range(0, nrows, rows_per_partition))
-            new_divs.append(nrows)
-            new_divisions = tuple(new_divs)
+        new_divisions: tuple[int, ...] = ()
+        if npartitions and npartitions == 1:
+            npartitions, n_to_one = None, self.npartitions
+        if n_to_one or one_to_n:
+            token = tokenize(self, n_to_one, one_to_n)
+            key = f"repartition-{token}"
+            new_layer_raw, new_divisions = simple_repartition_layer(
+                self, n_to_one, one_to_n, key
+            )
+        else:
+            if not self.known_divisions:
+                self.eager_compute_divisions()
+            nrows = self.defined_divisions[-1]
+            if divisions:
+                if divisions == self.divisions:
+                    # noop
+                    return self
+                new_divisions = divisions
+            elif npartitions:
+                rows_per_partition = math.ceil(nrows / npartitions)
+            if rows_per_partition:
+                new_divs = list(range(0, nrows, rows_per_partition))
+                new_divs.append(nrows)
+                new_divisions = tuple(new_divs)
+            token = tokenize(self, divisions)
+            key = f"repartition-{token}"
+            new_layer_raw = repartition_layer(self, key, new_divisions)
 
-        token = tokenize(self, divisions)
-        key = f"repartition-{token}"
-
-        new_layer_raw = repartition_layer(self, key, new_divisions)
         new_layer = AwkwardMaterializedLayer(
             new_layer_raw,
             previous_layer_names=[self.name],
@@ -2445,7 +2505,7 @@ def meta_or_identity(obj: Any) -> Any:
     --------
     >>> import awkward as ak
     >>> import dask_awkward as dak
-    >>> from dask_awkward.core import meta_or_identity
+    >>> from dask_awkward.lib.core import meta_or_identity
     >>> x = ak.from_iter([[1, 2, 3], [4]])
     >>> x = dak.from_awkward(x, npartitions=2)
     >>> x
@@ -2641,7 +2701,7 @@ def normalize_single_outer_inner_index(
 
     Examples
     --------
-    >>> from dask_awkward.utils import normalize_single_outer_inner_index
+    >>> from dask_awkward.lib.core import normalize_single_outer_inner_index
     >>> divisions = (0, 3, 6, 9)
     >>> normalize_single_outer_inner_index(divisions, 0)
     (0, 0)

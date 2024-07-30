@@ -157,6 +157,15 @@ def test_drop_none(axis: int) -> None:
     assert_eq(d, e)
 
 
+def test_nan_to_num():
+    a = [[1, 2, np.nan], [], [np.nan], [5, 6, 7, np.nan], [1, 2], np.nan]
+    b = [[np.nan, 2, 1], [np.nan], [], np.nan, [7, 6, np.nan, 5], [np.nan, np.nan]]
+    c = dak.from_lists([a, b])
+    d = dak.nan_to_num(c, nan=5)
+    e = ak.nan_to_num(ak.from_iter(a + b), nan=5)
+    assert_eq(d, e)
+
+
 @pytest.mark.parametrize("axis", [0, 1, -1])
 def test_is_none(axis: int) -> None:
     a: list[Any] = [[1, 2, None], None, None, [], [None], [5, 6, 7, None], [1, 2], None]
@@ -203,26 +212,35 @@ def test_pad_none(axis: int, target: int) -> None:
 
 
 def test_with_field(caa: ak.Array, daa: dak.Array) -> None:
-    assert_eq(
-        ak.with_field(caa["points"], caa["points"]["x"], where="xx"),
-        dak.with_field(daa["points"], daa["points"]["x"], where="xx"),
-    )
+    new_caa = ak.with_field(caa["points"], caa["points"]["x"], where="xx")
+    new_daa = dak.with_field(daa["points"], daa["points"]["x"], where="xx")
+    assert_eq(new_caa, new_daa)
+    assert_eq(ak.without_field(new_caa, "xx"), ak.without_field(new_daa, "xx"))
 
-    assert_eq(
-        ak.with_field(caa["points"], 1, where="xx"),
-        dak.with_field(daa["points"], 1, where="xx"),
-    )
+    new_caa = ak.with_field(caa["points"], 1, where="xx")
+    new_daa = dak.with_field(daa["points"], 1, where="xx")
+    assert_eq(new_caa, new_daa)
+    assert_eq(ak.without_field(new_caa, "xx"), ak.without_field(new_daa, "xx"))
 
-    assert_eq(
-        ak.with_field(caa["points"], 1.0, where="xx"),
-        dak.with_field(daa["points"], 1.0, where="xx"),
-    )
+    new_caa = ak.with_field(caa["points"], 1.0, where="xx")
+    new_daa = dak.with_field(daa["points"], 1.0, where="xx")
+    assert_eq(new_caa, new_daa)
+    assert_eq(ak.without_field(new_caa, "xx"), ak.without_field(new_daa, "xx"))
 
     with pytest.raises(
         ValueError,
         match="Base argument in with_field must be a dask_awkward.Array",
     ):
         _ = dak.with_field([{"foo": 1.0}, {"foo": 2.0}], daa.points.x, where="x")
+
+    with pytest.raises(
+        ValueError,
+        match="Base argument in without_field must be a dask_awkward.Array",
+    ):
+        _ = dak.without_field(
+            [{"foo": [1.0, 2.0], "bar": [3.0, 4.0]}],
+            "bar",
+        )
 
     with pytest.raises(
         ValueError,
@@ -528,6 +546,31 @@ def test_repartition_whole(daa):
     daa1 = daa.repartition(npartitions=1)
     assert daa1.npartitions == 1
     assert_eq(daa, daa1, check_divisions=False)
+
+
+def test_repartition_one_to_n(daa):
+    daa1 = daa.repartition(one_to_n=2)
+    assert daa1.npartitions == daa.npartitions * 2
+    assert_eq(daa, daa1, check_divisions=False)
+
+
+def test_repartition_n_to_one():
+    daa = dak.from_lists([[[1, 2, 3], [], [4, 5]] * 2] * 52)
+    daa2 = daa.repartition(n_to_one=52)
+    assert daa2.npartitions == 1
+    assert daa.compute().to_list() == daa2.compute().to_list()
+    daa2 = daa.repartition(n_to_one=53)
+    assert daa2.npartitions == 1
+    assert daa.compute().to_list() == daa2.compute().to_list()
+    daa2 = daa.repartition(n_to_one=2)
+    assert daa2.npartitions == 26
+    assert daa.compute().to_list() == daa2.compute().to_list()
+    daa2 = daa.repartition(n_to_one=10)
+    assert daa2.npartitions == 6
+    assert daa.compute().to_list() == daa2.compute().to_list()
+    daa._divisions = (None,) * len(daa.divisions)
+    assert daa2.npartitions == 6
+    assert daa.compute().to_list() == daa2.compute().to_list()
 
 
 def test_repartition_no_change(daa):
