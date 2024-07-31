@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
@@ -35,15 +36,8 @@ class ConcatenateFnAxisGT0:
 
 def _enforce_concatenated_form(array: AwkwardArray, form: Form) -> AwkwardArray:
     layout = ak.to_layout(array)
-    # TODO: should this check whether the form agrees first, or assume that the
-    #       operation is harmless if not required?
     result = enforce_layout_to_concatenated_form(layout, form)
     return ak.Array(result, behavior=array._behavior, attrs=array._attrs)
-
-
-def _concatenate_axis_0_meta(*arrays: AwkwardArray) -> AwkwardArray:
-    # At this stage, the metas have all been enforced to the same type
-    return arrays[0]
 
 
 def concatenate(
@@ -98,7 +92,6 @@ def concatenate(
             aml = AwkwardMaterializedLayer(
                 g,
                 previous_layer_names=[a.name for a in arrays],
-                fn=_concatenate_axis_0_meta,
             )
         else:
             g = {
@@ -108,9 +101,15 @@ def concatenate(
                 )
             }
 
-            aml = AwkwardMaterializedLayer(g, previous_layer_names=[arrays[0].name])
+            aml = AwkwardMaterializedLayer(
+                g, previous_layer_names=[a.name for a in arrays]
+            )
+        from awkward.typetracer import touch_data
 
-        new_meta = ak.copy(metas[0])
+        # TODO: touching all metas we don't pass on should not be necessary
+        [touch_data(m) for m in metas[1:]]
+        [r.commit(name) for r in report]
+        new_meta = copy.copy(metas[0])
         new_meta._report = report
         hlg = HighLevelGraph.from_collections(name, aml, dependencies=arrays)
         aml.meta = new_meta

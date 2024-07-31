@@ -635,6 +635,7 @@ def from_map(
             highlevel=True,
             behavior=io_func.behavior,
             buffer_key=render_buffer_key,
+            attrs=meta._attrs if meta is not None else None,
         )
         report.commit(name)
         # column tracking report, not failure report, below
@@ -646,7 +647,8 @@ def from_map(
         array_meta, report = typetracer_with_report(
             form_with_unique_keys(meta.layout.form, "@"),
             highlevel=True,
-            behavior=None,
+            behavior=meta._behavior,
+            attrs=meta._attrs,
             buffer_key=render_buffer_key,
         )
         report.commit(name)

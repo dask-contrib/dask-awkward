@@ -10,6 +10,7 @@ from dask_awkward.utils import IncompatiblePartitions
 
 @pytest.mark.parametrize("axis", [0, 1])
 def test_concatenate_simple(daa, caa, axis):
+    # daa.x and daa.y have the same types
     assert_eq(
         ak.concatenate([caa.points.x, caa.points.y], axis=axis),
         dak.concatenate([daa.points.x, daa.points.y], axis=axis),
@@ -42,6 +43,10 @@ def test_concatenate_axis_0_logical_different(daa):
         empty_array = ak.Array(empty_form.length_zero_array(highlevel=False))
         empty_dak_array = dak.from_awkward(empty_array, npartitions=1)
         result = dak.concatenate([daa, empty_dak_array], axis=0)
+        expected = ak.concatenate(
+            [daa.compute(), empty_dak_array.compute()], axis=0
+        ).tolist()
+        assert expected == result.compute().tolist()
 
 
 @pytest.mark.parametrize("axis", [0, 1, 2])

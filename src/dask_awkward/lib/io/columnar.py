@@ -4,8 +4,6 @@ import logging
 
 import awkward as ak
 
-from dask_awkward.layers.layers import BackendT
-
 log = logging.getLogger(__name__)
 
 
@@ -22,7 +20,7 @@ class ColumnProjectionMixin:
         # default implementation does nothing
         return self
 
-    def mock_empty(self, backend: BackendT = "cpu"):
+    def mock_empty(self, backend: str = "cpu"):
         # used by failure report generation
         return (
             ak.to_backend(

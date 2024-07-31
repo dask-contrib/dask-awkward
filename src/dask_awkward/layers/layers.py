@@ -1,20 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeVar, Union
+from typing import Any, Protocol, TypeVar
 
 from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
 from dask.highlevelgraph import MaterializedLayer
 from dask.layers import DataFrameTreeReduction
-from typing_extensions import TypeAlias
 
 from dask_awkward.utils import LazyInputsDict
-
-if TYPE_CHECKING:
-    from awkward import Array as AwkwardArray
-
-
-BackendT: TypeAlias = Union[Literal["cpu"], Literal["jax"], Literal["cuda"]]
 
 
 class AwkwardBlockwiseLayer(Blockwise):
@@ -46,31 +39,9 @@ class ImplementsIOFunction(Protocol):
 T = TypeVar("T")
 
 
-class ImplementsMockEmpty(ImplementsIOFunction, Protocol):
-    def mock_empty(self, backend: BackendT) -> AwkwardArray: ...
-
-
 class ImplementsReport(ImplementsIOFunction, Protocol):
     @property
     def return_report(self) -> bool: ...
-
-
-class ImplementsProjection(Protocol[T]):
-    def project(self, columns: list[str]) -> ImplementsIOFunction: ...
-
-
-class IOFunctionWithMocking(ImplementsIOFunction):
-    def __init__(self, meta: AwkwardArray, io_func: ImplementsIOFunction):
-        self._meta = meta
-        self._io_func = io_func
-
-    def __getstate__(self) -> dict:
-        state = self.__dict__.copy()
-        state["_meta"] = None
-        return state
-
-    def __call__(self, *args, **kwargs):
-        return self._io_func(*args, **kwargs)
 
 
 def io_func_implements_projection(func: ImplementsIOFunction) -> bool:

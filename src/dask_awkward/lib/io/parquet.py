@@ -6,7 +6,7 @@ import logging
 import math
 import operator
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
+from typing import Any, Literal, cast
 
 import awkward as ak
 import awkward.operations.ak_from_parquet as ak_from_parquet
@@ -25,13 +25,7 @@ from dask_awkward.lib.io.io import from_map
 from dask_awkward.lib.unproject_layout import unproject_layout
 from dask_awkward.lib.utils import _buf_to_col, commit_to_reports
 
-if TYPE_CHECKING:
-    pass
-
 log = logging.getLogger(__name__)
-
-
-T = TypeVar("T")
 
 
 def report_failure(exception, *args, **kwargs):
