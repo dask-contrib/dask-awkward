@@ -287,9 +287,15 @@ class RandomFailFromListsFn:
         if self.return_report:
             try:
                 result, time = time_it(self.read_fn)(*args, **kwargs)
-                return result, self.make_success_report(time, *args, **kwargs)
+                return {
+                    "data": result,
+                    "ioreport": self.make_success_report(time, *args, **kwargs),
+                }
             except self.allowed_exceptions as err:
-                return self.mock_empty(), self.make_fail_report(err, *args, **kwargs)
+                return {
+                    "data": self.mock_empty(),
+                    "ioreport": self.make_fail_report(err, *args, **kwargs),
+                }
 
         return self.read_fn(*args, **kwargs)
 

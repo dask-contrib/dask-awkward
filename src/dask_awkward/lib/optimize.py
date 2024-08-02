@@ -143,7 +143,7 @@ def _optimize_columns(dsk, all_layers):
         rep = getattr(lay.meta, "_report", None)
         if not rep:
             continue
-        rep = first(rep)  # each meta of an IL layer should have just one report
+        rep = first(rep)  # each meta of an IO layer should have just one report
         cols = set()
         # this loop not required after next ak release
         for ln in all_layers:

@@ -158,9 +158,12 @@ class FromParquetFileWiseFn(FromParquetFn):
         if self.return_report:
             try:
                 result = self.read_fn(source)
-                return result, report_success(self.columns, source)
+                return {
+                    "data": result,
+                    "ioreport": report_success(self.columns, source),
+                }
             except self.allowed_exceptions as err:
-                return self.mock_empty(), report_failure(err, source)
+                return {"data": ak.Array([]), "ioreport": report_failure(err, source)}
 
         return self.read_fn(source)
 

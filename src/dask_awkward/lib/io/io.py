@@ -4,17 +4,14 @@ import logging
 import math
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from functools import partial
 from typing import TYPE_CHECKING, Any, cast
 
 import awkward as ak
-import dask.config
 import numpy as np
 from awkward.types.numpytype import primitive_to_dtype
 from awkward.typetracer import length_zero_if_typetracer, typetracer_with_report
 from dask.base import flatten, tokenize
 from dask.highlevelgraph import HighLevelGraph
-from dask.local import identity
 from dask.utils import funcname, is_integer, parse_bytes
 from fsspec.utils import infer_compression
 
@@ -22,10 +19,7 @@ from dask_awkward.layers.layers import (
     AwkwardBlockwiseLayer,
     AwkwardInputLayer,
     AwkwardMaterializedLayer,
-    AwkwardTreeReductionLayer,
-    ImplementsReport,
     io_func_implements_projection,
-    io_func_implements_report,
 )
 from dask_awkward.lib.core import (
     Array,
@@ -36,7 +30,6 @@ from dask_awkward.lib.core import (
 )
 from dask_awkward.lib.io.columnar import ColumnProjectionMixin
 from dask_awkward.lib.utils import form_with_unique_keys, render_buffer_key
-from dask_awkward.utils import first, second
 
 if TYPE_CHECKING:
     from dask.array.core import Array as DaskArray
@@ -661,6 +654,13 @@ def from_map(
     dsk = AwkwardInputLayer(name=name, inputs=inputs, io_func=io_func)
 
     hlg = HighLevelGraph.from_collections(name, dsk)
+    making_report = getattr(io_func, "return_report", False)
+    if making_report:
+        array_meta = ak.Array(
+            {"ioreport": ak.Array([0]).layout.to_typetracer(True), "data": array_meta}
+        )
+        array_meta._report = {report}
+
     if divisions is not None:
         result = new_array_object(hlg, name, meta=array_meta, divisions=divisions, **kw)
     else:
@@ -669,56 +669,8 @@ def from_map(
         )
     dsk.meta = result._meta
 
-    if io_func_implements_report(io_func):
-        if cast(ImplementsReport, io_func).return_report:
-            # first element of each output tuple is the actual data
-            res = result.map_partitions(
-                first, meta=empty_typetracer(), label=label, output_divisions=1
-            )
-            res._meta = array_meta
-
-            concat_fn = partial(
-                ak.concatenate,
-                axis=0,
-            )
-
-            split_every = dask.config.get("awkward.aggregation.split-every", 8)
-
-            rep_trl_label = f"{label}-report"
-            rep_trl_token = tokenize(result, second, concat_fn, split_every)
-            rep_trl_name = f"{rep_trl_label}-{rep_trl_token}"
-            rep_trl_tree_node_name = f"{rep_trl_label}-tree-node-{rep_trl_token}"
-
-            # second element of each output tuple is the result, which does not
-            # depend on any of the actual data
-            rep_part = result.map_partitions(
-                second, meta=empty_typetracer(), label=f"{label}-partitioned-report"
-            )
-
-            rep_trl = AwkwardTreeReductionLayer(
-                name=rep_trl_name,
-                name_input=rep_part.name,
-                npartitions_input=rep_part.npartitions,
-                concat_func=concat_fn,
-                tree_node_func=identity,
-                finalize_func=identity,
-                split_every=split_every,
-                tree_node_name=rep_trl_tree_node_name,
-            )
-
-            rep_graph = HighLevelGraph.from_collections(
-                rep_trl_name, rep_trl, dependencies=[rep_part]
-            )
-            rep_trl.meta = empty_typetracer()
-
-            rep = new_array_object(
-                rep_graph,
-                rep_trl_name,
-                meta=rep_trl.meta,
-                npartitions=len(rep_trl.output_partitions),
-            )
-
-            return res, rep
+    if making_report:
+        return result.data, result.ioreport
 
     return result
 
