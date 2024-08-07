@@ -84,7 +84,8 @@ def test_field_access_to_front(pairs):
 def test_nocheck_context():
     from awkward._nplikes.typetracer import TypeTracerArray
 
-    assert getattr(TypeTracerArray, "runtime_typechecks", True)
+    old = getattr(TypeTracerArray, "runtime_typechecks", True)
     with typetracer_nochecks():
         assert not TypeTracerArray.runtime_typechecks
-    assert getattr(TypeTracerArray, "runtime_typechecks", True)
+    new = getattr(TypeTracerArray, "runtime_typechecks", True)
+    assert old == new

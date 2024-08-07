@@ -11,7 +11,12 @@ import dask_awkward as dak
 import dask_awkward.lib.testutils as daktu
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(autouse=True)
+def clear_cache():
+    dak.lib.core.dak_cache.clear()
+
+
+@pytest.fixture()
 def single_record_file(tmp_path_factory: pytest.TempPathFactory) -> str:
     fname = tmp_path_factory.mktemp("data") / "single_record.json"
     record = {"record": [1, 2, 3]}
@@ -20,7 +25,7 @@ def single_record_file(tmp_path_factory: pytest.TempPathFactory) -> str:
     return str(fname)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def ndjson_points1(tmp_path_factory: pytest.TempPathFactory) -> str:
     array = daktu.awkward_xy_points()
     fname = tmp_path_factory.mktemp("data") / "points_ndjson1.json"
@@ -30,7 +35,7 @@ def ndjson_points1(tmp_path_factory: pytest.TempPathFactory) -> str:
     return str(fname)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def ndjson_points1_str(tmp_path_factory: pytest.TempPathFactory) -> str:
     array = daktu.awkward_xy_points_str()
     fname = tmp_path_factory.mktemp("data") / "points_ndjson1.json"
@@ -40,7 +45,7 @@ def ndjson_points1_str(tmp_path_factory: pytest.TempPathFactory) -> str:
     return str(fname)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def ndjson_points2(tmp_path_factory: pytest.TempPathFactory) -> str:
     array = daktu.awkward_xy_points()
     fname = tmp_path_factory.mktemp("data") / "points_ndjson2.json"
@@ -50,77 +55,77 @@ def ndjson_points2(tmp_path_factory: pytest.TempPathFactory) -> str:
     return str(fname)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def ndjson_points_file(ndjson_points1: str) -> str:
     return ndjson_points1
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def ndjson_points_file_str(ndjson_points1_str: str) -> str:
     return ndjson_points1_str
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def daa(ndjson_points1: str) -> dak.Array:
     return dak.from_json([ndjson_points1] * 3)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def pq_points_dir(daa: dak.Array, tmp_path_factory: pytest.TempPathFactory) -> str:
     pqdir = tmp_path_factory.mktemp("pqfiles")
     dak.to_parquet(daa, str(pqdir))
     return str(pqdir)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def daa_parquet(pq_points_dir: str) -> dak.Array:
     return cast(dak.Array, dak.from_parquet(pq_points_dir))
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def daa_str(ndjson_points1_str: str) -> dak.Array:
     return dak.from_json([ndjson_points1_str] * 3)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def caa(ndjson_points1: str) -> ak.Array:
     with open(ndjson_points1, "rb") as f:
         a = ak.from_json(f, line_delimited=True)
     return ak.concatenate([a, a, a])
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def caa_str(ndjson_points1_str: str) -> ak.Array:
     with open(ndjson_points1_str, "rb") as f:
         a = ak.from_json(f, line_delimited=True)
     return ak.concatenate([a, a, a])
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def daa_p1(ndjson_points1: str) -> dak.Array:
     return dak.from_json([ndjson_points1] * 3)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def daa_p2(ndjson_points2: str) -> dak.Array:
     return dak.from_json([ndjson_points2] * 3)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def caa_p1(ndjson_points1: str) -> ak.Array:
     with open(ndjson_points1) as f:
         lines = [json.loads(line) for line in f]
     return ak.Array(lines * 3)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def caa_p2(ndjson_points2: str) -> ak.Array:
     with open(ndjson_points2) as f:
         lines = [json.loads(line) for line in f]
     return ak.Array(lines * 3)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def L1() -> list[list[dict[str, float]]]:
     return [
         [{"x": 1.0, "y": 1.1}, {"x": 2.0, "y": 2.2}, {"x": 3, "y": 3.3}],
@@ -131,7 +136,7 @@ def L1() -> list[list[dict[str, float]]]:
     ]
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def L2() -> list[list[dict[str, float]]]:
     return [
         [{"x": 0.9, "y": 1.0}, {"x": 2.0, "y": 2.2}, {"x": 2.9, "y": 3.0}],
@@ -142,7 +147,7 @@ def L2() -> list[list[dict[str, float]]]:
     ]
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def L3() -> list[list[dict[str, float]]]:
     return [
         [{"x": 1.9, "y": 9.0}, {"x": 2.0, "y": 8.2}, {"x": 9.9, "y": 9.0}],
@@ -153,7 +158,7 @@ def L3() -> list[list[dict[str, float]]]:
     ]
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def L4() -> list[list[dict[str, float]] | None]:
     return [
         [{"x": 1.9, "y": 9.0}, {"x": 2.0, "y": 8.2}, {"x": 9.9, "y": 9.0}],
@@ -164,14 +169,14 @@ def L4() -> list[list[dict[str, float]] | None]:
     ]
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def caa_parquet(caa: ak.Array, tmp_path_factory: pytest.TempPathFactory) -> str:
     fname = tmp_path_factory.mktemp("parquet_data") / "caa.parquet"
     ak.to_parquet(caa, str(fname), extensionarray=False)
     return str(fname)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def unnamed_root_parquet_file(tmp_path_factory: pytest.TempPathFactory) -> str:
     from dask_awkward.lib.testutils import unnamed_root_ds
 
