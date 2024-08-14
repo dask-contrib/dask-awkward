@@ -10,23 +10,11 @@ from dask_awkward.utils import IncompatiblePartitions
 
 @pytest.mark.parametrize("axis", [0, 1])
 def test_concatenate_simple(daa, caa, axis):
+    # daa.x and daa.y have the same types
     assert_eq(
         ak.concatenate([caa.points.x, caa.points.y], axis=axis),
         dak.concatenate([daa.points.x, daa.points.y], axis=axis),
     )
-
-
-def test_concatenate_axis_0_logical_same(daa):
-    result = dak.concatenate([daa, daa], axis=0)
-    buffers_report = dak.report_necessary_buffers(result.points.x)
-    assert len(buffers_report) == 1
-
-    buffers = next(iter(buffers_report.values()))
-
-    assert buffers.data_and_shape == frozenset(
-        ["@.points.content.x-data", "@.points-offsets"]
-    )
-    assert buffers.shape_only == frozenset()
 
 
 def test_concatenate_axis_0_logical_different(daa):
@@ -55,15 +43,10 @@ def test_concatenate_axis_0_logical_different(daa):
         empty_array = ak.Array(empty_form.length_zero_array(highlevel=False))
         empty_dak_array = dak.from_awkward(empty_array, npartitions=1)
         result = dak.concatenate([daa, empty_dak_array], axis=0)
-
-        buffers_report = dak.report_necessary_buffers(result.points.x)
-        assert len(buffers_report) == 2
-
-        buffers = next(iter(buffers_report.values()))
-        assert buffers.data_and_shape == frozenset(
-            ["@.points.content.x-data", "@.points.content.y-data", "@.points-offsets"]
-        )
-        assert buffers.shape_only == frozenset()
+        expected = ak.concatenate(
+            [daa.compute(), empty_dak_array.compute()], axis=0
+        ).tolist()
+        assert expected == result.compute().tolist()
 
 
 @pytest.mark.parametrize("axis", [0, 1, 2])

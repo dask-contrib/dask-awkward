@@ -4,17 +4,14 @@ import logging
 import math
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from functools import partial
 from typing import TYPE_CHECKING, Any, cast
 
 import awkward as ak
-import dask.config
 import numpy as np
 from awkward.types.numpytype import primitive_to_dtype
-from awkward.typetracer import length_zero_if_typetracer
+from awkward.typetracer import length_zero_if_typetracer, typetracer_with_report
 from dask.base import flatten, tokenize
 from dask.highlevelgraph import HighLevelGraph
-from dask.local import identity
 from dask.utils import funcname, is_integer, parse_bytes
 from fsspec.utils import infer_compression
 
@@ -22,12 +19,7 @@ from dask_awkward.layers.layers import (
     AwkwardBlockwiseLayer,
     AwkwardInputLayer,
     AwkwardMaterializedLayer,
-    AwkwardTreeReductionLayer,
-    ImplementsMocking,
-    ImplementsReport,
-    IOFunctionWithMocking,
-    io_func_implements_mocking,
-    io_func_implements_report,
+    io_func_implements_projection,
 )
 from dask_awkward.lib.core import (
     Array,
@@ -37,7 +29,7 @@ from dask_awkward.lib.core import (
     typetracer_array,
 )
 from dask_awkward.lib.io.columnar import ColumnProjectionMixin
-from dask_awkward.utils import first, second
+from dask_awkward.lib.utils import form_with_unique_keys, render_buffer_key
 
 if TYPE_CHECKING:
     from dask.array.core import Array as DaskArray
@@ -133,10 +125,13 @@ def from_awkward(
     )
 
 
-class _FromListsFn:
-    def __init__(self, behavior: Mapping | None, attrs: Mapping[str, Any] | None):
+class _FromListsFn(ColumnProjectionMixin):
+    def __init__(
+        self, behavior: Mapping | None, attrs: Mapping[str, Any] | None, form=None
+    ):
         self.behavior = behavior
         self.attrs = attrs
+        self.form = form
 
     def __call__(self, x: list) -> ak.Array:
         return ak.Array(x, behavior=self.behavior, attrs=self.attrs)
@@ -178,12 +173,13 @@ def from_lists(
     """
     lists = list(source)
     divs = (0, *np.cumsum(list(map(len, lists))))
+    meta = typetracer_array(ak.Array(lists[0], attrs=attrs, behavior=behavior))
     return cast(
         Array,
         from_map(
-            _FromListsFn(behavior=behavior, attrs=attrs),
+            _FromListsFn(behavior=behavior, attrs=attrs, form=meta.layout.form),
             lists,
-            meta=typetracer_array(ak.Array(lists[0], attrs=attrs, behavior=behavior)),
+            meta=meta,
             divisions=divs,
             label="from-lists",
         ),
@@ -425,6 +421,8 @@ def from_dask_array(
         concatenate=True,
     )
     layer = AwkwardBlockwiseLayer.from_blockwise(layer)
+    layer.meta = meta
+    meta._report = set()  # just because we can't project, we shouldn't track?
     hlg = HighLevelGraph.from_collections(name, layer, dependencies=[array])
     if np.any(np.isnan(array.chunks)):
         return new_array_object(
@@ -620,16 +618,35 @@ def from_map(
             packed=packed,
         )
 
-    # Special `io_func` implementations can implement mocking and optionally
-    # support buffer projection.
-    if io_func_implements_mocking(func):
+    kw = {}
+    if io_func_implements_projection(func):
+        # Special `io_func` implementations can do buffer projection - choosing columns
+        # so here we start with a blank report
         io_func = func
-        array_meta = cast(ImplementsMocking, func).mock()
-    # If we know the meta, we can spoof mocking
-    elif meta is not None:
-        io_func = IOFunctionWithMocking(meta, func)
-        array_meta = meta
+        array_meta, report = typetracer_with_report(
+            form_with_unique_keys(io_func.form, "@"),
+            highlevel=True,
+            behavior=io_func.behavior,
+            buffer_key=render_buffer_key,
+            attrs=meta._attrs if meta is not None else None,
+        )
+        report.commit(name)
+        # column tracking report, not failure report, below
+        array_meta._report = {report}
     # Without `meta`, the meta will be computed by executing the graph
+    elif meta is not None:
+        # we can still track necessary columns even if we can't project
+        io_func = func
+        array_meta, report = typetracer_with_report(
+            form_with_unique_keys(meta.layout.form, "@"),
+            highlevel=True,
+            behavior=meta._behavior,
+            attrs=meta._attrs,
+            buffer_key=render_buffer_key,
+        )
+        report.commit(name)
+        # column tracking report, not failure report, below
+        array_meta._report = {report}
     else:
         io_func = func
         array_meta = None
@@ -637,56 +654,23 @@ def from_map(
     dsk = AwkwardInputLayer(name=name, inputs=inputs, io_func=io_func)
 
     hlg = HighLevelGraph.from_collections(name, dsk)
+    making_report = getattr(io_func, "return_report", False)
+    if making_report:
+        array_meta = ak.Array(
+            {"ioreport": ak.Array([0]).layout.to_typetracer(True), "data": array_meta}
+        )
+        array_meta._report = {report}
+
     if divisions is not None:
-        result = new_array_object(hlg, name, meta=array_meta, divisions=divisions)
+        result = new_array_object(hlg, name, meta=array_meta, divisions=divisions, **kw)
     else:
-        result = new_array_object(hlg, name, meta=array_meta, npartitions=len(inputs))
+        result = new_array_object(
+            hlg, name, meta=array_meta, npartitions=len(inputs), **kw
+        )
+    dsk.meta = result._meta
 
-    if io_func_implements_report(io_func):
-        if cast(ImplementsReport, io_func).return_report:
-            res = result.map_partitions(
-                first, meta=array_meta, label=label, output_divisions=1
-            )
-
-            concat_fn = partial(
-                ak.concatenate,
-                axis=0,
-            )
-
-            split_every = dask.config.get("awkward.aggregation.split-every", 8)
-
-            rep_trl_label = f"{label}-report"
-            rep_trl_token = tokenize(result, second, concat_fn, split_every)
-            rep_trl_name = f"{rep_trl_label}-{rep_trl_token}"
-            rep_trl_tree_node_name = f"{rep_trl_label}-tree-node-{rep_trl_token}"
-
-            rep_part = result.map_partitions(
-                second, meta=empty_typetracer(), label=f"{label}-partitioned-report"
-            )
-
-            rep_trl = AwkwardTreeReductionLayer(
-                name=rep_trl_name,
-                name_input=rep_part.name,
-                npartitions_input=rep_part.npartitions,
-                concat_func=concat_fn,
-                tree_node_func=identity,
-                finalize_func=identity,
-                split_every=split_every,
-                tree_node_name=rep_trl_tree_node_name,
-            )
-
-            rep_graph = HighLevelGraph.from_collections(
-                rep_trl_name, rep_trl, dependencies=[rep_part]
-            )
-
-            rep = new_array_object(
-                rep_graph,
-                rep_trl_name,
-                meta=empty_typetracer(),
-                npartitions=len(rep_trl.output_partitions),
-            )
-
-            return res, rep
+    if making_report:
+        return result.data, result.ioreport
 
     return result
 
