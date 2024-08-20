@@ -335,32 +335,32 @@ def rewrite_layer_chains(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelG
         outkey = chain[-1]
         layer0 = dsk.layers[chain[0]]
         outlayer = layers[outkey]
-        numblocks = [nb[0] for nb in layer0.numblocks.values() if nb[0] is not None][0]  # type: ignore
+        numblocks = [nb[0] for nb in layer0.numblocks.values() if nb[0] is not None][0]
         deps[outkey] = deps[chain[0]]  # type: ignore
         [deps.pop(ch) for ch in chain[:-1]]  # type: ignore
 
-        subgraph = layer0.dsk.copy()  # type: ignore
-        indices = list(layer0.indices)  # type: ignore
+        subgraph = layer0.dsk.copy()
+        indices = list(layer0.indices)
         parent = chain[0]
 
-        outlayer.io_deps = layer0.io_deps  # type: ignore
+        outlayer.io_deps = layer0.io_deps
         for chain_member in chain[1:]:
             layer = dsk.layers[chain_member]
-            for k in layer.io_deps:  # type: ignore
-                outlayer.io_deps[k] = layer.io_deps[k]  # type: ignore
-            func, *args = layer.dsk[chain_member]  # type: ignore
+            for k in layer.io_deps:
+                outlayer.io_deps[k] = layer.io_deps[k]
+            func, *args = layer.dsk[chain_member]
             args2 = _recursive_replace(args, layer, parent, indices)
             subgraph[chain_member] = (func,) + tuple(args2)
             parent = chain_member
-        outlayer.numblocks = {i[0]: (numblocks,) for i in indices if i[1] is not None}  # type: ignore
-        outlayer.dsk = subgraph  # type: ignore
+        outlayer.numblocks = {i[0]: (numblocks,) for i in indices if i[1] is not None}
+        outlayer.dsk = subgraph
         if hasattr(outlayer, "_dims"):
             del outlayer._dims
-        outlayer.indices = tuple(  # type: ignore
+        outlayer.indices = tuple(
             (i[0], (".0",) if i[1] is not None else None) for i in indices
         )
-        outlayer.output_indices = (".0",)  # type: ignore
-        outlayer.inputs = getattr(layer0, "inputs", set())  # type: ignore
+        outlayer.output_indices = (".0",)
+        outlayer.inputs = getattr(layer0, "inputs", set())
         if hasattr(outlayer, "_cached_dict"):
             del outlayer._cached_dict  # reset, since original can be mutated
     return HighLevelGraph(layers, deps)
