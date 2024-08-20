@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import dask.config
 from awkward.typetracer import touch_data
-from dask.blockwise import fuse_roots, optimize_blockwise
+from dask.blockwise import Blockwise, fuse_roots, optimize_blockwise
 from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
 from dask.local import get_sync
@@ -333,7 +333,7 @@ def rewrite_layer_chains(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelG
         # outputs are the outputs of chain[-1]
         # .dsk is composed from the .dsk of each layer
         outkey = chain[-1]
-        layer0 = dsk.layers[chain[0]]
+        layer0 = cast(Blockwise, dsk.layers[chain[0]])
         outlayer = layers[outkey]
         numblocks = [nb[0] for nb in layer0.numblocks.values() if nb[0] is not None][0]
         deps[outkey] = deps[chain[0]]  # type: ignore
@@ -347,7 +347,7 @@ def rewrite_layer_chains(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelG
         for chain_member in chain[1:]:
             layer = dsk.layers[chain_member]
             for k in layer.io_deps:
-                outlayer.io_deps[k] = layer.io_deps[k]
+                outlayer.io_deps[k] = layer.io_deps[k]  # type: ignore
             func, *args = layer.dsk[chain_member]
             args2 = _recursive_replace(args, layer, parent, indices)
             subgraph[chain_member] = (func,) + tuple(args2)
