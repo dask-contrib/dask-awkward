@@ -2267,50 +2267,42 @@ def non_trivial_reduction(
     else:
         prepared_array = array
 
-    chunked_fn = _chunk_reducer_non_positional
-    tree_node_fn = _chunk_reducer_non_positional
-    concat_fn = _concat_reducer_non_positional
-    finalize_fn = _finalise_reducer_non_positional
-
-    chunked_kwargs = {
-        "reducer": reducer,
-        "is_axis_none": axis is None,
-        "mask_identity": mask_identity,
-    }
-    tree_node_kwargs = {
-        "reducer": combiner,
-        "is_axis_none": axis is None,
-        "mask_identity": mask_identity,
-    }
-
-    concat_kwargs = {"is_axis_none": axis is None}
-    finalize_kwargs = {
-        "reducer": combiner,
-        "mask_identity": mask_identity,
-        "keepdims": keepdims,
-        "is_axis_none": axis is None,
-    }
-
     from dask_awkward.layers import AwkwardTreeReductionLayer
 
     token = token or tokenize(
         array,
         reducer,
+        combiner,
         label,
         dtype,
         split_every,
-        chunked_kwargs,
-        tree_node_kwargs,
-        concat_kwargs,
-        finalize_kwargs,
+        axis,
+        mask_identity,
+        keepdims,
     )
     name_tree_node = f"{label}-tree-node-{token}"
     name_finalize = f"{label}-finalize-{token}"
 
-    chunked_fn = partial(chunked_fn, **chunked_kwargs)
-    tree_node_fn = partial(tree_node_fn, **tree_node_kwargs)
-    concat_fn = partial(concat_fn, **concat_kwargs)
-    finalize_fn = partial(finalize_fn, **finalize_kwargs)
+    chunked_fn = partial(
+        _chunk_reducer_non_positional,
+        reducer=reducer,
+        is_axis_none=axis is None,
+        mask_identity=mask_identity,
+    )
+    tree_node_fn = partial(
+        _chunk_reducer_non_positional,
+        reducer=combiner,
+        is_axis_none=axis is None,
+        mask_identity=mask_identity,
+    )
+    concat_fn = partial(_concat_reducer_non_positional, is_axis_none=axis is None)
+    finalize_fn = partial(
+        _finalise_reducer_non_positional,
+        reducer=combiner,
+        is_axis_none=axis is None,
+        keepdims=keepdims,
+        mask_identity=mask_identity,
+    )
 
     if split_every is None:
         split_every = dask.config.get("awkward.aggregation.split-every", 8)

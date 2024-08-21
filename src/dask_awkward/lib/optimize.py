@@ -4,11 +4,11 @@ import copy
 import logging
 import warnings
 from collections.abc import Iterable, Mapping, Sequence
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, cast, no_type_check
 
 import dask.config
 from awkward.typetracer import touch_data
-from dask.blockwise import fuse_roots, optimize_blockwise
+from dask.blockwise import Blockwise, fuse_roots, optimize_blockwise
 from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
 from dask.local import get_sync
@@ -244,6 +244,7 @@ def _mock_output(layer):
     return new_layer
 
 
+@no_type_check
 def rewrite_layer_chains(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelGraph:
     """Smush chains of blockwise layers into a single layer.
 
@@ -333,34 +334,36 @@ def rewrite_layer_chains(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelG
         # outputs are the outputs of chain[-1]
         # .dsk is composed from the .dsk of each layer
         outkey = chain[-1]
-        layer0 = dsk.layers[chain[0]]
+        layer0 = cast(Blockwise, dsk.layers[chain[0]])
         outlayer = layers[outkey]
-        numblocks = [nb[0] for nb in layer0.numblocks.values() if nb[0] is not None][0]  # type: ignore
-        deps[outkey] = deps[chain[0]]  # type: ignore
-        [deps.pop(ch) for ch in chain[:-1]]  # type: ignore
+        numblocks = [nb[0] for nb in layer0.numblocks.values() if nb[0] is not None][0]
+        deps[outkey] = deps[chain[0]]
+        [deps.pop(ch) for ch in chain[:-1]]
 
-        subgraph = layer0.dsk.copy()  # type: ignore
-        indices = list(layer0.indices)  # type: ignore
+        subgraph = layer0.dsk.copy()  # mypy: ignore
+        indices = list(layer0.indices)
         parent = chain[0]
 
-        outlayer.io_deps = layer0.io_deps  # type: ignore
+        outlayer.io_deps = layer0.io_deps  # mypy: ignore
         for chain_member in chain[1:]:
             layer = dsk.layers[chain_member]
-            for k in layer.io_deps:  # type: ignore
-                outlayer.io_deps[k] = layer.io_deps[k]  # type: ignore
-            func, *args = layer.dsk[chain_member]  # type: ignore
+            for k in layer.io_deps:  # mypy: ignore
+                outlayer.io_deps[k] = layer.io_deps[k]
+            func, *args = layer.dsk[chain_member]  # mypy: ignore
             args2 = _recursive_replace(args, layer, parent, indices)
             subgraph[chain_member] = (func,) + tuple(args2)
             parent = chain_member
-        outlayer.numblocks = {i[0]: (numblocks,) for i in indices if i[1] is not None}  # type: ignore
-        outlayer.dsk = subgraph  # type: ignore
+        outlayer.numblocks = {
+            i[0]: (numblocks,) for i in indices if i[1] is not None
+        }  # mypy: ignore
+        outlayer.dsk = subgraph  # mypy: ignore
         if hasattr(outlayer, "_dims"):
             del outlayer._dims
-        outlayer.indices = tuple(  # type: ignore
+        outlayer.indices = tuple(  # mypy: ignore
             (i[0], (".0",) if i[1] is not None else None) for i in indices
         )
-        outlayer.output_indices = (".0",)  # type: ignore
-        outlayer.inputs = getattr(layer0, "inputs", set())  # type: ignore
+        outlayer.output_indices = (".0",)  # mypy: ignore
+        outlayer.inputs = getattr(layer0, "inputs", set())  # mypy: ignore
         if hasattr(outlayer, "_cached_dict"):
             del outlayer._cached_dict  # reset, since original can be mutated
     return HighLevelGraph(layers, deps)

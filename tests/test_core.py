@@ -384,13 +384,13 @@ def test_to_meta(daa: Array) -> None:
 
 def test_record_str(daa: Array) -> None:
     r = daa[0]
-    assert type(r) == dak.Record
+    assert type(r) is dak.Record
     assert str(r) == "dask.awkward<getitem, type=Record>"
 
 
 def test_record_to_delayed(daa: Array) -> None:
     r = daa[0]
-    assert type(r) == dak.Record
+    assert type(r) is dak.Record
     d = r.to_delayed()
     x = r.compute().tolist()
     y = d.compute().tolist()
@@ -399,7 +399,7 @@ def test_record_to_delayed(daa: Array) -> None:
 
 def test_record_fields(daa: Array) -> None:
     r = daa[0]
-    assert type(r) == dak.Record
+    assert type(r) is dak.Record
     r._meta = None
     with pytest.raises(TypeError, match="metadata is missing"):
         assert not r.fields
@@ -407,7 +407,7 @@ def test_record_fields(daa: Array) -> None:
 
 def test_record_dir(daa: Array) -> None:
     r = daa["points"][0][0]
-    assert type(r) == dak.Record
+    assert type(r) is dak.Record
     d = dir(r)
     for f in r.fields:
         assert f in d
@@ -418,7 +418,7 @@ def test_record_dir(daa: Array) -> None:
 #     import pickle
 
 #     r = daa[0]
-#     assert type(r) == dak.Record
+#     assert type(r) is dak.Record
 #     assert isinstance(r._meta, ak.Record)
 
 #     dumped = pickle.dumps(r)
