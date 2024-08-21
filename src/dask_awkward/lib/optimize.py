@@ -4,7 +4,7 @@ import copy
 import logging
 import warnings
 from collections.abc import Iterable, Mapping, Sequence
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, cast, no_type_check
 
 import dask.config
 from awkward.typetracer import touch_data
@@ -244,6 +244,7 @@ def _mock_output(layer):
     return new_layer
 
 
+@no_type_check
 def rewrite_layer_chains(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelGraph:
     """Smush chains of blockwise layers into a single layer.
 
@@ -336,8 +337,8 @@ def rewrite_layer_chains(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelG
         layer0 = cast(Blockwise, dsk.layers[chain[0]])
         outlayer = layers[outkey]
         numblocks = [nb[0] for nb in layer0.numblocks.values() if nb[0] is not None][0]
-        deps[outkey] = deps[chain[0]]  # type: ignore
-        [deps.pop(ch) for ch in chain[:-1]]  # type: ignore
+        deps[outkey] = deps[chain[0]]
+        [deps.pop(ch) for ch in chain[:-1]]
 
         subgraph = layer0.dsk.copy()  # mypy: ignore
         indices = list(layer0.indices)
@@ -347,7 +348,7 @@ def rewrite_layer_chains(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelG
         for chain_member in chain[1:]:
             layer = dsk.layers[chain_member]
             for k in layer.io_deps:  # mypy: ignore
-                outlayer.io_deps[k] = layer.io_deps[k]  # type: ignore
+                outlayer.io_deps[k] = layer.io_deps[k]
             func, *args = layer.dsk[chain_member]  # mypy: ignore
             args2 = _recursive_replace(args, layer, parent, indices)
             subgraph[chain_member] = (func,) + tuple(args2)
