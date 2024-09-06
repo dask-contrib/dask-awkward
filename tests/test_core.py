@@ -968,3 +968,27 @@ def test_map_partitions_bad_arguments():
             array2,
             meta=empty_typetracer(),
         )
+
+
+def test_array__bool_nonzero_long_int_float_complex_index():
+    import operator
+
+    dak_arr = dak.from_awkward(ak.Array([1]), npartitions=1)
+    dask_arr = da.from_array(np.array([1]))
+
+    for fun in bool, int, float, complex, operator.index:
+        assert fun(dak_arr) == fun(dask_arr)
+
+    toolong = dak.from_awkward(ak.Array([1, 2]), npartitions=1)
+
+    with pytest.raises(
+        ValueError,
+        match=r"The truth value of a .+ is ambiguous. Use a.any\(\) or a.all\(\).",
+    ):
+        bool(toolong)
+
+    with pytest.raises(
+        TypeError, match="Only length-1 arrays can be converted to Python scalars"
+    ):
+        for fun in int, float, complex, operator.index:
+            fun(toolong)

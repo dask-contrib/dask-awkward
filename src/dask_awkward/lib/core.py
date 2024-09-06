@@ -921,6 +921,36 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
     __dask_scheduler__ = staticmethod(threaded_get)
 
+    # taken from https://github.com/dask/dask/blob/3003db5b84070b1afc197c7c70c76c5c4c2bc821/dask/array/core.py#L1854-L1883
+    def __bool__(self):
+        materialized = self.compute().to_numpy()
+        if materialized.size != 1:
+            raise ValueError(
+                f"The truth value of a {self.__class__.__name__} is ambiguous. "
+                "Use a.any() or a.all()."
+            )
+        else:
+            return bool(materialized)
+
+    def _scalarfunc(self, cast_type):
+        materialized = self.compute().to_numpy()
+        if materialized.size != 1:
+            raise TypeError("Only length-1 arrays can be converted to Python scalars")
+        else:
+            return cast_type(materialized.item())
+
+    def __int__(self):
+        return self._scalarfunc(int)
+
+    def __float__(self):
+        return self._scalarfunc(float)
+
+    def __complex__(self):
+        return self._scalarfunc(complex)
+
+    def __index__(self):
+        return self._scalarfunc(operator.index)
+
     def __setitem__(self, where: Any, what: Any) -> None:
         if not (
             isinstance(where, str)
