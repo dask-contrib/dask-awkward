@@ -34,7 +34,7 @@ from dask_awkward.lib.core import (
     typetracer_array,
 )
 from dask_awkward.lib.testutils import assert_eq
-from dask_awkward.utils import IncompatiblePartitions
+from dask_awkward.utils import IncompatiblePartitions, TracerConversionError
 
 if TYPE_CHECKING:
     from dask_awkward.lib.core import Array
@@ -973,22 +973,11 @@ def test_map_partitions_bad_arguments():
 def test_array__bool_nonzero_long_int_float_complex_index():
     import operator
 
-    dak_arr = dak.from_awkward(ak.Array([1]), npartitions=1)
-    dask_arr = da.from_array(np.array([1]))
+    tracer = dak.from_awkward(ak.Array([1]), npartitions=1)
 
     for fun in bool, int, float, complex, operator.index:
-        assert fun(dak_arr) == fun(dask_arr)
-
-    toolong = dak.from_awkward(ak.Array([1, 2]), npartitions=1)
-
-    with pytest.raises(
-        ValueError,
-        match=r"The truth value of a .+ is ambiguous. Use a.any\(\) or a.all\(\).",
-    ):
-        bool(toolong)
-
-    with pytest.raises(
-        TypeError, match="Only length-1 arrays can be converted to Python scalars"
-    ):
-        for fun in int, float, complex, operator.index:
-            fun(toolong)
+        with pytest.raises(
+            TracerConversionError,
+            match=r"Attempted to convert \(.+\) a Dask tracer to a concrete value. If you intend to convert the tracer to a concrete value, use the `.compute\(\)` method.",
+        ):
+            fun(tracer)

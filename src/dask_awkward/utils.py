@@ -38,6 +38,49 @@ class IncompatiblePartitions(ValueError):
         return msg
 
 
+class TracerConversionError(TypeError):
+    """
+    This error occurs when a tracer is used in a context that requires a concrete
+    value.
+
+
+    There are several reasons why this error might occur:
+
+    Examples
+    --------
+
+    - When a tracer is used in a conditional statement:
+
+    >>> import dask_awkward as dak
+    >>> tracer = dak.from_awkward(ak.Array([1]), npartitions=1)
+    >>> bool(dask_arr)
+    Traceback (most recent call last): ...
+    TracerConversionError: Attempted to convert (``bool(dask.awkward<from-awkward, npartitions=1>)``) a Dask tracer to a concrete value. If you intend to convert the tracer to a concrete value, use the `.compute()` method.
+
+
+    - When a tracer is cast to a Python type:
+
+    >>> import dask_awkward as dak
+    >>> tracer = dak.from_awkward(ak.Array([1]), npartitions=1)
+    >>> int(dask_arr)
+    Traceback (most recent call last): ...
+    TracerConversionError: Attempted to convert (``int(dask.awkward<from-awkward, npartitions=1>)``) a Dask tracer to a concrete value. If you intend to convert the tracer to a concrete value, use the `.compute()` method.
+
+
+    These errors can be resolved by explicitely converting the tracer to a concrete value:
+
+    >>> import dask_awkward as dak
+    >>> tracer = dak.from_awkward(ak.Array([1]), npartitions=1)
+    >>> bool(tracer.compute())
+    >>> int(tracer.compute())
+    """
+
+    def __init__(self, func: Callable, array: Array):
+        self.message = f"Attempted to convert (`{func.__name__}({array!r})`) a Dask tracer to a concrete value. "
+        self.message += "If you intend to convert the tracer to a concrete value, use the `.compute()` method."
+        super().__init__(self.message)
+
+
 class LazyInputsDict(Mapping):
     """Dictionary with lazy key value pairs
 
