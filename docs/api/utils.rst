@@ -15,7 +15,7 @@ Utilities to implement array behaviors for dask-awkward arrays.
 .. autosummary::
    :toctree: generated/
 
-   utils.TracerConversionError
+   utils.ConcretizationTypeError
 
 .. raw:: html
 

@@ -8,7 +8,6 @@ from typing_extensions import ParamSpec
 if TYPE_CHECKING:
     from dask_awkward.lib.core import Array
 
-
 T = TypeVar("T")
 P = ParamSpec("P")
 
@@ -38,9 +37,9 @@ class IncompatiblePartitions(ValueError):
         return msg
 
 
-class TracerConversionError(TypeError):
+class ConcretizationTypeError(TypeError):
     """
-    This error occurs when a tracer is used in a context that requires a concrete
+    This error occurs when a ``dask_awkward.Array`` is used in a context that requires a concrete
     value.
 
 
@@ -49,35 +48,37 @@ class TracerConversionError(TypeError):
     Examples
     --------
 
-    - When a tracer is used in a conditional statement:
+    - When a ``dask_awkward.Array`` is used in a conditional statement:
 
     >>> import dask_awkward as dak
-    >>> tracer = dak.from_awkward(ak.Array([1]), npartitions=1)
-    >>> bool(dask_arr)
+    >>> import awkward as ak
+    >>> dask_arr = dak.from_awkward(ak.Array([1]), npartitions=1)
+    >>> if dask_arr > 2:
+    >>>     dask_arr += 1
     Traceback (most recent call last): ...
-    TracerConversionError: Attempted to convert (``bool(dask.awkward<from-awkward, npartitions=1>)``) a Dask tracer to a concrete value. If you intend to convert the tracer to a concrete value, use the `.compute()` method.
+    dask_awkward.utils.ConcretizationTypeError: A dask_awkward.Array is encountered in a computation where a concrete value is expected. If you intend to convert the dask_awkward.Array to a concrete value, use the `.compute()` method. The __bool__() method was called on dask.awkward<greater, npartitions=1>.
 
-
-    - When a tracer is cast to a Python type:
+    - When a ``dask_awkward.Array`` is cast to a Python type:
 
     >>> import dask_awkward as dak
-    >>> tracer = dak.from_awkward(ak.Array([1]), npartitions=1)
+    >>> import awkward as ak
+    >>> dask_arr = dak.from_awkward(ak.Array([1]), npartitions=1)
     >>> int(dask_arr)
     Traceback (most recent call last): ...
-    TracerConversionError: Attempted to convert (``int(dask.awkward<from-awkward, npartitions=1>)``) a Dask tracer to a concrete value. If you intend to convert the tracer to a concrete value, use the `.compute()` method.
-
+    dask_awkward.utils.ConcretizationTypeError: A dask_awkward.Array is encountered in a computation where a concrete value is expected. If you intend to convert the dask_awkward.Array to a concrete value, use the `.compute()` method. The __int__() method was called on dask.awkward<from-awkward, npartitions=1>.
 
     These errors can be resolved by explicitely converting the tracer to a concrete value:
 
     >>> import dask_awkward as dak
-    >>> tracer = dak.from_awkward(ak.Array([1]), npartitions=1)
-    >>> bool(tracer.compute())
-    >>> int(tracer.compute())
+    >>> dask_arr = dak.from_awkward(ak.Array([1]), npartitions=1)
+    >>> bool(dask_arr.compute())
+    True
     """
 
-    def __init__(self, func: Callable, array: Array):
-        self.message = f"Attempted to convert (`{func.__name__}({array!r})`) a Dask tracer to a concrete value. "
-        self.message += "If you intend to convert the tracer to a concrete value, use the `.compute()` method."
+    def __init__(self, msg: str):
+        self.message = "A dask_awkward.Array is encountered in a computation where a concrete value is expected. "
+        self.message += "If you intend to convert the dask_awkward.Array to a concrete value, use the `.compute()` method. "
+        self.message += msg
         super().__init__(self.message)
 
 

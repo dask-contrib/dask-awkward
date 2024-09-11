@@ -48,9 +48,9 @@ from dask.utils import funcname, is_arraylike, key_split
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardMaterializedLayer
 from dask_awkward.lib.optimize import all_optimizations
 from dask_awkward.utils import (
+    ConcretizationTypeError,
     DaskAwkwardNotImplemented,
     IncompatiblePartitions,
-    TracerConversionError,
     field_access_to_front,
     first,
     hyphenize,
@@ -923,19 +923,21 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     __dask_scheduler__ = staticmethod(threaded_get)
 
     def __bool__(self):
-        raise TracerConversionError(bool, self)
+        raise ConcretizationTypeError(f"The __bool__() method was called on {self!r}.")
 
     def __int__(self):
-        raise TracerConversionError(int, self)
+        raise ConcretizationTypeError(f"The __int__() method was called on {self!r}.")
 
     def __float__(self):
-        raise TracerConversionError(float, self)
+        raise ConcretizationTypeError(f"The __float__() method was called on {self!r}.")
 
     def __complex__(self):
-        raise TracerConversionError(complex, self)
+        raise ConcretizationTypeError(
+            f"The __complex__() method was called on {self!r}."
+        )
 
     def __index__(self):
-        raise TracerConversionError(operator.index, self)
+        raise ConcretizationTypeError(f"The __index__() method was called on {self!r}.")
 
     def __setitem__(self, where: Any, what: Any) -> None:
         if not (
