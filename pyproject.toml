@@ -80,6 +80,12 @@ test = [
 [project.entry-points."dask.sizeof"]
 awkward = "dask_awkward_sizeof:register"
 
+[tool.hatch.build.targets.sdist.force-include]
+"../src/dask_awkward_sizeof" = "src/dask_awkward_sizeof"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dask_awkward", "src/dask_awkward_sizeof"]
+
 [project.entry-points."awkward.pickle.reduce"]
 dask_awkward = "dask_awkward.pickle:plugin"
 
