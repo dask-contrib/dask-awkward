@@ -10,6 +10,8 @@ dependencies:
   - pytest
   - pyarrow
   - awkward
-  - dask-histogram
+  # - dask-histogram
   - uproot
   - hist
+  - pip:
+      - git+https://github.com/martindurant/dask-histogram@sizeof
