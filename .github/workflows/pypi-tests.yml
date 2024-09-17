@@ -35,6 +35,7 @@ jobs:
         pip install pip wheel -U
         pip install dask[array,dataframe,distributed,diagnostics]
         pip install -q --no-cache-dir .[complete,test]
+        pip install git+https://github.com/martindurant/dask-histogram@sizeof
         pip list
     - name: test
       run: |
