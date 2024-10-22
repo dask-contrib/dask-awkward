@@ -483,6 +483,7 @@ class _ToParquetFn:
         npartitions: int,
         prefix: str | None = None,
         storage_options: dict | None = None,
+        write_metadata: bool = False,
         **kwargs: Any,
     ):
         self.fs = fs
@@ -496,6 +497,7 @@ class _ToParquetFn:
             if isinstance(self.fs.protocol, str)
             else self.fs.protocol[0]
         )
+        self.write_metadata = write_metadata
         self.kwargs = kwargs
 
     def __call__(self, data, block_index):
@@ -503,9 +505,11 @@ class _ToParquetFn:
         if self.prefix is not None:
             filename = f"{self.prefix}-{filename}"
         filename = self.fs.unstrip_protocol(f"{self.path}{self.fs.sep}{filename}")
-        return ak.to_parquet(
+        out = ak.to_parquet(
             data, filename, **self.kwargs, storage_options=self.storage_options
         )
+        if self.write_metadata:
+            return out
 
 
 def to_parquet(
@@ -667,6 +671,7 @@ def to_parquet(
             parquet_old_int96_timestamps=parquet_old_int96_timestamps,
             parquet_compliant_nested=parquet_compliant_nested,
             parquet_extra_options=parquet_extra_options,
+            write_metadata=write_metadata,
         ),
         array,
         BlockIndex((array.npartitions,)),
