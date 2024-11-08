@@ -692,6 +692,7 @@ def to_parquet(
     else:
         if fire_and_forget:
             import distributed
+
             # assume default client for now; will error if doesn't exist
             client = distributed.get_client()
             futs = client.compute(map_res.to_delayed())
