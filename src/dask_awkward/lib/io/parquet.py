@@ -541,6 +541,7 @@ def to_parquet(
     compute: bool = True,
     prefix: str | None = None,
     fire_and_forget: bool = False,
+    tree: bool = False,
 ) -> Scalar | None:
     """Write data to Parquet format.
 
@@ -690,15 +691,40 @@ def to_parquet(
             map_res.__dask_keys__()
         )
     else:
+        final_name = name + "-finalize"
         if fire_and_forget:
             import distributed
+
             # assume default client for now; will error if doesn't exist
             client = distributed.get_client()
             futs = client.compute(map_res.to_delayed())
             distributed.fire_and_forget(futs)
-            return
-        final_name = name + "-finalize"
-        dsk[(final_name, 0)] = (lambda *_: None, map_res.__dask_keys__())
+            return None
+        elif tree:
+            from dask_awkward.layers import AwkwardTreeReductionLayer
+
+            layer = AwkwardTreeReductionLayer(
+                name=final_name,
+                concat_func=none_to_none,
+                tree_node_func=none_to_none,
+                name_input=map_res.name,
+                npartitions_input=map_res.npartitions,
+                finalize_func=none_to_none,
+            )
+            graph = HighLevelGraph.from_collections(
+                final_name,
+                layer,
+                dependencies=[map_res],
+            )
+            out = new_scalar_object(graph, final_name, dtype="f8")
+            if compute:
+                out.compute()
+                return None
+            else:
+                return out
+
+        else:
+            dsk[(final_name, 0)] = (lambda *_: None, map_res.__dask_keys__())
     graph = HighLevelGraph.from_collections(
         final_name,
         AwkwardMaterializedLayer(dsk, previous_layer_names=[map_res.name]),
@@ -710,3 +736,7 @@ def to_parquet(
         return None
     else:
         return out
+
+
+def none_to_none(*_):
+    return None
