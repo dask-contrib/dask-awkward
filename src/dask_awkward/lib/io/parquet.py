@@ -540,6 +540,7 @@ def to_parquet(
     write_metadata: bool = False,
     compute: bool = True,
     prefix: str | None = None,
+    fire_and_forget: bool = False,
 ) -> Scalar | None:
     """Write data to Parquet format.
 
@@ -682,11 +683,20 @@ def to_parquet(
 
     dsk = {}
     if write_metadata:
+        if fire_and_forget:
+            raise ValueError
         final_name = name + "-metadata"
         dsk[(final_name, 0)] = (_metadata_file_from_metas, fs, path) + tuple(
             map_res.__dask_keys__()
         )
     else:
+        if fire_and_forget:
+            import distributed
+            # assume default client for now; will error if doesn't exist
+            client = distributed.get_client()
+            futs = client.compute(map_res.to_delayed())
+            distributed.fire_and_forget(futs)
+            return
         final_name = name + "-finalize"
         dsk[(final_name, 0)] = (lambda *_: None, map_res.__dask_keys__())
     graph = HighLevelGraph.from_collections(
