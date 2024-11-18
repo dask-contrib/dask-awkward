@@ -601,7 +601,10 @@ def to_parquet(
     storage_options
         Storage options passed to ``fsspec``.
     write_metadata
-        Write Parquet metadata.
+        Write Parquet metadata. Note, that when this is True, all the
+        metadata pieces will be pulled into a single finalizer task. When
+        False, the whole write graph can be evaluated as a more efficient
+        tree reduction.
     compute
         If ``True``, immediately compute the result (write data to
         disk). If ``False`` a Scalar collection will be returned such
@@ -719,4 +722,5 @@ def to_parquet(
 
 
 def none_to_none(*_):
+    """Dummy reduction function where write tasks produce no metadata"""
     return None
