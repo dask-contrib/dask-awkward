@@ -323,12 +323,12 @@ class mapfilter:
 
         hlg, meta, deps, name = _map_partitions_prepare(
             fn,
-            *args,
+            *arg_flat_deps_expanded,
+            *kwarg_flat_deps,
             label=self.label,
             token=self.token,
             meta=self.meta,
             output_divisions=None,
-            **kwargs,
         )
 
         # check consistent partitioning
