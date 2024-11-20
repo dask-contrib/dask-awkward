@@ -31,25 +31,19 @@ def test_mapfilter_multiple_return():
     @dak.mapfilter
     def fun(x):
         y = x.foo + 1
-        return (
-            y,
-            ak.sum(y),
-            some(),
-            np.ones((1, 4)),
-        )  # add first length-1 dimension to numpy array for 'correct' stacking
+        return y, (np.sum(y),), some(), ak.Array(np.ones(4))
 
-    y, y_sum, something, np_arr = fun(dak_array)
+    y, y_sum, something, arr = fun(dak_array)
 
     assert ak.all(y.compute() == ak_array.foo + 1)
-    assert ak.all(y_sum.compute() == np.array([5, 9]))
+    assert np.all(y_sum.compute() == [np.array(5), np.array(9)])
     something = something.compute()
     assert len(something) == 2
     assert all(isinstance(s, some) for s in something)
-    np_arrays = np_arr.compute()
-    assert len(np_arrays) == 2
-    for arr in np_arrays:
-        assert arr.shape == (4,)
-        assert np.all(arr == np.ones(4))
+    array = arr.compute()
+    assert len(array) == 8
+    assert array.ndim == 1
+    assert ak.all(array == ak.Array(np.ones(8)))
 
 
 def test_mapfilter_needs_outlike():

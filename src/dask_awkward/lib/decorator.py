@@ -23,36 +23,38 @@ def _single_return_map_partitions(
     meta: tp.Any,
     npartitions: int,
 ) -> tp.Any:
+    from dask.utils import (
+        is_arraylike,
+        is_dataframe_like,
+        is_index_like,
+        is_series_like,
+    )
+
     # ak.Array (this is dak.map_partitions case)
     if isinstance(meta, ak.Array):
+        # convert to typetracer if not already
+        # this happens when the user provides a concrete array (e.g. np.array)
+        # and then wraps it with ak.Array as a return type
+        if not ak.backend(meta) == "typetracer":
+            meta = ak.to_backend(meta, "typetracer")
         return new_array_object(
             hlg,
             name=name,
             meta=meta,
             npartitions=npartitions,
         )
-
-    # TODO: np.array
-    # from dask.utils import is_arraylike, is_dataframe_like, is_index_like, is_series_like
-    #
-    # elif is_arraylike(meta):
-    # this doesn't work yet, because the graph/chunking is not correct
-    #
-    # import numpy as np
-    # from dask.array.core import new_da_object
-    # meta = meta[None, ...]
-    # first = (np.nan,) * npartitions
-    # rest = ((-1,),) * (meta.ndim - 1)
-    # chunks = (first, *rest)
-    # return new_da_object(hlg, name=name, meta=meta, chunks=chunks)
-
-    # TODO: dataframe, series, index
-    # elif (
-    #     is_dataframe_like(meta)
-    #     or is_series_like(meta)
-    #     or is_index_like(meta)
-    # ): pass
-
+    # TODO: array, dataframe, series, index
+    elif (
+        is_arraylike(meta)
+        or is_dataframe_like(meta)
+        or is_series_like(meta)
+        or is_index_like(meta)
+    ):
+        msg = (
+            f"{meta=} is not (yet) supported as return type. If possible, "
+            "you can convert it to ak.Array first, or wrap it with a python container."
+        )
+        raise NotImplementedError(msg)
     # don't know? -> put it in a bag
     else:
         from dask.bag.core import Bag
@@ -101,26 +103,14 @@ def _multi_return_map_partitions(
                     dependencies=[cast(DaskCollection, tmp)],
                 )
                 dak_cache[ith_name] = hlg_pick, m_pick
-
-            # nested return case -> recurse
-            if isinstance(m_pick, tuple):
-                ret.append(
-                    _multi_return_map_partitions(
-                        hlg=hlg_pick,
-                        name=ith_name,
-                        meta=m_pick,
-                        npartitions=npartitions,
-                    )
+            ret.append(
+                _single_return_map_partitions(
+                    hlg=hlg_pick,
+                    name=ith_name,
+                    meta=m_pick,
+                    npartitions=npartitions,
                 )
-            else:
-                ret.append(
-                    _single_return_map_partitions(
-                        hlg=hlg_pick,
-                        name=ith_name,
-                        meta=m_pick,
-                        npartitions=npartitions,
-                    )
-                )
+            )
         return tuple(ret)
 
 
