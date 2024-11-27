@@ -49,9 +49,9 @@ def test_mapfilter_multiple_return():
 def test_mapfilter_needs_outlike():
     ak_array = ak.zip(
         {
-            "x": [{"foo": [10, 20, 30, 40], "bar": [10, 20, 30, 40]}],
-            "y": [{"foo": [1, 1, 1, 1], "bar": [1, 1, 1, 1]}],
-            "z": [0, 0, 0, 0],
+            "x": ak.zip({"foo": [10, 20, 30, 40], "bar": [10, 20, 30, 40]}),
+            "y": ak.zip({"foo": [1, 1, 1, 1], "bar": [1, 1, 1, 1]}),
+            "z": ak.zip({"a": [0, 0, 0, 0], "b": [2, 2, 2, 2]}),
         }
     )
     dak_array = dak.from_awkward(ak_array, 2)
@@ -73,9 +73,7 @@ def test_mapfilter_needs_outlike():
         dak.mapfilter,
         needs={"muons": [("x", "foo"), ("z",), ("y", "bar")]},
         meta=ak.Array([0.0]),
-        pre_run=False,
     )
-    out = wrap(untraceable_fun)(dak_array)  # noqa
-    # TODO
-    # cols = next(iter(dak.report_necessary_columns(out).values()))
-    # assert cols == {"pt"}
+    out = wrap(untraceable_fun)(dak_array)
+    cols = next(iter(dak.report_necessary_columns(out).values()))
+    assert cols == frozenset({"x.foo", "y.bar", "z.a", "z.b"})

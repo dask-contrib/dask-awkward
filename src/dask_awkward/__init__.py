@@ -18,13 +18,13 @@ from dask_awkward.lib.core import (
     map_partitions,
     partition_compatibility,
 )
-from dask_awkward.lib.decorator import mapfilter
 from dask_awkward.lib.describe import backend, fields
 from dask_awkward.lib.inspect import (
     report_necessary_buffers,
     report_necessary_columns,
     sample,
 )
+from dask_awkward.lib.mapfilter import mapfilter
 
 necessary_columns = report_necessary_columns  # Export for backwards compatibility.
 

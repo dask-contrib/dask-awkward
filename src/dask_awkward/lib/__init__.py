@@ -7,7 +7,6 @@ from dask_awkward.lib.core import (
     map_partitions,
     partition_compatibility,
 )
-from dask_awkward.lib.decorator import mapfilter
 from dask_awkward.lib.describe import backend, fields
 from dask_awkward.lib.inspect import (
     report_necessary_buffers,
@@ -28,6 +27,7 @@ from dask_awkward.lib.io.io import (
 from dask_awkward.lib.io.json import from_json, to_json
 from dask_awkward.lib.io.parquet import from_parquet, to_parquet
 from dask_awkward.lib.io.text import from_text
+from dask_awkward.lib.mapfilter import mapfilter
 from dask_awkward.lib.operations import concatenate
 from dask_awkward.lib.reducers import (
     all,
