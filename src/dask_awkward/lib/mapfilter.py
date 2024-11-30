@@ -118,28 +118,6 @@ def _multi_return_map_partitions(
         return tuple(ret)
 
 
-def _compare_return_vals(left: tp.Any, right: tp.Any) -> None:
-    def cmp(left, right):
-        msg = (
-            "The provided 'meta' does not match "
-            "the output type inferred from the pre-run step; "
-            "got {right}, but expected {left}.".format(left=left, right=right)
-        )
-        if isinstance(left, ak.Array):
-            if left.layout.form != right.layout.form:
-                raise ValueError(msg)
-
-        else:
-            if left != right:
-                raise ValueError(msg)
-
-    if isinstance(left, tuple) and isinstance(right, tuple):
-        for left_, right_ in zip(left, right):
-            cmp(left_, right_)
-    else:
-        cmp(left, right)
-
-
 class UntraceableFunctionError(Exception): ...
 
 
@@ -188,7 +166,7 @@ def prerun(
     fn: tp.Callable, *args: tp.Any, **kwargs: tp.Any
 ) -> tuple[tp.Any, tp.Mapping]:
     """
-    Pre-runs the provided function with typetracer arrays to determine the necessary columns/slices
+    Pre-runs the provided function with typetracer arrays to determine the necessary columns
     that should be touched explicitly and to infer the metadata of the function's output.
 
     Parameters
@@ -264,17 +242,15 @@ def prerun(
         needs = dict(_reports2needs(reports=reports))
 
         msg = (
-            f"This wrapped function '{fn}' is not traceable. "
-            f"An error occurred at line {line_number}.\n"
-            "'mapfilter' can circumvent this by providing the 'needs' and "
-            "'meta' arguments to the decorator.\n"
-            "\n- 'needs': mapping where the keys point to input argument "
-            "dask_awkward arrays and the values to columns/slices that "
-            "should be touched explicitly. The typetracing step could "
-            "determine the following necessary columns/slices.\n\n"
-            f"Pre-running reported the following 'needs':\n"
-            f"\n{needs}\n"
-            "\n- 'meta': value(s) of what the wrapped function would "
+            f"'{fn}' is not traceable, an error occurred at line {line_number}. "
+            "'dak.mapfilter' can circumvent this by providing 'needs' and "
+            "'meta' arguments to it.\n\n"
+            "- 'needs': mapping where the keys point to input argument "
+            "dask_awkward arrays and the values to columns that should "
+            "be touched explicitly. The typetracing step could determine "
+            "the following necessary columns until the exception occurred:\n\n"
+            f"{needs=}\n\n"
+            "- 'meta': value(s) of what the wrapped function would "
             "return. For arrays, only the shape and type matter."
         )
         raise UntraceableFunctionError(msg) from err
@@ -310,7 +286,7 @@ class mapfilter:
     needs : dict, optional
         If ``None`` (the default), nothing is touched in addition to the standard typetracer report.
         In certain cases, it is necessary to touch additional objects **explicitly** to get the correct typetracer report.
-        For this, provide a dictionary that maps input arguments that are arrays to the columns/slices of that array that should be touched.
+        For this, provide a dictionary that maps input arguments that are arrays to the columns of that array that should be touched.
         If ``needs`` is used together with ``meta``, **only** the columns provided by the ``needs`` argument will be touched explicitly.
     """
 
@@ -326,8 +302,8 @@ class mapfilter:
             msg = (  # type: ignore[unreachable]
                 "'needs' argument must be a mapping where the keys "
                 "point to input argument dask_awkward arrays and the values "
-                "to columns/slices that should be touched explicitly, "
-                f"got '{self.needs!r}' instead.\n\n"
+                "to columns that should be touched explicitly, "
+                f"got {self.needs!r} instead.\n\n"
                 "Exemplary usage:\n"
                 "\n@partial(mapfilter, needs={'array': ['col1', 'col2']})"
                 "\ndef process(array: ak.Array) -> ak.Array:"
