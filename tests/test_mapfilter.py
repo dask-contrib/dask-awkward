@@ -46,7 +46,7 @@ def test_mapfilter_multiple_return():
     assert ak.all(array == ak.Array(np.ones(8)))
 
 
-def test_mapfilter_needs_outlike():
+def test_mapfilter_needs_meta():
     ak_array = ak.zip(
         {
             "x": ak.zip({"foo": [10, 20, 30, 40], "bar": [10, 20, 30, 40]}),
@@ -77,3 +77,24 @@ def test_mapfilter_needs_outlike():
     out = wrap(untraceable_fun)(dak_array)
     cols = next(iter(dak.report_necessary_columns(out).values()))
     assert cols == frozenset({"x.foo", "y.bar", "z.a", "z.b"})
+
+
+def test_mapfilter_multi_dak_array_inputs():
+    ak_array1 = ak.zip({"foo": [1, 2, 3, 4], "bar": [1, 1, 1, 1]})
+    ak_array2 = ak.zip({"foo": [1, 2, 3, 4], "bar": [1, 1, 1, 1]})
+
+    @dak.mapfilter
+    def fun(x, y):
+        return x.foo + y.bar
+
+    assert ak.all(
+        fun(
+            dak.from_awkward(ak_array1, 2),
+            dak.from_awkward(ak_array2, 2),
+        ).compute()
+        == ak.Array([2, 3, 4, 5])
+    )
+
+    # test incompatible partitioning
+    with pytest.raises(ValueError):
+        fun(dak.from_awkward(ak_array1, 1), dak.from_awkward(ak_array2, 2))

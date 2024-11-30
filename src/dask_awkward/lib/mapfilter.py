@@ -18,6 +18,7 @@ from dask_awkward.lib.core import (
     to_meta,
     typetracer_array,
 )
+from dask_awkward.utils import DaskAwkwardNotImplemented
 
 
 def _single_return_map_partitions(
@@ -142,14 +143,14 @@ def _compare_return_vals(left: tp.Any, right: tp.Any) -> None:
 class UntraceableFunctionError(Exception): ...
 
 
-def _func_args(fun: tp.Callable, *args: tp.Any, **kwargs: tp.Any) -> tp.Mapping:
+def _func_args(fn: tp.Callable, *args: tp.Any, **kwargs: tp.Any) -> tp.Mapping:
     import inspect
 
-    ba = inspect.signature(fun).bind(*args, **kwargs)
+    ba = inspect.signature(fn).bind(*args, **kwargs)
     return ba.arguments
 
 
-def reports2needs(reports: tp.Mapping) -> dict:
+def _reports2needs(reports: tp.Mapping) -> dict:
     import ast
     from collections import defaultdict
 
@@ -173,7 +174,7 @@ def _replace_arrays_with_typetracers(meta: tp.Any) -> tp.Any:
             if not ak.backend(meta) == "typetracer":
                 meta = typetracer_array(meta)
         elif isinstance(meta, DakArray):
-            meta = to_meta([meta])
+            meta = to_meta([meta])[0]
         return meta
 
     if isinstance(meta, tuple):
@@ -184,21 +185,46 @@ def _replace_arrays_with_typetracers(meta: tp.Any) -> tp.Any:
 
 
 def prerun(
-    fun: tp.Callable, *args: tp.Any, **kwargs: tp.Any
+    fn: tp.Callable, *args: tp.Any, **kwargs: tp.Any
 ) -> tuple[tp.Any, tp.Mapping]:
-    in_arguments = _func_args(fun, *args, **kwargs)
+    """
+    Pre-runs the provided function with typetracer arrays to determine the necessary columns/slices
+    that should be touched explicitly and to infer the metadata of the function's output.
+
+    Parameters
+    ----------
+    fn : Callable
+        The function to be pre-run.
+    *args : Any
+        Positional arguments to be passed to the function.
+    **kwargs : Any
+        Keyword arguments to be passed to the function.
+
+    Returns
+    -------
+    tuple[Any, Mapping]
+        A tuple containing the output of the function when run with typetracer arrays and
+        a mapping of the touched columns (prepared to use with ``mapfilter(needs=...)``) generated during the typetracing step.
+    """
+    # unwrap `mapfilter`
+    if isinstance(fn, mapfilter):
+        fn = fn.fn
+
+    in_arguments = _func_args(fn, *args, **kwargs)
 
     # replace ak.Arrays with typetracers and store the reports
     reports = {}
     fun_kwargs = {}
-    args_metas = {arg: to_meta([val])[0] for arg, val in in_arguments.items()}
+    args_metas = {
+        arg: _replace_arrays_with_typetracers(val) for arg, val in in_arguments.items()
+    }
 
     # can't typetrace if no ak.Arrays are present
     ak_arrays = tuple(filter(lambda x: isinstance(x, ak.Array), args_metas.values()))
     if not ak_arrays:
         return None, {}
 
-    def render_buffer_key(
+    def _render_buffer_key(
         form: ak.forms.Form,
         form_key: str,
         attribute: str,
@@ -215,16 +241,16 @@ def prerun(
                 highlevel=True,
                 behavior=val.behavior,
                 attrs=val.attrs,
-                buffer_key=render_buffer_key,
+                buffer_key=_render_buffer_key,
             )
             reports[arg] = report
             fun_kwargs[arg] = tracer
         else:
             fun_kwargs[arg] = val
 
-    # try to run the function once with type tracers
+    # try to run the function once with typetracers
     try:
-        out = fun(**fun_kwargs)
+        out = fn(**fun_kwargs)
     except Exception as err:
         import traceback
 
@@ -235,10 +261,10 @@ def prerun(
 
         # add also the reports of the typetracer to the error message,
         # and format them as 'needs' wants it to be
-        needs = dict(reports2needs(reports=reports))
+        needs = dict(_reports2needs(reports=reports))
 
         msg = (
-            f"This wrapped function '{fun}' is not traceable. "
+            f"This wrapped function '{fn}' is not traceable. "
             f"An error occurred at line {line_number}.\n"
             "'mapfilter' can circumvent this by providing the 'needs' and "
             "'meta' arguments to the decorator.\n"
@@ -246,83 +272,71 @@ def prerun(
             "dask_awkward arrays and the values to columns/slices that "
             "should be touched explicitly. The typetracing step could "
             "determine the following necessary columns/slices.\n\n"
-            f"Typetracer reported the following 'needs':\n"
-            f"{needs}\n"
+            f"Pre-running reported the following 'needs':\n"
+            f"\n{needs}\n"
             "\n- 'meta': value(s) of what the wrapped function would "
             "return. For arrays, only the shape and type matter."
         )
         raise UntraceableFunctionError(msg) from err
-    return out, reports
+    return out, dict(_reports2needs(reports))
 
 
 @dataclass
 class mapfilter:
-    """Map a callable across all partitions of any number of collections.
-    This decorator is a convenience wrapper around the `dak.map_partitions` function.
+    """
+    A decorator to map a callable across all partitions of any number of collections.
 
-    It serves the following purposes:
-        - Turn multiple operations into a single node in the Dask graph
-        - Explicitly touch columns if necessarily without interacting with the typetracer
+    Purpose:
+    - Consolidate multiple operations into a single node in the Dask graph.
+    - Explicitly touch columns without interacting with the typetracer.
 
     Caveats:
-        - The function must use pure eager awkward inside (no delayed operations)
-        - The function must return a single argument, i.e. an awkward array
-        - The function must be emberassingly parallel
+    - The function must use pure eager awkward inside (no delayed operations).
+    - The function must be embarrassingly parallel.
 
     Parameters
     ----------
-    base_fn : Callable
-        Function to apply on all partitions, this will get wrapped to
-        handle kwargs, including dask collections.
+    fn : Callable
+        The function to apply on all partitions. This will get wrapped to handle kwargs, including Dask collections.
     label : str, optional
-        Label for the Dask graph layer; if left to ``None`` (default),
-        the name of the function will be used.
+        Label for the Dask graph layer; if left as ``None`` (default), the name of the function will be used.
     token : str, optional
-        Provide an already defined token. If ``None`` a new token will
-        be generated.
+        Provide an already defined token. If ``None``, a new token will be generated.
     meta : Any, optional
-        Metadata (typetracer) array for the result (if known). If
-        unknown, `fn` will be applied to the metadata of the `args`;
-        if that call fails, the first partition of the new collection
-        will be used to compute the new metadata **if** the
-        ``awkward.compute-known-meta`` configuration setting is
-        ``True``. If the configuration setting is ``False``, an empty
-        typetracer will be assigned as the metadata.
+        Metadata for the result (if known). If unknown, `fn` will be applied to the metadata of the `args`.
+        If provided, the tracing step will be skipped and the provided metadata is used as return value(s) of `fn`.
     traverse : bool
-        Unpack basic python containers to find dask collections.
-    needs: dict, optional
-        If ``None`` (the default), nothing is touched in addition to the
-        standard typetracer report. In certain cases, it is necessary to
-        touch additional objects **explicitly** to get the correct typetracer report.
-        For this, provide a dictionary that maps input argument that's an array to
-        the columns/slice of that array that should be touched.
+        Unpack basic Python containers to find Dask collections.
+    needs : dict, optional
+        If ``None`` (the default), nothing is touched in addition to the standard typetracer report.
+        In certain cases, it is necessary to touch additional objects **explicitly** to get the correct typetracer report.
+        For this, provide a dictionary that maps input arguments that are arrays to the columns/slices of that array that should be touched.
+        If ``needs`` is used together with ``meta``, **only** the columns provided by the ``needs`` argument will be touched explicitly.
     """
 
-    base_fn: tp.Callable
+    fn: tp.Callable
     label: str | None = None
     token: str | None = None
     meta: tp.Any | None = None
     traverse: bool = True
-    # additional options that are not available in dak.map_partitions
     needs: tp.Mapping | None = None
 
     def __post_init__(self) -> None:
         if self.needs is not None and not isinstance(self.needs, tp.Mapping):
-            # this is reachable, mypy doesn't understand this
             msg = (  # type: ignore[unreachable]
                 "'needs' argument must be a mapping where the keys "
                 "point to input argument dask_awkward arrays and the values "
                 "to columns/slices that should be touched explicitly, "
                 f"got '{self.needs!r}' instead.\n\n"
                 "Exemplary usage:\n"
-                "\n@partial(mapfilter, needs={'array': ['col1', 'ecol2']})"
+                "\n@partial(mapfilter, needs={'array': ['col1', 'col2']})"
                 "\ndef process(array: ak.Array) -> ak.Array:"
                 "\n  return array.col1 + array.col2"
             )
             raise ValueError(msg)
 
     def wrapped_fn(self, *args: tp.Any, **kwargs: tp.Any) -> tp.Any:
-        in_arguments = _func_args(self.base_fn, *args, **kwargs)
+        in_arguments = _func_args(self.fn, *args, **kwargs)
         if self.needs is not None:
             tobe_touched = set()
             for arg in self.needs.keys():
@@ -338,7 +352,6 @@ class mapfilter:
                         f"Can only touch columns of an awkward array, got {array}."
                     )
                 if ak.backend(array) == "typetracer":
-                    # touch the objects explicitly
                     for slce in self.needs[arg]:
                         ak.typetracer.touch_data(array[slce])
 
@@ -347,9 +360,8 @@ class mapfilter:
                 arg for arg in in_arguments.values() if isinstance(arg, ak.Array)
             ]
             if all(ak.backend(arr) == "typetracer" for arr in ak_arrays):
-                # if the meta is known, we can use it to skip the tracing step
                 return self.meta
-        return self.base_fn(*args, **kwargs)
+        return self.fn(*args, **kwargs)
 
     def __call__(self, *args: tp.Any, **kwargs: tp.Any) -> tp.Any:
         fn, arg_flat_deps_expanded, kwarg_flat_deps = _to_packed_fn_args(
@@ -373,25 +385,25 @@ class mapfilter:
                 meta=meta,
                 output_divisions=None,
             )
+        # handle the case where the function is not implemented for Dask arrays in dask-awkward
+        except DaskAwkwardNotImplemented as err:
+            raise err from None
+        # handle the case where the function is not traceable - for whatever reason
         except Exception as err:
-            # if there's a problem with typetracing, we can report it and recommend a 'prerun'
             if in_typetracing_mode:
-                fn_args = _func_args(self.base_fn, *args, **kwargs)
+                fn_args = _func_args(self.fn, *args, **kwargs)
                 sig_str = ", ".join(f"{k}={v}" for k, v in fn_args.items())
                 msg = (
-                    f"Failed to trace the function '{self.base_fn}'. "
+                    f"Failed to trace the function '{self.fn}'. "
                     "You can use 'needs' and 'meta' to circumvent this step. "
                     "For this, it might be helpful to do a pre-run of the function:"
-                    f"\n\n\tfrom dask_awkward.lib.mapfilter import prerun"
-                    f"\n\n\tprerun({self.base_fn.__name__}, {sig_str})"
+                    f"\n\n\tmeta, needs = dak.prerun({self.fn.__name__}, {sig_str})"
                     f"\n\nThis may help to infer the correct `needs` for `mapfilter`."
                 )
                 raise UntraceableFunctionError(msg) from err
-            # otherwise, just raise the error - whatever it is
             else:
                 raise err from None
 
-        # check consistent partitioning
         if len(deps) == 0:
             raise ValueError("Need at least one input that is a dask collection.")
         elif len(deps) == 1:
