@@ -183,6 +183,23 @@ def prerun(
     tuple[Any, Mapping]
         A tuple containing the output of the function when run with typetracer arrays and
         a mapping of the touched columns (prepared to use with ``mapfilter(needs=...)``) generated during the typetracing step.
+
+    Examples
+    --------
+    >>> import awkward as ak
+    >>> import dask_awkward as dak
+    >>>
+    >>> ak_array = ak.zip({"foo": [1, 2, 3, 4], "bar": [1, 1, 1, 1]})
+    >>> dak_array = dak.from_awkward(ak_array, 2)
+    >>>
+    >>> def process(array: ak.Array) -> ak.Array:
+    >>>   return array.foo + array.bar
+    >>>
+    >>> meta, needs = dak.prerun(process, array)
+    >>> print(meta)
+    <Array-typetracer [...] type='## * int64'>
+    >>> print(needs)
+    {'array': [('bar',), ('foo',)]}
     """
     # unwrap `mapfilter`
     if isinstance(fn, mapfilter):
@@ -261,14 +278,7 @@ def prerun(
 class mapfilter:
     """
     A decorator to map a callable across all partitions of any number of collections.
-
-    Purpose:
-    - Consolidate multiple operations into a single node in the Dask graph.
-    - Explicitly touch columns without interacting with the typetracer.
-
-    Caveats:
-    - The function must use pure eager awkward inside (no delayed operations).
-    - The function must be embarrassingly parallel.
+    The function will be treated as a single node in the Dask graph.
 
     Parameters
     ----------
@@ -288,6 +298,25 @@ class mapfilter:
         In certain cases, it is necessary to touch additional objects **explicitly** to get the correct typetracer report.
         For this, provide a dictionary that maps input arguments that are arrays to the columns of that array that should be touched.
         If ``needs`` is used together with ``meta``, **only** the columns provided by the ``needs`` argument will be touched explicitly.
+
+    Examples
+    --------
+
+    .. code-block:: ipython
+
+        import awkward as ak
+        import dask_awkward as dak
+
+        ak_array = ak.zip({"foo": [1, 2, 3, 4], "bar": [1, 1, 1, 1]})
+        dak_array = dak.from_awkward(ak_array, 2)
+
+        @dak.mapfilter
+        def process(array: ak.Array) -> ak.Array:
+          return array.foo * 2
+
+        out = process(dak_array)
+        print(out.compute())
+        # <Array [2, 4, 6, 8] type='4 * int64'>
     """
 
     fn: tp.Callable
