@@ -388,7 +388,7 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
     def _rebuild(self, dsk, *, rename=None):
         name = self._name
         if rename:
-            raise ValueError("rename= unsupported in dask-awkward")
+            name = rename.get(name, name)
         return type(self)(dsk, name, self._meta, self.known_value)
 
     def __reduce__(self):
@@ -969,7 +969,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     def _rebuild(self, dsk, *, rename=None):
         name = self.name
         if rename:
-            raise ValueError("rename= unsupported in dask-awkward")
+            name = rename.get(name, name)
         return Array(dsk, name, self._meta, divisions=self.divisions)
 
     def reset_meta(self) -> None:
