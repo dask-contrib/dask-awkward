@@ -167,9 +167,6 @@ def test_array_rebuild(ndjson_points_file: str) -> None:
     y = daa.compute()
     assert x.tolist() == y.tolist()
 
-    with pytest.raises(ValueError, match="rename= unsupported"):
-        daa._rebuild(daa.dask, rename={"x": "y"})
-
 
 def test_type(ndjson_points_file: str) -> None:
     daa = dak.from_json([ndjson_points_file] * 2)
@@ -661,14 +658,10 @@ def test_array_persist(daa: Array) -> None:
     assert_eq(daa2, daa)
 
 
-def test_scalar_persist_and_rebuild(daa: Array) -> None:
+def test_scalar_persist(daa: Array) -> None:
     coll = daa["points"][0]["x"][0]
     coll2 = coll.persist()
     assert_eq(coll, coll2)
-
-    m = dak.max(daa.points.x, axis=None)
-    with pytest.raises(ValueError, match="rename= unsupported"):
-        m._rebuild(m.dask, rename={m._name: "max2"})
 
 
 def test_output_divisions(daa: Array) -> None:
