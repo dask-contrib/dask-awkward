@@ -1956,19 +1956,6 @@ class ArgsKwargsPackedFunction:
         self.arg_lens_for_repackers = arg_lens_for_repackers
 
     def _repack(self, *args_deps_expanded):
-        args = []
-        len_args = 0
-        for repacker, n_args in zip(self.arg_repackers, self.arg_lens_for_repackers):
-            args.append(
-                repacker(args_deps_expanded[len_args : len_args + n_args])[0]
-                if repacker is not None
-                else args_deps_expanded[len_args]
-            )
-            len_args += n_args
-        kwargs = self.kwarg_repacker(args_deps_expanded[len_args:])[0]
-        return args, kwargs
-
-    def __call__(self, *args_deps_expanded):
         """This packing function receives a list of strictly
         ordered arguments. The first range of arguments,
         [0:sum(self.arg_lens_for_repackers)], corresponding to
@@ -1982,6 +1969,19 @@ class ArgsKwargsPackedFunction:
         The various repackers deal with restructuring the received flattened
         list into the shape that self.fn expects.
         """
+        args = []
+        len_args = 0
+        for repacker, n_args in zip(self.arg_repackers, self.arg_lens_for_repackers):
+            args.append(
+                repacker(args_deps_expanded[len_args : len_args + n_args])[0]
+                if repacker is not None
+                else args_deps_expanded[len_args]
+            )
+            len_args += n_args
+        kwargs = self.kwarg_repacker(args_deps_expanded[len_args:])[0]
+        return args, kwargs
+
+    def __call__(self, *args_deps_expanded):
         args, kwargs = self._repack(*args_deps_expanded)
         return self.fn(*args, **kwargs)
 
