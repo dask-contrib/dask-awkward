@@ -167,7 +167,7 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         )
 
         if _dask_uses_tasks:
-            super().__init__( # type: ignore
+            super().__init__(  # type: ignore
                 output=self.name,
                 output_indices="i",
                 task=Task(name, self.io_func, blockwise_token(0)),
@@ -176,7 +176,7 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
                 annotations=None,
             )
         else:
-            super().__init__( # type: ignore
+            super().__init__(  # type: ignore
                 output=self.name,
                 output_indices="i",
                 dsk={name: (self.io_func, blockwise_token(0))},
