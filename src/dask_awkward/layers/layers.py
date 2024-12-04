@@ -180,9 +180,9 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         }
 
         if _dask_uses_tasks:
-            task = convert_legacy_graph(super_args["dsk"])
-            super_args["task"] = task
-            super_args.pop("dsk")
+            task = convert_legacy_graph(super_kwargs["dsk"])
+            super_kwargs["task"] = task
+            super_kwargs.pop("dsk")
 
         super().__init__(**super_kwargs)
 
