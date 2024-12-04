@@ -4,7 +4,12 @@ import copy
 from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeVar, Union, cast
 
-from dask._task_spec import Task
+_dask_uses_tasks = True
+try:
+    from dask._task_spec import Task
+except ModuleNotFoundError as _:
+    _dask_uses_tasks = False
+
 from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
 from dask.highlevelgraph import MaterializedLayer
 from dask.layers import DataFrameTreeReduction
@@ -161,14 +166,24 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
             produces_tasks=self.produces_tasks,
         )
 
-        super().__init__(
-            output=self.name,
-            output_indices="i",
-            task=Task(name, self.io_func, blockwise_token(0)),
-            indices=[(io_arg_map, "i")],
-            numblocks={},
-            annotations=None,
-        )
+        if _dask_uses_tasks:
+            super().__init__(
+                output=self.name,
+                output_indices="i",
+                task=Task(name, self.io_func, blockwise_token(0)),
+                indices=[(io_arg_map, "i")],
+                numblocks={},
+                annotations=None,
+            )
+        else:
+            super().__init__(
+                output=self.name,
+                output_indices="i",
+                dsk={name: (self.io_func, blockwise_token(0))},
+                indices=[(io_arg_map, "i")],
+                numblocks={},
+                annotations=None,
+            )
 
     def __repr__(self) -> str:
         return f"AwkwardInputLayer<{self.output}>"
