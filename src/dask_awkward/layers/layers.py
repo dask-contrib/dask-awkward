@@ -6,8 +6,10 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeVar, Union, cast
 
 _dask_uses_tasks = True
 try:
-    from dask._task_spec import Task
+    from dask._task_spec import convert_legacy_graph
 except ModuleNotFoundError as _:
+    def convert_legacy_graph(_):
+        return _
     _dask_uses_tasks = False
 
 from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
@@ -166,24 +168,21 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
             produces_tasks=self.produces_tasks,
         )
 
+        super_kwargs = {
+            "output": self.name,
+            "output_indices": "i",
+            "dsk": {name: (self.io_func, blockwise_token(0))},
+            "indices": [(io_arg_map, "i")],
+            "numblocks": {},
+            "annotations": None,
+        }
+        
         if _dask_uses_tasks:
-            super().__init__(  # type: ignore
-                output=self.name,
-                output_indices="i",
-                task=Task(name, self.io_func, blockwise_token(0)),
-                indices=[(io_arg_map, "i")],
-                numblocks={},
-                annotations=None,
-            )
-        else:
-            super().__init__(
-                output=self.name,
-                output_indices="i",
-                dsk={name: (self.io_func, blockwise_token(0))},
-                indices=[(io_arg_map, "i")],
-                numblocks={},
-                annotations=None,
-            )
+            task = convert_legacy_graph(super_args["dsk"])
+            super_args["task"] = task
+            super_args.pop("dsk")
+       
+        super().__init__(**super_kwargs)
 
     def __repr__(self) -> str:
         return f"AwkwardInputLayer<{self.output}>"
