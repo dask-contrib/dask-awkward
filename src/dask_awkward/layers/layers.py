@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import copy
-from collections.abc import Callable, Container, Mapping
+from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeVar, Union, cast
 
 _dask_uses_tasks = True
@@ -180,7 +180,7 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         }
 
         if _dask_uses_tasks:
-            task = convert_legacy_graph(super_kwargs["dsk"])
+            task = convert_legacy_graph(super_kwargs["dsk"])  # type: ignore
             super_kwargs["task"] = task
             super_kwargs.pop("dsk")
 
