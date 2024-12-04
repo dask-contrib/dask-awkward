@@ -9,8 +9,8 @@ try:
     from dask._task_spec import convert_legacy_graph
 except ModuleNotFoundError as _:
 
-    def convert_legacy_graph(_):
-        return _
+    def convert_legacy_graph(dsk: Mapping, all_keys: Container | None = None):
+        return dsk
 
     _dask_uses_tasks = False
 
@@ -184,7 +184,7 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
             super_kwargs["task"] = task
             super_kwargs.pop("dsk")
 
-        super().__init__(**super_kwargs)
+        super().__init__(**super_kwargs)  # type: ignore
 
     def __repr__(self) -> str:
         return f"AwkwardInputLayer<{self.output}>"
