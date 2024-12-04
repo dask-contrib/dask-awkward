@@ -9,7 +9,7 @@ try:
     from dask._task_spec import convert_legacy_graph
 except ModuleNotFoundError as _:
 
-    def convert_legacy_graph(dsk, all_keys=None):
+    def convert_legacy_graph(dsk, all_keys=None):  # type: ignore
         return dsk
 
     _dask_uses_tasks = False
