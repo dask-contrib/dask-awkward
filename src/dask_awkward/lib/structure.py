@@ -15,13 +15,21 @@ from dask.base import is_dask_collection, tokenize, unpack_collections
 from dask.highlevelgraph import HighLevelGraph
 
 from dask_awkward.layers import AwkwardMaterializedLayer
-from dask_awkward.lib.core import (Array, PartitionCompatibility,
-                                   _map_partitions, map_partitions,
-                                   new_known_scalar, new_scalar_object,
-                                   partition_compatibility)
-from dask_awkward.utils import (DaskAwkwardNotImplemented,
-                                IncompatiblePartitions, borrow_docstring,
-                                first)
+from dask_awkward.lib.core import (
+    Array,
+    PartitionCompatibility,
+    _map_partitions,
+    map_partitions,
+    new_known_scalar,
+    new_scalar_object,
+    partition_compatibility,
+)
+from dask_awkward.utils import (
+    DaskAwkwardNotImplemented,
+    IncompatiblePartitions,
+    borrow_docstring,
+    first,
+)
 
 if TYPE_CHECKING:
     from numpy.typing import DTypeLike

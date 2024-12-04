@@ -13,8 +13,11 @@ from fsspec.core import get_fs_token_paths
 from fsspec.utils import infer_compression, read_block
 
 from dask_awkward.lib.core import Array
-from dask_awkward.lib.io.io import (_bytes_with_sample,
-                                    _BytesReadingInstructions, from_map)
+from dask_awkward.lib.io.io import (
+    _bytes_with_sample,
+    _BytesReadingInstructions,
+    from_map,
+)
 
 
 def _string_array_from_bytestring(bytestring: bytes, delimiter: bytes) -> ak.Array:

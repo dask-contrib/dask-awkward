@@ -16,14 +16,23 @@ import pytest
 from dask.delayed import delayed
 
 import dask_awkward as dak
-from dask_awkward.lib.core import (Record, Scalar, calculate_known_divisions,
-                                   compute_typetracer, empty_typetracer,
-                                   is_typetracer, map_partitions,
-                                   meta_or_identity, new_array_object,
-                                   new_known_scalar, new_record_object,
-                                   new_scalar_object,
-                                   normalize_single_outer_inner_index, to_meta,
-                                   typetracer_array)
+from dask_awkward.lib.core import (
+    Record,
+    Scalar,
+    calculate_known_divisions,
+    compute_typetracer,
+    empty_typetracer,
+    is_typetracer,
+    map_partitions,
+    meta_or_identity,
+    new_array_object,
+    new_known_scalar,
+    new_record_object,
+    new_scalar_object,
+    normalize_single_outer_inner_index,
+    to_meta,
+    typetracer_array,
+)
 from dask_awkward.lib.testutils import assert_eq
 from dask_awkward.utils import ConcretizationTypeError, IncompatiblePartitions
 

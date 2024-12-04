@@ -15,8 +15,7 @@ import pyarrow as pa
 import pyarrow.dataset as pad
 
 import dask_awkward as dak
-from dask_awkward.lib.io.parquet import (_metadata_file_from_data_files,
-                                         to_parquet)
+from dask_awkward.lib.io.parquet import _metadata_file_from_data_files, to_parquet
 from dask_awkward.lib.testutils import assert_eq
 
 data = [[1, 2, 3], [4, None], None]

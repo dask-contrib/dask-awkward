@@ -9,8 +9,7 @@ import pytest
 
 import dask_awkward as dak
 import dask_awkward.lib.core as dakc
-from dask_awkward.lib.core import (DaskAwkwardNotImplemented,
-                                   IncompatiblePartitions)
+from dask_awkward.lib.core import DaskAwkwardNotImplemented, IncompatiblePartitions
 from dask_awkward.lib.testutils import assert_eq
 
 

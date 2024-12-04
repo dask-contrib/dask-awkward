@@ -4,18 +4,22 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 import awkward as ak
-from awkward.operations.ak_concatenate import \
-    enforce_concatenated_form as enforce_layout_to_concatenated_form
+from awkward.operations.ak_concatenate import (
+    enforce_concatenated_form as enforce_layout_to_concatenated_form,
+)
 from awkward.typetracer import typetracer_from_form
 from dask.base import tokenize
 from dask.highlevelgraph import HighLevelGraph
 
 from dask_awkward.layers import AwkwardMaterializedLayer
-from dask_awkward.lib.core import (Array, PartitionCompatibility,
-                                   map_partitions, new_array_object,
-                                   partition_compatibility)
-from dask_awkward.utils import (DaskAwkwardNotImplemented,
-                                IncompatiblePartitions)
+from dask_awkward.lib.core import (
+    Array,
+    PartitionCompatibility,
+    map_partitions,
+    new_array_object,
+    partition_compatibility,
+)
+from dask_awkward.utils import DaskAwkwardNotImplemented, IncompatiblePartitions
 
 if TYPE_CHECKING:
     from awkward.forms import Form

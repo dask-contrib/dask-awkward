@@ -19,8 +19,7 @@ from fsspec import AbstractFileSystem
 from fsspec.core import get_fs_token_paths, url_to_fs
 
 from dask_awkward.layers.layers import AwkwardMaterializedLayer
-from dask_awkward.lib.core import (Array, Scalar, map_partitions,
-                                   new_scalar_object)
+from dask_awkward.lib.core import Array, Scalar, map_partitions, new_scalar_object
 from dask_awkward.lib.io.columnar import ColumnProjectionMixin
 from dask_awkward.lib.io.io import from_map
 from dask_awkward.lib.unproject_layout import unproject_layout

@@ -21,10 +21,20 @@ import dask.config
 import numpy as np
 from awkward._do import remove_structure as ak_do_remove_structure
 from awkward.highlevel import NDArrayOperatorsMixin, _dir_pattern
-from awkward.typetracer import (MaybeNone, OneOf, TypeTracerArray,
-                                create_unknown_scalar, is_unknown_scalar)
-from dask.base import (DaskMethodsMixin, dont_optimize, is_dask_collection,
-                       tokenize, unpack_collections)
+from awkward.typetracer import (
+    MaybeNone,
+    OneOf,
+    TypeTracerArray,
+    create_unknown_scalar,
+    is_unknown_scalar,
+)
+from dask.base import (
+    DaskMethodsMixin,
+    dont_optimize,
+    is_dask_collection,
+    tokenize,
+    unpack_collections,
+)
 from dask.blockwise import BlockwiseDep
 from dask.blockwise import blockwise as dask_blockwise
 from dask.context import globalmethod
@@ -37,10 +47,15 @@ from dask.utils import funcname, is_arraylike, key_split
 
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardMaterializedLayer
 from dask_awkward.lib.optimize import all_optimizations
-from dask_awkward.utils import (ConcretizationTypeError,
-                                DaskAwkwardNotImplemented,
-                                IncompatiblePartitions, field_access_to_front,
-                                first, hyphenize, is_empty_slice)
+from dask_awkward.utils import (
+    ConcretizationTypeError,
+    DaskAwkwardNotImplemented,
+    IncompatiblePartitions,
+    field_access_to_front,
+    first,
+    hyphenize,
+    is_empty_slice,
+)
 
 if TYPE_CHECKING:
     from awkward.contents.content import Content
@@ -981,8 +996,10 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
           (npartitions=1) is a special case of this.
         """
         from dask_awkward.layers import AwkwardMaterializedLayer
-        from dask_awkward.lib.structure import (repartition_layer,
-                                                simple_repartition_layer)
+        from dask_awkward.lib.structure import (
+            repartition_layer,
+            simple_repartition_layer,
+        )
 
         if (
             sum(
