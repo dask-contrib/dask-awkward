@@ -176,7 +176,7 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
                 annotations=None,
             )
         else:
-            super().__init__(  # type: ignore
+            super().__init__(
                 output=self.name,
                 output_indices="i",
                 dsk={name: (self.io_func, blockwise_token(0))},
