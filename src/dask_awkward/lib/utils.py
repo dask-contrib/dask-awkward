@@ -2,7 +2,8 @@ from __future__ import annotations
 
 __all__ = ("trace_form_structure", "buffer_keys_required_to_compute_shapes")
 
-from collections.abc import Callable, Iterable, Iterator, Mapping, MutableMapping
+from collections.abc import (Callable, Iterable, Iterator, Mapping,
+                             MutableMapping)
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, TypedDict, TypeVar
 

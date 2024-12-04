@@ -3,12 +3,8 @@ from __future__ import annotations
 import pytest
 
 from dask_awkward.lib.utils import typetracer_nochecks
-from dask_awkward.utils import (
-    LazyInputsDict,
-    field_access_to_front,
-    hyphenize,
-    is_empty_slice,
-)
+from dask_awkward.utils import (LazyInputsDict, field_access_to_front,
+                                hyphenize, is_empty_slice)
 
 
 def test_is_empty_slice() -> None:

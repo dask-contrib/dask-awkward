@@ -8,21 +8,13 @@ from awkward import Array as AwkwardArray
 from awkward.forms import Form
 from awkward.typetracer import typetracer_from_form, typetracer_with_report
 
-from dask_awkward.layers.layers import (
-    BackendT,
-    ImplementsIOFunction,
-    ImplementsNecessaryColumns,
-)
-from dask_awkward.lib.utils import (
-    METADATA_ATTRIBUTES,
-    FormStructure,
-    buffer_keys_required_to_compute_shapes,
-    form_with_unique_keys,
-    parse_buffer_key,
-    render_buffer_key,
-    trace_form_structure,
-    walk_graph_depth_first,
-)
+from dask_awkward.layers.layers import (BackendT, ImplementsIOFunction,
+                                        ImplementsNecessaryColumns)
+from dask_awkward.lib.utils import (METADATA_ATTRIBUTES, FormStructure,
+                                    buffer_keys_required_to_compute_shapes,
+                                    form_with_unique_keys, parse_buffer_key,
+                                    render_buffer_key, trace_form_structure,
+                                    walk_graph_depth_first)
 
 if TYPE_CHECKING:
     from awkward._nplikes.typetracer import TypeTracerReport

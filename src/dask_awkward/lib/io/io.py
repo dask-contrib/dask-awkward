@@ -18,24 +18,16 @@ from dask.local import identity
 from dask.utils import funcname, is_integer, parse_bytes
 from fsspec.utils import infer_compression
 
-from dask_awkward.layers.layers import (
-    AwkwardBlockwiseLayer,
-    AwkwardInputLayer,
-    AwkwardMaterializedLayer,
-    AwkwardTreeReductionLayer,
-    ImplementsMocking,
-    ImplementsReport,
-    IOFunctionWithMocking,
-    io_func_implements_mocking,
-    io_func_implements_report,
-)
-from dask_awkward.lib.core import (
-    Array,
-    empty_typetracer,
-    map_partitions,
-    new_array_object,
-    typetracer_array,
-)
+from dask_awkward.layers.layers import (AwkwardBlockwiseLayer,
+                                        AwkwardInputLayer,
+                                        AwkwardMaterializedLayer,
+                                        AwkwardTreeReductionLayer,
+                                        ImplementsMocking, ImplementsReport,
+                                        IOFunctionWithMocking,
+                                        io_func_implements_mocking,
+                                        io_func_implements_report)
+from dask_awkward.lib.core import (Array, empty_typetracer, map_partitions,
+                                   new_array_object, typetracer_array)
 from dask_awkward.lib.io.columnar import ColumnProjectionMixin
 from dask_awkward.utils import first, second
 

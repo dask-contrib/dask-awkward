@@ -5,36 +5,15 @@ from typing import Any
 
 import awkward as ak
 import numpy as np
-from awkward.contents import (
-    BitMaskedArray,
-    ByteMaskedArray,
-    Content,
-    EmptyArray,
-    IndexedArray,
-    IndexedOptionArray,
-    ListArray,
-    ListOffsetArray,
-    NumpyArray,
-    RecordArray,
-    RegularArray,
-    UnionArray,
-    UnmaskedArray,
-)
-from awkward.forms import (
-    BitMaskedForm,
-    ByteMaskedForm,
-    EmptyForm,
-    Form,
-    IndexedForm,
-    IndexedOptionForm,
-    ListForm,
-    ListOffsetForm,
-    NumpyForm,
-    RecordForm,
-    RegularForm,
-    UnionForm,
-    UnmaskedForm,
-)
+from awkward.contents import (BitMaskedArray, ByteMaskedArray, Content,
+                              EmptyArray, IndexedArray, IndexedOptionArray,
+                              ListArray, ListOffsetArray, NumpyArray,
+                              RecordArray, RegularArray, UnionArray,
+                              UnmaskedArray)
+from awkward.forms import (BitMaskedForm, ByteMaskedForm, EmptyForm, Form,
+                           IndexedForm, IndexedOptionForm, ListForm,
+                           ListOffsetForm, NumpyForm, RecordForm, RegularForm,
+                           UnionForm, UnmaskedForm)
 from awkward.typetracer import PlaceholderArray, unknown_length
 
 index_of = {
