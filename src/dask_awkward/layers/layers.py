@@ -8,8 +8,10 @@ _dask_uses_tasks = True
 try:
     from dask._task_spec import convert_legacy_graph
 except ModuleNotFoundError as _:
+
     def convert_legacy_graph(_):
         return _
+
     _dask_uses_tasks = False
 
 from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
@@ -176,12 +178,12 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
             "numblocks": {},
             "annotations": None,
         }
-        
+
         if _dask_uses_tasks:
             task = convert_legacy_graph(super_args["dsk"])
             super_args["task"] = task
             super_args.pop("dsk")
-       
+
         super().__init__(**super_kwargs)
 
     def __repr__(self) -> str:
