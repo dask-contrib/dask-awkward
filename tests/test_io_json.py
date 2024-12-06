@@ -10,6 +10,7 @@ import fsspec
 import pytest
 
 import dask_awkward as dak
+from dask_awkward.layers import _dask_uses_tasks
 from dask_awkward.lib.core import Array
 from dask_awkward.lib.optimize import optimize as dak_optimize
 from dask_awkward.lib.testutils import assert_eq
@@ -94,8 +95,11 @@ def input_layer_array_partition0(collection: Array) -> ak.Array:
         optimized_hlg = dak_optimize(collection.dask, collection.keys)  # type: ignore
         layers = list(optimized_hlg.layers)  # type: ignore
         layer_name = [name for name in layers if name.startswith("from-json")][0]
-        sgc, arg = optimized_hlg[(layer_name, 0)]
-        array = sgc.dsk[layer_name][0](arg)
+        if _dask_uses_tasks:
+            array = optimized_hlg[(layer_name, 0)]()
+        else:
+            sgc, arg = optimized_hlg[(layer_name, 0)]
+            array = sgc.dsk[layer_name][0](arg)
     return array
 
 

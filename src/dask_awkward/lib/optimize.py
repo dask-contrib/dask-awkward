@@ -238,14 +238,23 @@ def _touch_all_data(*args, **kwargs):
 
 def _mock_output(layer):
     """Update a layer to run the _touch_all_data."""
-    assert len(layer.dsk) == 1
+    if _dask_uses_tasks:
+        new_layer = copy.deepcopy(layer)
+        task = new_layer.task.copy()
+        # replace the original function with _touch_all_data
+        # and keep the rest of the task the same
+        task.func = _touch_all_data
+        new_layer.task = task
+        return new_layer
+    else:
+        assert len(layer.dsk) == 1
 
-    new_layer = copy.deepcopy(layer)
-    mp = new_layer.dsk.copy()
-    for k in iter(mp.keys()):
-        mp[k] = (_touch_all_data,) + mp[k][1:]
-    new_layer.dsk = mp
-    return new_layer
+        new_layer = copy.deepcopy(layer)
+        mp = new_layer.dsk.copy()
+        for k in iter(mp.keys()):
+            mp[k] = (_touch_all_data,) + mp[k][1:]
+        new_layer.dsk = mp
+        return new_layer
 
 
 @no_type_check
@@ -358,10 +367,13 @@ def rewrite_layer_chains(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelG
                 outlayer.io_deps[k] = layer.io_deps[k]
 
             if _dask_uses_tasks:
-                from dask._task_spec import Task
+                from dask._task_spec import GraphNode, Task
 
                 func = layer.task.func
-                args = layer.task.dependencies
+                args = [
+                    arg.key if isinstance(arg, GraphNode) else arg
+                    for arg in layer.task.args
+                ]
                 # how to do this with `.substitute(...)`?
                 args2 = _recursive_replace(args, layer, parent, indices)
                 all_tasks.append(Task(chain_member, func, *args2))
@@ -408,7 +420,13 @@ def _recursive_replace(args, layer, parent, indices):
             else:
                 # arg refers to things defined in io_deps
                 indices.append(layer.indices[ind])
-                args2.append(f"__dask_blockwise__{len(indices) - 1}")
+                arg2 = f"__dask_blockwise__{len(indices) - 1}"
+                if _dask_uses_tasks:
+                    from dask._task_spec import TaskRef
+
+                    args2.append(TaskRef(arg2))
+                else:
+                    args2.append(arg2)
         elif isinstance(arg, list):
             args2.append(_recursive_replace(arg, layer, parent, indices))
         elif isinstance(arg, tuple):
