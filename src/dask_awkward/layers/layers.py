@@ -4,15 +4,9 @@ import copy
 from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeVar, Union, cast
 
-_dask_uses_tasks = True
-try:
-    from dask._task_spec import convert_legacy_graph
-except ModuleNotFoundError as _:
+import dask
 
-    def convert_legacy_graph(dsk, all_keys=None):  # type: ignore
-        return dsk
-
-    _dask_uses_tasks = False
+_dask_uses_tasks = dask.__version__ >= "2024.12.0"
 
 from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
 from dask.highlevelgraph import MaterializedLayer
@@ -170,21 +164,22 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
             produces_tasks=self.produces_tasks,
         )
 
-        super_kwargs = {
+        super_kwargs: dict[str, Any] = {
             "output": self.name,
             "output_indices": "i",
-            "dsk": {name: (self.io_func, blockwise_token(0))},
             "indices": [(io_arg_map, "i")],
             "numblocks": {},
             "annotations": None,
         }
 
         if _dask_uses_tasks:
-            task = convert_legacy_graph(super_kwargs["dsk"])  # type: ignore
-            super_kwargs["task"] = task
-            super_kwargs.pop("dsk")
+            from dask._task_spec import Task, TaskRef
 
-        super().__init__(**super_kwargs)  # type: ignore
+            super_kwargs["task"] = Task(name, self.io_func, TaskRef(blockwise_token(0)))
+        else:
+            super_kwargs["dsk"] = {name: (self.io_func, blockwise_token(0))}
+
+        super().__init__(**super_kwargs)
 
     def __repr__(self) -> str:
         return f"AwkwardInputLayer<{self.output}>"

@@ -13,7 +13,11 @@ from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
 from dask.local import get_sync
 
-from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardInputLayer
+from dask_awkward.layers import (
+    AwkwardBlockwiseLayer,
+    AwkwardInputLayer,
+    _dask_uses_tasks,
+)
 from dask_awkward.lib.utils import typetracer_nochecks
 from dask_awkward.utils import first
 
@@ -340,7 +344,10 @@ def rewrite_layer_chains(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelG
         deps[outkey] = deps[chain[0]]
         [deps.pop(ch) for ch in chain[:-1]]
 
-        subgraph = layer0.dsk.copy()  # mypy: ignore
+        if _dask_uses_tasks:
+            all_tasks = [layer0.task]
+        else:
+            subgraph = layer0.dsk.copy()
         indices = list(layer0.indices)
         parent = chain[0]
 
@@ -349,14 +356,27 @@ def rewrite_layer_chains(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelG
             layer = dsk.layers[chain_member]
             for k in layer.io_deps:  # mypy: ignore
                 outlayer.io_deps[k] = layer.io_deps[k]
-            func, *args = layer.dsk[chain_member]  # mypy: ignore
-            args2 = _recursive_replace(args, layer, parent, indices)
-            subgraph[chain_member] = (func,) + tuple(args2)
+
+            if _dask_uses_tasks:
+                from dask._task_spec import Task
+
+                func = layer.task.func
+                args = layer.task.dependencies
+                # how to do this with `.substitute(...)`?
+                args2 = _recursive_replace(args, layer, parent, indices)
+                all_tasks.append(Task(chain_member, func, *args2))
+            else:
+                func, *args = layer.dsk[chain_member]  # mypy: ignore
+                args2 = _recursive_replace(args, layer, parent, indices)
+                subgraph[chain_member] = (func,) + tuple(args2)
             parent = chain_member
         outlayer.numblocks = {
             i[0]: (numblocks,) for i in indices if i[1] is not None
         }  # mypy: ignore
-        outlayer.dsk = subgraph  # mypy: ignore
+        if _dask_uses_tasks:
+            outlayer.task = Task.fuse(*all_tasks)
+        else:
+            outlayer.dsk = subgraph  # mypy: ignore
         if hasattr(outlayer, "_dims"):
             del outlayer._dims
         outlayer.indices = tuple(  # mypy: ignore
@@ -379,7 +399,12 @@ def _recursive_replace(args, layer, parent, indices):
                 args2.append(layer.indices[ind][0])
             elif layer.indices[ind][0] == parent:
                 # arg refers to output of previous layer
-                args2.append(parent)
+                if _dask_uses_tasks:
+                    from dask._task_spec import TaskRef
+
+                    args2.append(TaskRef(parent))
+                else:
+                    args2.append(parent)
             else:
                 # arg refers to things defined in io_deps
                 indices.append(layer.indices[ind])
