@@ -4,12 +4,19 @@ import copy
 from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeVar, Union, cast
 
+import dask
+
+_dask_uses_tasks = hasattr(dask, "_task_spec")
+
 from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
 from dask.highlevelgraph import MaterializedLayer
 from dask.layers import DataFrameTreeReduction
 from typing_extensions import TypeAlias
 
 from dask_awkward.utils import LazyInputsDict
+
+if _dask_uses_tasks:
+    from dask._task_spec import Task, TaskRef
 
 if TYPE_CHECKING:
     from awkward import Array as AwkwardArray
@@ -160,14 +167,20 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
             produces_tasks=self.produces_tasks,
         )
 
-        super().__init__(
-            output=self.name,
-            output_indices="i",
-            dsk={name: (self.io_func, blockwise_token(0))},
-            indices=[(io_arg_map, "i")],
-            numblocks={},
-            annotations=None,
-        )
+        super_kwargs: dict[str, Any] = {
+            "output": self.name,
+            "output_indices": "i",
+            "indices": [(io_arg_map, "i")],
+            "numblocks": {},
+            "annotations": None,
+        }
+
+        if _dask_uses_tasks:
+            super_kwargs["task"] = Task(name, self.io_func, TaskRef(blockwise_token(0)))
+        else:
+            super_kwargs["dsk"] = {name: (self.io_func, blockwise_token(0))}
+
+        super().__init__(**super_kwargs)
 
     def __repr__(self) -> str:
         return f"AwkwardInputLayer<{self.output}>"

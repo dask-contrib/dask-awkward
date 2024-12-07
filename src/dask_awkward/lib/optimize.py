@@ -13,9 +13,16 @@ from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
 from dask.local import get_sync
 
-from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardInputLayer
+from dask_awkward.layers import (
+    AwkwardBlockwiseLayer,
+    AwkwardInputLayer,
+    _dask_uses_tasks,
+)
 from dask_awkward.lib.utils import typetracer_nochecks
 from dask_awkward.utils import first
+
+if _dask_uses_tasks:
+    from dask._task_spec import GraphNode, Task, TaskRef
 
 if TYPE_CHECKING:
     from awkward._nplikes.typetracer import TypeTracerReport
@@ -234,14 +241,23 @@ def _touch_all_data(*args, **kwargs):
 
 def _mock_output(layer):
     """Update a layer to run the _touch_all_data."""
-    assert len(layer.dsk) == 1
+    if _dask_uses_tasks:
+        new_layer = copy.deepcopy(layer)
+        task = new_layer.task.copy()
+        # replace the original function with _touch_all_data
+        # and keep the rest of the task the same
+        task.func = _touch_all_data
+        new_layer.task = task
+        return new_layer
+    else:
+        assert len(layer.dsk) == 1
 
-    new_layer = copy.deepcopy(layer)
-    mp = new_layer.dsk.copy()
-    for k in iter(mp.keys()):
-        mp[k] = (_touch_all_data,) + mp[k][1:]
-    new_layer.dsk = mp
-    return new_layer
+        new_layer = copy.deepcopy(layer)
+        mp = new_layer.dsk.copy()
+        for k in iter(mp.keys()):
+            mp[k] = (_touch_all_data,) + mp[k][1:]
+        new_layer.dsk = mp
+        return new_layer
 
 
 @no_type_check
@@ -340,7 +356,10 @@ def rewrite_layer_chains(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelG
         deps[outkey] = deps[chain[0]]
         [deps.pop(ch) for ch in chain[:-1]]
 
-        subgraph = layer0.dsk.copy()  # mypy: ignore
+        if _dask_uses_tasks:
+            all_tasks = [layer0.task]
+        else:
+            subgraph = layer0.dsk.copy()
         indices = list(layer0.indices)
         parent = chain[0]
 
@@ -349,14 +368,28 @@ def rewrite_layer_chains(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelG
             layer = dsk.layers[chain_member]
             for k in layer.io_deps:  # mypy: ignore
                 outlayer.io_deps[k] = layer.io_deps[k]
-            func, *args = layer.dsk[chain_member]  # mypy: ignore
-            args2 = _recursive_replace(args, layer, parent, indices)
-            subgraph[chain_member] = (func,) + tuple(args2)
+
+            if _dask_uses_tasks:
+                func = layer.task.func
+                args = [
+                    arg.key if isinstance(arg, GraphNode) else arg
+                    for arg in layer.task.args
+                ]
+                # how to do this with `.substitute(...)`?
+                args2 = _recursive_replace(args, layer, parent, indices)
+                all_tasks.append(Task(chain_member, func, *args2))
+            else:
+                func, *args = layer.dsk[chain_member]  # mypy: ignore
+                args2 = _recursive_replace(args, layer, parent, indices)
+                subgraph[chain_member] = (func,) + tuple(args2)
             parent = chain_member
         outlayer.numblocks = {
             i[0]: (numblocks,) for i in indices if i[1] is not None
         }  # mypy: ignore
-        outlayer.dsk = subgraph  # mypy: ignore
+        if _dask_uses_tasks:
+            outlayer.task = Task.fuse(*all_tasks)
+        else:
+            outlayer.dsk = subgraph  # mypy: ignore
         if hasattr(outlayer, "_dims"):
             del outlayer._dims
         outlayer.indices = tuple(  # mypy: ignore
@@ -379,11 +412,18 @@ def _recursive_replace(args, layer, parent, indices):
                 args2.append(layer.indices[ind][0])
             elif layer.indices[ind][0] == parent:
                 # arg refers to output of previous layer
-                args2.append(parent)
+                if _dask_uses_tasks:
+                    args2.append(TaskRef(parent))
+                else:
+                    args2.append(parent)
             else:
                 # arg refers to things defined in io_deps
                 indices.append(layer.indices[ind])
-                args2.append(f"__dask_blockwise__{len(indices) - 1}")
+                arg2 = f"__dask_blockwise__{len(indices) - 1}"
+                if _dask_uses_tasks:
+                    args2.append(TaskRef(arg2))
+                else:
+                    args2.append(arg2)
         elif isinstance(arg, list):
             args2.append(_recursive_replace(arg, layer, parent, indices))
         elif isinstance(arg, tuple):
