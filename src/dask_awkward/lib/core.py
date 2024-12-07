@@ -45,7 +45,11 @@ from dask.utils import IndexCallable
 from dask.utils import OperatorMethodMixin as DaskOperatorMethodMixin
 from dask.utils import funcname, is_arraylike, key_split
 
-from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardMaterializedLayer, _dask_uses_tasks
+from dask_awkward.layers import (
+    AwkwardBlockwiseLayer,
+    AwkwardMaterializedLayer,
+    _dask_uses_tasks,
+)
 from dask_awkward.lib.optimize import all_optimizations
 from dask_awkward.utils import (
     ConcretizationTypeError,
