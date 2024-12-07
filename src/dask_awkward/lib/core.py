@@ -1955,6 +1955,9 @@ class ArgsKwargsPackedFunction:
         self.kwarg_repacker = kwarg_repacker
         self.arg_lens_for_repackers = arg_lens_for_repackers
 
+    def __repr__(self):
+        return "repacked-" + repr(self.fn).replace("<", "").replace(">", "").replace("function ", "").replace("built-in ", "")
+
     def _repack(self, *args_deps_expanded):
         """This packing function receives a list of strictly
         ordered arguments. The first range of arguments,
