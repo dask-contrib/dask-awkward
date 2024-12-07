@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeVar, Union, cast
 
 import dask
 
-_dask_uses_tasks = dask.__version__ >= "2024.12.0"
+_dask_uses_tasks = hasattr(dask, "_task_spec")
 
 from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
 from dask.highlevelgraph import MaterializedLayer
@@ -14,6 +14,9 @@ from dask.layers import DataFrameTreeReduction
 from typing_extensions import TypeAlias
 
 from dask_awkward.utils import LazyInputsDict
+
+if _dask_uses_tasks:
+    from dask._task_spec import Task, TaskRef
 
 if TYPE_CHECKING:
     from awkward import Array as AwkwardArray
@@ -173,8 +176,6 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         }
 
         if _dask_uses_tasks:
-            from dask._task_spec import Task, TaskRef
-
             super_kwargs["task"] = Task(name, self.io_func, TaskRef(blockwise_token(0)))
         else:
             super_kwargs["dsk"] = {name: (self.io_func, blockwise_token(0))}
