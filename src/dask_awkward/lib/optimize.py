@@ -21,6 +21,9 @@ from dask_awkward.layers import (
 from dask_awkward.lib.utils import typetracer_nochecks
 from dask_awkward.utils import first
 
+if _dask_uses_tasks:
+    from dask._task_spec import GraphNode, Task, TaskRef
+
 if TYPE_CHECKING:
     from awkward._nplikes.typetracer import TypeTracerReport
     from dask.typing import Key
@@ -367,8 +370,6 @@ def rewrite_layer_chains(dsk: HighLevelGraph, keys: Sequence[Key]) -> HighLevelG
                 outlayer.io_deps[k] = layer.io_deps[k]
 
             if _dask_uses_tasks:
-                from dask._task_spec import GraphNode, Task
-
                 func = layer.task.func
                 args = [
                     arg.key if isinstance(arg, GraphNode) else arg
@@ -412,8 +413,6 @@ def _recursive_replace(args, layer, parent, indices):
             elif layer.indices[ind][0] == parent:
                 # arg refers to output of previous layer
                 if _dask_uses_tasks:
-                    from dask._task_spec import TaskRef
-
                     args2.append(TaskRef(parent))
                 else:
                     args2.append(parent)
@@ -422,8 +421,6 @@ def _recursive_replace(args, layer, parent, indices):
                 indices.append(layer.indices[ind])
                 arg2 = f"__dask_blockwise__{len(indices) - 1}"
                 if _dask_uses_tasks:
-                    from dask._task_spec import TaskRef
-
                     args2.append(TaskRef(arg2))
                 else:
                     args2.append(arg2)
