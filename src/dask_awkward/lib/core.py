@@ -61,6 +61,9 @@ from dask_awkward.utils import (
     is_empty_slice,
 )
 
+if _dask_uses_tasks:
+    from dask._task_spec import TaskRef
+
 if TYPE_CHECKING:
     from awkward.contents.content import Content
     from awkward.forms.form import Form
@@ -1933,8 +1936,6 @@ def partitionwise_layer(
             numblocks[arg.name] = (1,)
         elif isinstance(arg, Delayed):
             if _dask_uses_tasks:
-                from dask._task_spec import TaskRef
-
                 pairs.extend([TaskRef(arg.key), None])
             else:
                 pairs.extend([arg.key, None])
