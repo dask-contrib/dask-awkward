@@ -1603,7 +1603,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
                     @wraps(cls_method)
                     def wrapper(*args, **kwargs):
-                        return self.map_partitions(
+                        return self._map_partitions(
                             _BehaviorMethodFn(attr, **kwargs),
                             *args,
                             label=hyphenize(attr),
@@ -1611,7 +1611,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
                     return wrapper
                 else:
-                    return self.map_partitions(
+                    return self._map_partitions(
                         _BehaviorPropertyFn(attr),
                         label=hyphenize(attr),
                     )
