@@ -4,13 +4,11 @@ import logging
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast, no_type_check
 
-
 import awkward as ak
 import dask.config
 from awkward.typetracer import touch_data
-
 from dask.base import tokenize
-from dask.blockwise import Blockwise,fuse_roots, optimize_blockwise
+from dask.blockwise import Blockwise, fuse_roots, optimize_blockwise
 from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
 
