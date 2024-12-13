@@ -6,12 +6,12 @@ import logging
 import math
 import operator
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
+from typing import Any, Literal, cast
 
 import awkward as ak
 import awkward.operations.ak_from_parquet as ak_from_parquet
-import dask
 from awkward.forms.form import Form
+from awkward.typetracer import touch_data
 from dask.base import tokenize
 from dask.blockwise import BlockIndex
 from dask.highlevelgraph import HighLevelGraph
@@ -23,14 +23,9 @@ from dask_awkward.lib.core import Array, Scalar, map_partitions, new_scalar_obje
 from dask_awkward.lib.io.columnar import ColumnProjectionMixin
 from dask_awkward.lib.io.io import from_map
 from dask_awkward.lib.unproject_layout import unproject_layout
-
-if TYPE_CHECKING:
-    pass
+from dask_awkward.lib.utils import _buf_to_col, commit_to_reports
 
 log = logging.getLogger(__name__)
-
-
-T = TypeVar("T")
 
 
 def report_failure(exception, *args, **kwargs):
@@ -94,18 +89,11 @@ class FromParquetFn(ColumnProjectionMixin):
     def __call__(self, *args, **kwargs): ...
 
     @abc.abstractmethod
-    def project_columns(self, columns): ...
+    def project(self, columns): ...
 
     @property
     def return_report(self) -> bool:
         return self.report
-
-    @property
-    def use_optimization(self) -> bool:
-        return "parquet" in dask.config.get(
-            "awkward.optimization.columns-opt-formats",
-            default=[],
-        )
 
     def __repr__(self) -> str:
         s = (
@@ -170,16 +158,20 @@ class FromParquetFileWiseFn(FromParquetFn):
         if self.return_report:
             try:
                 result = self.read_fn(source)
-                return result, report_success(self.columns, source)
+                return {
+                    "data": result,
+                    "ioreport": report_success(self.columns, source),
+                }
             except self.allowed_exceptions as err:
-                return self.mock_empty(), report_failure(err, source)
+                return {"data": ak.Array([]), "ioreport": report_failure(err, source)}
 
         return self.read_fn(source)
 
-    def project_columns(self, columns):
+    def project(self, columns):
+        cols = [_buf_to_col(s) for s in columns]
         return FromParquetFileWiseFn(
             fs=self.fs,
-            form=self.form.select_columns(columns),
+            form=self.form.select_columns(cols),
             listsep=self.listsep,
             unnamed_root=self.unnamed_root,
             original_form=self.form,
@@ -235,10 +227,11 @@ class FromParquetFragmentWiseFn(FromParquetFn):
             attrs=self.attrs,
         )
 
-    def project_columns(self, columns):
+    def project(self, columns):
+        cols = [_buf_to_col(s) for s in columns]
         return FromParquetFragmentWiseFn(
             fs=self.fs,
-            form=self.form.select_columns(columns),
+            form=self.form.select_columns(cols),
             unnamed_root=self.unnamed_root,
             original_form=self.form,
             report=self.report,
@@ -697,23 +690,15 @@ def to_parquet(
         out = new_scalar_object(graph, final_name, dtype="f8")
     else:
         final_name = name + "-finalize"
-        from dask_awkward.layers import AwkwardTreeReductionLayer
-
-        layer = AwkwardTreeReductionLayer(
-            name=final_name,
-            concat_func=none_to_none,
-            tree_node_func=none_to_none,
-            name_input=map_res.name,
-            npartitions_input=map_res.npartitions,
-            finalize_func=none_to_none,
-        )
-        graph = HighLevelGraph.from_collections(
-            final_name,
-            layer,
-            dependencies=[map_res],
-        )
-        out = new_scalar_object(graph, final_name, dtype="f8")
-
+        dsk[(final_name, 0)] = (lambda *_: None, map_res.__dask_keys__())
+    graph = HighLevelGraph.from_collections(
+        final_name,
+        AwkwardMaterializedLayer(dsk, previous_layer_names=[map_res.name]),
+        dependencies=[map_res],
+    )
+    touch_data(array._meta)
+    commit_to_reports(name, array.report)
+    out = new_scalar_object(graph, final_name, dtype="f8")
     if compute:
         out.compute()
         return None

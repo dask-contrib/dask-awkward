@@ -27,6 +27,7 @@ from awkward.typetracer import (
     TypeTracerArray,
     create_unknown_scalar,
     is_unknown_scalar,
+    touch_data,
 )
 from dask.base import (
     DaskMethodsMixin,
@@ -47,6 +48,7 @@ from dask.utils import funcname, is_arraylike, key_split
 
 from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardMaterializedLayer
 from dask_awkward.lib.optimize import all_optimizations
+from dask_awkward.lib.utils import commit_to_reports
 from dask_awkward.utils import (
     ConcretizationTypeError,
     DaskAwkwardNotImplemented,
@@ -399,6 +401,10 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
     def key(self) -> Key:
         return (self._name, 0)
 
+    @property
+    def report(self):
+        return getattr(self._meta, "_report", set())
+
     def _check_meta(self, m):
         if isinstance(m, MaybeNone):
             return ak.Array(m.content)
@@ -533,6 +539,7 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
                     meta = op(other, self._meta)
                 else:
                     meta = op(self._meta, other)
+            commit_to_reports(name, self.report)
             return new_scalar_object(graph, name, meta=meta)
 
         return f
@@ -675,7 +682,7 @@ def new_known_scalar(
 
     Examples
     --------
-    >>> from dask_awkward.core import new_known_scalar
+    >>> from dask_awkward.lib.core import new_known_scalar
     >>> a = new_known_scalar(5, label="five")
     >>> a
     dask.awkward<five, type=Scalar, dtype=int64, known_value=5>
@@ -728,7 +735,9 @@ class Record(Scalar):
     def __getitem__(self, where):
         token = tokenize(self, where)
         new_name = f"{where}-{token}"
+        report = self.report
         new_meta = self._meta[where]
+        commit_to_reports(new_name, report)
 
         # first check for array type return
         if isinstance(new_meta, ak.Array):
@@ -738,6 +747,8 @@ class Record(Scalar):
                 graphlayer,
                 dependencies=[self],
             )
+            new_meta._report = report
+            hlg.layers[new_name].meta = new_meta
             return new_array_object(hlg, new_name, meta=new_meta, npartitions=1)
 
         # then check for scalar (or record) type
@@ -748,6 +759,8 @@ class Record(Scalar):
             dependencies=[self],
         )
         if isinstance(new_meta, ak.Record):
+            new_meta._report = report
+            hlg.layers[new_name].meta = new_meta
             return new_record_object(hlg, new_name, meta=new_meta)
         else:
             return new_scalar_object(hlg, new_name, meta=new_meta)
@@ -821,7 +834,7 @@ def new_record_object(dsk: HighLevelGraph, name: str, *, meta: Any) -> Record:
         raise TypeError(
             f"meta Record must have a typetracer backend, not {ak.backend(meta)}"
         )
-    return Record(dsk, name, meta)
+    return out
 
 
 def _is_numpy_or_cupy_like(arr: Any) -> bool:
@@ -969,6 +982,10 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         """Assign an empty typetracer array as the collection metadata."""
         self._meta = empty_typetracer()
 
+    @property
+    def report(self):
+        return getattr(self._meta, "_report", set())
+
     def repartition(
         self,
         npartitions: int | None = None,
@@ -1050,6 +1067,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         new_graph = HighLevelGraph.from_collections(
             key, new_layer, dependencies=(self,)
         )
+        commit_to_reports(key, self.report)
         return new_array_object(
             new_graph,
             key,
@@ -1235,11 +1253,13 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         name = f"partitions-{token}"
         new_keys = self.keys_array[index].tolist()
         dsk = {(name, i): tuple(key) for i, key in enumerate(new_keys)}
+        layer = AwkwardMaterializedLayer(dsk, previous_layer_names=[self.name])
         graph = HighLevelGraph.from_collections(
             name,
-            AwkwardMaterializedLayer(dsk, previous_layer_names=[self.name]),
+            layer,
             dependencies=(self,),
         )
+        layer.meta = self._meta
 
         # if a single partition was requested we trivially know the new divisions.
         if len(raw) == 1 and isinstance(raw[0], int) and self.known_divisions:
@@ -1251,7 +1271,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         # otherwise nullify the known divisions
         else:
             new_divisions = (None,) * (len(new_keys) + 1)  # type: ignore
-
+        commit_to_reports(name, self.report)
         return new_array_object(
             graph, name, meta=self._meta, divisions=tuple(new_divisions)
         )
@@ -1473,6 +1493,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
             AwkwardMaterializedLayer(dask, previous_layer_names=[self.name]),
             dependencies=[self],
         )
+        commit_to_reports(name, self.report)
         return new_array_object(
             hlg,
             name,
@@ -1583,9 +1604,14 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
                 raise RuntimeError("Lists containing integers are not supported.")
 
         if isinstance(where, tuple):
-            return self._getitem_tuple(where)
-
-        return self._getitem_single(where)
+            out = self._getitem_tuple(where)
+        else:
+            out = self._getitem_single(where)
+        if self.report:
+            commit_to_reports(out.name, self.report)
+            out._meta._report = self._meta._report
+        out.dask.layers[out.name].meta = out._meta
+        return out
 
     def _is_method_heuristic(self, resolved: Any) -> bool:
         return callable(resolved)
@@ -1912,10 +1938,12 @@ def partitionwise_layer(
     """
     pairs: list[Any] = []
     numblocks: dict[str, tuple[int, ...]] = {}
+    reps = set()
     for arg in args:
         if isinstance(arg, Array):
             pairs.extend([arg.name, "i"])
             numblocks[arg.name] = (arg.npartitions,)
+            reps.update(arg.report)
         elif isinstance(arg, BlockwiseDep):
             if len(arg.numblocks) == 1:
                 pairs.extend([arg, "i"])
@@ -1935,6 +1963,8 @@ def partitionwise_layer(
             )
         else:
             pairs.extend([arg, None])
+    commit_to_reports(name, reps)
+
     layer = dask_blockwise(
         func,
         name,
@@ -2018,8 +2048,23 @@ def _map_partitions(
             **kwargs,
         )
 
-        if meta is None:
-            meta = map_meta(fn, *args, **kwargs)
+        reps = set()
+        try:
+            if meta is None:
+                meta = map_meta(fn, *args, **kwargs)
+            else:
+                # To do any touching??
+                map_meta(fn, *args, **kwargs)
+            meta._report = reps
+            lay.meta = meta
+        except (AssertionError, TypeError, NotImplementedError):
+            [touch_data(_._meta) for _ in dak_arrays]
+
+        for dep in dak_arrays:
+            for rep in dep.report:
+                if rep not in reps:
+                    rep.commit(name)
+                    reps.add(rep)
 
         hlg = HighLevelGraph.from_collections(
             name,
@@ -2033,6 +2078,8 @@ def _map_partitions(
                 "should be a dask_awkward.Array collection."
             )
         dak_cache[name] = hlg, meta
+    if name in dak_cache:
+        hlg0, meta0 = dak_cache[name]
     in_npartitions = dak_arrays[0].npartitions
     in_divisions = dak_arrays[0].divisions
     if output_divisions is not None:
@@ -2042,7 +2089,6 @@ def _map_partitions(
             new_divisions = tuple(map(lambda x: x * output_divisions, in_divisions))
     else:
         new_divisions = in_divisions
-
     if output_divisions is not None:
         return new_array_object(
             hlg,
@@ -2273,10 +2319,6 @@ def non_trivial_reduction(
     if combiner is None:
         combiner = reducer
 
-    # is_positional == True is not implemented
-    # if is_positional:
-    #     assert combiner is reducer
-
     # For `axis=None`, we prepare each array to have the following structure:
     #   [[[ ... [x1 x2 x3 ... xN] ... ]]] (length-1 outer lists)
     # This makes the subsequent reductions an `axis=-1` reduction
@@ -2343,14 +2385,16 @@ def non_trivial_reduction(
     )
 
     graph = HighLevelGraph.from_collections(name_finalize, trl, dependencies=(chunked,))
-
     meta = reducer(
         array._meta,
         axis=axis,
         keepdims=keepdims,
         mask_identity=mask_identity,
     )
+    trl.meta = meta
+    commit_to_reports(name_finalize, array.report)
     if isinstance(meta, ak.highlevel.Array):
+        meta._report = array.report
         return new_array_object(graph, name_finalize, meta=meta, npartitions=1)
     else:
         return new_scalar_object(graph, name_finalize, meta=meta)
@@ -2471,7 +2515,7 @@ def meta_or_identity(obj: Any) -> Any:
     --------
     >>> import awkward as ak
     >>> import dask_awkward as dak
-    >>> from dask_awkward.core import meta_or_identity
+    >>> from dask_awkward.lib.core import meta_or_identity
     >>> x = ak.from_iter([[1, 2, 3], [4]])
     >>> x = dak.from_awkward(x, npartitions=2)
     >>> x
@@ -2667,7 +2711,7 @@ def normalize_single_outer_inner_index(
 
     Examples
     --------
-    >>> from dask_awkward.utils import normalize_single_outer_inner_index
+    >>> from dask_awkward.lib.core import normalize_single_outer_inner_index
     >>> divisions = (0, 3, 6, 9)
     >>> normalize_single_outer_inner_index(divisions, 0)
     (0, 0)

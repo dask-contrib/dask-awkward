@@ -19,14 +19,7 @@ from dask_awkward.lib.core import (
     partition_compatibility,
 )
 from dask_awkward.lib.describe import backend, fields
-from dask_awkward.lib.inspect import (
-    report_necessary_buffers,
-    report_necessary_columns,
-    sample,
-)
-
-necessary_columns = report_necessary_columns  # Export for backwards compatibility.
-
+from dask_awkward.lib.inspect import sample
 from dask_awkward.lib.io.io import (
     from_awkward,
     from_dask_array,
@@ -42,6 +35,7 @@ from dask_awkward.lib.io.json import from_json, layout_to_jsonschema, to_json
 from dask_awkward.lib.io.parquet import from_parquet, to_parquet
 from dask_awkward.lib.io.text import from_text
 from dask_awkward.lib.operations import concatenate
+from dask_awkward.lib.optimize import necessary_columns
 from dask_awkward.lib.reducers import (
     all,
     any,

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast, overload
 import awkward as ak
 import dask
 from awkward.forms.form import Form
+from awkward.typetracer import touch_data
 from dask.base import tokenize
 from dask.blockwise import BlockIndex
 from dask.core import flatten
@@ -31,6 +32,7 @@ from dask_awkward.lib.io.io import (
     _BytesReadingInstructions,
     from_map,
 )
+from dask_awkward.lib.utils import _buf_to_col, commit_to_reports
 
 if TYPE_CHECKING:
     from awkward.contents.content import Content
@@ -74,8 +76,9 @@ class FromJsonFn(ColumnProjectionMixin):
             and self.schema is None
         )
 
-    def project_columns(self, columns):
-        form = self.form.select_columns(columns)
+    def project(self, columns: list[str]):
+        cols = [_buf_to_col(s) for s in columns]
+        form = self.form.select_columns(cols)
         assert form is not None
         schema = layout_to_jsonschema(form.length_zero_array(highlevel=False))
 
@@ -769,6 +772,8 @@ def to_json(
     map_res.dask.layers[map_res.name].annotations = {"ak_output": True}
     name = f"to-json-{tokenize(array, path)}"
     dsk = {(name, 0): (lambda *_: None, map_res.__dask_keys__())}
+    touch_data(array._meta)
+    commit_to_reports(name, array.report)
     graph = HighLevelGraph.from_collections(
         name,
         AwkwardMaterializedLayer(dsk, previous_layer_names=[map_res.name]),

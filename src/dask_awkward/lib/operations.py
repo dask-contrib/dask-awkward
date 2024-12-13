@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
@@ -7,7 +8,6 @@ import awkward as ak
 from awkward.operations.ak_concatenate import (
     enforce_concatenated_form as enforce_layout_to_concatenated_form,
 )
-from awkward.typetracer import typetracer_from_form
 from dask.base import tokenize
 from dask.highlevelgraph import HighLevelGraph
 
@@ -36,15 +36,8 @@ class ConcatenateFnAxisGT0:
 
 def _enforce_concatenated_form(array: AwkwardArray, form: Form) -> AwkwardArray:
     layout = ak.to_layout(array)
-    # TODO: should this check whether the form agrees first, or assume that the
-    #       operation is harmless if not required?
     result = enforce_layout_to_concatenated_form(layout, form)
     return ak.Array(result, behavior=array._behavior, attrs=array._attrs)
-
-
-def _concatenate_axis_0_meta(*arrays: AwkwardArray) -> AwkwardArray:
-    # At this stage, the metas have all been enforced to the same type
-    return arrays[0]
 
 
 def concatenate(
@@ -60,33 +53,23 @@ def concatenate(
     name = f"{label}-{token}"
 
     metas = [c._meta for c in arrays]
+    report = set.union(*(getattr(m, "_report", set()) for m in metas))
 
     if len(metas) == 0:
         raise ValueError("Need at least one array to concatenate")
 
-    # Are we performing a _logical_ concatenation?
     if axis == 0:
         # There are two possible cases here:
         # 1. all arrays have identical metas — just grow the Dask collection
         # 2. some arrays have different metas — coerce arrays to same form
-
-        # Drop reports from metas to avoid later touching any buffers
-        metas_no_report = [
-            typetracer_from_form(x.layout.form, behavior=x.behavior, attrs=x._attrs)
-            for x in metas
-        ]
-        # Concatenate metas to determine result form
-        meta_no_report = ak.concatenate(
-            metas_no_report, axis=0, behavior=behavior, attrs=attrs
-        )
-        intended_form = meta_no_report.layout.form
+        intended_form = metas[0].layout.form
 
         # If any forms aren't equal to this form, we must enforce each form to the same type
         if any(
             not m.layout.form.is_equal_to(
                 intended_form, all_parameters=True, form_key=False
             )
-            for m in metas
+            for m in metas[1:]
         ):
             arrays = [
                 map_partitions(
@@ -109,7 +92,6 @@ def concatenate(
             aml = AwkwardMaterializedLayer(
                 g,
                 previous_layer_names=[a.name for a in arrays],
-                fn=_concatenate_axis_0_meta,
             )
         else:
             g = {
@@ -119,13 +101,22 @@ def concatenate(
                 )
             }
 
-            aml = AwkwardMaterializedLayer(g, previous_layer_names=[arrays[0].name])
+            aml = AwkwardMaterializedLayer(
+                g, previous_layer_names=[a.name for a in arrays]
+            )
+        from awkward.typetracer import touch_data
 
+        # TODO: touching all metas we don't pass on should not be necessary
+        [touch_data(m) for m in metas[1:]]
+        [r.commit(name) for r in report]
+        new_meta = copy.copy(metas[0])
+        new_meta._report = report
         hlg = HighLevelGraph.from_collections(name, aml, dependencies=arrays)
+        aml.meta = new_meta
         return new_array_object(
             hlg,
             name,
-            meta=meta_no_report,
+            meta=new_meta,
             npartitions=sum(a.npartitions for a in arrays),
         )
 

@@ -24,6 +24,7 @@ from dask_awkward.lib.core import (
     new_scalar_object,
     partition_compatibility,
 )
+from dask_awkward.lib.utils import commit_to_reports
 from dask_awkward.utils import (
     DaskAwkwardNotImplemented,
     IncompatiblePartitions,
@@ -337,6 +338,7 @@ def copy(array: Array) -> Array:
     # dask-awkward's copy is metadata-only
     old_meta = array._meta
     new_meta = ak.Array(old_meta.layout, behavior=deepcopy(old_meta._behavior))
+    new_meta._report = old_meta._report
 
     return Array(
         array._dask,
@@ -931,8 +933,10 @@ def _array_with_rebuilt_meta(
         behavior = array._meta.behavior
 
     new_meta = ak.Array(array._meta, behavior=behavior, attrs=attrs)
-
-    return Array(array.dask, array.name, new_meta, array.divisions)
+    new_meta._report = array.report
+    out = Array(array.dask, array.name, new_meta, array.divisions)
+    commit_to_reports(out.name, array.report)
+    return out
 
 
 @borrow_docstring(ak.unzip)
