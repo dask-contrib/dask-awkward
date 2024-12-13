@@ -146,17 +146,7 @@ def _optimize_columns(dsk, all_layers):
         if not rep:
             continue
         rep = first(rep)  # each meta of an IO layer should have just one report
-        cols = set()
-        # this loop not required after next ak release
-        for ln in all_layers:
-            try:
-                cols.update(rep.data_touched_in((ln,)))
-            except KeyError:
-                pass
-            try:
-                cols.update(rep.shape_touched_in((ln,)))
-            except KeyError:
-                pass
+        cols = rep.data_touched_in(all_layers)
         if cols:
             yield k, lay, cols
 
