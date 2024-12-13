@@ -68,9 +68,9 @@ def test_json_sanity(json_data_dir: Path, concrete_data: ak.Array) -> None:
             ", use `\\.eager_compute_divisions\\(\\)` on the collection."
         ),
     ):
-        assert ds
+        assert len(ds)
     ds.eager_compute_divisions()
-    assert ds
+    assert len(ds)
 
     assert_eq(ds, concrete_data)
 
