@@ -50,6 +50,7 @@ Table of Contents
    api/reducers.rst
    api/structure.rst
    api/behavior.rst
+   api/utils.rst
 
 .. toctree::
    :maxdepth: 1

@@ -34,7 +34,7 @@ from dask_awkward.lib.core import (
     typetracer_array,
 )
 from dask_awkward.lib.testutils import assert_eq
-from dask_awkward.utils import IncompatiblePartitions
+from dask_awkward.utils import ConcretizationTypeError, IncompatiblePartitions
 
 if TYPE_CHECKING:
     from dask_awkward.lib.core import Array
@@ -384,13 +384,13 @@ def test_to_meta(daa: Array) -> None:
 
 def test_record_str(daa: Array) -> None:
     r = daa[0]
-    assert isinstance(r, dak.Record)
+    assert type(r) is dak.Record
     assert str(r) == "dask.awkward<getitem, type=Record>"
 
 
 def test_record_to_delayed(daa: Array) -> None:
     r = daa[0]
-    assert isinstance(r, dak.Record)
+    assert type(r) is dak.Record
     d = r.to_delayed()
     x = r.compute().tolist()
     y = d.compute().tolist()
@@ -399,7 +399,7 @@ def test_record_to_delayed(daa: Array) -> None:
 
 def test_record_fields(daa: Array) -> None:
     r = daa[0]
-    assert isinstance(r, dak.Record)
+    assert type(r) is dak.Record
     r._meta = None
     with pytest.raises(TypeError, match="metadata is missing"):
         assert not r.fields
@@ -407,7 +407,7 @@ def test_record_fields(daa: Array) -> None:
 
 def test_record_dir(daa: Array) -> None:
     r = daa["points"][0][0]
-    assert isinstance(r, dak.Record)
+    assert type(r) is dak.Record
     d = dir(r)
     for f in r.fields:
         assert f in d
@@ -418,7 +418,8 @@ def test_record_dir(daa: Array) -> None:
 #     import pickle
 
 #     r = daa[0]
-#     assert isinstance(r, dak.Record)
+
+#     assert type(r) is dak.Record
 #     assert isinstance(r._meta, ak.Record)
 
 #     dumped = pickle.dumps(r)
@@ -969,3 +970,16 @@ def test_map_partitions_bad_arguments():
             array2,
             meta=empty_typetracer(),
         )
+
+
+def test_array__bool_nonzero_long_int_float_complex_index():
+    import operator
+
+    dask_arr = dak.from_awkward(ak.Array([1]), npartitions=1)
+
+    for fun in bool, int, float, complex, operator.index:
+        with pytest.raises(
+            ConcretizationTypeError,
+            match=r"A dask_awkward.Array is encountered in a computation where a concrete value is expected. If you intend to convert the dask_awkward.Array to a concrete value, use the `.compute\(\)` method. The .+ method was called on .+.",
+        ):
+            fun(dask_arr)

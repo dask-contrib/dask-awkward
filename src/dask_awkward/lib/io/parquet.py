@@ -476,6 +476,7 @@ class _ToParquetFn:
         npartitions: int,
         prefix: str | None = None,
         storage_options: dict | None = None,
+        write_metadata: bool = False,
         **kwargs: Any,
     ):
         self.fs = fs
@@ -489,6 +490,7 @@ class _ToParquetFn:
             if isinstance(self.fs.protocol, str)
             else self.fs.protocol[0]
         )
+        self.write_metadata = write_metadata
         self.kwargs = kwargs
 
     def __call__(self, data, block_index):
@@ -496,9 +498,11 @@ class _ToParquetFn:
         if self.prefix is not None:
             filename = f"{self.prefix}-{filename}"
         filename = self.fs.unstrip_protocol(f"{self.path}{self.fs.sep}{filename}")
-        return ak.to_parquet(
+        out = ak.to_parquet(
             data, filename, **self.kwargs, storage_options=self.storage_options
         )
+        if self.write_metadata:
+            return out
 
 
 def to_parquet(
@@ -590,7 +594,10 @@ def to_parquet(
     storage_options
         Storage options passed to ``fsspec``.
     write_metadata
-        Write Parquet metadata.
+        Write Parquet metadata. Note, that when this is True, all the
+        metadata pieces will be pulled into a single finalizer task. When
+        False, the whole write graph can be evaluated as a more efficient
+        tree reduction.
     compute
         If ``True``, immediately compute the result (write data to
         disk). If ``False`` a Scalar collection will be returned such
@@ -660,6 +667,7 @@ def to_parquet(
             parquet_old_int96_timestamps=parquet_old_int96_timestamps,
             parquet_compliant_nested=parquet_compliant_nested,
             parquet_extra_options=parquet_extra_options,
+            write_metadata=write_metadata,
         ),
         array,
         BlockIndex((array.npartitions,)),
@@ -674,6 +682,12 @@ def to_parquet(
         dsk[(final_name, 0)] = (_metadata_file_from_metas, fs, path) + tuple(
             map_res.__dask_keys__()
         )
+        graph = HighLevelGraph.from_collections(
+            final_name,
+            AwkwardMaterializedLayer(dsk, previous_layer_names=[map_res.name]),
+            dependencies=[map_res],
+        )
+        out = new_scalar_object(graph, final_name, dtype="f8")
     else:
         final_name = name + "-finalize"
         dsk[(final_name, 0)] = (lambda *_: None, map_res.__dask_keys__())
@@ -690,3 +704,8 @@ def to_parquet(
         return None
     else:
         return out
+
+
+def none_to_none(*_):
+    """Dummy reduction function where write tasks produce no metadata"""
+    return None
