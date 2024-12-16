@@ -6,6 +6,7 @@ from dask_awkward.layers.layers import (
     ImplementsIOFunction,
     ImplementsProjection,
     IOFunctionWithMocking,
+    _dask_uses_tasks,
     io_func_implements_projection,
 )
 
@@ -18,4 +19,5 @@ __all__ = (
     "ImplementsIOFunction",
     "IOFunctionWithMocking",
     "io_func_implements_projection",
+    "_dask_uses_tasks",
 )
