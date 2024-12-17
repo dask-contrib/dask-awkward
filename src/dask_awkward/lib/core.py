@@ -1966,7 +1966,15 @@ class ArgsKwargsPackedFunction:
         self.arg_lens_for_repackers = arg_lens_for_repackers
 
     def __repr__(self):
-        return f"{self.fn.__qualname__}-repacked"
+        if hasattr(self.fn, "__qualname__")
+            return f"{self.fn.__qualname__}-repacked"
+        return (
+            repr(self.fn)
+            .replace("<", "")
+            .replace(">", "")
+            .replace("function ", "")
+            .replace("built-in ", "")
+        ) + "-repacked"
 
     def _repack(self, *args_deps_expanded):
         """This packing function receives a list of strictly
