@@ -986,6 +986,8 @@ def test_map_partitions_deterministic_token():
     dask_arr = dak.from_awkward(ak.Array([1]), npartitions=1)
 
     def f(x):
-        return x + 1
+        return x[0] + 1
 
-    assert map_partitions(f, dask_arr).name == map_partitions(f, dask_arr).name
+    assert (
+        map_partitions(f, {0: dask_arr}).name == map_partitions(f, {0: dask_arr}).name
+    )
