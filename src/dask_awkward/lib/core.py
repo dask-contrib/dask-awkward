@@ -1966,7 +1966,7 @@ class ArgsKwargsPackedFunction:
         self.arg_lens_for_repackers = arg_lens_for_repackers
 
     def __repr__(self):
-        if hasattr(self.fn, "__qualname__")
+        if hasattr(self.fn, "__qualname__"):
             return f"{self.fn.__qualname__}-repacked"
         return (
             repr(self.fn)
