@@ -37,8 +37,7 @@ classifiers = [
 ]
 dependencies = [
   "awkward >=2.5.1",
-  "dask >=2024.12.0;python_version>'3.9'",
-  "dask >=2023.04.0;python_version<'3.10'",
+  "dask >=2023.04.0",
   "cachetools",
   "typing_extensions >=4.8.0",
 ]
