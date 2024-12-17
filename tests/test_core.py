@@ -982,7 +982,7 @@ def test_array__bool_nonzero_long_int_float_complex_index():
             fun(dask_arr)
 
 
-def test_map_partitoins_deterministic_token():
+def test_map_partitions_deterministic_token():
     dask_arr = dak.from_awkward(ak.Array([1]), npartitions=1)
 
     def f(x):
