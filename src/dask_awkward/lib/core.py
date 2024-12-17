@@ -45,7 +45,11 @@ from dask.utils import IndexCallable
 from dask.utils import OperatorMethodMixin as DaskOperatorMethodMixin
 from dask.utils import funcname, is_arraylike, key_split
 
-from dask_awkward.layers import AwkwardBlockwiseLayer, AwkwardMaterializedLayer
+from dask_awkward.layers import (
+    AwkwardBlockwiseLayer,
+    AwkwardMaterializedLayer,
+    _dask_uses_tasks,
+)
 from dask_awkward.lib.optimize import all_optimizations
 from dask_awkward.utils import (
     ConcretizationTypeError,
@@ -56,6 +60,9 @@ from dask_awkward.utils import (
     hyphenize,
     is_empty_slice,
 )
+
+if _dask_uses_tasks:
+    from dask._task_spec import TaskRef
 
 if TYPE_CHECKING:
     from awkward.contents.content import Content
@@ -381,7 +388,7 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
     def _rebuild(self, dsk, *, rename=None):
         name = self._name
         if rename:
-            raise ValueError("rename= unsupported in dask-awkward")
+            name = rename.get(name, name)
         return type(self)(dsk, name, self._meta, self.known_value)
 
     def __reduce__(self):
@@ -962,7 +969,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     def _rebuild(self, dsk, *, rename=None):
         name = self.name
         if rename:
-            raise ValueError("rename= unsupported in dask-awkward")
+            name = rename.get(name, name)
         return Array(dsk, name, self._meta, divisions=self.divisions)
 
     def reset_meta(self) -> None:
@@ -1928,7 +1935,10 @@ def partitionwise_layer(
             pairs.extend([arg.name, "i"])
             numblocks[arg.name] = (1,)
         elif isinstance(arg, Delayed):
-            pairs.extend([arg.key, None])
+            if _dask_uses_tasks:
+                pairs.extend([TaskRef(arg.key), None])
+            else:
+                pairs.extend([arg.key, None])
         elif is_dask_collection(arg):
             raise DaskAwkwardNotImplemented(
                 "Use of Array with other Dask collections is currently unsupported."
