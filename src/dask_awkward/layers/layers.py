@@ -5,7 +5,6 @@ from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeVar, Union, cast
 
 import dask
-
 from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
 from dask.highlevelgraph import MaterializedLayer
 from dask.layers import DataFrameTreeReduction
