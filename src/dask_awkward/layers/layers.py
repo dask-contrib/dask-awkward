@@ -5,9 +5,6 @@ from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeVar, Union, cast
 
 import dask
-
-_dask_uses_tasks = hasattr(dask, "_task_spec")
-
 from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
 from dask.highlevelgraph import MaterializedLayer
 from dask.layers import DataFrameTreeReduction
@@ -15,8 +12,10 @@ from typing_extensions import TypeAlias
 
 from dask_awkward.utils import LazyInputsDict
 
+_dask_uses_tasks = hasattr(dask.blockwise, "Task")
+
 if _dask_uses_tasks:
-    from dask._task_spec import Task, TaskRef
+    from dask.blockwise import Task, TaskRef  # type: ignore
 
 if TYPE_CHECKING:
     from awkward import Array as AwkwardArray
