@@ -286,7 +286,7 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
 
     def necessary_columns(self, report: TypeTracerReport, state: T) -> frozenset[str]:
         """Report the necessary _columns_ implied by a given buffer optimisation state.
-        
+
         Each IO source usually has the notion of a "column". For uproot, that's a TTree key,
         whilst Parquet has "fields". Awkward operates at the _buffer_ level, which is nearly-always
         a lower-level representation. As such, when users want to answer the question "which IO-columns"
