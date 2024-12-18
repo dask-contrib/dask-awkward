@@ -121,7 +121,7 @@ def report_necessary_columns(
     r"""Get columns necessary to compute a collection
 
     This function is specific to sources that are columnar (e.g. Parquet).
-    It determines the names of IO-specific "columns" (e.g. TTree keys, 
+    It determines the names of IO-specific "columns" (e.g. TTree keys,
     or Parquet fields) that are required by the necessary-buffers optimization.
 
     Parameters
