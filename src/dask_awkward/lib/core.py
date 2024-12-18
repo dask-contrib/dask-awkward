@@ -62,7 +62,7 @@ from dask_awkward.utils import (
 )
 
 if _dask_uses_tasks:
-    from dask.blockwise import TaskRef  # type: ignore
+    from dask.blockwise import TaskRef
 
 if TYPE_CHECKING:
     from awkward.contents.content import Content

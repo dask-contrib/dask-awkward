@@ -391,16 +391,14 @@ def _unproject_layout(form, layout, length, backend):
 
 
 def unproject_layout(form: Form | None, layout: Content) -> Content:
-    """Does nothing! Currently returns the passed in layout unchanged!
+    """Rehydrate a layout to include all parts of an original form.
 
-    Rehydrate a layout to include all parts of an original form.
-
-    When we perform the necessary columns optimization we drop fields
+    When we perform the necessary columns optimization, we drop fields
     that are not necessary for a computed result. Sometimes we have
-    task graphs that expect to see fields in name only (but no their
-    data). To protect against FieldNotFound exception we "unproject"
-    or "rehydrate" the layout with the original form. This reapplys
-    all original fields, but the ones that were orignally projected
+    task graphs that expect to see fields in name only (but not their
+    data). To protect against `FieldNotFound` exceptions we "unproject"
+    or "rehydrate" the layout with the original form. This restores
+    the original structure, but fields that were orignally projected
     away are data-less.
 
     Parameters
