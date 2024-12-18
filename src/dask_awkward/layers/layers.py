@@ -15,7 +15,7 @@ from dask_awkward.utils import LazyInputsDict
 _dask_uses_tasks = hasattr(dask.blockwise, "Task")
 
 if _dask_uses_tasks:
-    from dask.blockwise import Task, TaskRef  # type: ignore
+    from dask.blockwise import Task, TaskRef
 
 if TYPE_CHECKING:
     from awkward import Array as AwkwardArray

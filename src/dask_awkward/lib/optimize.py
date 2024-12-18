@@ -23,7 +23,7 @@ from dask_awkward.lib.utils import typetracer_nochecks
 from dask_awkward.utils import first
 
 if _dask_uses_tasks:
-    from dask.blockwise import GraphNode, Task, TaskRef  # type: ignore
+    from dask.blockwise import GraphNode, Task, TaskRef 
 
 if TYPE_CHECKING:
     from awkward._nplikes.typetracer import TypeTracerReport
