@@ -37,6 +37,7 @@ class AwkwardBlockwiseLayer(Blockwise):
         return ob
 
     def mock(self) -> AwkwardBlockwiseLayer:
+        """Mock this layer without evaluating it"""
         layer = copy.copy(self)
         nb = layer.numblocks
         layer.numblocks = {k: tuple(1 for _ in v) for k, v in nb.items()}
@@ -216,23 +217,24 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         """Mock the input layer as starting with a data-less typetracer.
         This method is used to create new dask task graphs that
         operate purely on typetracer Arrays (that is, array with
-        awkward structure but without real data buffers). This allows
-        us to test which parts of a real awkward array will be used in
+        Awkward structure but without real data buffers). This allows
+        us to test which parts of a real Awkward array will be used in
         a real computation. We do this by running a graph which starts
         with mocked AwkwardInputLayers.
 
         We mock an AwkwardInputLayer in these steps:
-        1. Ask the IO function to prepare a new meta array, and return
+        1. Ask the IO function to prepare a new meta Array, and return
            any transient state.
         2. Build a new AwkwardInputLayer whose IO function just returns
-           this meta (typetracer) array
+           this meta (typetracer) Array
         3. Return the new input layer and the transient state
 
-        When this new layer is added to a dask task graph and that
+        When this new layer is added to a dask task graph, and that
         graph is computed, the report object will be mutated.
         Inspecting the report object after the compute tells us which
         buffers from the original form would be required for a real
         compute with the same graph.
+
         Returns
         -------
         AwkwardInputLayer
@@ -283,6 +285,15 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
         )
 
     def necessary_columns(self, report: TypeTracerReport, state: T) -> frozenset[str]:
+        """Report the necessary _columns_ implied by a given buffer optimisation state.
+        
+        Each IO source usually has the notion of a "column". For uproot, that's a TTree key,
+        whilst Parquet has "fields". Awkward operates at the _buffer_ level, which is nearly-always
+        a lower-level representation. As such, when users want to answer the question "which IO-columns"
+        does this graph require, we need to map between buffer names and the IO-source columns.
+
+        This routine asks the IO function to perform that remapping, without knowing anything about what it does.
+        """
         assert self.is_columnar
         return cast(ImplementsNecessaryColumns, self.io_func).necessary_columns(
             report=report, state=state
