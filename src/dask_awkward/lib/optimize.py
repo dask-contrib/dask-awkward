@@ -6,8 +6,8 @@ import warnings
 from collections.abc import Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast, no_type_check
 
-import dask.config
 import awkward as ak
+import dask.config
 from awkward.typetracer import touch_data
 from dask.blockwise import Blockwise, fuse_roots, optimize_blockwise
 from dask.core import flatten
