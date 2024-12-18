@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 import logging
 import warnings
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast, no_type_check
 
 import awkward as ak
