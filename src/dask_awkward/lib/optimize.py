@@ -227,10 +227,10 @@ def _ak_output_layer_names(dsk: HighLevelGraph) -> list[str]:
 
 def _has_projectable_awkward_io_layer(dsk: HighLevelGraph) -> bool:
     """Check if a graph at least one AwkwardInputLayer that is project-able."""
-    for _, v in dsk.layers.items():
-        if isinstance(v, AwkwardInputLayer) and v.is_projectable:
-            return True
-    return False
+    return any(
+        isinstance(v, AwkwardInputLayer) and v.is_projectable
+        for v in dsk.layers.values()
+    )
 
 
 def _touch_all_data(*args, **kwargs):
