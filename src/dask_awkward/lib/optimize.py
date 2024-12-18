@@ -85,7 +85,7 @@ def optimize(dsk: HighLevelGraph, keys: Sequence[Key], **_: Any) -> Mapping:
 def _prepare_buffer_projection(
     dsk: HighLevelGraph, keys: Sequence[Key]
 ) -> tuple[dict[str, TypeTracerReport], dict[str, Any]] | None:
-    """Prepare for buffer projection by building and evaluating a version of the graph that 
+    """Prepare for buffer projection by building and evaluating a version of the graph that
     has been annotated for typetracer reporting.
 
     Parameters
