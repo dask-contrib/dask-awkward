@@ -9,6 +9,8 @@ import dask_awkward as dak
 
 def test_optimize_columns():
     pytest.importorskip("pyarrow")
+    pytest.importorskip("requests")
+    pytest.importorskip("aiohttp")
 
     array = dak.from_parquet(
         "https://github.com/scikit-hep/awkward/raw/main/tests/samples/nullable-record-primitives-simple.parquet"
