@@ -5,10 +5,10 @@ from typing import cast
 from dask.highlevelgraph import HighLevelGraph
 
 from dask_awkward.layers.layers import AwkwardInputLayer
-from dask_awkward.lib.core import Array as DakArray
+from dask_awkward.lib.core import Array
 
 
-def optimize_columns(array: DakArray, columns: dict[str, frozenset[str]]) -> DakArray:
+def optimize_columns(array: Array, columns: dict[str, frozenset[str]]) -> Array:
     """
     Manually updates the AwkwardInputLayer(s) with the specified columns. This is useful
     for tracing the necessary buffers for a given computation once, and then reusing the
@@ -21,8 +21,8 @@ def optimize_columns(array: DakArray, columns: dict[str, frozenset[str]]) -> Dak
 
     Parameters
     ----------
-    dak_array : Array
-        The Dask-Awkward array to be processed.
+    array : Array
+        The dask-awkward array to be optimized.
     columns : dict[str, frozenset[str]]
         The columns to be touched.
 
@@ -31,7 +31,7 @@ def optimize_columns(array: DakArray, columns: dict[str, frozenset[str]]) -> Dak
     Array
         A new Dask-Awkward array with only the specified columns.
     """
-    if not isinstance(array, DakArray):
+    if not isinstance(array, Array):
         raise TypeError(
             f"Expected `dak_array` to be of type `dask_awkward.Array`, got {type(array)}"
         )
