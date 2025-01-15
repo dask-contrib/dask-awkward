@@ -201,12 +201,10 @@ class AwkwardInputLayer(AwkwardBlockwiseLayer):
                 io_func_implements_projection(self.io_func)
                 and not self.has_been_unpickled
             )
-        assert isinstance(self._is_projectable, bool)
         return self._is_projectable
 
     @is_projectable.setter
     def is_projectable(self, value: bool) -> None:
-        assert isinstance(value, bool)
         self._is_projectable = value
 
     @property
