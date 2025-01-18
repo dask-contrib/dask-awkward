@@ -600,7 +600,7 @@ class AwkwardTreeReductionLayer(Layer):
         return splits
 
     def _cull(self, output_partitions):
-        return DataFrameTreeReduction(
+        return AwkwardTreeReductionLayer(
             self.name,
             self.name_input,
             self.npartitions_input,
