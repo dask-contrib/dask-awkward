@@ -468,7 +468,7 @@ def to_dataframe(
     """
     import dask
     from dask.dataframe import DataFrame as DaskDataFrame
-    from dask.dataframe.core import new_dd_object  # type: ignore
+    from dask.dataframe.core import new_dd_object
 
     if parse_version(dask.__version__) >= parse_version("2025"):
         raise NotImplementedError(
