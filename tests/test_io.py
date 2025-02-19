@@ -11,6 +11,7 @@ from dask.array.utils import assert_eq as da_assert_eq
 from dask.delayed import delayed
 from fsspec.core import get_fs_token_paths
 from numpy.typing import DTypeLike
+from packaging.version import parse as parse_version
 
 import dask_awkward as dak
 from dask_awkward.lib.core import typetracer_array
@@ -246,6 +247,10 @@ def test_to_bag(daa, caa):
         assert comprec.tolist() == entry.tolist()
 
 
+@pytest.mark.skipif(
+    parse_version(dask.__version__) >= parse_version("2025"),
+    reason="dask.DataFrame constructor changed",
+)
 @pytest.mark.parametrize("optimize_graph", [True, False])
 def test_to_dataframe(daa: dak.Array, caa: ak.Array, optimize_graph: bool) -> None:
     pytest.importorskip("pandas")
@@ -261,6 +266,10 @@ def test_to_dataframe(daa: dak.Array, caa: ak.Array, optimize_graph: bool) -> No
     assert_eq(dd, df, check_index=False)
 
 
+@pytest.mark.skipif(
+    parse_version(dask.__version__) >= parse_version("2025"),
+    reason="dask.DataFrame constructor changed",
+)
 @pytest.mark.parametrize("optimize_graph", [True, False])
 def test_to_dataframe_str(
     daa_str: dak.Array, caa_str: ak.Array, optimize_graph: bool
