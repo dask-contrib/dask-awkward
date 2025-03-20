@@ -901,7 +901,7 @@ def test_dask_array_in_map_partitions(daa, caa):
     x1.eager_compute_divisions()
     y1 = da.ones(len(x1), chunks=x1.divisions[1])
     z1 = x1 + y1
-    x2 = ak.zeros_like(caa.points.x)    
+    x2 = ak.zeros_like(caa.points.x)
     y2 = np.ones(len(x2))
     z2 = x2 + y2
     assert_eq(z1, z2)
