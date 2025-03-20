@@ -754,7 +754,7 @@ def test_optimize_rewrite_layer_chains_kwargs(daa):
     def increment(x, how_much=None):
         return x + how_much
 
-    arr = ((daa.points.x + 1) + 6).map_partitions(increment, 5)
+    arr = ((daa.points.x + 1) + 6).map_partitions(increment, how_much=5)
 
     # first a simple test by calling the one optimisation directly
     dsk2 = rewrite_layer_chains(arr.dask, arr.keys)
@@ -764,7 +764,7 @@ def test_optimize_rewrite_layer_chains_kwargs(daa):
     assert out.tolist() == out2.tolist()
 
     # and now with optimise as part of the usual pipeline
-    arr = ((daa.points.x + 1) + 6).map_partitions(increment, 5)
+    arr = ((daa.points.x + 1) + 6).map_partitions(increment, how_much=5)
     out = arr.compute()
     assert out.tolist() == out2.tolist()
 
