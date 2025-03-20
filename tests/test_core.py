@@ -746,6 +746,29 @@ def test_optimize_chain_single(daa):
     assert out.tolist() == out2.tolist()
 
 
+def test_optimize_rewrite_layer_chains_kwargs(daa):
+    import dask
+
+    from dask_awkward.lib.optimize import rewrite_layer_chains
+
+    def increment(x, how_much=None):
+        return x + how_much
+
+    arr = ((daa.points.x + 1) + 6).map_partitions(increment, 5)
+
+    # first a simple test by calling the one optimisation directly
+    dsk2 = rewrite_layer_chains(arr.dask, arr.keys)
+    (out,) = dask.compute(arr, optimize_graph=False)
+    arr._dask = dsk2
+    (out2,) = dask.compute(arr, optimize_graph=False)
+    assert out.tolist() == out2.tolist()
+
+    # and now with optimise as part of the usual pipeline
+    arr = ((daa.points.x + 1) + 6).map_partitions(increment, 5)
+    out = arr.compute()
+    assert out.tolist() == out2.tolist()
+
+
 def test_optimize_chain_multiple(daa):
     result = (daa.points.x**2 - daa.points.y) + 1
 
