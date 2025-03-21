@@ -2191,6 +2191,23 @@ def map_partitions(
             message += f"- {type(arg)}"
         raise TypeError(message)
 
+    # only allow this shortcut for new dask!
+    if len(kwarg_flat_deps) == 0 and _dask_uses_tasks:
+        non_traversed_deps, _ = unpack_collections(*args, traverse=False)
+        if len(flat_deps) == len(non_traversed_deps) and all(
+            id(traversed_dep) == id(non_traversed_dep)
+            for traversed_dep, non_traversed_dep in zip(flat_deps, non_traversed_deps)
+        ):
+            return _map_partitions(
+                base_fn,
+                *args,
+                label=label,
+                token=token,
+                meta=meta,
+                output_divisions=output_divisions,
+                **kwargs,
+            )
+
     arg_flat_deps_expanded = []
     arg_repackers = []
     arg_lens_for_repackers = []
@@ -2561,11 +2578,19 @@ def to_length_zero_arrays(objects: Sequence[Any]) -> tuple[Any, ...]:
     return tuple(map(length_zero_array_or_identity, objects))
 
 
-def map_meta(fn: Callable | ArgsKwargsPackedFunction, *deps: Any) -> ak.Array | None:
-    # NOTE: fn is assumed to be a *packed* function
+def map_meta(
+    fn: Callable | ArgsKwargsPackedFunction, *deps: Any, **kwargs: Any
+) -> ak.Array | None:
+    # NOTE: fn to be a *packed* function (so flat deps or ArgsKwargsPackedFunction)
+    #       if ArgsKwargsPackedFunction we do not allow kwargs
     #       as defined up in map_partitions. be careful!
+    if isinstance(fn, ArgsKwargsPackedFunction) and len(kwargs) > 0:
+        raise ValueError("ArgsKwargsPackedFunctions may not have additional kwargs!")
     try:
-        meta = fn(*to_meta(deps))
+        if isinstance(fn, ArgsKwargsPackedFunction):
+            meta = fn(*to_meta(deps))
+        else:
+            meta = fn(*to_meta(deps), **kwargs)
         return meta
     except Exception as err:
         # if compute-unknown-meta is False then we don't care about

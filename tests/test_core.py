@@ -754,7 +754,7 @@ def test_optimize_rewrite_layer_chains_kwargs(daa):
     def increment(x, how_much=None):
         return x + how_much
 
-    arr = ((daa.points.x + 1) + 6).map_partitions(increment, 5)
+    arr = ((daa.points.x + 1) + 6).map_partitions(increment, how_much=5)
 
     # first a simple test by calling the one optimisation directly
     dsk2 = rewrite_layer_chains(arr.dask, arr.keys)
@@ -764,7 +764,7 @@ def test_optimize_rewrite_layer_chains_kwargs(daa):
     assert out.tolist() == out2.tolist()
 
     # and now with optimise as part of the usual pipeline
-    arr = ((daa.points.x + 1) + 6).map_partitions(increment, 5)
+    arr = ((daa.points.x + 1) + 6).map_partitions(increment, how_much=5)
     out = arr.compute()
     assert out.tolist() == out2.tolist()
 
@@ -828,6 +828,12 @@ def test_map_partitions_args_and_kwargs_have_collection():
     zc = my_power(xc, kwarg_y=yc)
     zl = dak.map_partitions(my_power, xl, kwarg_y=yl)
 
+    # kwargs that contain collections should be wrapped
+    if hasattr(zl.dask.layers[zl.name], "task"):
+        assert isinstance(
+            zl.dask.layers[zl.name].task.func, dak.lib.core.ArgsKwargsPackedFunction
+        )
+
     assert_eq(zc, zl)
 
     zd = structured_function(inputs={"x": xc, "y": xc, "z": yc})
@@ -851,6 +857,10 @@ def test_map_partitions_args_and_kwargs_have_collection():
 
     zg = my_power(xc, kwarg_y=2.0)
     zp = dak.map_partitions(my_power, xl, kwarg_y=2.0)
+
+    # this invocation of my_power shouldn't be wrapped, no collections
+    if hasattr(zp.dask.layers[zp.name], "task"):
+        assert zp.dask.layers[zp.name].task.func is my_power
 
     assert_eq(zg, zp)
 
@@ -882,6 +892,7 @@ def test_map_partitions_args_and_kwargs_have_collection():
         ccc=cc,
         ddd=dd,
     )
+
     assert_eq(res1, res2)
 
 
