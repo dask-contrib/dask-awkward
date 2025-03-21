@@ -95,4 +95,5 @@ from dask_awkward.lib.structure import (
     without_parameters,
     zeros_like,
     zip,
+    zip_no_broadcast,
 )
