@@ -8,7 +8,6 @@ from pathlib import Path
 
 import awkward as ak
 import numpy as np
-from dask import persist
 from dask.delayed import delayed
 from distributed import Client
 from distributed.client import _wait
@@ -43,7 +42,7 @@ def test_compute(loop, ndjson_points_file):  # noqa
 @gen_cluster(client=True)
 async def test_persist(c, s, a, b, ndjson_points_file):
     daa = dak.from_json([ndjson_points_file])
-    (x1,) = persist(daa, scheduler=c)
+    (x1,) = c.persist(daa)
     await _wait(x1)
     assert x1.__dask_keys__()[0] in daa.__dask_keys__()
 
