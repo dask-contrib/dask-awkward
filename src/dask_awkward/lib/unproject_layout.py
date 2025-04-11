@@ -149,7 +149,7 @@ def _unproject_layout(form, layout, length, backend):
                         if length is unknown_length
                         else math.ceil(length / 8.0)
                     ),
-                    backend.index_nplike,
+                    backend.nplike,
                 ),
                 _unproject_layout(form.content, None, length, backend),
                 form.valid_when,
@@ -160,7 +160,7 @@ def _unproject_layout(form, layout, length, backend):
 
         elif isinstance(form, ByteMaskedForm):
             return ByteMaskedArray(
-                dummy_index_of(form.mask, length, backend.index_nplike),
+                dummy_index_of(form.mask, length, backend.nplike),
                 _unproject_layout(form.content, None, length, backend),
                 form.valid_when,
                 parameters=form.parameters,
@@ -168,29 +168,29 @@ def _unproject_layout(form, layout, length, backend):
 
         elif isinstance(form, IndexedForm):
             return IndexedArray(
-                dummy_index_of(form.index, length, backend.index_nplike),
+                dummy_index_of(form.index, length, backend.nplike),
                 _unproject_layout(form.content, None, unknown_length, backend),
                 parameters=form.parameters,
             )
 
         elif isinstance(form, IndexedOptionForm):
             return IndexedOptionArray(
-                dummy_index_of(form.index, length, backend.index_nplike),
+                dummy_index_of(form.index, length, backend.nplike),
                 _unproject_layout(form.content, None, unknown_length, backend),
                 parameters=form.parameters,
             )
 
         elif isinstance(form, ListForm):
             return ListArray(
-                dummy_index_of(form.starts, length, backend.index_nplike),
-                dummy_index_of(form.stops, length, backend.index_nplike),
+                dummy_index_of(form.starts, length, backend.nplike),
+                dummy_index_of(form.stops, length, backend.nplike),
                 _unproject_layout(form.content, None, unknown_length, backend),
                 parameters=form.parameters,
             )
 
         elif isinstance(form, ListOffsetForm):
             return ListOffsetArray(
-                dummy_index_of(form.offsets, length + 1, backend.index_nplike),
+                dummy_index_of(form.offsets, length + 1, backend.nplike),
                 _unproject_layout(form.content, None, unknown_length, backend),
                 parameters=form.parameters,
             )
@@ -222,8 +222,8 @@ def _unproject_layout(form, layout, length, backend):
 
         elif isinstance(form, UnionForm):
             return UnionArray(
-                dummy_index_of(form.tags, length, backend.index_nplike),
-                dummy_index_of(form.index, length, backend.index_nplike),
+                dummy_index_of(form.tags, length, backend.nplike),
+                dummy_index_of(form.index, length, backend.nplike),
                 [
                     _unproject_layout(content, None, unknown_length, backend)
                     for content in form.contents
@@ -321,9 +321,9 @@ def _unproject_layout(form, layout, length, backend):
             )
             return BitMaskedArray(
                 ak.index.Index(
-                    backend.index_nplike.full(byte_length, 255, dtype=np.uint8)
+                    backend.nplike.full(byte_length, 255, dtype=np.uint8)
                     if form.valid_when
-                    else backend.index_nplike.zeros(byte_length, dtype=np.uint8)
+                    else backend.nplike.zeros(byte_length, dtype=np.uint8)
                 ),
                 _unproject_layout(
                     form.content, layout.content, layout.content.length, backend
@@ -336,9 +336,9 @@ def _unproject_layout(form, layout, length, backend):
         elif isinstance(form, ByteMaskedForm):
             return ByteMaskedArray(
                 ak.index.Index(
-                    backend.index_nplike.full(length, 1, dtype=np.int8)
+                    backend.nplike.full(length, 1, dtype=np.int8)
                     if form.valid_when
-                    else backend.index_nplike.zeros(length, dtype=np.int8)
+                    else backend.nplike.zeros(length, dtype=np.int8)
                 ),
                 _unproject_layout(
                     form.content, layout.content, layout.content.length, backend
@@ -349,8 +349,8 @@ def _unproject_layout(form, layout, length, backend):
         elif isinstance(form, IndexedOptionForm):
             return IndexedOptionArray(
                 ak.index.Index64(
-                    backend.index_nplike.arange(layout.length, dtype=np.int64),
-                    nplike=backend.index_nplike,
+                    backend.nplike.arange(layout.length, dtype=np.int64),
+                    nplike=backend.nplike,
                 ),
                 _unproject_layout(
                     form.content, layout.content, layout.content.length, backend
