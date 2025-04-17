@@ -1434,7 +1434,7 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
 
         if not self.known_divisions:
             self.eager_compute_divisions()
-        stop = sl.stop or self.defined_divisions[-1]
+        stop = self.defined_divisions[-1] if sl.stop is None else sl.stop
         start = start if start >= 0 else self.defined_divisions[-1] + start
         stop = stop if stop >= 0 else self.defined_divisions[-1] + stop
         if step < 0:

@@ -85,6 +85,11 @@ def test_single_ellipsis(daa: dak.Array, caa: ak.Array) -> None:
     assert_eq(daa[...], caa[...])
 
 
+def test_length0_slice(daa: dak.Array, caa: ak.Array) -> None:
+    assert_eq(daa[0:0], caa[0:0])
+    assert len(daa[0:0]) == len(caa[0:0]) == 0
+
+
 def test_empty_slice(daa: dak.Array, caa: ak.Array) -> None:
     assert_eq(daa[:], caa[:])
     assert_eq(daa[:, "points"], caa[:, "points"])
