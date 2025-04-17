@@ -355,7 +355,9 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
             self._meta = self._check_meta(meta)
             self._dtype = self._meta.layout.dtype
         elif meta is None and dtype is not None:
-            self._meta = ak.Array(create_unknown_scalar(dtype))
+            self._meta = ak.Array(
+                ak.to_layout(create_unknown_scalar(dtype), primitive_policy="promote")
+            )
             self._dtype = dtype
         else:
             ValueError("One (and only one) of dtype or meta can be defined.")
@@ -413,7 +415,7 @@ class Scalar(DaskMethodsMixin, DaskOperatorMethodMixin):
             return m
         elif isinstance(m, OneOf) or is_unknown_scalar(m):
             if isinstance(m, TypeTracerArray):
-                return ak.Array(m)
+                return ak.Array(ak.to_layout(m, primitive_policy="promote"))
             else:
                 return m
         raise TypeError(f"meta must be a typetracer, not a {type(m)}")
@@ -576,7 +578,12 @@ def _promote_maybenones(op: Callable) -> Callable:
     @wraps(op)
     def f(*args):
         args = tuple(
-            ak.Array(arg.content) if isinstance(arg, MaybeNone) else arg for arg in args
+            (
+                ak.Array(ak.to_layout(arg.content, primitive_policy="promote"))
+                if isinstance(arg, MaybeNone)
+                else arg
+            )
+            for arg in args
         )
         result = op(*args)
         return result
@@ -639,12 +646,14 @@ def new_scalar_object(
     if meta is not None and dtype is None:
         pass
     elif meta is None and dtype is not None:
-        meta = ak.Array(create_unknown_scalar(dtype))
+        meta = ak.Array(
+            ak.to_layout(create_unknown_scalar(dtype), primitive_policy="promote")
+        )
     else:
         ValueError("One (and only one) of dtype or meta can be defined.")
 
     if isinstance(meta, MaybeNone):
-        meta = ak.Array(meta.content)
+        meta = ak.Array(ak.to_layout(meta.content, primitive_policy="promote"))
     elif meta is not None:
         try:
             if ak.backend(meta) != "typetracer":
