@@ -754,6 +754,29 @@ def test_optimize_chain_single(daa):
     assert out.tolist() == out2.tolist()
 
 
+def test_optimize_rewrite_layer_chains_kwargs(daa):
+    import dask
+
+    from dask_awkward.lib.optimize import rewrite_layer_chains
+
+    def increment(x, how_much=None):
+        return x + how_much
+
+    arr = ((daa.points.x + 1) + 6).map_partitions(increment, how_much=5)
+
+    # first a simple test by calling the one optimisation directly
+    dsk2 = rewrite_layer_chains(arr.dask, arr.keys)
+    (out,) = dask.compute(arr, optimize_graph=False)
+    arr._dask = dsk2
+    (out2,) = dask.compute(arr, optimize_graph=False)
+    assert out.tolist() == out2.tolist()
+
+    # and now with optimise as part of the usual pipeline
+    arr = ((daa.points.x + 1) + 6).map_partitions(increment, how_much=5)
+    out = arr.compute()
+    assert out.tolist() == out2.tolist()
+
+
 def test_optimize_chain_multiple(daa):
     result = (daa.points.x**2 - daa.points.y) + 1
 
@@ -813,6 +836,12 @@ def test_map_partitions_args_and_kwargs_have_collection():
     zc = my_power(xc, kwarg_y=yc)
     zl = dak.map_partitions(my_power, xl, kwarg_y=yl)
 
+    # kwargs that contain collections should be wrapped
+    if hasattr(zl.dask.layers[zl.name], "task"):
+        assert isinstance(
+            zl.dask.layers[zl.name].task.func, dak.lib.core.ArgsKwargsPackedFunction
+        )
+
     assert_eq(zc, zl)
 
     zd = structured_function(inputs={"x": xc, "y": xc, "z": yc})
@@ -836,6 +865,10 @@ def test_map_partitions_args_and_kwargs_have_collection():
 
     zg = my_power(xc, kwarg_y=2.0)
     zp = dak.map_partitions(my_power, xl, kwarg_y=2.0)
+
+    # this invocation of my_power shouldn't be wrapped, no collections
+    if hasattr(zp.dask.layers[zp.name], "task"):
+        assert zp.dask.layers[zp.name].task.func is my_power
 
     assert_eq(zg, zp)
 
@@ -867,11 +900,13 @@ def test_map_partitions_args_and_kwargs_have_collection():
         ccc=cc,
         ddd=dd,
     )
+
     assert_eq(res1, res2)
 
 
 def test_dask_array_in_map_partitions(daa, caa):
     x1 = dak.zeros_like(daa.points.x)
+    x1.eager_compute_divisions()
     y1 = da.ones(len(x1), chunks=x1.divisions[1])
     z1 = x1 + y1
     x2 = ak.zeros_like(caa.points.x)
@@ -988,3 +1023,14 @@ def test_array__bool_nonzero_long_int_float_complex_index():
             match=r"A dask_awkward.Array is encountered in a computation where a concrete value is expected. If you intend to convert the dask_awkward.Array to a concrete value, use the `.compute\(\)` method. The .+ method was called on .+.",
         ):
             fun(dask_arr)
+
+
+def test_map_partitions_deterministic_token():
+    dask_arr = dak.from_awkward(ak.Array([1]), npartitions=1)
+
+    def f(x):
+        return x[0] + 1
+
+    assert (
+        map_partitions(f, {0: dask_arr}).name == map_partitions(f, {0: dask_arr}).name
+    )

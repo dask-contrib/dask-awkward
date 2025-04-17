@@ -1967,7 +1967,18 @@ class ArgsKwargsPackedFunction:
         self.kwarg_repacker = kwarg_repacker
         self.arg_lens_for_repackers = arg_lens_for_repackers
 
-    def __call__(self, *args_deps_expanded):
+    def __repr__(self):
+        if hasattr(self.fn, "__qualname__"):
+            return f"{self.fn.__qualname__}-repacked"
+        return (
+            repr(self.fn)
+            .replace("<", "")
+            .replace(">", "")
+            .replace("function ", "")
+            .replace("built-in ", "")
+        ) + "-repacked"
+
+    def _repack(self, *args_deps_expanded):
         """This packing function receives a list of strictly
         ordered arguments. The first range of arguments,
         [0:sum(self.arg_lens_for_repackers)], corresponding to
@@ -1991,6 +2002,10 @@ class ArgsKwargsPackedFunction:
             )
             len_args += n_args
         kwargs = self.kwarg_repacker(args_deps_expanded[len_args:])[0]
+        return args, kwargs
+
+    def __call__(self, *args_deps_expanded):
+        args, kwargs = self._repack(*args_deps_expanded)
         return self.fn(*args, **kwargs)
 
 
@@ -2012,7 +2027,12 @@ def _map_partitions(
     will not be traversed to extract all dask collections, except those in
     the first dimension of args or kwargs.
     """
-    token = token or tokenize(fn, *args, output_divisions, **kwargs)
+    if isinstance(fn, ArgsKwargsPackedFunction):
+        token_args, token_kwargs = fn._repack(*args)
+        token = token or tokenize(fn.fn, *token_args, output_divisions, **token_kwargs)
+    else:
+        token = token or tokenize(fn, *args, output_divisions, **kwargs)
+
     label = hyphenize(label or funcname(fn))
     name = f"{label}-{token}"
     deps = [a for a in args if is_dask_collection(a)] + [
@@ -2172,6 +2192,23 @@ def map_partitions(
         for arg in args:
             message += f"- {type(arg)}"
         raise TypeError(message)
+
+    # only allow this shortcut for new dask!
+    if len(kwarg_flat_deps) == 0 and _dask_uses_tasks:
+        non_traversed_deps, _ = unpack_collections(*args, traverse=False)
+        if len(flat_deps) == len(non_traversed_deps) and all(
+            id(traversed_dep) == id(non_traversed_dep)
+            for traversed_dep, non_traversed_dep in zip(flat_deps, non_traversed_deps)
+        ):
+            return _map_partitions(
+                base_fn,
+                *args,
+                label=label,
+                token=token,
+                meta=meta,
+                output_divisions=output_divisions,
+                **kwargs,
+            )
 
     arg_flat_deps_expanded = []
     arg_repackers = []
@@ -2543,11 +2580,19 @@ def to_length_zero_arrays(objects: Sequence[Any]) -> tuple[Any, ...]:
     return tuple(map(length_zero_array_or_identity, objects))
 
 
-def map_meta(fn: Callable | ArgsKwargsPackedFunction, *deps: Any) -> ak.Array | None:
-    # NOTE: fn is assumed to be a *packed* function
+def map_meta(
+    fn: Callable | ArgsKwargsPackedFunction, *deps: Any, **kwargs: Any
+) -> ak.Array | None:
+    # NOTE: fn to be a *packed* function (so flat deps or ArgsKwargsPackedFunction)
+    #       if ArgsKwargsPackedFunction we do not allow kwargs
     #       as defined up in map_partitions. be careful!
+    if isinstance(fn, ArgsKwargsPackedFunction) and len(kwargs) > 0:
+        raise ValueError("ArgsKwargsPackedFunctions may not have additional kwargs!")
     try:
-        meta = fn(*to_meta(deps))
+        if isinstance(fn, ArgsKwargsPackedFunction):
+            meta = fn(*to_meta(deps))
+        else:
+            meta = fn(*to_meta(deps), **kwargs)
         return meta
     except Exception as err:
         # if compute-unknown-meta is False then we don't care about

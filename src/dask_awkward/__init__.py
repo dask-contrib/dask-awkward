@@ -9,7 +9,12 @@ import dask_awkward.lib.reducers as reducers
 import dask_awkward.lib.str as str
 import dask_awkward.lib.structure as structure
 import dask_awkward.lib.utils as utils
-from dask_awkward.lib.core import Array, PartitionCompatibility, Record, Scalar
+from dask_awkward.lib.core import (
+    Array,
+    PartitionCompatibility,
+    Record,
+    Scalar,
+)
 from dask_awkward.lib.core import _type as type
 from dask_awkward.lib.core import (
     compatible_partitions,
@@ -27,6 +32,7 @@ from dask_awkward.lib.inspect import (
 
 necessary_columns = report_necessary_columns  # Export for backwards compatibility.
 
+import dask_awkward.manual as manual
 from dask_awkward.lib.io.io import (
     from_awkward,
     from_dask_array,
