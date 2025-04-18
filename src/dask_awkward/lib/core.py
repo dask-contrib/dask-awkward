@@ -706,6 +706,8 @@ def new_known_scalar(
             dtype = np.dtype(int)
         elif isinstance(s, (float, np.floating)):
             dtype = np.dtype(float)
+        elif hasattr(s, "dtype"):
+            dtype = getattr(s, "dtype")
         else:
             dtype = np.dtype(type(s))
     else:

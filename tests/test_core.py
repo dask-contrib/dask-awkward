@@ -466,6 +466,14 @@ def test_new_known_scalar() -> None:
     assert c.compute() == s1
 
 
+def test_new_known_scalar_from_array() -> None:
+    s = np.array(0.0)
+    c = new_known_scalar(s)
+    assert c.compute() == s
+    assert c._meta is not None
+    assert c.dtype == s.dtype
+
+
 def test_scalar_dtype() -> None:
     s = 2
     c = new_known_scalar(s)
