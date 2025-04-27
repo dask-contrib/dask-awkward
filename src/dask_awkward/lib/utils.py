@@ -6,8 +6,6 @@ from collections.abc import Callable, Iterable, Iterator, Mapping, MutableMappin
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, TypedDict, TypeVar
 
-import awkward as ak
-
 if TYPE_CHECKING:
     from awkward.forms import Form
 
@@ -135,36 +133,6 @@ def render_buffer_key(form: Form, form_key: str, attribute: str) -> str:
 def parse_buffer_key(buffer_key: str) -> tuple[str, str]:
     head, tail = buffer_key.rsplit("-", maxsplit=1)
     return head, tail
-
-
-def form_with_unique_keys(form: Form, key: str) -> Form:
-    def impl(form: Form, key: str) -> None:
-        # Set form key
-        form.form_key = key
-
-        # If the form is a record we need to loop over all fields in the
-        # record and set form that include the field name; this will keep
-        # recursing as well.
-        if form.is_record:
-            for field in form.fields:
-                impl(form.content(field), f"{key}.{field}")
-
-        elif form.is_union:
-            for i, entry in enumerate(form.contents):
-                impl(entry, f"{key}#{i}")
-
-        # NumPy like array is easy
-        elif form.is_numpy or form.is_unknown:
-            pass
-
-        # Anything else grab the content and keep recursing
-        else:
-            impl(form.content, f"{key}.content")
-
-    # Perform a "deep" copy without preserving references
-    form = ak.forms.from_dict(form.to_dict())
-    impl(form, key)
-    return form
 
 
 @contextmanager
