@@ -653,7 +653,11 @@ def num(
         return new_scalar_object(
             hlg,
             name,
-            meta=ak.Array(create_unknown_scalar(np.dtype("int64"))),
+            meta=ak.Array(
+                ak.to_layout(
+                    create_unknown_scalar(np.dtype("int64")), primitive_policy="promote"
+                )
+            ),
         )
     else:
         return map_partitions(
