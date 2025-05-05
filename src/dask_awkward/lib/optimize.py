@@ -7,12 +7,12 @@ from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast, no_type_check
 
 import awkward as ak
+import dask
 import dask.config
 from awkward.typetracer import touch_data
 from dask.blockwise import Blockwise, fuse_roots, optimize_blockwise
 from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
-from dask.local import get_sync
 
 from dask_awkward.layers import (
     AwkwardBlockwiseLayer,
@@ -146,8 +146,7 @@ def _prepare_buffer_projection(
     try:
         for layer in hlg.layers.values():
             layer.__dict__.pop("_cached_dict", None)
-
-        results = get_sync(hlg, list(minimal_keys))
+        results = dask.compute(hlg, list(minimal_keys), scheduler="sync")
 
         # Touch all the buffers associated with the given output keys
         for out in results:
