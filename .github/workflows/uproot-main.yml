@@ -32,5 +32,5 @@ jobs:
         cd ..
         git clone https://github.com/scikit-hep/uproot5
         cd uproot5
-        python3 -m pip install .[test,dev]
+        python3 -m pip install . --group dev
         python3 -m pytest -k dask
