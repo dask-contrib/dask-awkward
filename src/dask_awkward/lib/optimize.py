@@ -101,6 +101,7 @@ def _unwind(llg, arg):
     if isinstance(arg, DataNode):
         return arg.value
     if isinstance(arg, GraphNode):
+        # other types to implement
         raise ValueError
     return arg
 
@@ -125,8 +126,9 @@ def _get_sync(llg, key):
 def get_sync(hlg, keys):
     get_cache.clear()
     llg = dict(hlg)
+    out = [_get_sync(llg, key) for key in keys]
     get_cache.clear()
-    return [_get_sync(llg, key) for key in keys]
+    return out
 
 
 def _prepare_buffer_projection(
