@@ -112,6 +112,7 @@ def _unwind(llg, arg):
     if isinstance(arg, GraphNode):
         # other types to implement
         raise ValueError
+
     return arg
 
 
@@ -121,7 +122,15 @@ def _get_sync(llg, key):
             task = llg[key]
         else:
             return NoKey
-        get_cache[key] = _unwind(llg, task)
+        out = _unwind(llg, task)
+        try:
+            if out in llg:
+                # some things just return another key
+                out = _get_sync(llg, out)
+        except TypeError:
+            pass
+        get_cache[key] = out
+
     return get_cache[key]
 
 
