@@ -90,6 +90,15 @@ class NoKey: ...
 
 
 def _unwind(llg, arg):
+    if isinstance(arg, Task):
+        func = arg.func
+        args = arg.args
+        kwargs = arg.kwargs
+        args = [_unwind(llg, arg) for arg in args]
+        args = [_ for _ in args if _ is not NoKey]
+        kwargs = {k: _unwind(llg, v) for k, v in kwargs.items()}
+        kwargs = {k: v for k, v in kwargs.items() if v is not NoKey}
+        return func(*args, **kwargs)
     if isinstance(arg, Alias):
         return _get_sync(llg, arg.target)
     if isinstance(arg, List):
@@ -112,14 +121,7 @@ def _get_sync(llg, key):
             task = llg[key]
         else:
             return NoKey
-        func = task.func
-        args = task.args
-        kwargs = task.kwargs
-        args = [_unwind(llg, arg) for arg in args]
-        args = [_ for _ in args if _ is not NoKey]
-        kwargs = {k: _unwind(llg, v) for k, v in kwargs.items()}
-        kwargs = {k: v for k, v in kwargs.items() if v is not NoKey}
-        get_cache[key] = func(*args, **kwargs)
+        get_cache[key] = _unwind(llg, task)
     return get_cache[key]
 
 
