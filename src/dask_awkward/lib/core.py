@@ -1811,14 +1811,10 @@ def _zero_getitem(arr: ak.Array, zeroth: slice, rest: tuple[slice, ...]) -> ak.A
 
 
 def compute_typetracer(dsk: HighLevelGraph, name: str) -> ak.Array:
+    from dask_awkward.lib.optimize import get_sync
+
     key = (name, 0)
-    return typetracer_array(
-        Delayed(
-            key,
-            dsk.cull({key}),
-            layer=name,
-        ).compute()
-    )
+    return typetracer_array(get_sync(dsk, [key])[0])
 
 
 def new_array_object(
