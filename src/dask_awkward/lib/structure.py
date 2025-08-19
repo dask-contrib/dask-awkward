@@ -961,6 +961,7 @@ def unzip(
 def values_astype(
     array: Array,
     to: np.dtype | str,
+    including_unknown: bool = False,
     highlevel: bool = True,
     behavior: Mapping | None = None,
     attrs: Mapping[str, Any] | None = None,
@@ -971,6 +972,7 @@ def values_astype(
         ak.values_astype,
         array,
         to=to,
+        including_unknown=including_unknown,
         behavior=behavior,
         label="values-astype",
         attrs=attrs,
