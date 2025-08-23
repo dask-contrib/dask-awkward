@@ -20,7 +20,6 @@ from dask_awkward.lib.core import (
     PartitionCompatibility,
     _map_partitions,
     map_partitions,
-    new_known_scalar,
     new_scalar_object,
     partition_compatibility,
 )
