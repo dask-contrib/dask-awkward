@@ -635,9 +635,6 @@ def num(
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
     if axis == 0 or axis == -1 * array.ndim:
-        if array.known_divisions:
-            return new_known_scalar(array.defined_divisions[-1], label="num")
-
         per_axis = map_partitions(
             ak.num,
             array,
