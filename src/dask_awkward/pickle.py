@@ -15,6 +15,8 @@ def _maybe_make_pickle_buffer(buffer: Any) -> PlaceholderArray | PickleBuffer:
     if isinstance(buffer, PlaceholderArray):
         return buffer
     else:
+        if hasattr(buffer, "materialize") and callable(buffer.materialize):
+            buffer = buffer.materialize()
         return PickleBuffer(buffer)
 
 
