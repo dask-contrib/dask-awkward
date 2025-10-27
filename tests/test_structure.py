@@ -264,6 +264,16 @@ def test_setitem(caa: ak.Array, daa: dak.Array) -> None:
         daa["points", "q"] = "hi there"
 
 
+def test_delitem(caa: ak.Array, daa: dak.Array) -> None:
+    del daa["points", "y"]
+    del caa["points", "y"]
+    assert_eq(caa, daa)
+
+    del daa["points"]
+    del caa["points"]
+    assert_eq(caa, daa)
+
+
 def test_with_parameter() -> None:
     a = [[1, 2, 3], [], [4]]
     b = [[], [3], []]
