@@ -250,6 +250,8 @@ def test_with_field(caa: ak.Array, daa: dak.Array) -> None:
 
 
 def test_setitem(caa: ak.Array, daa: dak.Array) -> None:
+    caa = ak.copy(caa)
+    daa = dak.copy(daa)
     daa["xx"] = daa["points"]["x"]
     caa["xx"] = caa["points"]["x"]
 
@@ -265,6 +267,8 @@ def test_setitem(caa: ak.Array, daa: dak.Array) -> None:
 
 
 def test_delitem(caa: ak.Array, daa: dak.Array) -> None:
+    caa = ak.copy(caa)
+    daa = dak.copy(daa)
     del daa["points", "y"]
     del caa["points", "y"]
     assert_eq(caa, daa)
