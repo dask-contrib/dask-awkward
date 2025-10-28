@@ -60,7 +60,7 @@ def ndjson_points_file_str(ndjson_points1_str: str) -> str:
     return ndjson_points1_str
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def daa(ndjson_points1: str) -> dak.Array:
     return dak.from_json([ndjson_points1] * 3)
 
@@ -82,7 +82,7 @@ def daa_str(ndjson_points1_str: str) -> dak.Array:
     return dak.from_json([ndjson_points1_str] * 3)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def caa(ndjson_points1: str) -> ak.Array:
     with open(ndjson_points1, "rb") as f:
         a = ak.from_json(f, line_delimited=True)
