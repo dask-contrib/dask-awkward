@@ -1092,12 +1092,13 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
     def _typestr(self, max: int = 0) -> str:
         tstr = str(_type(self))
         if max and len(tstr) > max:
-            tstr = f"{tstr[0:max]} ... }}"
-        return f"var * {tstr}"
+            tstr = f"{tstr[0:max]}..."
+        return f"## * {tstr}"
 
     def __str__(self) -> str:
         return (
             f"dask.awkward<{key_split(self.name)}, "
+            f"type='{self._typestr(50).split('[')[0]}', "
             f"npartitions={self.npartitions}"
             ">"
         )
