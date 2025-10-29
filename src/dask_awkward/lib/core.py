@@ -977,6 +977,21 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         self._dask = appended._dask
         self._name = appended._name
 
+    def __delitem__(self, where: Any) -> None:
+        if not (
+            isinstance(where, str)
+            or (isinstance(where, tuple) and all(isinstance(x, str) for x in where))
+        ):
+            raise TypeError("only fields may be deleted in-place (by field name)")
+
+        from dask_awkward.lib.structure import without_field
+
+        removed = without_field(self, where=where, behavior=self.behavior)
+
+        self._meta = removed._meta
+        self._dask = removed._dask
+        self._name = removed._name
+
     def _rebuild(self, dsk, *, rename=None):
         name = self.name
         if rename:
