@@ -53,6 +53,12 @@ def test_dunder_str(caa: ak.Array) -> None:
     daa = dak.from_awkward(caa, npartitions=2)
     assert (
         str(daa)
+        == "dask.awkward<from-awkward, type='15 * {points: var * {x: int64, y: int64}}', npartitions=2>"
+    )
+
+    daa._divisions = (None, None, None)
+    assert (
+        str(daa)
         == "dask.awkward<from-awkward, type='## * {points: var * {x: int64, y: int64}}', npartitions=2>"
     )
 
