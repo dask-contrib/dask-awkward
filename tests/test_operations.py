@@ -24,7 +24,8 @@ def test_concatenate_axis_0_logical_same(daa):
     buffers = next(iter(buffers_report.values()))
 
     assert buffers.data_and_shape == frozenset(
-        ["@.points.content.x-data", "@.points-offsets"]
+        # ["@.points.content.x-data", "@.points-offsets"]
+        [repr(("@", "points", None, "x")) + "-data", repr(("@", "points")) + "-offsets"]
     )
     assert buffers.shape_only == frozenset()
 
@@ -61,7 +62,12 @@ def test_concatenate_axis_0_logical_different(daa):
 
         buffers = next(iter(buffers_report.values()))
         assert buffers.data_and_shape == frozenset(
-            ["@.points.content.x-data", "@.points.content.y-data", "@.points-offsets"]
+            # ["@.points.content.x-data", "@.points.content.y-data", "@.points-offsets"]
+            [
+                repr(("@", "points", None, "x")) + "-data",
+                repr(("@", "points", None, "y")) + "-data",
+                repr(("@", "points")) + "-offsets",
+            ]
         )
         assert buffers.shape_only == frozenset()
 
