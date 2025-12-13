@@ -44,6 +44,7 @@ __all__ = (
     "combinations",
     "copy",
     "drop_none",
+    "enforce_type",
     "fill_none",
     "firsts",
     "flatten",
@@ -1349,6 +1350,28 @@ def zip(
         )
 
 
+@borrow_docstring(ak.enforce_type)
+def enforce_type(
+    array: Array,
+    type: str | dict | Type,
+    highlevel: bool = True,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
+) -> Array:
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
+    return map_partitions(
+        ak.enforce_type,
+        array,
+        label="enforce-type",
+        type=type,
+        behavior=behavior,
+        attrs=attrs,
+        output_divisions=1,
+    )
+
+
 def _repartition_func(*stuff):
     import builtins
 
@@ -1443,25 +1466,3 @@ def simple_repartition_layer(
     else:
         raise ValueError
     return layer, new_divisions
-
-
-@borrow_docstring(ak.enforce_type)
-def enforce_type(
-    array: Array,
-    type: str | dict | Type,
-    highlevel: bool = True,
-    behavior: Mapping | None = None,
-    attrs: Mapping[str, Any] | None = None,
-) -> Array:
-    if not highlevel:
-        raise ValueError("Only highlevel=True is supported")
-
-    return map_partitions(
-        ak.enforce_type,
-        array,
-        label="enforce-type",
-        type=type,
-        behavior=behavior,
-        attrs=attrs,
-        output_divisions=1,
-    )
