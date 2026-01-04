@@ -34,6 +34,34 @@ def test_pickle_ak_array():
     assert next_array.behavior == behavior
     assert next_array.attrs == {"foo": "keep"}
 
+    matrix = np.arange(64).reshape(8, -1)
+    buffers = []
+    # Contiguous
+    array = ak.Array(matrix)
+    next_array = pickle.loads(
+        pickle.dumps(array, protocol=5, buffer_callback=buffers.append), buffers=buffers
+    )
+    assert array.layout.form == next_array.layout.form
+    assert ak.almost_equal(array, next_array)
+    assert buffers
+    assert np.shares_memory(
+        array.layout.data,
+        next_array.layout.data,
+    )
+    buffers = []
+    # Non-contiguous
+    array = ak.Array(matrix[:, 0])
+    next_array = pickle.loads(
+        pickle.dumps(array, protocol=5, buffer_callback=buffers.append), buffers=buffers
+    )
+    assert array.layout.form == next_array.layout.form
+    assert ak.almost_equal(array, next_array)
+    assert buffers
+    assert not np.shares_memory(
+        array.layout.data,
+        next_array.layout.data,
+    )
+
 
 def test_pickle_ak_record():
     buffers = []
