@@ -116,7 +116,7 @@ line_length = 88
 src_paths = ["src", "tests"]
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.10"
 files = ["src"]
 exclude = ["tests/"]
 strict = false
