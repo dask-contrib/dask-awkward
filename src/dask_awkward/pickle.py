@@ -16,10 +16,10 @@ def _maybe_make_pickle_buffer(buffer: Any) -> PlaceholderArray | PickleBuffer:
     if isinstance(buffer, PlaceholderArray):
         return buffer
     else:
+        nplike = nplike_of_obj(buffer)
         if hasattr(buffer, "materialize") and callable(buffer.materialize):
-            nplike = nplike_of_obj(buffer)
-            buffer = nplike.ascontiguousarray(buffer.materialize())
-        return PickleBuffer(buffer)
+            buffer = buffer.materialize()
+        return PickleBuffer(nplike.ascontiguousarray(buffer))
 
 
 def _without_transient_attrs(attrs: Mapping[str, Any]) -> Mapping[str, Any]:
