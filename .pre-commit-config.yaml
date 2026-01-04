@@ -30,11 +30,6 @@ repos:
   hooks:
   - id: black
     language_version: python3
-    args:
-    - --target-version=py310
-    - --target-version=py311
-    - --target-version=py312
-    - --target-version=py313
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
   rev: v0.11.2
