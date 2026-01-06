@@ -3,7 +3,7 @@ channels:
   - conda-forge
 dependencies:
   # required dependencies
-  - python=3.11
+  - python=3.13
   - dask
   - aiohttp
   - requests
