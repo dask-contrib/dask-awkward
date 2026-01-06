@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import math
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from functools import partial
 from typing import TYPE_CHECKING, Any, cast
@@ -45,6 +45,7 @@ if TYPE_CHECKING:
     from dask.bag.core import Bag as DaskBag
     from dask.dataframe import DataFrame as DaskDataFrame
     from dask.delayed import Delayed
+    from dask.typing import DaskCollection
     from fsspec.spec import AbstractFileSystem
 
 
@@ -240,7 +241,9 @@ def from_delayed(
         divs = divisions
         if len(divs) != len(parts) + 1:
             raise ValueError("divisions must be a tuple of length len(source) + 1")
-    hlg = HighLevelGraph.from_collections(name, dsk, dependencies=parts)
+    hlg = HighLevelGraph.from_collections(
+        name, dsk, dependencies=cast("Sequence[DaskCollection]", parts)
+    )
     return new_array_object(
         hlg, name=name, meta=meta, behavior=behavior, divisions=divs, attrs=attrs
     )
@@ -426,7 +429,9 @@ def from_dask_array(
         concatenate=True,
     )
     layer = AwkwardBlockwiseLayer.from_blockwise(layer)
-    hlg = HighLevelGraph.from_collections(name, layer, dependencies=[array])
+    hlg = HighLevelGraph.from_collections(
+        name, layer, dependencies=cast("Sequence[DaskCollection]", [array])
+    )
     if np.any(np.isnan(array.chunks)):
         return new_array_object(
             hlg,
