@@ -855,7 +855,7 @@ def _finalize_array(results: Sequence[Any]) -> Any:
     # special cases for length 1 results
     if len(results) == 1:
         np_like = _is_numpy_or_cupy_like(results[0])
-        if isinstance(results[0], (int, ak.Array)) or np_like:  # type: ignore[unreachable]
+        if isinstance(results[0], (int, ak.Array)) or np_like:
             return results[0]
 
     # a sequence of arrays that need to be concatenated.

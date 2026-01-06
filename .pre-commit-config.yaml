@@ -14,7 +14,7 @@ ci:
 repos:
 
 - repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v5.0.0
+  rev: v6.0.0
   hooks:
   - id: check-added-large-files
   - id: check-case-conflict
@@ -26,24 +26,24 @@ repos:
   - id: trailing-whitespace
 
 - repo: https://github.com/psf/black-pre-commit-mirror
-  rev: 25.1.0
+  rev: 25.12.0
   hooks:
   - id: black
     language_version: python3
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.11.2
+  rev: v0.14.10
   hooks:
   - id: ruff
 
 - repo: https://github.com/PyCQA/isort
-  rev: 6.0.1
+  rev: 7.0.0
   hooks:
   - id: isort
     language_version: python3
 
 - repo: https://github.com/asottile/pyupgrade
-  rev: v3.19.1
+  rev: v3.21.2
   hooks:
   - id: pyupgrade
     args:
@@ -60,14 +60,14 @@ repos:
   - id: yesqa
 
 - repo: https://github.com/adamchainz/blacken-docs
-  rev: 1.19.1
+  rev: 1.20.0
   hooks:
   - id: blacken-docs
     additional_dependencies:
     - black
 
 - repo: https://github.com/pre-commit/mirrors-mypy
-  rev: v1.15.0
+  rev: v1.19.1
   hooks:
   - id: mypy
     files: "src/"
