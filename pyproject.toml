@@ -36,7 +36,7 @@ classifiers = [
   "Topic :: Software Development",
 ]
 dependencies = [
-  "awkward >=2.5.1",
+  "awkward @ git+https://github.com/scikit-hep/awkward.git",
   "dask >=2023.04.0,<2025.4.0",
   "cachetools",
   "typing_extensions >=4.8.0",
@@ -85,6 +85,9 @@ awkward = "dask_awkward_sizeof:register"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dask_awkward", "src/dask_awkward_sizeof"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [project.entry-points."awkward.pickle.reduce"]
 dask_awkward = "dask_awkward.pickle:plugin"
