@@ -83,7 +83,7 @@ class ColumnProjectionMixin(ImplementsNecessaryColumns[FormStructure]):
         form = form_with_unique_keys(self.form, "@")
 
         # Build typetracer and associated report object
-        (meta, report) = typetracer_with_report(
+        meta, report = typetracer_with_report(
             form,
             highlevel=True,
             behavior=self.behavior,

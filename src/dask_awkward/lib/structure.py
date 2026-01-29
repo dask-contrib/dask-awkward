@@ -489,11 +489,9 @@ def full_like(
         raise ValueError("Only highlevel=True is supported")
 
     if dtype is str:
-        raise ValueError(
-            """dtype cannot be 'str' for dak.full_like,
+        raise ValueError("""dtype cannot be 'str' for dak.full_like,
             you can accomplish this with dask-array and
-            dak.flatten/dak.unflatten"""
-        )
+            dak.flatten/dak.unflatten""")
 
     return map_partitions(
         ak.full_like,
@@ -909,12 +907,10 @@ def unflatten(
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
 
-    warnings.warn(
-        f"""Please ensure that {counts}
+    warnings.warn(f"""Please ensure that {counts}
         is partitionwise-compatible with {array}
         (e.g. counts comes from a dak.num(array, axis=1)),
-        otherwise this unflatten operation will fail when computed!"""
-    )
+        otherwise this unflatten operation will fail when computed!""")
 
     return map_partitions(
         ak.unflatten,
