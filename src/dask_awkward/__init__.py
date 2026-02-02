@@ -78,6 +78,7 @@ from dask_awkward.lib.structure import (
     combinations,
     copy,
     drop_none,
+    enforce_type,
     fill_none,
     firsts,
     flatten,

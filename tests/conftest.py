@@ -9,6 +9,13 @@ import pytest
 
 import dask_awkward as dak
 import dask_awkward.lib.testutils as daktu
+from dask_awkward.lib.core import dak_cache
+
+
+@pytest.fixture(scope="function", autouse=True)
+def clear_dak_cache():
+    yield
+    dak_cache.clear()
 
 
 @pytest.fixture(scope="session")
@@ -72,12 +79,12 @@ def pq_points_dir(daa: dak.Array, tmp_path_factory: pytest.TempPathFactory) -> s
     return str(pqdir)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def daa_parquet(pq_points_dir: str) -> dak.Array:
     return cast(dak.Array, dak.from_parquet(pq_points_dir))
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def daa_str(ndjson_points1_str: str) -> dak.Array:
     return dak.from_json([ndjson_points1_str] * 3)
 
@@ -89,31 +96,31 @@ def caa(ndjson_points1: str) -> ak.Array:
     return ak.concatenate([a, a, a])
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def caa_str(ndjson_points1_str: str) -> ak.Array:
     with open(ndjson_points1_str, "rb") as f:
         a = ak.from_json(f, line_delimited=True)
     return ak.concatenate([a, a, a])
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def daa_p1(ndjson_points1: str) -> dak.Array:
     return dak.from_json([ndjson_points1] * 3)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def daa_p2(ndjson_points2: str) -> dak.Array:
     return dak.from_json([ndjson_points2] * 3)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def caa_p1(ndjson_points1: str) -> ak.Array:
     with open(ndjson_points1) as f:
         lines = [json.loads(line) for line in f]
     return ak.Array(lines * 3)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def caa_p2(ndjson_points2: str) -> ak.Array:
     with open(ndjson_points2) as f:
         lines = [json.loads(line) for line in f]
