@@ -16,7 +16,6 @@ from dask_awkward.lib.core import dak_cache
 def clear_dak_cache():
     dak_cache.clear()
     yield
-    dak_cache.clear()
 
 
 @pytest.fixture(scope="session")
