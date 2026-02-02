@@ -9,6 +9,14 @@ import pytest
 
 import dask_awkward as dak
 import dask_awkward.lib.testutils as daktu
+from dask_awkward.lib.core import dak_cache
+
+
+@pytest.fixture(autouse=True)
+def clear_dak_cache():
+    dak_cache.clear()
+    yield
+    dak_cache.clear()
 
 
 @pytest.fixture(scope="session")
