@@ -4,7 +4,7 @@ channels:
 dependencies:
   # required dependencies
   - python=3.13
-  - dask
+  - dask >=2025.3.1,<2025.4.0
   - aiohttp
   - requests
   - pytest
