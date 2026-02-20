@@ -21,15 +21,29 @@ jobs:
       with:
         fetch-depth: 0
         lfs: true
+    - name: Checkout scikit-hep/awkward
+      uses: actions/checkout@v6
+      with:
+        repository: scikit-hep/awkward
+        path: repo-awkward
+        submodules: true
+        ref: main
+        fetch-depth: 0
     - name: Setup Python
       uses: actions/setup-python@v6
       with:
         python-version: "3.13"
+    - name: Prepare awkward-cpp
+      run: |
+        python3 -m pip install nox
+        cd repo-awkward && nox -s prepare
     - name: Install
       run: |
         python3 -m pip install pip wheel -U
         python3 -m pip install -q --no-cache-dir -e .[complete,test]
-        python3 -m pip uninstall -y awkward && pip install git+https://github.com/scikit-hep/awkward.git@main --no-deps
+        python3 -m pip uninstall -y awkward awkward-cpp
+        python3 -m pip install -v repo-awkward/awkward-cpp
+        python3 -m pip install repo-awkward --no-deps
     - name: Run tests
       run: |
         python3 -m pytest
