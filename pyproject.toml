@@ -7,7 +7,7 @@ name = "dask-awkward"
 description = "Awkward Array meets Dask"
 readme = "README.md"
 license = {text = "BSD-3-Clause"}
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [
   { name = "Doug Davis", email = "ddavis@ddavis.io" },
   { name = "Martin Durant", email = "mdurant@anaconda.com" },
@@ -144,7 +144,7 @@ warn_unreachable = true
 
 [tool.pyright]
 include = ["src"]
-pythonVersion = "3.9"
+pythonVersion = "3.10"
 reportPrivateImportUsage = false
 
 [tool.coverage.report]
