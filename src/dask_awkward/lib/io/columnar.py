@@ -17,7 +17,6 @@ from dask_awkward.lib.utils import (
     METADATA_ATTRIBUTES,
     FormStructure,
     buffer_keys_required_to_compute_shapes,
-    form_with_unique_keys,
     parse_buffer_key,
     render_buffer_key,
     trace_form_structure,
@@ -80,7 +79,7 @@ class ColumnProjectionMixin(ImplementsNecessaryColumns[FormStructure]):
     def prepare_for_projection(
         self: S,
     ) -> tuple[AwkwardArray, TypeTracerReport, FormStructure]:
-        form = form_with_unique_keys(self.form, "@")
+        form = ak.forms.form_with_unique_keys(self.form, ("@",))
 
         # Build typetracer and associated report object
         meta, report = typetracer_with_report(

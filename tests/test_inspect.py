@@ -18,9 +18,9 @@ def test_report_necessary_buffers(
         assert v == (
             frozenset(
                 {
-                    "@.points-offsets",
-                    "@.points.content.y-data",
-                    "@.points.content.x-data",
+                    repr(("@", "points")) + "-offsets",
+                    repr(("@", "points", None, "y")) + "-data",
+                    repr(("@", "points", None, "x")) + "-data",
                 }
             ),
             frozenset(),
@@ -31,7 +31,13 @@ def test_report_necessary_buffers(
     )
     for k, v in dak.report_necessary_buffers(w).items():
         assert v == (
-            frozenset({"@.points-offsets", "@.points.content.x-data"}),
+            # frozenset({"@.points-offsets", "@.points.content.x-data"}),
+            frozenset(
+                {
+                    repr(("@", "points")) + "-offsets",
+                    repr(("@", "points", None, "x")) + "-data",
+                }
+            ),
             frozenset(),
         )
 
@@ -40,9 +46,9 @@ def test_report_necessary_buffers(
         assert v == (
             frozenset(
                 {
-                    "@.points-offsets",
-                    "@.points.content.x-data",
-                    "@.points.content.y-data",
+                    repr(("@", "points")) + "-offsets",
+                    repr(("@", "points", None, "y")) + "-data",
+                    repr(("@", "points", None, "x")) + "-data",
                 }
             ),
             frozenset(),
@@ -51,8 +57,8 @@ def test_report_necessary_buffers(
     z = dak.zeros_like(daa.points.x)
     for k, v in dak.report_necessary_buffers(z).items():
         assert v == (
-            frozenset({"@.points-offsets"}),
-            frozenset({"@.points.content.x-data"}),
+            frozenset({repr(("@", "points")) + "-offsets"}),
+            frozenset({repr(("@", "points", None, "x")) + "-data"}),
         )
 
 
