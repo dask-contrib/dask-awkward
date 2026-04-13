@@ -44,6 +44,7 @@ __all__ = (
     "combinations",
     "copy",
     "drop_none",
+    "enforce_type",
     "fill_none",
     "firsts",
     "flatten",
@@ -488,11 +489,9 @@ def full_like(
         raise ValueError("Only highlevel=True is supported")
 
     if dtype is str:
-        raise ValueError(
-            """dtype cannot be 'str' for dak.full_like,
+        raise ValueError("""dtype cannot be 'str' for dak.full_like,
             you can accomplish this with dask-array and
-            dak.flatten/dak.unflatten"""
-        )
+            dak.flatten/dak.unflatten""")
 
     return map_partitions(
         ak.full_like,
@@ -908,12 +907,10 @@ def unflatten(
     if not highlevel:
         raise ValueError("Only highlevel=True is supported")
 
-    warnings.warn(
-        f"""Please ensure that {counts}
+    warnings.warn(f"""Please ensure that {counts}
         is partitionwise-compatible with {array}
         (e.g. counts comes from a dak.num(array, axis=1)),
-        otherwise this unflatten operation will fail when computed!"""
-    )
+        otherwise this unflatten operation will fail when computed!""")
 
     return map_partitions(
         ak.unflatten,
@@ -961,6 +958,7 @@ def unzip(
 def values_astype(
     array: Array,
     to: np.dtype | str,
+    including_unknown: bool = False,
     highlevel: bool = True,
     behavior: Mapping | None = None,
     attrs: Mapping[str, Any] | None = None,
@@ -971,6 +969,7 @@ def values_astype(
         ak.values_astype,
         array,
         to=to,
+        including_unknown=including_unknown,
         behavior=behavior,
         label="values-astype",
         attrs=attrs,
@@ -1347,6 +1346,28 @@ def zip(
         )
 
 
+@borrow_docstring(ak.enforce_type)
+def enforce_type(
+    array: Array,
+    type: str | dict | Type,
+    highlevel: bool = True,
+    behavior: Mapping | None = None,
+    attrs: Mapping[str, Any] | None = None,
+) -> Array:
+    if not highlevel:
+        raise ValueError("Only highlevel=True is supported")
+
+    return map_partitions(
+        ak.enforce_type,
+        array,
+        label="enforce-type",
+        type=type,
+        behavior=behavior,
+        attrs=attrs,
+        output_divisions=1,
+    )
+
+
 def _repartition_func(*stuff):
     import builtins
 
@@ -1441,25 +1462,3 @@ def simple_repartition_layer(
     else:
         raise ValueError
     return layer, new_divisions
-
-
-@borrow_docstring(ak.enforce_type)
-def enforce_type(
-    array: Array,
-    type: str | dict | Type,
-    highlevel: bool = True,
-    behavior: Mapping | None = None,
-    attrs: Mapping[str, Any] | None = None,
-) -> Array:
-    if not highlevel:
-        raise ValueError("Only highlevel=True is supported")
-
-    return map_partitions(
-        ak.enforce_type,
-        array,
-        label="enforce-type",
-        type=type,
-        behavior=behavior,
-        attrs=attrs,
-        output_divisions=1,
-    )

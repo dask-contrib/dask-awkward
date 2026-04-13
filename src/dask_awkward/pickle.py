@@ -8,14 +8,18 @@ __all__ = ("plugin",)
 from pickle import PickleBuffer
 
 import awkward as ak
-from awkward.typetracer import PlaceholderArray
+from awkward._nplikes.dispatch import nplike_of_obj
+from awkward._nplikes.placeholder import PlaceholderArray
 
 
 def _maybe_make_pickle_buffer(buffer: Any) -> PlaceholderArray | PickleBuffer:
     if isinstance(buffer, PlaceholderArray):
         return buffer
     else:
-        return PickleBuffer(buffer)
+        nplike = nplike_of_obj(buffer)
+        if hasattr(buffer, "materialize") and callable(buffer.materialize):
+            buffer = buffer.materialize()
+        return PickleBuffer(nplike.ascontiguousarray(buffer))
 
 
 def _without_transient_attrs(attrs: Mapping[str, Any]) -> Mapping[str, Any]:

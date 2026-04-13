@@ -51,7 +51,16 @@ def test_clear_divisions(ndjson_points_file: str) -> None:
 
 def test_dunder_str(caa: ak.Array) -> None:
     daa = dak.from_awkward(caa, npartitions=2)
-    assert str(daa) == "dask.awkward<from-awkward, npartitions=2>"
+    assert (
+        str(daa)
+        == "dask.awkward<from-awkward, type='15 * {points: var * {x: int64, y: int64}}', npartitions=2>"
+    )
+
+    daa._divisions = (None, None, None)
+    assert (
+        str(daa)
+        == "dask.awkward<from-awkward, type='## * {points: var * {x: int64, y: int64}}', npartitions=2>"
+    )
 
 
 def test_calculate_known_divisions(ndjson_points_file: str) -> None:
@@ -183,7 +192,7 @@ def test_short_typestr(daa: Array) -> None:
 def test_typestr(daa: Array) -> None:
     aa = daa.compute()
     assert str(aa.layout.form.type) in daa._typestr()
-    extras = len("var *  ... }")
+    extras = len("## * ...")
     assert len(daa._typestr(max=20)) == 20 + extras
 
 

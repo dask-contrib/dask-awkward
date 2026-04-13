@@ -4,14 +4,22 @@ import copy
 import math
 import operator
 from collections.abc import Callable, Mapping
-from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeVar, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Literal,
+    Protocol,
+    TypeAlias,
+    TypeVar,
+    Union,
+    cast,
+)
 
 import dask
 import toolz
 from dask.blockwise import Blockwise, BlockwiseDepDict, blockwise_token
 from dask.highlevelgraph import MaterializedLayer
 from dask.layers import Layer
-from typing_extensions import TypeAlias
 
 from dask_awkward.utils import LazyInputsDict
 

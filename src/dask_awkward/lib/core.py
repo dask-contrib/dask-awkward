@@ -855,7 +855,7 @@ def _finalize_array(results: Sequence[Any]) -> Any:
     # special cases for length 1 results
     if len(results) == 1:
         np_like = _is_numpy_or_cupy_like(results[0])
-        if isinstance(results[0], (int, ak.Array)) or np_like:  # type: ignore[unreachable]
+        if isinstance(results[0], (int, ak.Array)) or np_like:
             return results[0]
 
     # a sequence of arrays that need to be concatenated.
@@ -977,6 +977,21 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         self._dask = appended._dask
         self._name = appended._name
 
+    def __delitem__(self, where: Any) -> None:
+        if not (
+            isinstance(where, str)
+            or (isinstance(where, tuple) and all(isinstance(x, str) for x in where))
+        ):
+            raise TypeError("only fields may be deleted in-place (by field name)")
+
+        from dask_awkward.lib.structure import without_field
+
+        removed = without_field(self, where=where, behavior=self.behavior)
+
+        self._meta = removed._meta
+        self._dask = removed._dask
+        self._name = removed._name
+
     def _rebuild(self, dsk, *, rename=None):
         name = self.name
         if rename:
@@ -1090,14 +1105,16 @@ class Array(DaskMethodsMixin, NDArrayOperatorsMixin):
         return str(_type(self))[0:max]
 
     def _typestr(self, max: int = 0) -> str:
+        lenstr = self.divisions[-1] if self.known_divisions else "##"
         tstr = str(_type(self))
         if max and len(tstr) > max:
-            tstr = f"{tstr[0:max]} ... }}"
-        return f"var * {tstr}"
+            tstr = f"{tstr[0:max]}..."
+        return f"{lenstr} * {tstr}"
 
     def __str__(self) -> str:
         return (
             f"dask.awkward<{key_split(self.name)}, "
+            f"type='{self._typestr(50).split('[')[0]}', "
             f"npartitions={self.npartitions}"
             ">"
         )

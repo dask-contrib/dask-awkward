@@ -240,7 +240,7 @@ def from_delayed(
         divs = divisions
         if len(divs) != len(parts) + 1:
             raise ValueError("divisions must be a tuple of length len(source) + 1")
-    hlg = HighLevelGraph.from_collections(name, dsk, dependencies=parts)
+    hlg = HighLevelGraph.from_collections(name, dsk, dependencies=parts)  # type: ignore[arg-type]
     return new_array_object(
         hlg, name=name, meta=meta, behavior=behavior, divisions=divs, attrs=attrs
     )
@@ -426,7 +426,7 @@ def from_dask_array(
         concatenate=True,
     )
     layer = AwkwardBlockwiseLayer.from_blockwise(layer)
-    hlg = HighLevelGraph.from_collections(name, layer, dependencies=[array])
+    hlg = HighLevelGraph.from_collections(name, layer, dependencies=[array])  # type: ignore[list-item]
     if np.any(np.isnan(array.chunks)):
         return new_array_object(
             hlg,
