@@ -9,10 +9,10 @@ from typing import TYPE_CHECKING, Any, cast, no_type_check
 import awkward as ak
 import dask.config
 from awkward.typetracer import touch_data
+from dask._task_spec import Alias, DataNode, GraphNode, List, Tuple
 from dask.blockwise import Blockwise, fuse_roots, optimize_blockwise
 from dask.core import flatten
 from dask.highlevelgraph import HighLevelGraph
-from dask.local import get_sync
 
 from dask_awkward.layers import (
     AwkwardBlockwiseLayer,
@@ -81,6 +81,65 @@ def optimize(dsk: HighLevelGraph, keys: Sequence[Key], **_: Any) -> Mapping:
             dsk = rewrite_layer_chains(dsk, keys)
 
     return dsk
+
+
+get_cache = {}
+
+
+class NoKey: ...
+
+
+def _unwind(llg, arg):
+    if isinstance(arg, Task):
+        func = arg.func
+        args = arg.args
+        kwargs = arg.kwargs
+        args = [_unwind(llg, arg) for arg in args]
+        args = [_ for _ in args if _ is not NoKey]
+        kwargs = {k: _unwind(llg, v) for k, v in kwargs.items()}
+        kwargs = {k: v for k, v in kwargs.items() if v is not NoKey}
+        return func(*args, **kwargs)
+    if isinstance(arg, Alias):
+        return _get_sync(llg, arg.target)
+    if isinstance(arg, List):
+        out = [_unwind(llg, _) for _ in arg.args]
+        return [_ for _ in out if _ is not NoKey]
+    if isinstance(arg, Tuple):
+        out = tuple(_unwind(llg, _) for _ in arg.args)
+        return tuple(_ for _ in out if _ is not NoKey)
+    if isinstance(arg, DataNode):
+        return arg.value
+    if isinstance(arg, GraphNode):
+        # other types to implement
+        raise ValueError
+
+    return arg
+
+
+def _get_sync(llg, key):
+    if key not in get_cache:
+        if key in llg:
+            task = llg[key]
+        else:
+            return NoKey
+        out = _unwind(llg, task)
+        try:
+            if out in llg:
+                # some things just return another key
+                out = _get_sync(llg, out)
+        except TypeError:
+            pass
+        get_cache[key] = out
+
+    return get_cache[key]
+
+
+def get_sync(hlg, keys):
+    get_cache.clear()
+    llg = dict(hlg)
+    out = [_get_sync(llg, key) for key in keys]
+    get_cache.clear()
+    return out
 
 
 def _prepare_buffer_projection(
