@@ -76,4 +76,4 @@ repos:
     - dask
     - types-PyYAML
     - pytest
-    - numpy
+    - numpy<2.3  # Last NumPy series supporting the Python 3.10 mypy target.
