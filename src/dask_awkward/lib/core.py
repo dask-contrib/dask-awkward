@@ -131,6 +131,22 @@ F = TypeVar("F", bound=Callable)
 G = TypeVar("G", bound=Callable)
 
 
+def _rebuild_dask_property(
+    fget: Callable | None,
+    fset: Callable | None,
+    fdel: Callable | None,
+    doc: str | None,
+    dask_get: Callable | None,
+) -> _DaskProperty:
+    """Reconstruct a `_DaskProperty` when unpickling."""
+    prop = _DaskProperty(fget, fset, fdel)
+    # a doc passed to property() lands in a C slot which, before 3.13, the
+    # subclass' own docstring shadows -- so assign it to the instance instead
+    prop.__doc__ = doc
+    prop._dask_get = dask_get
+    return prop
+
+
 class _DaskProperty(property):
     """A property descriptor that exposes a `.dask` method for registering
     dask-awkward descriptor implementations.
@@ -142,6 +158,16 @@ class _DaskProperty(property):
         assert self._dask_get is None
         self._dask_get = _make_dask_descriptor(func)
         return self
+
+    def __reduce__(self) -> tuple:
+        # property keeps fget/fset/fdel in C slots and offers no reduction of
+        # its own, so a class carrying a dask_property cannot be pickled by
+        # value (which is what cloudpickle does for classes defined in
+        # __main__ or a notebook) unless we provide one.
+        return (
+            _rebuild_dask_property,
+            (self.fget, self.fset, self.fdel, self.__doc__, self._dask_get),
+        )
 
 
 def _adapt_naive_dask_get(func: Callable) -> Callable:
