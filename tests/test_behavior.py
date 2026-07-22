@@ -106,3 +106,63 @@ def test_nonexistent_behavior(daa_p1: dak.Array, daa_p2: dak.Array) -> None:
     # in this case the field check is where we raise
     with pytest.raises(AttributeError, match="distance not in fields"):
         daa2.distance(daa1)
+
+
+def test_dask_property_is_picklable() -> None:
+    """Classes defined outside an importable module (``__main__``, a notebook)
+    get pickled by value, which walks the class dict -- and plain property
+    objects cannot be pickled.
+    """
+    cloudpickle = pytest.importorskip("cloudpickle")
+
+    class Thing:
+        def __init__(self, x):
+            self.x = x
+
+        @dak.dask_property
+        def doubled(self):
+            """twice x"""
+            return 2 * self.x
+
+        @no_type_check
+        @doubled.dask
+        def doubled(self, array):
+            return 20 * array.x
+
+        @dak.dask_property(no_dispatch=True)
+        def tripled(self):
+            return 3 * self.x
+
+    # defined in a function body, so this has to go by value
+    unpickled = cloudpickle.loads(cloudpickle.dumps(Thing))
+
+    assert unpickled(1).doubled == 2
+    assert unpickled(1).tripled == 3
+
+    doubled = unpickled.__dict__["doubled"]
+    assert doubled.__doc__ == "twice x"
+    assert doubled._dask_get(unpickled(1), unpickled, Thing(3)) == 60
+    assert unpickled.__dict__["tripled"]._dask_get(unpickled(2), unpickled, None) == 6
+
+
+def test_dask_method_is_picklable() -> None:
+    cloudpickle = pytest.importorskip("cloudpickle")
+
+    class Thing:
+        def __init__(self, x):
+            self.x = x
+
+        @dak.dask_method
+        def scaled(self, n):
+            return self.x * n
+
+        @no_type_check
+        @scaled.dask
+        def scaled(self, array, n):
+            return array.x * n * 10
+
+    unpickled = cloudpickle.loads(cloudpickle.dumps(Thing))
+
+    assert unpickled(2).scaled(3) == 6
+    scaled = unpickled.__dict__["scaled"]
+    assert scaled._dask_get(unpickled(2), unpickled, Thing(2))(3) == 60
