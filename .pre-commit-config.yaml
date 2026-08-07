@@ -34,7 +34,8 @@ repos:
 - repo: https://github.com/astral-sh/ruff-pre-commit
   rev: v0.16.1
   hooks:
-  - id: ruff
+  - id: ruff-check
+    args: [--fix, --show-fixes]
 
 - repo: https://github.com/PyCQA/isort
   rev: 9.0.0b1
