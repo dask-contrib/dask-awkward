@@ -11,7 +11,6 @@ from typing import (
     Protocol,
     TypeAlias,
     TypeVar,
-    Union,
     cast,
 )
 
@@ -33,7 +32,7 @@ if TYPE_CHECKING:
     from awkward._nplikes.typetracer import TypeTracerReport
 
 
-BackendT: TypeAlias = Union[Literal["cpu"], Literal["jax"], Literal["cuda"]]
+BackendT: TypeAlias = Literal["cpu"] | Literal["jax"] | Literal["cuda"]
 
 
 class AwkwardBlockwiseLayer(Blockwise):
@@ -584,9 +583,7 @@ class AwkwardTreeReductionLayer(Layer):
         return dsk
 
     def __repr__(self):
-        return "DataFrameTreeReduction<name='{}', input_name={}, split_out={}>".format(
-            self.name, self.name_input, self.split_out
-        )
+        return f"DataFrameTreeReduction<name='{self.name}', input_name={self.name_input}, split_out={self.split_out}>"
 
     def _output_keys(self):
         return {(self.name, s) for s in self.output_partitions}
