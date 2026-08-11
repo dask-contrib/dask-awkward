@@ -13,7 +13,7 @@ from functools import cached_property, partial, wraps
 from inspect import getattr_static
 from numbers import Number
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Literal, TypeVar, Union, overload
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, overload
 
 import awkward as ak
 import cachetools
@@ -41,9 +41,8 @@ from dask.context import globalmethod
 from dask.delayed import Delayed
 from dask.highlevelgraph import HighLevelGraph
 from dask.threaded import get as threaded_get
-from dask.utils import IndexCallable
+from dask.utils import IndexCallable, funcname, is_arraylike, key_split
 from dask.utils import OperatorMethodMixin as DaskOperatorMethodMixin
-from dask.utils import funcname, is_arraylike, key_split
 
 from dask_awkward.layers import (
     AwkwardBlockwiseLayer,
@@ -2938,7 +2937,7 @@ def partition_compatibility(*args: Array) -> PartitionCompatibility:
     return PartitionCompatibility._check(*args)
 
 
-HowStrictT = Union[Literal[1], Literal[2], PartitionCompatibility]
+HowStrictT = Literal[1] | Literal[2] | PartitionCompatibility
 
 
 def compatible_partitions(

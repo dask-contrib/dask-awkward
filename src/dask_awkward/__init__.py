@@ -14,15 +14,13 @@ from dask_awkward.lib.core import (
     PartitionCompatibility,
     Record,
     Scalar,
-)
-from dask_awkward.lib.core import _type as type
-from dask_awkward.lib.core import (
     compatible_partitions,
     dask_method,
     dask_property,
     map_partitions,
     partition_compatibility,
 )
+from dask_awkward.lib.core import _type as type
 from dask_awkward.lib.describe import backend, fields
 from dask_awkward.lib.inspect import (
     report_necessary_buffers,

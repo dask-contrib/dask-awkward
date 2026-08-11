@@ -119,7 +119,7 @@ class FromJsonLineDelimitedFn(FromJsonFn):
                 schema=self.schema,
                 **self.kwargs,
             )
-        log.debug("columns read from disk: %s" % str(array.layout.form.columns()))
+        log.debug(f"columns read from disk: {array.layout.form.columns()}")
         assert isinstance(array, ak.Array)
         return array
         # return ak.Array(unproject_layout(self.original_form, array.layout))
@@ -159,7 +159,7 @@ class FromJsonSingleObjPerFile(FromJsonFn):
                     )
                 ]
             )
-        log.debug("columns read from disk: %s" % str(array.layout.form.columns()))
+        log.debug(f"columns read from disk: {array.layout.form.columns()}")
         assert isinstance(array, ak.Array)
         return array
         # return ak.Array(unproject_layout(self.original_form, array.layout))
@@ -207,7 +207,7 @@ class FromJsonBytesFn(FromJsonFn):
             schema=self.schema,
             **self.kwargs,
         )
-        log.debug("columns read from disk: %s" % str(array.layout.form.columns()))
+        log.debug(f"columns read from disk: {array.layout.form.columns()}")
         assert isinstance(array, ak.Array)
         return array
         # return ak.Array(unproject_layout(self.original_form, array.layout))
@@ -566,7 +566,7 @@ def from_json(
     fs, token, paths = json_fs_token_paths(source, storage_options=storage_options)
 
     if len(paths) == 0:
-        raise OSError("%s resolved to no files" % source)
+        raise OSError(f"{source} resolved to no files")
 
     # allow either blocksize or delimieter being not-None to trigger
     # line deliminated JSON reading.

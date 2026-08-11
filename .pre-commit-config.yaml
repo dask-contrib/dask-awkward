@@ -34,30 +34,13 @@ repos:
 - repo: https://github.com/astral-sh/ruff-pre-commit
   rev: v0.16.1
   hooks:
-  - id: ruff
-
-- repo: https://github.com/PyCQA/isort
-  rev: 9.0.0b1
-  hooks:
-  - id: isort
-    language_version: python3
-
-- repo: https://github.com/asottile/pyupgrade
-  rev: v3.21.2
-  hooks:
-  - id: pyupgrade
-    args:
-    - --py310-plus
+  - id: ruff-check
+    args: [--fix, --show-fixes]
 
 - repo: https://github.com/MarcoGorelli/absolufy-imports
   rev: v0.3.1
   hooks:
   - id: absolufy-imports
-
-- repo: https://github.com/asottile/yesqa
-  rev: v1.5.0
-  hooks:
-  - id: yesqa
 
 - repo: https://github.com/adamchainz/blacken-docs
   rev: 1.20.0
