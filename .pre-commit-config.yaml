@@ -26,13 +26,13 @@ repos:
   - id: trailing-whitespace
 
 - repo: https://github.com/psf/black-pre-commit-mirror
-  rev: 26.10.0
+  rev: 26.10.1
   hooks:
   - id: black
     language_version: python3
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.16.10
+  rev: v0.17.3
   hooks:
   - id: ruff-check
     args: [--fix, --show-fixes]
@@ -50,7 +50,7 @@ repos:
     - black
 
 - repo: https://github.com/pre-commit/mirrors-mypy
-  rev: v2.4.0
+  rev: v2.4.1
   hooks:
   - id: mypy
     files: "src/"
