@@ -1,7 +1,7 @@
 Contributing
 ============
 
-We're very happy recieve contributions to dask-awkward!
+We're very happy to receive contributions to dask-awkward!
 
 Reporting bugs
 --------------
